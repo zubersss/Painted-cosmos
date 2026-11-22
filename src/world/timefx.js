@@ -14,12 +14,17 @@
 //     haste   a warm orange, the marks short and quick and smeared the way a dragged brush leaves them
 //     still   a cold pale glaze with HAIRLINE CRACKS of light in it: the one mark in the game with no motion at
 //             all, because the place it holds has none either
-//   THE KNOT tied in time (the seventh power): a small bright standing stroke with a ring crossed through it,
-//   seen from anywhere on the world, turning very slowly. It is the one thing in the picture that says "you can
-//   come back here".
+//   THE RIP IN SPACE-TIME (the owner's own idea, 2026-11-22: "a rip in space time that sucks everything in a long
+//   ways in"). A TEAR standing where it was torn: a slit of nothing with its edges painted hot, breathing, and
+//   round it the air itself drawn in as STROKES THAT RUN INWARD and die at the lip. The strokes are the whole
+//   point of it -- the world really is being pulled in (physics/powers.js KIND.rip: the leaves, the dust, the
+//   spray and the rain all answer it), and these say so.
 //
-// WHAT IT COSTS. One instanced draw for every bubble (eight at most, and only while one is open) and one for the
-// knot. With nothing cast the meshes are invisible and nothing is drawn at all.
+//   (THE KNOT went with the cut of 2026-11-22, when the owner cut space and time from twelve powers to four. Its
+//   shader is in the history at v31.)
+//
+// WHAT IT COSTS. One instanced draw for every bubble (eight at most, and only while one is open) and one for all
+// the rips together. With nothing cast the meshes are invisible and nothing is drawn at all.
 import * as THREE from 'three';
 import { makePaintUniforms, bindBodyUniforms } from '../render/materials.js';
 import { VERT_PARS, VERT_END, FRAG_PARS } from '../render/chunks.js';
@@ -100,25 +105,61 @@ void main() {
 }
 `;
 
-// ---- the knot ---------------------------------------------------------------------------------------------
-const KNOT_VERT = /* glsl */`
+// ---- the rip ----------------------------------------------------------------------------------------------
+// One buffer holds every rip's marks: RIPS tears, QUADS little cards each. A card's own number is carried in
+// position.z, and which rip it belongs to falls out of that. Card 0 is the TEAR itself (a tall slit that faces
+// the eye); the rest are the STROKES OF AIR running inward, each one going round again when it reaches the lip.
+const RIPS = 3, QUADS = 76;
+
+const RIP_VERT = /* glsl */`
 ${VERT_PARS}
-uniform vec4 uKnot;        // xyz: where it is, FROM THE EYE, in the body's axes; w: 0..1 how shown
+uniform vec4 uRip[${RIPS}];       // xyz: the tear, FROM THE EYE, in the body's axes; w: how far it reaches (m)
+uniform vec4 uRipK[${RIPS}];      // x: 0..1 how open it is; y: a number of its own, so two tears are not alike
+uniform vec3 uRipO;               // where the EYE is, in the body's own axes (so UP can be worked out at all)
 uniform float uTime;
 varying vec2 vQ;
+varying float vRole;              // 0 the tear itself, 1 a stroke of air
+varying float vFade;
 varying vec3 vView;
-varying float vArm;
+float ripHash(float n) { return fract(sin(n * 127.1 + 311.7) * 43758.5453); }
 void main() {
+  float qi = position.z;
+  float ri = floor(qi / ${QUADS}.0);
+  float k = qi - ri * ${QUADS}.0;
+  int rj = int(ri);
+  vec4 R = uRip[rj];
+  vec4 K = uRipK[rj];
   vQ = position.xy;
-  vArm = position.z;                                            // which of the crossed cards this is
-  // it stands upright, faces the eye about that, and turns very slowly
-  vec3 up = normalize(uKnot.xyz + vec3(0.0, 1e-5, 0.0));
-  vec3 to = normalize(-uKnot.xyz);
-  vec3 r = normalize(cross(up, to));
-  float a = uTime * 0.6 + vArm * 2.094;
-  vec3 ax = r * cos(a) + cross(up, r) * sin(a);
-  float s = 0.42 * uKnot.w;
-  vec3 p = uKnot.xyz + up * (position.y * s * 1.9 + s * 1.1) + ax * (position.x * s);
+  vRole = k < 0.5 ? 0.0 : 1.0;
+  vFade = K.x;
+  if (K.x < 0.004) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); vView = vec3(0.0); return; }   // not open: off the screen
+  // THE GROUND'S OWN FRAME AT THE TEAR. up is from the WORLD'S MIDDLE to the tear, which needs the eye's own
+  // place in the body's axes: everything here is eye-relative (for the precision), so normalize(R.xyz) is the way
+  // from the EYE to the tear and not up at all. (That mistake built the first rip entirely under the ground.)
+  vec3 up = normalize(uRipO + R.xyz);
+  vec3 to = normalize(-R.xyz);
+  vec3 rt = normalize(cross(up, to));
+  vec3 fw = normalize(cross(rt, up));
+  vec3 p;
+  if (k < 0.5) {
+    // THE TEAR: a slit standing on the ground, facing the eye, breathing a little. (It was 0.21 of the reach at
+    // first -- a twenty-metre column that ran off the top of the picture at sixteen paces. Seen and cut back.)
+    float h = R.w * 0.080 * (0.88 + 0.12 * sin(uTime * 1.7 + K.y));
+    float w = R.w * 0.048 * (0.80 + 0.20 * sin(uTime * 6.3 + K.y * 3.0));
+    p = R.xyz + up * (position.y * h + h) * K.x + rt * (position.x * w);
+  } else {
+    // A STROKE OF AIR: laid along the way in, carried from the rim to the lip over and over
+    float a = ripHash(k + K.y) * 6.2831853;
+    float sp = 0.40 + 0.55 * ripHash(k + 3.3);
+    float ph = fract(ripHash(k + 7.1) + uTime * sp);
+    float rho = R.w * mix(1.0, 0.07, ph * ph);                    // faster as it nears, as a drawn thing is
+    float hh = (0.8 + 7.0 * ripHash(k + 11.7)) * (1.0 - 0.55 * ph);
+    vec3 dir = rt * cos(a) + fw * sin(a);
+    float len = R.w * (0.030 + 0.045 * ripHash(k + 5.2)) * (0.45 + 0.9 * ph);
+    float wid = 0.07 + 0.16 * ripHash(k + 2.2);                     // thin: a stroke of air, not a leaf
+    p = R.xyz + dir * (rho + position.x * len) + up * (hh + position.y * wid);
+    vFade = K.x * (1.0 - smoothstep(0.80, 1.0, ph)) * smoothstep(0.0, 0.10, ph);
+  }
   vec4 mv = modelViewMatrix * vec4(p, 1.0);
   vView = mv.xyz;
   gl_Position = projectionMatrix * mv;
@@ -126,23 +167,41 @@ void main() {
 }
 `;
 
-const KNOT_FRAG = /* glsl */`
+const RIP_FRAG = /* glsl */`
 ${FRAG_PARS}
-uniform vec4 uKnot;
 varying vec2 vQ;
+varying float vRole;
+varying float vFade;
 varying vec3 vView;
-varying float vArm;
 void main() {
   #include <logdepthbuf_fragment>
-  if (uKnot.w < 0.01) discard;
-  // a stroke drawn to a point at both ends, with a bright heart: the mark a brush leaves standing on end
-  float w = 1.0 - vQ.y * vQ.y;
-  if (abs(vQ.x) > w * 0.42) discard;
-  float e = abs(vQ.x) / max(w * 0.42, 1e-3);
-  float beat = 0.72 + 0.28 * sin(uTime * 2.3 + vArm * 1.7);
-  vec3 col = mix(vec3(1.0, 0.97, 0.86), vec3(0.62, 0.84, 1.00), smoothstep(0.1, 0.9, e));
-  float a = (1.0 - smoothstep(0.55, 1.0, e)) * (0.45 + 0.55 * w) * beat * uKnot.w;
-  if (a < 0.30) discard;                                        // a mark, not a glow: see the bubble above
+  if (vFade < 0.02) discard;
+  vec3 col;
+  float a;
+  if (vRole < 0.5) {
+    // THE TEAR: a slit of nothing with its edges painted hot. The middle is the darkest thing in the picture and
+    // the lips are near white; the edge is broken into marks and gaps so it is paint and not a glow.
+    float w = 1.0 - vQ.y * vQ.y * 0.82;                            // narrower at top and bottom: a tear, not a box
+    // AND TORN, not cut: the edge is taken in bands, each band its own width, so the silhouette itself is ragged
+    float band = floor(vQ.y * 6.0);
+    float jag = 0.80 + 0.20 * fract(sin((band + 3.1) * 12.9898) * 43758.5453);
+    float e = abs(vQ.x) / max(w * jag, 1e-3);
+    if (e > 1.0) discard;
+    float tear = fract(sin((vQ.y * 17.0 + 4.7) * 12.9898) * 43758.5453);
+    if (e > 0.80 && tear < 0.30) discard;                          // and the lip itself breaks into marks
+    // the inside of it is the darkest thing in the picture, and only the last of the way out is the hot lip
+    float lip = smoothstep(0.58, 0.99, e);
+    col = mix(vec3(0.02, 0.015, 0.05), mix(vec3(0.52, 0.36, 0.95), vec3(1.0, 0.97, 0.90), lip * lip), lip);
+    a = vFade * (0.72 + 0.28 * lip);
+  } else {
+    // A STROKE OF AIR drawn in: pointed at both ends, cool and pale, the colour of the stopped moment
+    float w = 1.0 - vQ.y * vQ.y;
+    if (abs(vQ.x) > w) discard;
+    float e = abs(vQ.x) / max(w, 1e-3);
+    col = mix(vec3(0.93, 0.96, 1.0), vec3(0.55, 0.72, 0.98), smoothstep(0.0, 1.0, e));
+    a = vFade * (1.0 - smoothstep(0.45, 1.0, e)) * (0.35 + 0.65 * w);
+  }
+  if (a < 0.28) discard;                                           // marks and gaps: the bubble's own lesson
   vec3 c = pcAtmosV(col, pcFogAmount(length(vView)), vView);
   pcWrite(c, 1.0, normalize(-vView), -vView.z, 6.0);
 }
@@ -172,34 +231,37 @@ export function makeTimeFx(bodyUniforms) {
   mesh.name = 'pc-timefx';
   mesh.frustumCulled = false; mesh.matrixAutoUpdate = false; mesh.visible = false;
 
-  // the knot: three crossed strokes standing on the ground
+  // the rips: RIPS tears of QUADS cards each, all in one buffer. A card carries its own number in position.z and
+  // works out from that which tear it belongs to and what it is (the tear itself, or a stroke of air).
   const kg = new THREE.BufferGeometry();
   const pos = [], idx = [];
-  for (let a = 0; a < 3; a++) {
-    const o = a * 4;
-    pos.push(-1, -1, a, 1, -1, a, -1, 1, a, 1, 1, a);
+  for (let q = 0; q < RIPS * QUADS; q++) {
+    const o = q * 4;
+    pos.push(-1, -1, q, 1, -1, q, -1, 1, q, 1, 1, q);
     idx.push(o, o + 1, o + 2, o + 1, o + 3, o + 2);
   }
   kg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   kg.setIndex(idx);
+  const ripU = []; const ripK = [];
+  for (let i = 0; i < RIPS; i++) { ripU.push(new THREE.Vector4(0, 0, 0, 1)); ripK.push(new THREE.Vector4(0, 0, 0, 0)); }
   const kmat = new THREE.ShaderMaterial({
-    name: 'pc-knot',
-    uniforms: makePaintUniforms(bodyUniforms, { uKnot: { value: new THREE.Vector4(0, 0, 0, 0) }, uSceneAux: G.uSceneAux, uSceneRes: G.uSceneRes }),
-    vertexShader: KNOT_VERT, fragmentShader: KNOT_FRAG,
+    name: 'pc-rip',
+    uniforms: makePaintUniforms(bodyUniforms, { uRip: { value: ripU }, uRipK: { value: ripK }, uRipO: { value: new THREE.Vector3() }, uSceneAux: G.uSceneAux, uSceneRes: G.uSceneRes }),
+    vertexShader: RIP_VERT, fragmentShader: RIP_FRAG,
     side: THREE.DoubleSide,
   });
   kmat.userData.pcPainted = true;
   register(kmat, 'glaze');
-  const knot = new THREE.Mesh(kg, kmat);
-  knot.name = 'pc-knot';
-  knot.frustumCulled = false; knot.matrixAutoUpdate = false; knot.visible = false;
+  const rip = new THREE.Mesh(kg, kmat);
+  rip.name = 'pc-rip';
+  rip.frustumCulled = false; rip.matrixAutoUpdate = false; rip.visible = false;
 
   let bound = bodyUniforms || null;
   return {
-    mesh, knot,
+    mesh, rip,
     // Every frame: the eye in the scene and in the body's own axes, the body's root and its uniforms, and the
-    // player's own time (physics/times.js, with the knot stashed on it: see core/powers.js).
-    update(cameraPos, root, camL, bodyU, times, bodyId) {
+    // player's own time (physics/times.js, with the rips stashed on it: see core/powers.js).
+    update(cameraPos, root, camL, bodyU, times, bodyId, rips) {
       const live = times && times.count ? times : null;
       let n = 0;
       if (live) {
@@ -219,13 +281,25 @@ export function makeTimeFx(bodyUniforms) {
         aZone.needsUpdate = true; aZoneK.needsUpdate = true;
         mesh.position.copy(cameraPos); mesh.quaternion.copy(root.quaternion); mesh.updateMatrix(); mesh.matrixWorld.copy(mesh.matrix); mesh.matrixWorldNeedsUpdate = false;
       }
-      // the knot, if one is tied on this world
-      const k = live && live.knot && live.knot.bodyId === bodyId ? live.knot : null;
-      knot.visible = !!k;
-      if (k) {
+      // THE RIPS torn open on this world (core/powers.js hands them over on the time list: they live in the WIND
+      // list, because a rip IS a wind source, and the painter never sees that one)
+      let m = 0;
+      if (rips) {
+        const nr = rips.count !== undefined ? rips.count : rips.length;
+        for (let i = 0; i < nr && m < RIPS; i++) {
+          const r = rips[i];
+          if (!r || r.bodyId !== bodyId || !(r.strength > 0.004)) continue;
+          ripU[m].set(r.px - camL.x, r.py - camL.y, r.pz - camL.z, r.radius);
+          ripK[m].set(r.strength, (r.id || i + 1) % 17, 0, 0);
+          m++;
+        }
+      }
+      for (let i = m; i < RIPS; i++) ripK[i].set(0, 0, 0, 0);
+      rip.visible = m > 0;
+      if (rip.visible) {
+        kmat.uniforms.uRipO.value.set(camL.x, camL.y, camL.z);
         if (bodyU !== bound) { bindBodyUniforms(mat, bodyU); bindBodyUniforms(kmat, bodyU); bound = bodyU; }
-        kmat.uniforms.uKnot.value.set(k.p.x - camL.x, k.p.y - camL.y, k.p.z - camL.z, 1);
-        knot.position.copy(cameraPos); knot.quaternion.copy(root.quaternion); knot.updateMatrix(); knot.matrixWorld.copy(knot.matrix); knot.matrixWorldNeedsUpdate = false;
+        rip.position.copy(cameraPos); rip.quaternion.copy(root.quaternion); rip.updateMatrix(); rip.matrixWorld.copy(rip.matrix); rip.matrixWorldNeedsUpdate = false;
       }
     },
   };
