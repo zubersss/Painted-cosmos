@@ -307,7 +307,14 @@ async function boot() {
   };
   let curSharp = 0;              // the rung the ladder stands on now (dynres decides; this applies it)
   const dprNow = () => (DPR_PIN > 0 ? DPR_PIN : curSharp > 0 ? PRESET.dpr + DYNRES.sharpStep * curSharp : 0);
+  // THE SPEED TEST HOLDS THE PICTURE'S SIZE while it asks its questions at a sharper one (core/bench.js). A phone
+  // fires a resize for things that have nothing to do with the game -- the address bar sliding away as the panel is
+  // scrolled is enough -- and that put the picture back to its own size in the middle of the owner's v27 table: the
+  // last eight rows were measured at a size the test did not know it was at, and read 16.7 ms whatever was asked.
+  let heldSize = null;
+  game.holdPictureSize = (w, h) => { heldSize = w > 1 && h > 1 ? { w: w | 0, h: h | 0 } : null; if (heldSize) { camera.aspect = heldSize.w / heldSize.h; camera.updateProjectionMatrix(); painter.resize(heldSize.w, heldSize.h); } else resize(); };
   function resize() {
+    if (heldSize) { camera.aspect = heldSize.w / heldSize.h; camera.updateProjectionMatrix(); painter.resize(heldSize.w, heldSize.h); return; }
     const b = bufferSize(canvas.clientWidth, canvas.clientHeight, window.devicePixelRatio || 1, PRESET, dprNow());
     camera.aspect = b.w / b.h;
     camera.updateProjectionMatrix();

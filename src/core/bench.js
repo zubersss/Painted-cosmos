@@ -216,7 +216,13 @@ export function attachBench(pc) {
     })();
     const sharpen = async (k) => {
       if (typeof P.resize !== 'function') return;
-      P.resize(Math.max(2, Math.round(canvas0.w * k)), Math.max(2, Math.round(canvas0.h * k)));
+      const w = Math.max(2, Math.round(canvas0.w * k)), h = Math.max(2, Math.round(canvas0.h * k));
+      // HELD, so that a resize the phone fires for its own reasons cannot put the picture back without the test
+      // knowing. In the owner's v27 table the last eight rows were measured at a size the test did not know it was
+      // at: they all read 16.7 ms -- the display's own floor -- whatever was asked of them, and one of them said
+      // that the FULL paint was four milliseconds faster than the lighter one, which cannot be true.
+      if (typeof pc.game === 'object' && pc.game && typeof pc.game.holdPictureSize === 'function') pc.game.holdPictureSize(w, h);
+      else P.resize(w, h);
       await wait(400);
       if (pc.settle) await Promise.race([pc.settle(12), wait(20000)]);
     };
@@ -338,6 +344,8 @@ export function attachBench(pc) {
         + ' they cannot be trusted. Run it again without touching the phone, and wait for the wood to finish'
         + ' building before you start.';
     }
+    // the picture is the phone's own again (it was held through the run: see sharpen above)
+    if (pc.game && typeof pc.game.holdPictureSize === 'function') pc.game.holdPictureSize(0, 0);
     el.textContent = head(r0) + '\n' + rows.join('\n') + '\ndone. (+ / - ms: against the "as set" row before it)' + warn;
     pc.bench = rows;
   };
