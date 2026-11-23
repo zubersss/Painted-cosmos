@@ -484,8 +484,8 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
 
 Head rewritten 2026-11-18, evening (the morning's text and the v12 text it replaced are in the log).
 
-**`look-proto` IS AT v34 (23 Nov), NOT YET MERGED: WATER THAT RUNS DOWNHILL AND POOLS, TWO AIR FIXES, AND THE
-ANIMALS (STAGE ONE OF THREE).**
+**`main` IS AT v34 (23 Nov), pull request #34 merged: WATER THAT RUNS DOWNHILL AND POOLS, THREE FIXES TO THE
+AIR, AND THE ANIMALS (STAGE ONE OF THREE).**
 The owner, 23 Nov: *"I want things even further away to load and look good up to 1 mile ... the oceans and the
 water system to feel more alive and real ... animals, there should at least be 25 different animals in every
 biome, drawn in the same artstyle, animated, each with their own routine ... focus on the artstyle and animation
@@ -531,6 +531,23 @@ for these make sure its really good."*
   `?beasts=2` and `?beasts=3` exceed the far crowd's 16-kind table and warn in the console.
 - **SWITCHES:** `?flow=1` `?pool=<m>` `?aer=0..3` `?beasts=1` `?beastpx=` `?beastlod=near` `?lifedens=0..4`
   `?lifeband=` `?lifehunt=0` `?farlight=` `?mtnair=0`. With the flags off the game is exactly what it was.
+- **AND A THIRD AIR FIX, FOUND BY THE STILL AND NOT BY A TEST.** SEEN 420 m over the alpine meadow at noon,
+  sun 48 degrees up: the eye stood **830 m over the datum on a 410 m range**, so the SKY measured its height
+  from SEA LEVEL and read **0.909 of the way to space -- black, with stars** -- while the GROUND, after the
+  fix above, measured from the land under the eye and read thick air and 2,600 m of visibility. **A sunlit
+  landscape under a midday starfield.** The cause is older than v34 (Earth's peaks were doubled to 968 m on
+  the 19th and her air is 800 m, so a range stands clean through the sky), but until v34 the ground went dark
+  along with the sky and the two at least agreed. The sky now reads the same height the ground does;
+  `space01` 0.909 -> 0, and the still shows a blue sky with cloud over a range that keeps its lit and shaded
+  faces to the horizon. `?mtnair=0` gives back the old pair. **THE RULE THIS LEAVES: when one half of a pair
+  is moved onto a new measure, go and look at the other half.**
+- **WHAT WAS SEEN, and it is the whole list:** the autumn wood with the water on; a lake (the picture that
+  matters most); a red deer grazing at 3 m and broadside at midday; and the A and B of the sky at 420 m.
+  **Nothing on another world has been looked at**, and Neptune's snowfield is still unshot.
+- **WHAT THE STILLS SAY IS WRONG, in the owner's own words back to them:** the deer's coat is a smooth brown
+  mass while everything round it is made of strokes, so it reads as a model standing in a painting; it casts
+  no shadow, which is most of why it does not sit into the floor; and the lake's surface is busier than still
+  water should be (that still was taken at `?aer=3`, the exaggerated setting, so the default is a third of it).
 - **SUITES:** `tests/` 325, `src/world/`+`src/data/looks/` 65, `src/physics/` 416. All pass, 0 fail.
 
 **`main` IS AT v33 (23 Nov), pull request #33 merged: THE TEN-STEP UPGRADE. THE FAR DISTANCE WAS NOT BEING DRAWN

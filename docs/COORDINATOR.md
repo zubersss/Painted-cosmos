@@ -3172,3 +3172,32 @@ is why the walk is arithmetic in the shader.**
 `?lifehunt=0` `?farlight=` `?mtnair=0`. With the flags off the game is what it was.
 
 **SUITES:** `tests/` 325 pass, `src/world/` + `src/data/looks/` 65 pass, `src/physics/` 416 pass. 0 fail.
+
+**MERGED. `main` IS AT v34** (pull request #34, squashed, 23 Nov). Before the merge: all three suites run again
+on the final tree (325 / 65 / 416, 0 fail), the browser taken, and four things looked at -- the autumn wood with
+the water on, **a lake**, **a red deer grazing**, and the A and B of the sky at 420 m.
+
+**A THIRD AIR FIX, FOUND BY A STILL AND BY NOTHING ELSE.** Shooting the mile from height, the picture came back
+black with stars at noon with the sun 48 degrees up. MEASURED in the page: the eye stood **420 m above the land
+but 830 m above the datum**, on a 410 m range. `space01` is built from `camR - body.radius` -- height above SEA
+LEVEL -- and read **0.909**, so the sky was all but in space; the ground, after this version's mountain-air fix,
+reads height above THE LAND UNDER THE EYE and had thick air and 2,600 m of visibility. **A sunlit landscape
+under a midday starfield.** The cause is older than v34 -- Earth's peaks were doubled to 968 m on the 19th and
+her air is 800 m, so a range stands clean through the sky -- but until v34 the ground went dark along with the
+sky, so the two at least agreed; the mountain-air fix broke the agreement. The sky now takes the same height the
+ground does, behind the same `MTN_AIR` flag (and `MTN_AIR` is 0 whenever the look is off, so the watercolour
+game cannot see it). `space01` 0.909 -> 0, and the still shows a blue sky with cloud over a range that keeps its
+lit and shaded faces to the horizon. `?mtnair=0` gives back the old pair.
+
+**THE RULE THIS LEAVES, and it is worth more than the fix: when one half of a pair is moved onto a new measure,
+go and look at the other half.** m1 wrote this risk down in its own report ("the sky, the limb and the aurora
+still read it -- that is a separate step") and no test could have caught it; only the picture did.
+
+**WHAT THE STILLS SAY IS STILL WRONG, told to the owner plainly:**
+- The deer's coat is a smooth brown mass while everything round it is made of strokes, so it reads as a model
+  standing in a painting rather than as part of it. **That is the art-style pass and it is the biggest thing
+  outstanding on the creatures.**
+- It casts no shadow (`shadow.js` only knows materials with a `uPart` uniform, and an instanced creature added
+  to the pass would cast its REST pose while walking). That is most of why it does not sit into the floor.
+- The lake's surface is busier than still water should be. That still was taken at `?aer=3`, the exaggerated
+  setting built for judging; the default lays about a third as much white.
