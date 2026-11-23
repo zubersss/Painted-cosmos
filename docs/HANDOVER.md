@@ -431,6 +431,20 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
   file in the repository, and CLAUDE.md forbids committing other people's pictures. A STANDING rule for every new
   power: **it is not finished until it has a picture of its own, drawn here.**
 
+- **2026-11-23, A MILE, LIVING WATER, AND 25 ANIMALS A BIOME:** the full words are in `docs/COORDINATOR.md`.
+  Three asks: a mile of distance with no loss of speed or quality; water that flows downhill, pools, and has
+  waves, aeration, fjords and waterfalls; and at least 25 animals in every biome, in this game's own hand,
+  animated, each with a routine, hunting and hunted, fish and birds, a whole ecosystem.
+  **TWO FACTS THAT SHAPE ALL OF IT, and a later session must not forget either:**
+  (a) **THESE WORLDS ARE 4 km IN RADIUS** (`src/data/bodies.js`), so Earth here is 16 miles round: the horizon
+      from standing height is **117 m**, and a thing a mile away lies **319 m below the eye's own plane**. A mile
+      of ground is deliverable **from the air and from hilltops** and nowhere else, unless the worlds themselves
+      are made bigger -- which moves the orbits, the travel times and the balance of the whole game, and is the
+      owner's decision. It has been put to them.
+  (b) **THERE ARE 42 BIOMES** across ten bodies, so 25 a biome is 1,050 creatures. The plan is the creature system
+      itself -- body, gait, routine, ecosystem -- and **Earth's twenty-five done properly first**, then one world
+      at a time.
+
 - **2026-11-22, A TEN-STEP UPGRADE (ultracode):** "Refine it even further specifically the looks do a 10 step up
   grade using ultracode i want better lighting better physics for the powers and specifically better looks i want
   things to look high quality and fully rendered even from 300 yards away". THREE THINGS: the lighting, the
