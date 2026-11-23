@@ -14,6 +14,17 @@
 import * as THREE from 'three';
 import { getTextures, G, PREV, LOOK, OIL } from './shared.js';
 
+// (2026-11-22, the owner's ten-step upgrade: the last pass's own switches, read once, so that the owner can be shown
+// A and B of the same still and can turn any one of them off. Each is described where it is used, in OIL_FRAG.)
+const _qs = (() => { try { return new URLSearchParams(location.search); } catch (e) { return null; } })();
+const _qn = (k, d) => { const v = _qs && _qs.get(k); const n = v == null ? NaN : +v; return Number.isFinite(n) ? n : d; };
+// the bilinear ramp's width in pixels of the SCREEN where the picture is enlarged (0: the plain read, as it was)
+const UPSCALE = Math.max(0, _qn('upscale', 1));
+// the most taps the light in the air gets, and metres of air to a tap (0: no light in the air at all)
+const SHAFTS = _qs && _qs.has('shafts') ? Math.max(0, Math.min(16, Math.round(_qn('shafts', 16)))) : null;
+// the far land's local contrast, the reference's reach in pixels of the scene, and the far colour push
+const FARCON = Math.max(0, _qn('farcon', 1.25)), FARPX = Math.max(0.5, _qn('farpx', 1.8)), FARSAT = Math.max(0, _qn('farsat', 0.15));
+
 const FS_VERT = /* glsl */`
 varying vec2 vUv;
 void main() {
@@ -635,11 +646,55 @@ uniform vec3 uShaftC;
 uniform vec3 uSunV;
 uniform vec2 uTanHalf;
 uniform vec4 uOilS;      // (y: the shoulder's knee, see below; 1.0 is off)
+uniform vec2 uInTexel;   // 1 / the size the scene is drawn at
+uniform float uUpK;      // (the sharp read where the picture is enlarged: 0 off, else the bilinear ramp's gain; setSize)
+uniform vec2 uShaftN;    // (the light in the air: x the most taps a line of sight gets, y metres of air to a tap; x 0 off)
+uniform vec4 uFarC;      // (the far land: x its local contrast, y the reference's reach in scene pixels, z its colour push, w free)
 varying vec2 vUv;
 ${AUX_DEC}
 const vec3 W = vec3(0.3, 0.5, 0.2);
 void main() {
-  vec3 col = texture(tAbs, vUv).rgb;
+  // A SHARP READ WHERE THE PICTURE IS ENLARGED (2026-11-22, the owner: "high quality and fully rendered"). When the
+  // frame controller cuts the render scale (main.js applyDynScale; the oil tier itself never draws small, index.js
+  // applySize) the picture is smaller than the canvas and was read back with one plain bilinear tap, which spreads
+  // every stroke's edge over a whole pixel OF THE SCENE -- a blur over the whole game, on exactly the machines that
+  // can least afford one. The same single tap is kept, but the place it is taken from is pulled toward the nearer
+  // texel's centre, so the blend falls in about one pixel OF THE SCREEN instead: an edge stays an edge and only the
+  // step between two texels is smoothed. Still one read, so it costs nothing, and it is a mix of the same four texels,
+  // so it cannot ring or halo as a sharpening cubic does (a four-tap Catmull-Rom was asked for and is not possible:
+  // its outer weights are negative and a bilinear tap cannot carry a negative weight; the 5- and 9-tap forms that can
+  // would add four to eight whole-screen reads on the slow frames, and on a hard stroke edge they are no sharper than
+  // the bilinear they replace, because the clamp that stops them ringing also flattens them back to one texel).
+  // uUpK is 0 at the full size and the read is then the one it always was, to the bit. ?upscale=0 turns it off.
+  vec2 ruv = vUv;
+  if (uUpK > 0.0) {
+    vec2 st = vUv / uInTexel - 0.5, i = floor(st), f = st - i;
+    ruv = (i + 0.5 + clamp((f - 0.5) * uUpK + 0.5, 0.0, 1.0)) * uInTexel;
+  }
+  vec3 col = texture(tAbs, ruv).rgb;
+  // (the normal, depth and region the scene wrote under this pixel, read ONCE: the light in the air, the far land's
+  // contrast and the night's lamp test each used to fetch it for itself)
+  vec4 aux = pcAuxDec(texture(tAux, vUv));
+  float vz = exp2(aux.z) - 1.0;
+  // THE FAR LAND KEEPS ITS LOCAL CONTRAST (the owner, 22 Nov: "fully rendered even from 300 yards away"). Past about
+  // 60 m the air's veil flattens the land's own value steps toward one tone, so a wood at 275 m reads as a smudge that
+  // sharpens as the player walks in. The pixel is set against a few-pixel reference of its neighbourhood and nudged
+  // AWAY from it: the watercolour sheet's own pooling term (fineP, above), capped at the same +-0.08 so that a
+  // silhouette cannot take a halo. The gain goes on the pixel's OWN colour and no neighbour's colour is ever mixed in,
+  // so no edge is softened; and it is zero on average over a neighbourhood, so the far land's palette value does not
+  // move and the shares the owner measured over 0.85 (the shoulder, below) stay as they were measured.
+  // (Laid before the light in the air on purpose: the shafts are light in the air, not the land's own modelling, and
+  // sharpening them would put form where there is none. The sky is left out by its region, as the night's and the
+  // storm's keys leave it out: step(0.5, aux.w) is 0 there, since the sky writes region 0.)
+  // ?farcon= is how much (0 off), ?farpx= the reference's reach.
+  float far = smoothstep(60.0, 170.0, vz) * step(0.5, aux.w);
+  if (uFarC.x > 0.0 && far > 0.0) {
+    vec2 o = uInTexel * uFarC.y;
+    vec3 r = texture(tAbs, vUv + o).rgb + texture(tAbs, vUv - o).rgb
+           + texture(tAbs, vUv + vec2(o.x, -o.y)).rgb + texture(tAbs, vUv - vec2(o.x, -o.y)).rgb;
+    float g = clamp(dot(r * 0.25, W) - dot(col, W), -0.08, 0.08) * uFarC.x * far;
+    col = clamp(col * (1.0 - g), 0.0, 1.0);
+  }
   // LIGHT IN THE AIR (the overhaul plan's fourth piece): the clip's wood has shafts of light in its haze. The air on the
   // pixel's line of sight is followed out to what it shows (sixteen places, closer together near the eye); at each the
   // shadow map, taken down and smoothed for the air (shadow.js AIR_FRAG), says how much of the sun reaches it, and the
@@ -648,35 +703,71 @@ void main() {
   // the picture's own brightness is not moved. It is light added to the picture as painted: no neighbour of the pixel
   // is read, no edge is touched, and the air's light itself is smooth (asked of the fine map with a start that differed
   // from pixel to pixel it came out as grain: the first stills of the shafts).
-  if (uShaft.x > 0.004) {
-    float vz = exp2(pcAuxDec(texture(tAux, vUv)).z) - 1.0;
+  // (2026-11-22) MARCH ONLY THE AIR THE SQUARE CAN ANSWER FOR, AND ONLY AS OFTEN AS THERE IS AIR TO ASK ABOUT.
+  // The march ran its full sixteen places with up to thirty-two texture reads for EVERY pixel, the whole sky included,
+  // and with no test of whether that line of sight ever crosses the square the shadow map covers (90 m to each side on
+  // the ground, shadow.js render). The owner's phone measured this at at least 4 ms of a 20.7 ms frame.
+  //   Two tests, both plain arithmetic before the loop and neither of them able to change the picture where the old
+  // march had an answer. First: the eye and the line of sight are put into the square's own space once (the square is
+  // laid perpendicular to the sun, so this is a slab test on the sun's two across-axes), giving the piece [t0, t1] of
+  // the line that is inside it. A line that never enters contributes exactly nothing today -- every tap outside the
+  // square sets d to 0 -- so skipping it is free of any change at all, and the taps that are left all land where the
+  // map can answer. Second: the taps are spread over that piece and there are as many of them as the piece is long,
+  // one every uShaftN.y metres up to uShaftN.x: a pixel on the ground ten metres off was being asked sixteen times
+  // over ten metres for a shaft the air can only carry a few per cent of.
+  //   The piece's own weight is set against THE WHOLE LINE's, worked out rather than summed (A below), so that a short
+  // piece inside the square lightens the air by its own share and no more. With the piece the whole line, this is the
+  // same estimator as before to the accuracy of its own quadrature: the old sum of the weights is the same integral.
+  // ?shafts= sets the most taps (0 turns the light in the air off), for an A and B still.
+  if (uShaft.x > 0.004 && uShaftN.x >= 1.0) {
     vec3 ray = vec3((vUv * 2.0 - 1.0) * uTanHalf, -1.0);
     float rl = length(ray);
     float tEnd = min(vz, uShaft.z / rl);
-    float S = 0.0, A = 0.0;
-    for (int i = 0; i < 16; i++) {
-      float u = (float(i) + 0.5) / 16.0, t = tEnd * u * u;
-      vec3 q = (uShV * vec4(ray * t, 1.0)).xyz;
-      vec2 a = abs(q.xy);
-      float d = 0.0;
-      if (max(a.x, a.y) < 0.97) {
-        vec2 suv = q.xy * 0.5 + 0.5;
-        vec2 f1 = textureLod(uShAir, suv, 1.0).rg, f5 = textureLod(uShAir, suv, 5.0).rg;
-        float z1 = f1.g / max(f1.r, 1e-3), z5 = f5.g / max(f5.r, 1e-3);
-        d = f5.r * smoothstep(z5 - 0.002, z5 + 0.004, q.z) - f1.r * smoothstep(z1 - 0.002, z1 + 0.004, q.z);
-        d *= 1.0 - smoothstep(0.80, 0.97, max(a.x, a.y));
+    // (the square's space: q(t) = q0 + dq * t, with t the depth in metres, as uShV * vec4(ray * t, 1.0) gave it)
+    vec3 q0 = uShV[3].xyz, dq = mat3(uShV) * ray;
+    float E = 0.97;                       // (the same edge the taps give way at, below)
+    float t0 = 0.0, t1 = tEnd;
+    if (abs(dq.x) > 1e-9) { float ta = (-E - q0.x) / dq.x, tb = (E - q0.x) / dq.x; t0 = max(t0, min(ta, tb)); t1 = min(t1, max(ta, tb)); }
+    else if (abs(q0.x) >= E) t1 = -1.0;
+    if (abs(dq.y) > 1e-9) { float ta = (-E - q0.y) / dq.y, tb = (E - q0.y) / dq.y; t0 = max(t0, min(ta, tb)); t1 = min(t1, max(ta, tb)); }
+    else if (abs(q0.y) >= E) t1 = -1.0;
+    if (t1 > t0) {
+      float L = t1 - t0, od = uShaft.y * rl;        // (the air's density along this line of sight, per metre of t)
+      // (never fewer than half the taps, whatever the piece. A near line of sight toward the sun can still carry a
+      // tenth of the picture's brightness, and the near air's shade changes on the metre: the map taken down for the
+      // air has about 0.7 m to a texel at the finer of the two mips this asks (shadow.js AIR_FRAG), so a tap every
+      // several metres is the one place a coarse march could be SEEN rather than only counted. The floor is where the
+      // desktop's saving stops and the phone's goes on: 8 of 16 there, 4 of 8 on a light device.)
+      int n = int(clamp(ceil(L * rl / uShaftN.y), max(4.0, uShaftN.x * 0.5), uShaftN.x));
+      float S = 0.0;
+      for (int i = 0; i < 16; i++) {
+        if (i >= n) break;
+        float u = (float(i) + 0.5) / float(n), t = t0 + L * u * u;
+        vec3 q = q0 + dq * t;
+        vec2 a = abs(q.xy);
+        float d = 0.0;
+        if (max(a.x, a.y) < E) {
+          vec2 suv = q.xy * 0.5 + 0.5;
+          vec2 f1 = textureLod(uShAir, suv, 1.0).rg, f5 = textureLod(uShAir, suv, 5.0).rg;
+          float z1 = f1.g / max(f1.r, 1e-3), z5 = f5.g / max(f5.r, 1e-3);
+          d = f5.r * smoothstep(z5 - 0.002, z5 + 0.004, q.z) - f1.r * smoothstep(z1 - 0.002, z1 + 0.004, q.z);
+          d *= 1.0 - smoothstep(0.80, E, max(a.x, a.y));
+        }
+        S += exp(-od * t) * u * d;
       }
-      float wgt = exp(-uShaft.y * t * rl) * u;
-      S += wgt * d; A += wgt;
+      float F = 1.0 - exp(-od * tEnd);
+      // (the whole line of sight's weight: the integral of exp(-od t) over 0 to tEnd, which is F / od. The taps' own
+      // sum cannot stand in for it any more, because the taps no longer cover the whole line.)
+      float A = max(F / max(od, 1e-6), 1e-5);
+      // (2 L u du is the step the quadratic spread takes in t, which is why the taps carry u as their weight)
+      float dl = (2.0 * L / float(n)) * S / A;
+      float ph = 0.40 + 1.4 * pow(max(dot(ray / rl, uSunV), 0.0), 3.0);
+      col += uShaftC * (uShaft.x * F * ph * (dl > 0.0 ? dl : 0.6 * dl));
+      col = max(col, vec3(0.0));
     }
-    float dl = S / max(A, 1e-5);
-    float F = 1.0 - exp(-uShaft.y * tEnd * rl);
-    float ph = 0.40 + 1.4 * pow(max(dot(ray / rl, uSunV), 0.0), 3.0);
-    col += uShaftC * (uShaft.x * F * ph * (dl > 0.0 ? dl : 0.6 * dl));
-    col = max(col, vec3(0.0));
   }
   float lamp = 0.0;
-  if (uNight > 0.003 || uGrade != vec3(1.0)) lamp = step(7.95, pcAuxDec(texture(tAux, vUv)).w);
+  if (uNight > 0.003 || uGrade != vec3(1.0)) lamp = step(7.95, aux.w);
   // (and by night what is warm is a light or is lit by one: the lantern's pool on the snow keeps its orange, as a
   // lamp's glass does; the night's cool key over it turned the pool to mustard)
   lamp = max(lamp, smoothstep(0.10, 0.32, col.r - col.b) * uNight);
@@ -684,12 +775,24 @@ void main() {
   // lightning: for a frame or two everything light goes lighter
   col = mix(col, vec3(1.0), clamp(uWxSheet.y * smoothstep(0.25, 0.75, dot(col, W)) * 0.6, 0.0, 0.9));
   // a gentle S over the values: the darks a step deeper, the lights kept
+  // (2026-11-22: THE S IS LEFT AT 0.35 AT EVERY DISTANCE, and the arithmetic is worth writing down because easing it
+  // off far away was the obvious step and is wrong. Its slope is 0.65 + 2.1 c (1 - c): 1.18 at mid value, 1.04 at
+  // 0.75, and only below 1 above about 0.79 and below 0.21. So over most of the far land's range the S ADDS local
+  // contrast rather than cutting it, and easing it off would have taken contrast OUT of the very band this step is
+  // meant to mend; above 0.79 it does cut, but easing it there lifts the far picture, which is exactly what the
+  // owner called "kinda light" and measured against (the shoulder's note below). The far land's modelling is put
+  // back by the local-contrast gain above instead, which moves no mean value at all.)
   vec3 s = col * col * (3.0 - 2.0 * col);
   col = mix(col, s, 0.35);
   // colours that pop (the owner, 2026-11-15): every colour pushed from its grey, the dull ones most and the pure ones
   // hardly, so nothing clips; a pixel's own colour only, no neighbour is read: no edge is touched
+  // (2026-11-22: and the push eases from 0.28 to uFarC.z with distance. It is strongest where the colour is weakest,
+  // which is precisely the far hazed land, so the far wood was being pushed hardest at the moment its form was
+  // flattest: colour without modelling, a poster of a wood. It moves no value whatever -- mix(vec3(lw), col, g) keeps
+  // dot(col, W) for any g -- so easing it cannot lighten the far picture and the measured shares do not move.
+  // ?farsat= sets it; 0.28 is the look as it was.)
   float lw = dot(col, W), sat = max(col.r, max(col.g, col.b)) - min(col.r, min(col.g, col.b));
-  col = clamp(mix(vec3(lw), col, 1.0 + 0.28 * (1.0 - sat)), 0.0, 1.0);
+  col = clamp(mix(vec3(lw), col, 1.0 + mix(0.28, uFarC.z, far) * (1.0 - sat)), 0.0, 1.0);
   col = mix(vec3(0.07, 0.06, 0.09), col, smoothstep(0.0, 1.0, uLaid));
   // (2026-11-18, the owner: "It's kinda light".) THE SHOULDER: nothing clips to paper white any more.
   // Measured on rendered stills against the owner's twenty oil paintings: HALF the game's aerial picture was
@@ -844,7 +947,11 @@ export class Post {
     this.mOil = fsMaterial(OIL_FRAG, { uOilS: OIL.uOilS, tAbs: this.sheetUniforms.tAbs, tAux: this.sheetUniforms.tAux, uGrade: this.sheetUniforms.uGrade, uWxSheet: this.sheetUniforms.uWxSheet,
       uNight: this.sheetUniforms.uNight, uLaid: this.sheetUniforms.uLaid, uOilC: OIL.uOilC, uAux8: G.uAux8,
       uShAir: OIL.uShAir, uShV: OIL.uShV, uShaft: OIL.uShaft, uShaftC: OIL.uShaftC, uSunV: OIL.uSunV,
-      uTanHalf: { value: new THREE.Vector2(1, 1) } });
+      uTanHalf: { value: new THREE.Vector2(1, 1) },
+      // (2026-11-22, the ten-step upgrade; the switches are at the top of this file and the reasons in OIL_FRAG)
+      uInTexel: this.sheetUniforms.uInTexel, uUpK: { value: 0 },
+      uShaftN: { value: new THREE.Vector2(16, 7) },
+      uFarC: { value: new THREE.Vector4(FARCON, FARPX, FARSAT, 0) } });
     this.mOil.name = 'oil-finish';
     this.debugView = 0;
     this.mCopy = fsMaterial(/* glsl */`
@@ -939,6 +1046,19 @@ export class Post {
     this._bindScene();
     this.sheetUniforms.uOutRes.value.set(outW, outH);
     this.sheetUniforms.uInTexel.value.set(1 / inW, 1 / inH);
+    // (2026-11-22) THE OIL PICTURE'S SHARP READ WHERE IT IS ENLARGED (OIL_FRAG, the note at its first line). The gain
+    // is the enlargement itself over the ramp wanted in pixels of the screen, so the blend stays one screen pixel
+    // wide whatever the render scale is. Under 1.15 the picture is at or near its full size and the read is left
+    // exactly as it was: the same threshold the watercolour sheet uses for its own soft enlargement (uOutRes.y *
+    // uInTexel.y, above).
+    { const up = outH / inH; this.mOil.uniforms.uUpK.value = UPSCALE > 0 && up > 1.15 ? up / UPSCALE : 0; }
+  }
+
+  // (2026-11-22) HOW MANY PLACES THE LIGHT IN THE AIR IS ASKED ABOUT (OIL_FRAG): the most a line of sight gets, and
+  // metres of air to a tap. render/index.js sets it once it knows whether the device is a light one; `?shafts=` wins.
+  setShaftTaps(maxTaps, metresPerTap) {
+    const n = SHAFTS != null ? SHAFTS : maxTaps;
+    this.mOil.uniforms.uShaftN.value.set(n > 0 ? Math.max(4, Math.min(16, n)) : 0, Math.max(1, metresPerTap || 7));
   }
 
   _pass(material, target) {
@@ -1065,6 +1185,12 @@ export class Post {
   warm() {
     const t = new THREE.WebGLRenderTarget(2, 2, { depthBuffer: false, type: THREE.UnsignedByteType });
     for (const m of [this.mPrepF, this.mAbs[4], this.mAbs[8], this.mFxaa, this.mPool, this.mSheet]) this._pass(m, t);
+    // (2026-11-22) AND THE OIL LOOK'S OWN LAST PASS, which was never in this list: in the oil look the six above are
+    // laid and then never drawn again, while the one pass that IS drawn every frame was first built on the first frame
+    // of play. It is the heaviest of them to build now that it carries the march and the far land's contrast. Only in
+    // the oil look: in the watercolour mOil is never drawn, its OIL uniforms are untouched defaults and uShAir has no
+    // texture, so building it there would cost the live game a program it can never use.
+    if (this.oil) this._pass(this.mOil, t);
     t.dispose();
     if (this.paperBaked) { this.paperAt[0] = 0; this._paper(); }
     this.absPaperAt = '';

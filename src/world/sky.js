@@ -5,12 +5,15 @@ import * as THREE from 'three';
 import { G, OIL, register, ensureGlobals } from '../render/shared.js';
 import { RING_PROFILE } from './orbit.js';
 
-// The oil sky's three dials, so that a still can be compared against the one before it without touching the code.
+// The oil sky's five dials, so that a still can be compared against the one before it without touching the code.
 // They do nothing at all in the watercolour game: the shader reads them only inside #ifdef PC_OIL.
 //   ?cloudform=  how much of the painted cloud is laid: its size, its lanes and the lobes along its edges
 //                (0: the cloud exactly as it was, one flat shape with a step down one side)
 //   ?skycap=     the ceiling on the sky's value, the sun's own disc apart (1: no ceiling, the sky as it was)
 //   ?cloudlit=   how far the cloud's lit side stands from its shadowed side (0: none, the mass in one tone)
+//   ?skyair=     how far the sky's lowest band is laid in the SAME air the far land ends in, and nothing else
+//                (0: the sky exactly as it was, its own air; 1: one air for the land and the sky. See pcSkyAir.)
+//   ?skyairtop=  how high that band stands, as dot(view, up): 0.075 is about four degrees above the horizon
 const _qs = (() => { try { return new URLSearchParams(location.search); } catch (e) { return null; } })();
 const _qn = (k, d) => (_qs && _qs.has(k) && isFinite(+_qs.get(k)) ? +_qs.get(k) : d);
 
@@ -61,6 +64,7 @@ uniform vec4 uOilC;
 uniform vec4 uOilG;
 uniform vec4 uOilS;         // x: how far the far air leans to the blue-violet of the owner's aerial references
 uniform vec4 uSkyOil;       // x cloud shaping, y the ceiling on the sky's value, z the cloud's lit side (the dials above)
+uniform vec4 uSkyAir;       // x: how far the lowest band is the land's own air   y: how high that band stands (dot(view, up))
 #endif
 
 vec3 dens(vec3 c, float d) { return clamp(c - (c - c * c) * (d - 1.0), 0.0, 1.0); }
@@ -122,6 +126,35 @@ ${RING_PROFILE}
 // colour now, so that the two meet instead of one being cream against the other's blue. k is how far it leans
 // (?hazeblue=, the dial the land already uses; 0 is the sky as it was).
 vec3 pcSkyFar(vec3 h, float k) { return mix(h, vec3(0.48, 0.50, 0.63), clamp(k, 0.0, 1.0)); }
+
+// ONE AIR FOR THE LAND AND THE SKY (2026-11-22, the owner: "i want things to look high quality and fully rendered
+// even from 300 yards away"). The far land ended in one function and the sky's lowest band in another (pcSkyFar
+// above), so the two were never the same colour. MEASURED at the horizon, away from the sun, largest of the three
+// channels: the sky's lowest band stood 0.098 from the land's air at noon on Earth, 0.119 at dusk, 0.103 on Pluto at
+// noon - and at dusk the difference was a HUE one, the land grey-lilac at (0.79, 0.73, 0.64) against a sky at
+// (0.82, 0.71, 0.52). That is a seam along the horizon, which is the one line in the picture a far ridge is read
+// against.
+//
+// THIS IS A COPY of pcOilHaze (render/chunks.js, in FRAG_PARS). It is copied, not shared, because FRAG_PARS is the
+// painted materials' own string with their own uniform list and the sky is its own program; making one string of it
+// is a change in two owners' files at once. THE TWO MUST BE CHANGED TOGETHER: if pcOilHaze's power, its cream or its
+// blue-violet move, move them here too.
+//
+// The gold is the LAND'S, not the sky's own. chunks.js pcGold multiplies by uDayness * (1 - uMoon), and uMoon is
+// (1 - dayness) * (1 - space01) (world/index.js), so on the ground the land's gold follows dayness SQUARED while the
+// sky's own warm band further down follows dayness: in twilight the sky warms twice as hard as the land does. That
+// band is the sky's and is left where it is; this is the air, and it follows the land exactly.
+// (The one thing left out: the land reads its overcast from uWx.x, which is max(overcast, 1.5 * storm), and the sky
+// is handed the overcast alone - so in a storm the land's air is a shade less gold than this. Little of the gold
+// survives a storm on either side.)
+float pcAirGold(float sunE) {
+  float moon = (1.0 - uAtmo.y) * (1.0 - uAtmo.x);
+  return (1.0 - smoothstep(0.48, 0.86, sunE)) * uAtmo.y * (1.0 - moon) * (1.0 - uWxSky.x) * uOilG.w;
+}
+vec3 pcSkyAir(vec3 h, float sunE) {
+  vec3 warm = mix(pow(h, vec3(uOilC.x)), vec3(0.95, 0.85, 0.63), 0.75 * pcAirGold(sunE));
+  return mix(warm, vec3(0.48, 0.50, 0.63), uOilS.x);
+}
 
 // NOTHING IN THE SKY IS PAPER WHITE any more, the sun's own disc and the light close round it apart. Measured on the
 // owner's twenty oil paintings: their cloud and their valley mist is a NEUTRAL grey-white at 0.78, not white, and only
@@ -208,7 +241,13 @@ void main() {
     // keys, so Venus stays warm, Uranus stays mint, and the hour still sets them (the keys are blended per hour in
     // world/index.js, and a golden hour warms the band below).
     vec3 zenO = dens(uSkyZenith, 1.0 + 0.45 * uAtmo.y * (1.0 - oc));          // more pigment overhead, by day only: the night keys are laid light on purpose
-    vec3 bandO = mix(pcSkyFar(uSkyHorizon, uOilS.x * 1.35), uSkyHorizon, 0.18);
+    // (and ONE AIR: the lowest band ends in the same function the far land ends in, pcSkyAir above, so that at a
+    // golden hour the land and the sky immediately over it warm together. ?skyair=0 is the band exactly as it was.
+    // On its own this closes almost none of the seam - the sky's own density, warm band and ceiling are laid over
+    // it afterwards - which is why the band at the very bottom is laid again, last of all, at the end of this
+    // shader. This keeps the HUE of the two the same all the way up the lower sky.)
+    vec3 airO = pcSkyAir(uHaze, sunE);        // what the far land ends in: chunks.js pcAtmos, on the same haze key
+    vec3 bandO = mix(mix(pcSkyFar(uSkyHorizon, uOilS.x * 1.35), uSkyHorizon, 0.18), pcSkyAir(uSkyHorizon, sunE), uSkyAir.x);
     vec3 midO = mix(zenO, bandO, 0.62);
     float tb = t * 6.0 + (n1.r - 0.5) * 1.7 + (n2.g - 0.5) * 0.35;
     float tbi = floor(tb), fwb = max(fwidth(tb), 1e-4);
@@ -231,7 +270,9 @@ void main() {
     // (the oil look: the far air's own colour, not the haze key straight. On Earth that key is all but white, and from
     // the air the white band under the horizon - wherever the land is too far off to be drawn - was a good part of
     // everything the measurement found over 0.85.)
-    sky = mix(sky, pcSkyFar(uHaze, uOilS.x), 1.0 - smoothstep(-0.12, 0.02, e));
+    // (ONE AIR here too: the band below the horizon is the land's own air, gold and all, not the haze key leaned
+    // blue. From 400 m up this band is everything between the lowest cloud and the land's own far edge.)
+    sky = mix(sky, mix(pcSkyFar(uHaze, uOilS.x), airO, uSkyAir.x), 1.0 - smoothstep(-0.12, 0.02, e));
   #else
   sky = mix(sky, uHaze, 1.0 - smoothstep(-0.12, 0.02, e));
   #endif
@@ -628,6 +669,30 @@ void main() {
     // THE CEILING, laid last of all (pcSkyCap above): the sun's own disc and the light close round it are left where
     // they are, because the references keep their small bright sun too, and so is space, which is dark already.
     col = mix(col, pcSkyCap(col, uSkyOil.y), (1.0 - clamp(halo * 1.2, 0.0, 1.0)) * (1.0 - sun) * (1.0 - uAtmo.x));
+    // AND THE LOWEST BAND OF ALL IS THE LAND'S OWN AIR, laid after everything else (pcSkyAir above). Three things
+    // in this shader belong to the sky alone and are laid over its bands: the extra density (uOilA.y, a third of the
+    // way), the golden-hour warm band, and the ceiling just above. The land's air gets none of the three, so they
+    // are exactly what held the two apart. MEASURED at the horizon on Earth, away from the sun, largest channel:
+    // giving the band the land's own function (above) moves the seam 0.098 -> 0.095 at noon and 0.119 -> 0.109 at
+    // dusk, and on Pluto at a low sun it OPENS it, 0.061 -> 0.100. Laid here, after all three, the lowest band IS
+    // the air and there is no seam left to measure.
+    // Stepped, not graded: two flat steps with an edge a pixel wide, wandering with the same noise the bands above
+    // wander with, because a four-degree gradient along the bottom of the sky is a glow, and this look has none.
+    // Left alone: the sun's own disc and the light close round it (as the ceiling leaves them); the sky toward the
+    // sun, where the land's air and the sky each have a warm glow of their own and the sky's is the better one (the
+    // land's is built from uLight, which the sky is not handed); falling rain and snow, which whiten the low sky
+    // themselves; and space.
+    // The far land keeps a quarter of its own paint now (the ceiling in chunks.js pcFogAmount), so it does NOT come
+    // all the way to this colour - and that is the point of the pair: one air, with a far ridge standing a quarter
+    // of a shade against it, which is the join the eye reads a distance by.
+    if (uSkyAir.x > 0.004) {
+      float ab = clamp((uSkyAir.y - e) / max(uSkyAir.y, 1e-3), 0.0, 1.0) * 2.0 + (n1.r - 0.5) * 0.6;
+      float abi = floor(ab), fwa = max(fwidth(ab), 1e-4);
+      float aq = clamp((abi + smoothstep(0.5 - fwa, 0.5 + fwa, ab - abi)) * 0.5, 0.0, 1.0);
+      float ak = aq * uSkyAir.x * (1.0 - uAtmo.x) * (1.0 - veil) * (1.0 - pow(max(sd, 0.0), 3.0))
+        * (1.0 - clamp(halo * 1.2, 0.0, 1.0)) * (1.0 - sun);
+      col = mix(col, airO, ak);
+    }
   #endif
   gl_FragColor = vec4(clamp(col, 0.0, 1.0), mix(1.0, 0.45, uAtmo.x));
   pcAux = uAux8 > 0.5 ? vec4(starOK, 0.0, 20.0 / 32.0, 0.0) : vec4(starOK, 0.0, 20.0, 0.0);     // (x: where stars may lie; the sky has no normal to store)
@@ -661,6 +726,11 @@ export function makeSkyUniforms() {
     // (w: how strongly the sky is laid in brush strokes -- the world's own `skyStrokes`, set per body in
     //  world/index.js; `?skystroke=` turns it anywhere, which is how it was looked at)
     uSkyOil: { value: new THREE.Vector4(_qn('cloudform', 1), _qn('skycap', 0.86), _qn('cloudlit', 1), 0) },
+    // ONE AIR FOR THE LAND AND THE SKY (see pcSkyAir in the shader above). x: how far the sky's lowest band is the
+    // same air the far land ends in (?skyair=; 0 is the sky exactly as it was, which is the other half of the pair
+    // to show the owner). y: how high that band stands, as dot(view, up) -- 0.075 is about four degrees over the
+    // horizon, which is a painter's band low down and not a wall of one colour (?skyairtop=).
+    uSkyAir: { value: new THREE.Vector4(_qn('skyair', 1), _qn('skyairtop', 0.075), 0, 0) },
     ...OIL,
   };
 }

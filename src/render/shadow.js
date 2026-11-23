@@ -12,9 +12,37 @@
 // change as the eye moves. The ground is not drawn into it (it shades itself by the light's angle), so a tree behind
 // a rise still throws its shadow through the rise: not seen in a wood on level ground.
 import * as THREE from 'three';
-import { SHADOW, OIL } from './shared.js';
+import { SHADOW, OIL, QUALITY } from './shared.js';
 
 export const SHADOW_LAYER = 2;
+
+// HOW FAR THE SQUARE REACHES WHEN THE EYE LOOKS ALONG THE LAND (2026-11-22, for the owner's 300 yards). `?shreach=`
+// is how many of the ladder's own SQRT2 steps it may take for that: 0 the square exactly as it was, 1 the default,
+// 2 to be shown beside it. (2 and 3 come out the same square: the test in render stops growing it once it holds
+// everything that casts into it.)
+const REACH = (() => {
+  try { const q = new URLSearchParams(location.search).get('shreach'); return q != null && isFinite(+q) ? Math.max(0, Math.min(3, Math.round(+q))) : 1; }
+  catch (e) { return 1; }     // (no address: a test, or a tool)
+})();
+// The square lies LEAD of its own half-width ahead of the eye, and the map alone answers for FULL of it (uShK.w in
+// render below; past that chunks.js pcSunAt eases into the leaf pattern). So the ground has cast shadows out to
+// (LEAD + FULL) x R metres ahead of the player's feet, and keeps (FULL - LEAD) x R behind them: with the 90 m
+// square, 113 m ahead and 41 m behind.
+const LEAD = 0.4, FULL = 0.86;
+// HOW FAR OUT SOMETHING THAT CAN CAST INTO THIS MAP STILL STANDS, at the top quality tier. The oil look's far trees
+// were taken out of this pass and the ground was never in it (flora.js), so what casts is the trees of the near and
+// middle tiers: the middle tier reaches T1 = 190 m times the tier's own range scale, each tree jittering its
+// hand-over by 15% (flora.js) -- 219 m at tier 2, 131 m at tier 1, 61 m at tier 0. The square is grown towards this
+// and NO further: every metre past the last caster coarsens the near shadow for nothing.
+// Only tier 2 grows at all. At tier 1 (what a phone starts at, core/preset.js) the whole prize is cast shadow on the
+// band from 113 to 131 m -- past 131 m nothing casts there whatever size the square is -- and that is not worth a
+// texel 41% coarser on the ground the player is standing on, nor the wider frustum's draws on a device at its frame
+// cap. The phone's middle distance wants the far trees drawn into this pass, not a bigger square.
+const MID_TIER = 219;
+// Looking DOWN this steeply (the sines of 48 and 58 degrees) the middle distance has left the frame, so the square
+// comes back in and the near shadow has its finest texels again. Two numbers and not one so that a view held near
+// the threshold does not change the texels a shadow is cut on from frame to frame.
+const LOOK_ON = 0.74, LOOK_OFF = 0.85;
 
 const VERT = /* glsl */`
 attribute vec4 aInst;     // (plants: z the instance's number, as in materials.js PROP_VERT)
@@ -135,7 +163,7 @@ export class ShadowMap {
     const ex = renderer.extensions;
     this.ok = !!(ex && ex.has && ex.has('EXT_color_buffer_float'));
     this.size = o.size || 2048; this.R = o.range || 90; this.R0 = this.R; this.D = 400;
-    this.rt = null; this.frames = 0;
+    this.rt = null; this.frames = 0; this._far = false;      // (whether the eye is looking along the land: LOOK_ON)
     if (!this.ok) return;
     this.rt = new THREE.WebGLRenderTarget(this.size, this.size, { type: THREE.FloatType, format: THREE.RedFormat, depthBuffer: true });
     this.rt.texture.minFilter = THREE.NearestFilter; this.rt.texture.magFilter = THREE.NearestFilter; this.rt.texture.generateMipmaps = false;
@@ -183,7 +211,8 @@ export class ShadowMap {
     const Y = this._Y.crossVectors(Z, X);
     // the square lies a little ahead of the eye, and moves in whole texels
     const f = this._f.set(0, 0, -1).applyQuaternion(camera.quaternion).applyQuaternion(qi);
-    f.addScaledVector(up, -f.dot(up));
+    const pitch = f.dot(up);      // the sine of how far the view is above level; negative looking down
+    f.addScaledVector(up, -pitch);
     if (f.lengthSq() > 1e-6) f.normalize(); else f.set(0, 0, 0);
     // FROM THE AIR the square lies on the LAND under the eye, not round the eye (from 150 m up with a low sun the land
     // in view fell outside it, and the wood from the ship had no shadows at all), and it is larger the higher the eye:
@@ -192,8 +221,21 @@ export class ShadowMap {
     const alt = Math.max(0, SHADOW.alt || 0);
     let R = this.R0;
     while (R < 359 && alt * 1.5 > R) R *= Math.SQRT2;
+    // ...AND WHEN THE EYE LOOKS ALONG THE LAND, not only when it is high. Standing on level ground the ladder above
+    // leaves the square at 90 m however far the player is looking, so a wood at 150 m had no cast shadow at all and
+    // the leaf pattern stood in for it. One step of the same ladder, 90 m to 127 m, carries the shadows out to 160 m
+    // ahead of the feet, and the square then keeps 58 m of ground behind them instead of 41, so a low sun at the
+    // player's back still holds the trees that throw towards them. What it costs, both of them MEASURED OFF THE
+    // NUMBERS AND NOT SEEN: the texel a shadow is cut on goes from 0.088 m to 0.124 m, and the patch the ground reads
+    // it through (the quarter-sized map, AIR_FRAG, at mip 0.5) from 0.50 m to 0.70 m. ?shreach=0 is the old square.
+    // Only while the ladder above has left the square at its smallest, which is an eye under 60 m: the views from
+    // the air were judged with the square their own height gives them, and this step is for the player on the land.
+    if (REACH > 0 && R === this.R0 && (QUALITY.level | 0) >= 2) {
+      this._far = f.lengthSq() > 0.5 && -pitch < (this._far ? LOOK_OFF : LOOK_ON);
+      for (let s = 0; this._far && s < REACH && R < 359 && (LEAD + FULL) * R < MID_TIER; s++) R *= Math.SQRT2;
+    }
     if (R !== this.R) { this.R = R; const sc = this.cam; sc.left = -R; sc.right = R; sc.top = R; sc.bottom = -R; sc.updateProjectionMatrix(); }
-    const c = this._c.copy(camL).addScaledVector(up, -alt).addScaledVector(f, this.R * 0.4);
+    const c = this._c.copy(camL).addScaledVector(up, -alt).addScaledVector(f, this.R * LEAD);
     const tx = (2 * this.R) / this.size;
     const cx = Math.round(c.dot(X) / tx) * tx, cy = Math.round(c.dot(Y) / tx) * tx, cz = c.dot(Z);
     c.set(0, 0, 0).addScaledVector(X, cx).addScaledVector(Y, cy).addScaledVector(Z, cz);
@@ -243,7 +285,7 @@ export class ShadowMap {
     renderer.setClearColor(this._keep, prevA);
     renderer.setRenderTarget(prevT);
     // x how strong, y the bias (0.3 m toward the sun), z a texel of the square, w where the square's answer gives way
-    K.set(k, 0.3 / (2 * D), 1 / this.size, 0.86);
+    K.set(k, 0.3 / (2 * D), 1 / this.size, FULL);
     // for the light in the air (post.js OIL_FRAG): the eye's space to the square, and the way to the sun in the eye's space
     // (the body's root and the eye are in the scene, and the scene has just been walked and placed for the sun's
     // camera: they are up to date. Walking the root's whole subtree again here was a third of a frame's placing.)

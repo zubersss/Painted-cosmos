@@ -16,7 +16,10 @@ function cell(kind, S, face, ix, iy) {
   if (v) { c.delete(key); c.set(key, v); return v; }     // refresh LRU order
   v = kind === 't' ? placeTrees(S, face, TREE_LEVEL, ix, iy, TREE_GRID) : placeUnder(S, face, UNDER_LEVEL, ix, iy, UNDER_GRID);
   c.set(key, v);
-  if (c.size > (kind === 't' ? 1400 : 700)) c.delete(c.keys().next().value);      // (the tiers reach farther now: more cells are alive at once)
+  // (2026-11-23) THE FAR CELL OF THE OIL LOOK IS FOUR TREE CELLS TO A SIDE (world/flora.js farSize), so a far
+  // wood's working set of PLACED cells is four times what it was and 1,400 was being overrun: the oldest cells
+  // were thrown away and placed again on the next frame, which is the one thing this cache exists to stop.
+  if (c.size > (kind === 't' ? 3000 : 700)) c.delete(c.keys().next().value);
   return v;
 }
 export function treeCell(S, face, ix, iy) { return cell('t', S, face, ix, iy); }

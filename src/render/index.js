@@ -131,7 +131,22 @@ export function createPainter(renderer) {
     }
     // (the oil look on a touch device has no smoothing filter at all: the light post filter softens every stroke's edge,
     // and the phone's screen then stretches the picture three times over: blur on blur, against the look's first rule)
-    post.setPostAA(aaMode === 'post' || (aaMode === 'auto' && post.samples === 0 && !LIGHT));
+    // (2026-11-22) AND ON NO DEVICE AT ALL IN THE OIL LOOK. The automatic path above still turned the filter on
+    // wherever the scene is drawn with one sample and the machine is NOT a light one -- a desktop at tier 0, or a
+    // screen so large that even two samples would cost over AA_MB -- so the one-pixel clean edge that the strokes are
+    // drawn with was being blended into its neighbours' on exactly the machines that can least afford the extra
+    // whole-screen pass. The owner's first rule for this look is no blur, and they have ruled that they would rather
+    // have stroke edges that alias in motion than any softening. `?aa=post` still forces it, for the tests and for an
+    // A and B still; the watercolour game's tiers are untouched.
+    //   It also takes a pass off those frames: with no post filter and no glaze visible, _finishOil reads the scene's
+    // own colour and the whole-screen copy into rtAbs is not drawn at all (post.js _finishOil, the note there).
+    post.setPostAA(aaMode === 'post' || (aaMode === 'auto' && post.samples === 0 && !LIGHT && !LOOK.oil));
+    // (2026-11-22) HOW OFTEN THE LIGHT IN THE AIR IS ASKED (post.js OIL_FRAG, the note on the march). The march was
+    // sixteen places and up to thirty-two texture reads for every pixel of the screen, the sky included, measured by
+    // the owner's phone at at least 4 ms of a 20.7 ms frame. A light device takes half as many taps and spends them
+    // twice as far apart; a desktop keeps sixteen, one every 7 m, so its picture does not change where the old march
+    // had a long answer to give. `?shafts=` overrides both (0: no light in the air, for an A and B still).
+    if (LOOK.oil && post.setShaftTaps) post.setShaftTaps(LIGHT ? 8 : 16, LIGHT ? 14 : 7);
     info.internalWidth = post.inW; info.internalHeight = post.inH; info.quality = quality; info.aa = post.samples; info.postAA = post.postAA;
   }
 

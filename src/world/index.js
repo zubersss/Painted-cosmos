@@ -645,7 +645,7 @@ export function createWorld(scene) {
       // eye rises. It was 40 km on the ground: the Moon's horizon stood as a crisp ruled line of boulders; ARTPASS wish 6)
       const air01 = body.atmosphereHeight > 0 ? space01 : THREE.MathUtils.smoothstep(alt, 250, 2500);
       const vis = (v0 * mist + (v1 - v0 * mist) * THREE.MathUtils.smoothstep(alt, 6, 160)) * (hazeK + (1 - hazeK) * air01) + 40000 * air01;
-      bu.uFog.value.set(1 / vis, 6, 1 - air01 * 0.9, space01 * st.limbK);
+      bu.uFog.value.set(1 / vis, LOOK.oil ? LOOK.oilBands : 6, 1 - air01 * 0.9, space01 * st.limbK);      // (the oil look lays the air in ten bands, not six: shared.js LOOK.oilBands, `?bands=`. The watercolour's six are untouched.)
       if (bu.uFogBank) bu.uFogBank.value.set(bank * (1 - air01), look.bankSize || 150);
       // sky
       skyU.uSunDirL.value.copy(bu.uSunDirL.value);
