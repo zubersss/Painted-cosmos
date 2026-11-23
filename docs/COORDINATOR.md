@@ -2990,3 +2990,69 @@ same fault the element button was built to mend. It also asked the thumb to lear
 - Run as: READ (what the lighting, the distance and the powers' physics really do now) -> DESIGN (three
   independent ten-step plans, judged, one synthesised) -> BUILD (one agent per step, one file each, no two in the
   same file) -> SEE IT (the coordinator alone drives the one browser this machine may run).
+
+### 2026-11-23 THE TEN-STEP UPGRADE, built by twelve agents in two workflows
+- Run as the owner asked (their word, "ultracode"): SIX READERS over the lighting, the 275 m picture, the powers'
+  physics, the frame's cost, the owner's own standing rules, and the shadow/post passes; then TEN BUILDERS, one
+  file set each so that no two could collide; then the coordinator alone at the one browser this machine may run.
+
+**THE FINDING THAT DROVE EVERYTHING, computed independently by three of the six readers.** The far distance was
+not low quality: **it was not being drawn at all.** `pcFogAmount` multiplies the distance by 2.7, Earth's ground
+visibility is 185 m, the autumn wood multiplies that by 1.4, the curve has a shoulder and is then quantised into
+six bands whose top band is exactly 1.0 -- so the haze fraction reads **0.968 at 200 m and 1.000 from 250 m out.**
+Whatever the ground, the trees and the water computed beyond that was thrown away and replaced by one flat colour.
+That is the owner's smudge, and nothing else in the lighting could be seen until it was mended.
+
+**THE OTHER FINDINGS, all anchored:** in clear daylight the oil look had THREE tones and not four, the deepest
+paint unreachable and the middle one about seven degrees of angle wide (so a far form was two flat shapes with a
+hard join); no cast shadow past about 87 m on flat ground, and past it a per-stroke coin toss on a noise pattern
+whose features are the stroke's own size (the far floor was flickering confetti); no sky fill that knows which way
+a surface faces, no ground bounce, and no contact darkening anywhere in the renderer; between about 197 m and
+281 m on the owner's phone only ONE TREE IN THREE drawn, each grown half again as wide, and past 281 m none; no
+ground marks of any kind past 240 m; and a softening filter still running over the oil picture on any computer
+without multisampling, against the owner's own first rule for this look.
+
+**THE TEN STEPS (each with the switch that turns it off, so every one has an A and a B):**
+1. The air keeps a quarter of the far paint, with a knee so the near air the owner approved does not move, and ten
+   bands instead of six so a hillside is not terraced (`?air=`, `?airknee=`, `?bands=`).
+2. Four usable values and a visible terminator (`?litcurve=`); a sky fill that knows which way a surface faces and
+   a warm ground bounce (`?bounce=`, `?skyface=`); the far floor eased into masses, not coin tosses (`?masses=`).
+3. The surfaces follow: the plants' air curve had DRIFTED from the ground's although its comment claimed they
+   matched; the floor keeps its variety by the mark's size on the screen instead of fading by raw distance; a far
+   crown has a lit side and a shaded side and its own silhouette instead of a per-leaf coin flip.
+4. The last pass stops flattening the distance: never soften the oil picture on any machine, a sharp read when it
+   is enlarged (`?upscale=`), the far land keeps its local contrast, and the light in the air is marched only
+   where the shadow square can answer -- a SAVING, which is what pays for the rest.
+5. The sun's square grows a step when the eye looks ALONG the land and not only when it is high: cast shadow to
+   160 m instead of 113 (`?shreach=`).
+6. Every tree drawn in the far band instead of one in three grown half again as wide (`?farfill=`), paid for with
+   far cells four tree cells to a side so four times as many trees batch into one mesh (`?farcell=`).
+7. One air for the land and the sky, so the horizon has no seam (`?skyair=`).
+8. A fourth ring of ground marks reaching 450 m, so the land at 275 m carries its own brush touches (`?vista=`).
+9. THE RIP IS A TEAR: it pulls harder the nearer you are, takes hold from the middle outward over half a second,
+   every tear turns its own way, and it finally has its own rows in the three grain tables -- it tears the leaves
+   out of the crowns, lifts the dust INWARD (its lift used to fall through into the vortex's branch, which threw
+   grains outward) and lays the strokes of air the painter already drew. And THE GRAINS OF A POWER NOW LIVE NEAR
+   THE POWER: every emitter culled against a box round the player, so a tear fifty metres off had a bare ring
+   round it (`?ripfeel=`, `?powerfar=`). Still the moment now stops the rain and the plants too (`?timehold=`).
+10. THE AIM REACHES AS FAR AS THE EYE. It was a straight function of the camera's pitch and the view was never
+   traced against the land, so every cast landed within thirty metres: looking at the far ridge and casting
+   flattened the grass at your feet. The view is marched down a ladder of nine rungs to 300 m, amortised two rungs
+   a frame and run whole on the press, with a table of what each ability can really reach so a ring is never drawn
+   where the cast cannot arrive (`?aimray=`). The fold's air is carried with the player instead of crawling out at
+   26 m/s behind a 180 m/s rush, it stops short of deep water, and you land running (`?foldair=`).
+
+**SEEN.** Two A/B pairs, same camera, same hour, every switch off against every switch on: the far bank, the
+conifers and the rock face across the river come back from a pale wash to green ground, dark distinct spires and
+a readable face. **Ten steps, five files of shader text edited by five different agents, and not one compile
+error** -- and the watercolour game still compiles and is untouched (everything is behind `LOOK.oil` / `PC_OIL`).
+
+**HELD BACK ON PURPOSE:** the second, coarse shadow square out to 400 m. Every reader who costed it said it was
+the one change most likely to be refused on speed, and the owner's phone is at its cap. It is written down
+precisely enough to build in a later session, and it wants the owner's own device to judge.
+
+**THE CONTAINER RESTARTED MID-BUILD.** Nine of the ten builders had reported; the tenth (the aim and the fold) was
+killed after its edits were on disk but before it could report. Its work was kept, not thrown away, because its
+own tests pass and its diff reads complete -- but it was not written up by the agent that did it, so this entry
+and the commit message are the coordinator's reading of the diff. Said here because a later session should know
+which account is first-hand and which is not.

@@ -470,6 +470,37 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
 
 Head rewritten 2026-11-18, evening (the morning's text and the v12 text it replaced are in the log).
 
+**v33 (23 Nov) IS READY ON `look-proto`: THE TEN-STEP UPGRADE. THE FAR DISTANCE WAS NOT BEING DRAWN AT ALL.**
+The owner, 23 Nov: *"do a 10 step up grade using ultracode i want better lighting better physics for the powers
+and specifically better looks i want things to look high quality and fully rendered even from 300 yards away."*
+
+- **THE FINDING, computed by three readers independently and the reason the picture looked the way it did:** the
+  haze fraction reached **1.000 from 250 m out** (2.7 x the distance, Earth's 185 m visibility, a shoulder, six
+  bands with a top band of exactly 1.0). Everything the ground, the trees and the water computed past that was
+  thrown away and painted one flat colour. **The far distance was not low quality -- it was not drawn.**
+- **THE TEN STEPS** are listed in `docs/COORDINATOR.md` under 23 Nov with the switch that turns each one off.
+  In short: the air keeps a quarter of the far paint; four values and a terminator; a sky fill and a ground
+  bounce; the far floor in masses not confetti; the plants' air matched to the ground's (they had drifted); a far
+  crown with a lit and a shaded side; the last pass never softening the oil picture and keeping the far land's
+  contrast; the sun's square reaching 160 m instead of 113; every tree drawn in the far band; one air for land
+  and sky; ground marks out to 450 m; the rip as a real tear with its own grains; and the aim reaching 300 m
+  instead of 30.
+- **EVERY STEP HAS AN A AND A B.** `?air=0&bands=6&litcurve=0&bounce=0&masses=0&skyface=0&skyair=0&vista=0&shreach=0&farfill=0&farcell=2&upscale=0`
+  is the look exactly as it was at v32. That is how the two pairs of stills were made.
+- **SEEN:** two A/B pairs at the same camera and hour. Ten steps, five files of shader text, five different
+  agents, **no compile error**; the watercolour game compiles and is untouched.
+- **HELD BACK:** the second coarse shadow square to 400 m -- the one change every reader costed as likely to be
+  refused on speed. Written down, not built.
+- **WHAT IS LEFT, said plainly:** the far trees' RANGE on the phone (the far mesh's fade floor, `flora.js` `fs`)
+  still cuts the wood inside the owner's 275 m at the phone's picture size; the near strokes' prefilter in
+  `materials.js` is keep-or-throw per pixel, which is what could make the new far ground marks read as pepper;
+  the grass's travelling wave is not held by a stopped place (one phase for the whole field); and the autumn
+  wood's palette art pass (task 45) was deliberately NOT done in the same round, so the air could be judged
+  without the colours moving under it.
+- **A RULE THIS LEAVES:** the test of the look is now **what a still taken at 275 m shows**, not what the near
+  ground shows.
+
+
 **`main` IS AT v32 (22 Nov), pull request #32 merged: SPACE AND TIME IS FOUR OVERLY POWERFUL ABILITIES, AND THE
 WORLD IS BUILT AHEAD OF A WALKER.**
 The owner, 22 Nov: *"to many space and time abilities cut them down into folding space should be one of them but
