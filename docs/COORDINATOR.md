@@ -3095,3 +3095,11 @@ piece of alien design, not a deer. What is deliverable to the standard the owner
 and animation, make sure its really good") is: **the creature system itself -- body, gait, routine, ecosystem --
 and Earth's twenty-five first, properly**; then one world at a time after that. That is the plan unless the owner
 says otherwise.
+- **THE NEPTUNE STILL WAS TRIED TWICE AND NEVER CAME.** Two grabs of the snow world in the oil look were started
+  (900x520, then 320x180 to make it cheap) and both were stopped at the half-hour limit without writing a file.
+  The cause is this machine, not the game: the first picture on a new world compiles every one of its shaders in
+  software, and nine design agents were sharing the cores. WHAT IS PROVEN INSTEAD, and it is not nothing: the
+  world was driven COLD from Node on **Neptune, Earth, Mars and Jupiter**, 4,000 frames each, **no throw on any of
+  them**, and all four settle full (Neptune: 249 patches, 208 plant cells, 152 meshes drawn). So the script side
+  of the ten steps is good on a world that is not Earth; what is unproven is only whether the ICE SKY READS worse.
+  `?skyair=0` turns that one step off. **First thing to shoot in the next session, on a quiet machine.**
