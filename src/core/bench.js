@@ -278,6 +278,15 @@ export function attachBench(pc) {
       ['a leaf in its own colour', () => B({ flat: 5 }), () => B({ flat: 0 })],
       ['no air laid on the plants', () => B({ flat: 6 }), () => B({ flat: 0 })],
       ['no near trees', () => show(/^pc-prop-tall/, false), () => show(/^pc-prop-tall/, true)],
+      // (2026-11-23, after speed test 9: the near trees are 62.7 ms of a 101 ms frame and NOTHING in that table says
+      //  why. These three rows split it. "hand over at half the distance" is not a diagnostic -- it IS the change
+      //  that would be made, so the device measures the fix and not a guess. "half their leaves" drives the leaf
+      //  thinning that is already built (flora.js uLeafLod); "no near leaves" leaves the trunks and branches alone,
+      //  so the gap between it and "no near trees" is what the WOOD of a tree costs against its FOLIAGE.)
+      ['near trees hand over at half the distance', () => { const f = flora(); if (f) { f.benchTreeK = 0.5; f.lastScale = -1; } },
+        () => { const f = flora(); if (f) { f.benchTreeK = null; f.lastScale = -1; } }],
+      ['near trees at a third of the distance', () => { const f = flora(); if (f) { f.benchTreeK = 0.33; f.lastScale = -1; } },
+        () => { const f = flora(); if (f) { f.benchTreeK = null; f.lastScale = -1; } }],
       ['no trees', () => show(/^pc-prop-(tall|far)/, false), () => show(/^pc-prop-(tall|far)/, true)],
       ['no small plants', () => show(/^pc-prop-(?!tall|far)/, false), () => show(/^pc-prop-(?!tall|far)/, true)],
       // (2026-11-20) WHERE THE DRAW CALLS ARE. The table's header says 350 of them and 9.6 ms of script, and a draw
