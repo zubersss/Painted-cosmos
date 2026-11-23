@@ -487,6 +487,17 @@ have been completed."* Four things: the creatures' art pass (coat strokes + a sh
 plans, the waterfall off the sea cliff, and **sixty frames a second without losing the look**. "Find out then do
 it": the measurement comes first. Report only when all four are done.
 
+**`main` IS AT v37 (23 Nov).** Of the owner's four asks of 23 Nov: the creatures' SHADOW is done and seen
+(v35); the HERON is built, its form seen from its own triangles, its paint the deer's unchanged, the two not yet
+seen together (v37); FALLING WATER goes white at the lips, measured at 7.26 per cent of wet points and matching
+the field's own 7.2, not yet seen (v37). **THE FISH IS NOT BUILT. A WATERFALL'S SHEET AND PLUNGE POOL ARE NOT
+BUILT. AND SIXTY FRAMES A SECOND IS NOT REACHED** -- the owner's phone measured TEN, the trees are five sixths
+of the frame, three ways of cutting them were tried and measured and ALL THREE REFUSED because each damaged the
+wood for a few milliseconds. v36 shipped the instrument instead: two speed-test rows that measure the actual fix
+(the near trees handing over at half, and a third, of the distance). **The owner's next bench reading decides
+whether the performance work is one more version or a redesign.** Their own row 16 -- no trees at all -- is
+16.7 ms, exactly sixty: everything that is not a tree already runs at sixty.
+
 ## 3. State right now (update this before you stop)
 
 Head rewritten 2026-11-18, evening (the morning's text and the v12 text it replaced are in the log).

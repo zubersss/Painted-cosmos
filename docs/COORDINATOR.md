@@ -3266,3 +3266,38 @@ dial -- and the owner's standing instruction is to keep the quality. That is the
 
 **A NOTE FOR WHOEVER READS THIS NEXT: the owner's phone is the only instrument. Three times now a reading taken
 here has pointed at the wrong thing. Measure the device, or do not claim a cause.**
+
+### 23 Nov — v37: THE HERON, AND FALLING WATER. And two bugs the measurements caught.
+
+**THE HERON.** `beastkit.js` had one body plan, so a bird would have been four-legged and `beasts.js` rightly
+refused to draw it. **The rig did not need changing:** `beastmat.js` finds a leg BY ITS NAME, so renaming the
+fore pair to `wl_*`/`wr_*` makes them take no stride and never be solved -- a folded wing. The hind pair becomes
+the bird's two legs, and the walk table already puts those two half a cycle apart, WHICH IS A BIPED'S WALK.
+Heron: 1,098 triangles against the deer's 1,648.
+
+Two faults, **both found by rasterising the silhouette from its own triangles, neither by a test**:
+- **the bill was four and a half times too long** -- I invented its length; the row already said `bill: 0.13`
+  and nobody had read it. The first silhouette was a kiwi with a spear;
+- **the body floated** -- `walkerLayout` assumes a body fills everything above the legs, true of a deer and
+  false of a wading bird. `bodyK` now sets how much of that room the barrel takes, and the rest becomes neck.
+
+**FALLING WATER.** Stage one gave the water lips and gave the paint a socket for two numbers it cannot work out
+itself (`patchgen.js:60`) -- **and nothing had ever filled it.** One agent owned the field that knows where water
+falls, the other the paint that turns white, and neither could reach across; the coordinator joined them.
+**MEASURED: 2,077 of 28,601 random wet points on Earth, 7.26 per cent, now read as falling water**, which agrees
+to the decimal with the field asked directly (7.2 per cent; the sea's median fall is exactly zero).
+
+**THE BUG THAT WOULD HAVE SHIPPED, and the rule it leaves.** Written the first way, `o.turb` and `o.fspd` were
+SET when there was a fall and left alone otherwise. **The sample object is made once and handed to every point on
+the planet**, so one lip's churn smeared across every piece of water sampled after it: **100 per cent of wet
+points came back as falling water and THE OCEANS WOULD HAVE GONE WHITE.** A still would very likely have sent
+me to tune the threshold, which was never the fault. What found it was asking the field directly and getting
+7.2 where my own code said 100.
+**THE RULE: a field on a shared sample object is written EVERY time or not at all. And when two numbers must
+agree, compute both -- a disagreement is a bug, not a judgement.**
+
+**WHAT IS NOT DONE, said plainly:** a waterfall's vertical sheet and plunge pool are not built, and the big fall
+on this Earth is the 30-50 m SEA CLIFF, which is the coast recipe and is untouched. **The fish plan is not built
+and the trout is still not drawn.** Neither the heron nor the falling water has been SEEN in a frame of the game:
+the heron's FORM is seen from its own triangles and its PAINT is the deer's material unchanged; the water is
+measurement only.
