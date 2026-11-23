@@ -480,6 +480,13 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
   soft far off. So: give the room to SHARPNESS (the ladder, v27), and buy more of it by cutting the script, not by
   cutting what is drawn. **Do not cut content for speed on this phone until a table says content costs something.**
 
+**THE OWNER, 23 Nov (latest): FINISH THE REST, AND MAKE IT RUN AT SIXTY.** *"Finish up the rest and also do a
+performance upgrade on it it runs a little laggy i want 60fps if you can find a way to do it while keeping the
+quality there most be something you can do find out then do it then come back to me when all my steps and asks
+have been completed."* Four things: the creatures' art pass (coat strokes + a shadow), the bird and fish body
+plans, the waterfall off the sea cliff, and **sixty frames a second without losing the look**. "Find out then do
+it": the measurement comes first. Report only when all four are done.
+
 ## 3. State right now (update this before you stop)
 
 Head rewritten 2026-11-18, evening (the morning's text and the v12 text it replaced are in the log).

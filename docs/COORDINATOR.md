@@ -3201,3 +3201,20 @@ still read it -- that is a separate step") and no test could have caught it; onl
   to the pass would cast its REST pose while walking). That is most of why it does not sit into the floor.
 - The lake's surface is busier than still water should be. That still was taken at `?aer=3`, the exaggerated
   setting built for judging; the default lays about a third as much white.
+
+### 23 Nov, later still — THE OWNER'S NEXT INSTRUCTION
+
+> *"Finish up the rest and also do a performance upgrade on it it runs a little laggy i want 60fps if you can
+> find a way to do it while keeping the quality there most be something you can do find out then do it then
+> come back to me when all my steps and asks have been completed"*
+
+Four things, and the fourth is new and is the one they can feel:
+1. **The creatures' art pass** (task 77): the coat in the look's own strokes, and a shadow under the feet.
+2. **The bird and the fish body plans** (task 75), so the heron and the trout can be drawn at all.
+3. **The waterfall off the sea cliff** (task 74), so a river can reach the sea.
+4. **SIXTY FRAMES A SECOND, WITHOUT LOSING THE LOOK.** "Find out then do it" -- so the finding comes first and
+   the fix follows it, and nothing is cut by guesswork. NOTE THE STANDING RULE: this machine draws in software
+   and has been wrong TWICE about why the phone is slow. Script time here is a fair stand-in; the picture's own
+   cost is not, and only `bench=1` on the owner's own device can settle that.
+
+Report only when all four are done.
