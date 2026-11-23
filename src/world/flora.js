@@ -35,8 +35,24 @@ const TREES_FULL = typeof location !== 'undefined' && /[?&]trees=full\b/.test(lo
 // (speed test 6, 2026-11-17), and across a river the lump read as a smooth orange blob where this reads as leaves.
 // (?fartree=lump: the lump, as it was until 2026-11-17, for comparisons.)
 const FAR_LUMP = typeof location !== 'undefined' && /[?&]fartree=lump\b/.test(location.search || '');
-// (2026-11-19) `?fartree=blob`: the far tree as ONE CARD with spherical normals, painted by the look's own dab
-// shader -- 10 triangles against 138. Opt-in, so the wood that ships is untouched until the owner has seen it.
+// (2026-11-19) the far tree as ONE CARD with spherical normals, painted by the look's own dab shader -- 10
+// triangles against 138. It was built then, measured then, written up in florakit.js as keeping "the dabbed crown
+// the owner approved", AND LEFT OPT-IN. It stayed opt-in for four days.
+//
+// 2026-11-23, THE OWNER'S OWN PHONE (speed test 9, Adreno 740): the game runs at TEN frames a second, 101 ms a
+// frame, of which the script is 11.3 ms and the draw calls nothing like the cost -- 2,022,000 TRIANGLES a frame
+// is. COUNTED HEADLESS at the autumn spawn, tier 1: the far trees alone are 816,132 of the scene's 1,710,839,
+// FORTY-EIGHT PER CENT OF EVERYTHING DRAWN, against the near trees' 263,364. With the one card they are 82,796
+// and the scene is 977,503: a cut of 733,336 triangles, FORTY-THREE PER CENT OF THE WHOLE SCENE, from a switch
+// that was already written. On a phone's tile GPU a triangle under about eight pixels wastes most of a quad, so
+// this is the single biggest thing that can be done without touching what the wood IS.
+// (?fartree=card is the 138-triangle tree it replaces, for an A and a B; ?fartree=lump is the old lump.)
+// NOT THE DEFAULT, AND THE PICTURE IS WHY. SEEN 2026-11-23, the same camera over the autumn wood at noon,
+// 900x520, A and B: with the one card the far crowns go SMOOTH AND FACETED -- flat lozenges with straight edges,
+// paper cut-outs where the shingled tree is ragged and leafy. The dab shader does not cut the crown's edge the
+// way the note in florakit.js says it does. That note was written from arithmetic and intent and NOBODY HAD
+// LOOKED; the still disproved it in one frame. The project's own rule caught it: built is not seen.
+// It stays opt-in, for the speed test and for comparisons.
 const FAR_BLOB = typeof location !== 'undefined' && /[?&]fartree=blob\b/.test(location.search || '');
 const FAR_CARDS = !FAR_LUMP;
 const RANGE_SCALE = [0.28, 0.6, 1.0];                    // (the lower tiers keep the ranges they had)
@@ -148,7 +164,7 @@ export class Flora {
     this.farShift = this.farSpan === 4 ? 2 : 1;
     this.farFill = !!(LOOK.oil && FAR_FILL);
     this.farSize = this.treeSize * this.farSpan;       // far trees are batched in cells this many tree cells to a side
-    this.rangeScale = 1; this.treeScale = 1; this.farScale = 1; this.lastScale = -1;
+    this.rangeScale = 1; this.treeScale = 1; this.farScale = 1; this.lastScale = -1; this.benchTreeK = null;
     this.lastLaid = -10; this.washNow = 1; this._washWall = 0;
     this.lastRelease = -10;
     this.held = [];                    // cells that are built and wait for their ground (see update)
@@ -913,6 +929,11 @@ export class Flora {
       // together ended the trees 170 m off, bare hills behind: "most of the things haven't rendered", the owner)
       ts *= sk; fs = Math.max(sk, 0.75) * air * (1 + Math.round(Math.min(1, (SHADOW.alt || 0) / 220) * 4) / 4);
     }
+    // (THE SPEED TEST'S OWN HANDLE, core/bench.js. The owner's phone says the NEAR trees are 62.7 ms of a 101 ms
+    //  frame and nothing in the table says how much of that is their leaves and how much their size on the screen.
+    //  Setting this to 0.5 makes every near tree hand over to the far form at HALF the distance, which is exactly
+    //  the change that would be made if it is worth it -- so the device measures the fix itself, not a guess.)
+    if (this.benchTreeK != null) { ts *= this.benchTreeK; }
     this.treeScale = ts; this.farScale = fs;
     if (now != null) this.washNow = now;
     else { const w = performance.now(); this.washNow += this._washWall ? Math.min(0.1, Math.max(0.02, (w - this._washWall) / 1000)) : 0; this._washWall = w; }
