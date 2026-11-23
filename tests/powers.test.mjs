@@ -560,3 +560,145 @@ test('the rip tears open a wind source that reaches tens of metres, and closes b
   assert.equal(p.winds.count, 0, 'a rip outlived its life');
   assert.equal(p.times.rips.length, 0, 'and the painter is still being handed it');
 });
+
+// ---- THE AIM REACHES AS FAR AS THE EYE DOES (2026-11-22) ----------------------------------------------------
+// The owner asked for the world to move at three hundred yards (275 m). Until v32 the aim's distance was a
+// function of the camera's PITCH alone -- 6 m looking steeply down, 30 m level -- and the view was never traced
+// against the land, so every power landed at most thirty metres away whatever the player was looking at. The view
+// is marched against the real ground now (src/core/powers.js _march) and the pitch rule is kept as the FLOOR and
+// the fallback, so the aim can only ever go FURTHER than it used to.
+const along = (d) => { const l = Math.hypot(d.x, d.y, d.z) || 1; return Math.atan2(d.z / l, d.y / l) * R; };
+// a world with a wall of rock standing 60 m tall across the view at `at` metres, and flat ground before it
+const ridgeSim = (pitch = -0.02, at = 150) => {
+  const s = fakeSim({ pitch });
+  s.ex.v = { x: 0, y: 0, z: 0 };
+  s.sampleSurface = (b, d) => ({ radius: R + (along(d) > at ? 60 : 0), liquidRadius: 0 });
+  return s;
+};
+
+test('the aim is marched against the land: a look at the far ridge puts the power on the ridge', () => {
+  const p = new Powers(); p.pick(2);                     // quicken: an ability that acts AT the aim
+  const sim = ridgeSim();
+  step(p, sim, 8);
+  assert.ok(p.aim.pitchDist <= POWERS.aimFar, 'the pitch rule alone still says ' + p.aim.pitchDist.toFixed(1) + ' m');
+  assert.ok(p.aim.ray > 100 && p.aim.ray < 160, 'the march met the ridge at ' + p.aim.ray.toFixed(1) + ' m');
+  assert.ok(p.aim.dist > 100, 'and the aim went out to it: ' + p.aim.dist.toFixed(1) + ' m');
+  // and the cast is really set down out there, not at arm's length
+  p.down = true; step(p, sim, 2); p.down = false; step(p, sim, 2);
+  const s = p.winds[0];
+  assert.equal(s.kind, KIND.zone);
+  const out = Math.hypot(s.px - sim.ex.p.x, s.py - sim.ex.p.y, s.pz - sim.ex.p.z);
+  assert.ok(out > 100, 'the power was set down ' + out.toFixed(1) + ' m away, not on the far ridge');
+});
+
+test('the aim falls back to the pitch rule for a view that meets nothing, and for a world that will not answer', () => {
+  // the sky: the march walks its whole ladder and meets nothing
+  const sky = new Powers(); sky.pick(2);
+  step(sky, ridgeSim(0.5), 10);
+  assert.equal(sky.aim.ray, 0, 'something was met in the sky');
+  assert.ok(Math.abs(sky.aim.dist - sky.aim.pitchDist) < 1e-9, 'the pitch rule did not stand: ' + sky.aim.dist);
+  assert.ok(sky.aim.ok && Number.isFinite(sky.aim.p.x), 'and there is still an aim to draw');
+  // a world that throws on every sample (between worlds, a body with nothing made yet)
+  const dead = new Powers(); dead.pick(2);
+  const sim = fakeSim(); sim.sampleSurface = () => { throw new Error('nothing made here yet'); };
+  step(dead, sim, 10);
+  assert.equal(dead.aim.ray, 0);
+  assert.ok(dead.aim.dist > 0 && dead.aim.dist <= POWERS.aimFar, 'the pitch rule is the fallback: ' + dead.aim.dist);
+  // and the aim never goes NEARER than the pitch rule, at any pitch, on any of these grounds
+  for (let pit = -1.15; pit <= 1.25; pit += 0.1) {
+    for (const g of [ridgeSim(pit).sampleSurface, () => ({ radius: R, liquidRadius: 0 }), () => ({ radius: R, liquidRadius: R + 3 })]) {
+      const q = new Powers(); q.pick(2);
+      const s2 = fakeSim({ pitch: pit }); s2.sampleSurface = g;
+      step(q, s2, 10);
+      assert.ok(q.aim.dist >= q.aim.pitchDist - 1e-9, 'at pitch ' + pit.toFixed(2) + ' the aim came nearer than it used to');
+      assert.ok(Number.isFinite(q.aim.dist) && Number.isFinite(q.aim.size), 'at pitch ' + pit.toFixed(2) + ': not a number');
+    }
+  }
+});
+
+test('the aim march is amortised: a few rungs a frame while nothing is pressed, the whole ladder on the press', () => {
+  // nothing pressed: the first frame cannot have walked all nine rungs, so the ring is still the pitch rule's
+  const slow = new Powers(); slow.pick(2);
+  const sim = ridgeSim();
+  step(slow, sim, 1);
+  assert.equal(slow.aim.ray, 0, 'the whole ladder was walked on an idle frame');
+  step(slow, sim, 6);
+  assert.ok(slow.aim.ray > 100, 'the sweep never finished: ' + slow.aim.ray);
+  // a tap: the press walks the whole ladder in that one frame, BEFORE the ability is armed and cast
+  const tap = new Powers(); tap.pick(2);
+  const sim2 = ridgeSim();
+  tap.tapOnce = true; step(tap, sim2, 1);
+  assert.ok(tap.aim.ray > 100, 'the press did not walk the whole ladder: ' + tap.aim.ray);
+  step(tap, sim2, 1);
+  const s = tap.winds[0];
+  assert.ok(Math.hypot(s.px - sim2.ex.p.x, s.py - sim2.ex.p.y, s.pz - sim2.ex.p.z) > 100, 'the tap cast at arm\'s length');
+});
+
+test('an ability whose work cannot travel that far keeps its ring where the work is', () => {
+  // a gust is a pulse that leaves the hands and is spent at WINDPOWER.gustReach: the ring must not be drawn on a
+  // ridge the air will never reach, which would be a worse lie than the thirty-metre aim was
+  const g = new Powers(); g.pick(0);
+  step(g, ridgeSim(), 8);
+  assert.ok(g.aim.ray > 100, 'the march still reaches: ' + g.aim.ray);
+  assert.ok(g.aim.dist <= WINDPOWER.gustReach * 2.5 + 1e-6, 'the gust\'s aim went past its own reach: ' + g.aim.dist.toFixed(1));
+  assert.ok(g.aim.dist > POWERS.aimFar, 'and it is still further than the old rule: ' + g.aim.dist.toFixed(1));
+  // the ones that act AT the aim are not capped
+  const r = new Powers(); while (r.element !== 2) r.nextElement(); r.pick(1);     // the rip
+  step(r, ridgeSim(), 8);
+  assert.ok(r.aim.dist > 100, 'the rip must reach as far as the eye: ' + r.aim.dist.toFixed(1));
+});
+
+// ---- THE FOLD'S AIR AT THE FOLD'S OWN SPEED (2026-11-22) ---------------------------------------------------
+// It used to cast ONE gust at the far end pointing back at the feet, and a gust's front runs out at
+// WINDPOWER.gustFront (26 m/s) while the fold carries the explorer at about 180: so the air the owner asked for
+// was a hundred metres behind them in the first frame and the eye went through still air the whole way.
+test('the fold carries ONE source of air with the player, pointed back along the travel', () => {
+  const p = new Powers(); while (p.element !== 2) p.nextElement(); p.pick(0);
+  const sim = ridgeSim();
+  p.tapOnce = true; step(p, sim, 2);
+  assert.ok(p.fold, 'no fold began');
+  const jets = () => p.winds.filter((s) => s.kind === KIND.jet);
+  assert.equal(jets().length, 1, 'the fold cast more than one gust');
+  let worst = 0;
+  for (let i = 0; i < 40 && p.fold; i++) {
+    step(p, sim, 1);
+    const js = jets();
+    assert.equal(js.length, 1, 'a gust was cast per frame: the six slots would fill in a tenth of a second');
+    const a = js[0], e = sim.ex.p;
+    worst = Math.max(worst, Math.hypot(a.px - e.x, a.py - e.y, a.pz - e.z));
+    // it lies BACK along the travel: the fold goes +z, so the air goes -z
+    assert.ok(a.dz < -0.9, 'the carried air stopped pointing back along the travel: dz ' + a.dz.toFixed(2));
+  }
+  assert.ok(worst < 2.0, 'the air was left behind: it got ' + worst.toFixed(1) + ' m from the eye (the hands are ' + POWERS.hands + ' m up)');
+  assert.equal(p.fold, null, 'the fold never ended');
+});
+
+test('the fold lands you running, and not on the face of a lake', async () => {
+  const { TIMEPOWERS } = await import('../src/core/powers.js');
+  // (1) you arrive moving: the velocity used to be zeroed on arrival, so a hundred-metre rush ended planted
+  const p = new Powers(); while (p.element !== 2) p.nextElement(); p.pick(0);
+  const sim = ridgeSim();
+  p.tapOnce = true; step(p, sim, 2 + 90);
+  assert.equal(p.fold, null);
+  const v = Math.hypot(sim.ex.v.x, sim.ex.v.y, sim.ex.v.z);
+  assert.ok(v > 1, 'it set you down planted: ' + v.toFixed(2) + ' m/s');
+  assert.ok(v <= TIMEPOWERS.foldLand + 1e-6, 'and it must stay under the body\'s own run: ' + v.toFixed(2) + ' m/s');
+  assert.ok(sim.ex.v.z > 0, 'the speed it keeps must be ALONG the travel');
+  // (2) a lake 40 m along the way: the fold stops on the bank and says so
+  const q = new Powers(); while (q.element !== 2) q.nextElement(); q.pick(0);
+  const wet = fakeSim(); wet.ex.v = { x: 0, y: 0, z: 0 };
+  wet.sampleSurface = (b, d) => ({ radius: R, liquidRadius: along(d) > 40 ? R + 1.4 : 0 });
+  q.tapOnce = true; step(q, wet, 2);
+  assert.ok(q.fold, 'the fold was refused outright at a lake 40 m off');
+  const far = Math.hypot(q.fold.p1.x - q.fold.p0.x, q.fold.p1.y - q.fold.p0.y, q.fold.p1.z - q.fold.p0.z);
+  assert.ok(far > 2 && far < 40, 'it did not stop at the water: ' + far.toFixed(1) + ' m');
+  assert.equal(q.note, 'the fold stops at the water');
+  step(q, wet, 90);
+  assert.ok(along({ x: wet.ex.p.x, y: wet.ex.p.y, z: wet.ex.p.z }) < 40, 'it set you down on the water');
+  // (3) and a world whose samples throw must not refuse the fold: a wet landing beats a power that does nothing
+  const r = new Powers(); while (r.element !== 2) r.nextElement(); r.pick(0);
+  const bad = fakeSim(); let n = 0;
+  bad.sampleSurface = (b, d) => { if (++n > 3) throw new Error('no ground'); return { radius: R, liquidRadius: 0 }; };
+  r.tapOnce = true; step(r, bad, 2);
+  assert.ok(r.fold || r.casts > 0, 'a bad sample refused the fold');
+});

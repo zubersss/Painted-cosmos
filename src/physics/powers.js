@@ -9,6 +9,8 @@
 //             devil answers it
 //   a PART    move water: a wall of wind held along a line, under which the water is parted (the painter presses its
 //             face down there; the explorer's ground has no water there: partedAt)
+//   a RIP     a tear in space and time: air poured in from a long way off, at full strength out to most of its
+//             reach and faster the nearer the tear, turning and lifting at the tear itself
 // It is given to the systems that already take the dust devils' wind in the same way: the air at a point (air.js
 // airAt), the plants' field (flora.js) and the loose things (loose.js). Each of them asks powerWind() for what the
 // list adds at a point, exactly, as it asks devilWind(): nothing is put on the wind grid, whose nodes are 16 m apart.
@@ -82,6 +84,19 @@ export const WINDPOWER = Object.freeze({
   ripTall: 34,            // m: above this the draw eases off (a crown is taken, a cloud is not)
   ripHold: 0.62,          // of the reach: full strength within this, eased to nothing at the rim
   ripFade: 1.1,           // s it takes to tear open, and to close again (nothing appears or vanishes)
+  // A TEAR AND NOT A RADIUS (2026-11-22; the first rip, built this morning, was a flat plateau of draw that arrived
+  // everywhere in one frame and was the same for every cast). Three numbers make it a tear:
+  ripMax: 2.2,            // x ripDraw: the cap on the rise toward the lip. Air pouring into a hole must go faster the
+                          // nearer it gets (the same air through a smaller ring: the draw goes as 1/r within ripHold
+                          // of the reach), and an UNCAPPED 1/r hands a grain a metre from the lip hundreds of m/s --
+                          // it leaves the simulated box in one step, and the explorer's own wind acceleration spikes
+                          // and the suit's brace fights it. So: 66 m/s at the lip, 30 out on the plateau.
+  ripFront: 90,           // m/s: how fast the tear TAKES HOLD, outward from the middle (a 55 m rip has the whole
+                          // ground by 0.6 s, a 120 m one by 1.3 s, instead of every metre of it in the first frame)
+  ripBreath: 0.3,         // the draw surges by up to this much, slowly (ripBreathRate rad/s): the pull is not a motor
+  ripBreathRate: 1.7,
+  ripWob: 0.45,           // and the turn round the tear wanders by this much (ripWobRate rad/s), each way for each
+  ripWobRate: 0.8,        // tear: with the spin and the swirl taken from where it was torn, no two turn alike
   // the tornado (a devil's numbers, features.js DEVILS, scaled up)
   vortexRadius: 2.6,      // m: the core
   vortexSpeed: 17,        // m/s at the core's edge
@@ -102,6 +117,15 @@ export const WINDPOWER = Object.freeze({
   // (2026-11-17, the owner: "fly leaves around and dust around when i use it". Three times what it was, and a gust
   // raises a puff of dust off any ground, not only dry ground.)
   liftGust: 420, liftOrb: 180, liftVortex: 260,
+  // THE RIP'S OWN THREE RATES (2026-11-22). Until today the rip was in NONE of the three tables that make grains: it
+  // tore no leaf from a crown, it raised the vortex's ring of dust (which turns the wrong way for a tear) and it made
+  // no strokes of air at all, although the painter draws strokes running into it (world/timefx.js). Its draw reaches
+  // 55 m against a gust's 34, so the same rate over four times the ground would read as a sprinkle; and it stays open
+  // for 6.5 s against a gust's 1.3, so the leaves off the crowns are kept well under the gust's rate or one cast
+  // would hold the whole leaf buffer (and starve the fire's share of it, loose.js FLAME.share).
+  liftRip: 420, tearRip: 180, wispRip: 300,
+  grainFar: 128,          // m: the furthest from a source its own grains may be born and live. The wind grid is 17
+                          // nodes 16 m apart (air.js AIR), so past 128 m nobody has looked at the ground at all.
   // LEAVES TORN FROM THE CROWNS the wind goes through, in leaves a second at full strength (loose.js _tear): the wood's
   // own leaves, thrown with the wind at the height they grew at. Nothing where there is no canopy.
   tearGust: 260, tearOrb: 90, tearVortex: 220, tearPart: 0,
@@ -118,6 +142,15 @@ export const WINDPOWER = Object.freeze({
   wispHush: 90, hushTime: 1.2,   // a stilled place: strokes a second round its rim while it falls still, and for how long (s)
 });
 
+// THE TWO SWITCHES OF THE RIP AND THE FAR GRAINS (2026-11-22), so that the owner can be shown A and B of the same
+// still and can turn either off. This module is pure physics and reads no address: core/powers.js sets these once
+// from `?ripfeel=0` and `?powerfar=0`, as the game sets MODE from the address.
+//   rip:  false puts the tear back to the flat plateau that arrived everywhere at once and turned the same way
+//         for every cast (the first rip, 2026-11-22 morning).
+//   far:  false puts every grain of every power back inside the box round the PLAYER, which is where they all
+//         lived until today: a rip fifty metres off then has a bare ring round it again.
+export const POWERFX = { rip: true, far: true };
+
 // A cast's size, kept between 1 (a tap) and WINDPOWER.sizeMax (held to the full) - or up to ultSize for an ultimate,
 // which is the second charge and is meant to be past every ordinary limit.
 export const sizeOf = (k) => (k > 1 ? (k < WINDPOWER.sizeMax ? k : k <= WINDPOWER.ultSize ? k : WINDPOWER.ultSize) : 1);
@@ -126,6 +159,13 @@ function blank() {
   return { kind: 0, bodyId: null, px: 0, py: 0, pz: 0, dx: 0, dy: 0, dz: 0, age: 0, life: 0, fade: 0, strength: 0,
     speed: 0, radius: 0, reach: 0, spread: 0, front: 0, pulse: 0, height: 0, gain: 1, push: 0, up: 0, spin: 1, held: false,
     x: 0, z: 0, de: 0, dn: 1, y: 0, placed: false, carry: 0, curl: 0, axis: 0, len: 0, snap: 0, tear: 0, size: 1,
+    // (2026-11-22) far: how far from THIS source its own grains may be born and live, across the ground, in the
+    // grid's axes (placeWinds works it out; 0: only the box round the player, as it was until today).
+    far: 0,
+    // and the tear's own character, from where it was torn: swirl (m/s round it), wob (the phase of its breathing
+    // and its wandering turn), wpull and wturn (what those two come to this frame: placeWinds, once a frame, so
+    // that powerWind -- asked thousands of times a frame -- does no trigonometry at all).
+    swirl: 0, wob: 0, wpull: 1, wturn: 1,
     bends: false };   // (bends: this source may lay a stand of trees over. Only the gust ability sets it: owner, 2026-11-18)
 }
 
@@ -199,12 +239,30 @@ export function castPart(S, bodyId, p, d, size = 1) {
   s.life = 1e9; s.held = true; s.radius = W.partHalf * k; s.reach = W.partReach * (0.7 + 0.3 * k); s.speed = W.partWind; s.len = 0; s.strength = 1; s.size = k;
   return s;
 }
+// A number in [0, 1) from a place, so that a cast can have a character of its own without an RNG in here (this
+// module is pure and the same list is stepped by the game, the tests and the gallery). Two tears torn in the same
+// spot turn alike, which is what "from the place" means; two a metre apart do not.
+function castHash(p) {
+  const h = Math.sin(p.x * 12.9898 + p.y * 78.233 + p.z * 37.719) * 43758.5453;
+  return h - Math.floor(h);
+}
+
 // A RIP torn open at p (body-local), drawing everything in from `reach` metres for `life` seconds. Nothing holds
 // it: it is cast and it closes by itself.
-export function castRip(S, bodyId, p, reach = 55, life = 6.5) {
+// (2026-11-22) It takes hold from the middle outward at ripFront, and takes its turn, the rate of that turn and
+// the phase of its breathing from where it was torn, so that no two tears behave alike. `spin`: pass -1 or 1 to
+// choose the turn; 0 (the default) takes it from the place.
+export function castRip(S, bodyId, p, reach = 55, life = 6.5, spin = 0) {
   const s = take(S, KIND.rip, bodyId, p, null), W = WINDPOWER;
   s.life = life; s.fade = W.ripFade; s.radius = reach > 1 ? reach : 1; s.speed = W.ripDraw;
   s.up = W.ripUp; s.height = W.ripTall; s.size = s.radius / 55;
+  if (POWERFX.rip) {
+    const u = castHash(p), v = u * 7.13 - Math.floor(u * 7.13);
+    s.front = W.ripFront;
+    s.spin = spin < 0 ? -1 : spin > 0 ? 1 : (u < 0.5 ? -1 : 1);
+    s.swirl = W.ripSwirl * (0.8 + 0.45 * v);
+    s.wob = u * 6.2831853;
+  } else { s.front = 0; s.swirl = W.ripSwirl; s.spin = 1; }     // (?ripfeel=0: the flat first rip of this morning)
   return s;
 }
 
@@ -295,7 +353,20 @@ export function placeWinds(S, frame, bodyId) {
     if (s.kind === KIND.jet) R = s.reach + 7 + 2.4 * (s.radius + s.spread * (s.reach > 0 ? s.reach : 0));
     else if (s.kind === KIND.part) R = s.len + 2.2 + 2 * s.radius;
     else if (s.kind === KIND.zone || s.kind === KIND.orb || s.kind === KIND.rip) R = s.radius;
-    else continue;                                        // a vortex: nothing in powerWind
+    else if (s.kind === KIND.vortex) R = s.radius * 2.6;  // (nothing in powerWind, but its own grains are flung
+                                                          //  out to about here: loose.js _tear)
+    // (2026-11-22) THE GRAINS OF A POWER LIVE NEAR THE POWER. Until today every emitter in loose.js, and the test
+    // that kills a grain, culled against the box round the PLAYER (24 m), so a rip fifty metres off had a bare ring
+    // round it: its leaves, its dust and its strokes of air were all worked out and then thrown away. The reach
+    // travels with the source. It is capped at what the air grid knows of the ground at all (grainFar, 128 m).
+    s.far = POWERFX.far ? (R < WINDPOWER.grainFar ? R : WINDPOWER.grainFar) : 0;
+    // and the tear's breath and its wandering turn: here, once a frame, and never in powerWind, which is asked
+    // thousands of times a frame (measured 2026-11-18: 5,448 asks in one frame with a power held)
+    if (s.kind === KIND.rip && POWERFX.rip) {
+      s.wpull = 1 + WINDPOWER.ripBreath * (0.5 + 0.5 * Math.sin(s.age * WINDPOWER.ripBreathRate + s.wob));
+      s.wturn = s.spin * (1 + WINDPOWER.ripWob * Math.sin(s.age * WINDPOWER.ripWobRate + s.wob * 1.7));
+    }
+    if (s.kind === KIND.vortex) continue;                 // a vortex: nothing in powerWind
     if (s.x - R < bx0) bx0 = s.x - R;
     if (s.x + R > bx1) bx1 = s.x + R;
     if (s.z - R < bz0) bz0 = s.z - R;
@@ -303,6 +374,43 @@ export function placeWinds(S, frame, bodyId) {
   }
   S.bany = bx0 <= bx1; S.bx0 = bx0; S.bx1 = bx1; S.bz0 = bz0; S.bz1 = bz1;
   return any;
+}
+
+// THE TEAR'S DRAW at r metres from its middle, as a share of ripDraw. What makes it the owner's rip and not a
+// bigger gathered ball is that it does NOT die away with distance: full strength out to ripHold of the reach, eased
+// to nothing at the rim. What makes it a TEAR and not a radius (2026-11-22) is the rise toward the lip: the same air
+// through an ever smaller ring must go faster, so within ripHold of the reach it goes as 1/r, capped at ripMax (see
+// there for what an uncapped 1/r does to a grain and to the explorer). The rise is FLOORED at the plateau, not
+// normalised to it, so the air a long way out is drawn exactly as hard as it was before today and only the middle
+// changes. Nothing inside the tear itself: there the air turns and lifts instead of pouring in, so what arrives is
+// not packed into a knot at the middle.
+// (Both loose.js and powerWind ask this, so the law is in one place: the strokes of air are born where the air they
+// ride is really moving.)
+export function ripDrawAt(s, r) {
+  const W = WINDPOWER, R = s.radius, rc = W.ripCore;
+  const rim = 1 - smoothstep(R * W.ripHold, R, r);
+  if (!(rim > 0)) return 0;
+  const g = rim * smoothstep(rc * 0.3, rc * 1.3, r);
+  if (!POWERFX.rip) return g;                             // (?ripfeel=0: the flat plateau of the first rip)
+  const conv = (R * W.ripHold) / (r > rc ? r : rc);
+  return g * (conv < 1 ? 1 : conv > W.ripMax ? W.ripMax : conv);
+}
+// HOW MUCH OF THE TEAR HAS TAKEN HOLD r metres out: it opens from the MIDDLE and runs outward at ripFront m/s, over
+// 6 m of lip, so a 55 m rip takes the whole ground in 0.6 s instead of every metre of it in the first frame. 1
+// everywhere when the source carries no front (?ripfeel=0, and every other kind of source).
+export const ripHoldAt = (s, r) => (s.front > 0 ? smoothstep(0, 6, s.front * s.age - r) : 1);
+
+// Is (x, z) within reach of a live source, plus `pad` metres? (loose.js: a grain of a power's own making lives near
+// the power and not near the player. With no far reach -- ?powerfar=0, or a list of vortices -- this is false and
+// the box round the player is the only test, as it was until 2026-11-22.)
+export function nearPower(S, x, z, pad = 0) {
+  for (let i = 0; i < S.count; i++) {
+    const s = S[i];
+    if (!s.placed || !(s.strength > 0) || !(s.far > 0)) continue;
+    const d = s.far + pad;
+    if (x > s.x - d && x < s.x + d && z > s.z - d && z < s.z + d) return true;
+  }
+  return false;
 }
 
 // What the list does to the air at grid (x, z), hz metres above the ground.
@@ -388,15 +496,15 @@ export function powerWind(S, x, z, hz, o, minR = 0) {
       const R = s.radius, r = Math.sqrt(rx * rx + rz * rz);
       if (r > R + minR) continue;
       const W = WINDPOWER, rc = W.ripCore, ir = r > 1e-3 ? 1 / r : 0;
-      const k = s.strength * (1 - smoothstep(s.height, s.height * 1.4, hz));
+      // POURED IN FROM A LONG WAY OFF (ripDrawAt), FASTER THE NEARER IT GETS, and only where the tear has taken
+      // hold yet (ripHoldAt: it opens from the middle outward). The breath and the wandering turn are this frame's,
+      // from placeWinds.
+      const k = s.strength * (1 - smoothstep(s.height, s.height * 1.4, hz)) * ripHoldAt(s, r);
       if (k < 0.01) continue;
-      // POURED IN FROM A LONG WAY OFF: full strength within ripHold of the reach, eased to nothing at the rim,
-      // and nothing inside the tear itself -- there the air only turns and lifts, so what arrives is not packed
-      // into a knot at the middle.
-      const g = (1 - smoothstep(R * W.ripHold, R, r)) * smoothstep(rc * 0.3, rc * 1.3, r);
-      const sw = (r < rc ? r / rc : rc / r) * W.ripSwirl;
-      o[0] += (-rx * ir * s.speed * g - rz * ir * sw) * k;
-      o[1] += (-rz * ir * s.speed * g + rx * ir * sw) * k;
+      const ri = s.speed * ripDrawAt(s, r) * s.wpull;                      // in, toward the tear
+      const ti = (r < rc ? r / rc : rc / r) * s.swirl * s.wturn;           // and round it
+      o[0] += (-rx * ri - rz * ti) * ir * k;
+      o[1] += (-rz * ri + rx * ti) * ir * k;
       o[2] += s.up * (1 - smoothstep(rc, rc * 4.5, r)) * k;
       any = true;
     }

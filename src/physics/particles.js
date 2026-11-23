@@ -31,6 +31,7 @@ import { heightFactor, WIND } from './wind.js';
 import { AIR, wakeAt } from './air.js';
 import { makeRng, clamp01, smoothstep, fsin, fcos } from './util.js';
 import { powerWind } from './powers.js';
+import { timeAt } from './times.js';
 
 export const PARTICLES = Object.freeze({
   kinds: ['rain', 'snow', 'hail', 'dust', 'sand', 'ash', 'spores', 'leaves', 'spray'],
@@ -79,6 +80,10 @@ function makeBuffer(cap) {
     // across it. 0 for every kind that does not tumble.
     turn: new Float32Array(cap),
     origin: { x: 0, y: 0, z: 0 }, radius: PARTICLES.radius,
+    // (2026-11-23, the powers) m: how far from the player this kind's grains may lie. physics/loose.js sets it on
+    // the frame a power reaches past the box; 0 on every frame of an ordinary game. It is here from the start so
+    // that no buffer changes its shape on the first frame of a cast.
+    far: 0,
     species: null, fallSpeed: 0,
     // internal: frame coordinates (east, up, north), terminal speed, phase
     _p: new Float32Array(cap * 3), _v: new Float32Array(cap * 3), _vt: new Float32Array(cap), _ph: new Float32Array(cap), _n: 0,
@@ -104,7 +109,7 @@ export class Particles {
     this.shelters = new Float32Array(4 * 4); this.shelterCount = 0;
     this._cp = new Float32Array(16);          // canopy closure on the 4 x 4 patch
     // (P17) the context _fall reads (set by update per kind; numbers start as -0 so that their fields hold numbers, not small integers)
-    this._fc = { h: -0, Rb: -0, bx: -0, bz: -0, ground: -0, fx: -0, fy: -0, fz: -0, g: -0, time: -0, H: -0, canopyH: -0, through: -0, liquid0: -0, drip: -0, want: -0, draining: false, isSnow: false, target: false, pr: null, nSH: -0 };
+    this._fc = { h: -0, Rb: -0, bx: -0, bz: -0, ground: -0, fx: -0, fy: -0, fz: -0, g: -0, time: -0, H: -0, canopyH: -0, through: -0, liquid0: -0, drip: -0, want: -0, draining: false, isSnow: false, target: false, pr: null, nSH: -0, times: null };
     this.dripping = 0;                        // 0..1: how hard the canopy over the focus is dripping
     this.frameVersion = -1;
     this._lut = new Float32Array(8);
@@ -202,9 +207,14 @@ export class Particles {
   //   coordinates, fy: focus height above frame.r0.  ground: ground height above frame.r0 at the
   //   focus.  wx: weather at the focus (weatherAt result).  rho: air density there.  cover: { z0,
   //   canopy01, canopyHeight }.  g: gravity (m/s^2).  (ecx, ecz): the eye in grid coordinates
-  //   (the centre of the snow's box; the focus when not given).
-  update(dt, frame, air, near, fx, fy, fz, ground, wx, rho, cover, bodyId, g, time, ecx = fx, ecz = fz) {
+  //   (the centre of the snow's box; the focus when not given).  times: the places where the world
+  //   runs at another pace (times.js), or nothing -- which is every frame of the ordinary game.
+  update(dt, frame, air, near, fx, fy, fz, ground, wx, rho, cover, bodyId, g, time, ecx = fx, ecz = fz, times = null) {
     this.time = time;
+    // (the powers, space and time) null while no bubble is open, and then the whole of what follows is one comparison
+    // (physics/times.js). The rain is handed the list the way the loose things are: each drop steps at the pace of the
+    // place it is in, so inside a stopped place it hangs where it was instead of falling through the bubble.
+    const slowed = times && times.any ? times : null;
     const Rr = PARTICLES.radius, H = PARTICLES.height;
     const reborn = this.frameVersion !== frame.version;
     if (reborn) { this.frameVersion = frame.version; for (const k in this.buffers) this.buffers[k]._n = 0; }
@@ -301,7 +311,7 @@ export class Particles {
       // (P17) the step of each falling particle is its own method (_fall: see there)
       const C = this._fc;
       C.h = h; C.Rb = Rb; C.bx = bx; C.bz = bz; C.ground = ground; C.fx = fx; C.fy = fy; C.fz = fz; C.g = g; C.time = time; C.H = H;
-      C.canopyH = canopyH; C.through = through; C.liquid0 = liquid0; C.drip = drip; C.want = want; C.draining = draining; C.isSnow = isSnow; C.target = b === target; C.pr = pr; C.nSH = nSH;
+      C.canopyH = canopyH; C.through = through; C.liquid0 = liquid0; C.drip = drip; C.want = want; C.draining = draining; C.isSnow = isSnow; C.target = b === target; C.pr = pr; C.nSH = nSH; C.times = slowed;
       this._fall(b, name, frame, air, near, C);
     }
     void other;
@@ -317,6 +327,10 @@ export class Particles {
       while (this._ring >= 1) {
         this._ring -= 1;
         const a = rng() * 6.2831853, r = PARTICLES.ringRadius * rng(), x = fx + Math.cos(a) * r, z = fz + Math.sin(a) * r, fate = rng(), big = rng();
+        // (the powers, space and time) and none of them where the world is held: the drops these stand for are
+        // hanging in the air, so a stopped place must not go on pinging its puddles. As many as the place's own pace
+        // asks for (a fifth of them in a slowed bubble), and with no list open this is one comparison.
+        if (slowed !== null) { const tr = timeAt(slowed, x, z); if (tr < 1 && rng() >= tr) continue; }
         let gy = near ? near.heightAt(x, z, NaN) : NaN; if (gy !== gy) gy = air.terrain.heightAt(x, z, groundF);
         let lq = near ? near.liquidAt(x, z) : NaN; if (lq !== lq) lq = air.terrain.liquidAt(x, z); if (lq !== lq) lq = liquid0;
         const onLiquid = lq > gy; if (onLiquid) gy = lq;
@@ -345,7 +359,7 @@ export class Particles {
     const n = b._n;
     if (n === 0) { b.count = 0; return; }
     const h = C.h, Rb = C.Rb, bx = C.bx, bz = C.bz, ground = C.ground, fx = C.fx, fy = C.fy, fz = C.fz, g = C.g, time = C.time, H = C.H;
-    const canopyH = C.canopyH, through = C.through, liquid0 = C.liquid0, drip = C.drip, want = C.want, draining = C.draining, isSnow = C.isSnow, pr = C.pr, nSH = C.nSH;
+    const canopyH = C.canopyH, through = C.through, liquid0 = C.liquid0, drip = C.drip, want = C.want, draining = C.draining, isSnow = C.isSnow, pr = C.pr, nSH = C.nSH, times = C.times;
     const target = C.target ? b : null, SH = this.shelters, cp = this._cp, wv = this._wv, ht = this._ht, wtx = this._wtx, wtz = this._wtz, SO = this.splashOf;
   const P = b._p, V = b._v, VT = b._vt, PH = b._ph;
   const snowy = name === 'snow';
@@ -362,6 +376,13 @@ export class Particles {
       if (x - bx > Rb) { x -= 2 * Rb * Math.ceil((x - bx - Rb) / (2 * Rb)); wrapped = true; } else if (x - bx < -Rb) { x += 2 * Rb * Math.ceil((bx - x - Rb) / (2 * Rb)); wrapped = true; }
       if (z - bz > Rb) { z -= 2 * Rb * Math.ceil((z - bz - Rb) / (2 * Rb)); wrapped = true; } else if (z - bz < -Rb) { z += 2 * Rb * Math.ceil((bz - z - Rb) / (2 * Rb)); wrapped = true; }
     }
+    // (the powers, space and time) HOW FAST THE WORLD RUNS WHERE THIS DROP IS, and so the length of ITS own step:
+    // 1 everywhere the player has cast nothing, and with no list at all this is one comparison for the whole fall
+    // (physics/times.js, and the same two lines in loose.js). At rate 0 the arithmetic below leaves the drop's
+    // position and its velocity exactly as they were, so a stopped place holds the rain hanging and gives it back
+    // moving at the speed it had when the bubble closes -- it does not drop it from rest.
+    const tr = times === null ? 1 : timeAt(times, x, z);
+    const hg = tr === 1 ? h : h * tr;
     // wind at the particle: between the four grid nodes round it, each with its own profile (P12)
     let u = (x - wtx) * 0.0625, v = (z - wtz) * 0.0625;
     u = u < 0 ? 0 : u > 3.999 ? 3.999 : u; v = v < 0 ? 0 : v > 3.999 ? 3.999 : v;
@@ -387,15 +408,15 @@ export class Particles {
     // lets it fall straight
     const pw = this.winds;
     if (pw && powerWind(pw, x, z, hz, _pwp)) { we = we * _pwp[3] + _pwp[0]; wn = wn * _pwp[3] + _pwp[1]; wu = wu * _pwp[3] + _pwp[2]; }
-    let rx = V[o] - we, ry = V[o + 1] - g * h - wu, rz = V[o + 2] - wn;
-    const m = 1 / (1 + g / (vt * vt) * Math.sqrt(rx * rx + ry * ry + rz * rz) * h);
+    let rx = V[o] - we, ry = V[o + 1] - g * hg - wu, rz = V[o + 2] - wn;
+    const m = 1 / (1 + g / (vt * vt) * Math.sqrt(rx * rx + ry * ry + rz * rz) * hg);
     rx *= m; ry *= m; rz *= m;
     const vx = we + rx, vy = wu + ry, vz = wn + rz;
-    x += vx * h; y += vy * h; z += vz * h;
-    b.age[i] += h;
+    x += vx * hg; y += vy * hg; z += vz * hg;
+    b.age[i] += hg;
     // the ground (only looked up when the particle is low)
     // (a flake is looked up all the way down: it rides the air over the ground, below)
-    let hit = false, gy = ground, wet = false, left = b.left[i] - h, nm = -1;
+    let hit = false, gy = ground, wet = false, left = b.left[i] - hg, nm = -1;
     if (snowy || y < ground + 6) {
       left = 1e9;
       // (P17: TerrainGrid.groundQ, both lookups through a scratch array: nothing boxed, nothing to collect)
@@ -420,7 +441,8 @@ export class Particles {
         // Across a wrap of the box it keeps its height over the ground instead.
         const g0 = b._g[i]; b._g[i] = gy;
         if (time - b._lt[i] < 0.5) {
-          if (wrapped || h < 1e-4) { y += gy - g0; b._wu[i] = 0; } else b._wu[i] = (gy - g0) / h;
+          // (the flake's OWN step, hg: the air under a held flake is not rising, because the flake is not travelling)
+          if (wrapped || hg < 1e-4) { y += gy - g0; b._wu[i] = 0; } else b._wu[i] = (gy - g0) / hg;
         } else { b._wu[i] = 0; y += gy - ground; }      // (the first look: it entered over the ground it is over, not the box centre's)
       }
       hit = y <= gy;
@@ -432,8 +454,10 @@ export class Particles {
       const alt = y - gy, dl = time - b._lt[i];
       let rate = -vy;                                                       // (the first look: its fall speed)
       if (dl > 0 && dl < 0.5) { const r0 = b._rate[i]; rate = r0 + ((b._alt[i] - alt) / dl - r0) * (dl < 0.15 ? dl / 0.15 : 1); }
-      // (never slower than it is falling: a clod of kicked powder is down again in a third of a second)
-      const closing = rate > -vy ? rate : -vy;
+      // (never slower than it is falling: a clod of kicked powder is down again in a third of a second. The floor is
+      //  its fall speed AS THE WORLD SEES IT, -vy * tr: a drop held in a stopped place is closing on nothing, and
+      //  told otherwise the painter would shrink its mark for a landing that never comes.)
+      const closing = rate > -vy * tr ? rate : -vy * tr;
       if (closing > 0.05) left = alt / closing;
       b._alt[i] = alt; b._lt[i] = time; b._rate[i] = rate;
     }
@@ -452,7 +476,7 @@ export class Particles {
     // the hull: a drop that reaches it stops there (a splash on the hull, none under it)
     for (let s = 0; s < nSH; s++) {
       const so = s * 4, dx = x - SH[so], dz = z - SH[so + 1];
-      if (y < SH[so + 2] && y - vy * h >= SH[so + 2] - 0.5 && dx * dx + dz * dz < SH[so + 3] * SH[so + 3]) {
+      if (y < SH[so + 2] && y - vy * hg >= SH[so + 2] - 0.5 && dx * dx + dz * dz < SH[so + 3] * SH[so + 3]) {
         this._event(frame, x, SH[so + 2], z, snowy ? EVENT.settle : EVENT.splash, clamp01(Math.hypot(vx, vy, vz) * b.size[i] * 60), b.size[i]);
         hit = false; gone = true; break;
       }

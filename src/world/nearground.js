@@ -16,19 +16,68 @@ import { faceToDir, dirToFace } from './cubesphere.js';
 import { hash3i } from './noise.js';
 import { getSurface, makeSample, NOLQ } from './surface.js';
 import { makeNearMaterial } from '../render/materials.js';
-import { QUALITY } from '../render/shared.js';
+import { QUALITY, LOOK } from '../render/shared.js';
 import { getLook } from '../data/looks.js';
 
 // cell (m); range (m) at quality 0, 1, 2 (0: the ring is not laid); marks per cell; the ring
 // fades in between `inner` distances (so a broad touch is never held up to the eye); how soft
 // its marks are left; how far above the ground the eye may be; cells moved before re-listing.
-const RINGS = [
+const RINGS_WC = [
   // (the single strokes run on to 23 m at the top tier and the fan touches begin at 6 m: the two
   // hands overlap over a long band instead of changing over at 17 m)
   { name: 'fine', cell: 0.6, range: [11, 12, 23], per: 12, inner: [0.8, 2.6], soft: 0, alt: 45, step: 2 },
   { name: 'mid', cell: 1.9, range: [0, 40, 66], per: 7, inner: [6, 13], soft: 0.6, alt: 90, step: 1 },
   { name: 'far', cell: 6.5, range: [0, 0, 240], per: 5, inner: [38, 66], soft: 0.8, alt: 200, step: 1 },
 ];
+
+// THE FAR GROUND'S OWN MARKS (2026-11-22, the owner: "i want things to look high quality and fully rendered even
+// from 300 yards away" -- 275 m). The three rings above reach 23 m, 66 m and 240 m at the three tiers, so at
+// 275 m the ground carried NONE of its own marks: a bare painted slope, which is half of why the far picture
+// reads as unfinished. The fourth ring below is a coarser, broader hand laid out past it.
+//   `?vista=`    0 takes the ring away altogether -- no ring, no draw call, no buffer, the oil look exactly as it
+//                was. Otherwise it scales the reach; the pool grows with the SQUARE of it, so it is held to 1.4.
+//   `?vistaink=` how far a far mark's colour departs from the ground it lies on (1 as laid, 0 the ground's own
+//                colour and nothing to see, 2 twice as far). The far marks are deliberately close to their
+//                ground: see layVista.
+//   `?farpool=`  how much bigger the FAR ring's pool of marks is than the old sizing (1.45 as laid, 1 as it was):
+//                see the note on `pool` in the constructor. Nothing to do with the reach; it only stops the far
+//                ring's outermost cells coming up bare.
+const VISTA = (() => {
+  let on = 1, ink = 1, pool = 1.45;
+  try {
+    const q = new URLSearchParams(location.search);
+    if (q.has('vista') && isFinite(+q.get('vista'))) on = Math.max(0, Math.min(1.4, +q.get('vista')));
+    if (q.has('vistaink') && isFinite(+q.get('vistaink'))) ink = Math.max(0, Math.min(2, +q.get('vistaink')));
+    if (q.has('farpool') && isFinite(+q.get('farpool'))) pool = Math.max(1, Math.min(2, +q.get('farpool')));
+  } catch { /* no address to read */ }
+  return { on, ink, pool };
+})();
+// Cell 13 m: twice the far ring's 6.5 m, so a quarter of the marks for the same ground, which is how the reach
+// is paid for -- the area grows with the SQUARE of the reach, and 450 m is 3.5 times the area of 240 m.
+// MEASURED on Earth's forest at the top tier (Node, the whole ring due at once): 5,141 cells and 15,501 marks of
+// a 22,513 pool (1.5 MB), against the far ring's 5,836 cells and 25,765 marks of a 30,959 pool (2.0 MB). Nearly
+// twice the reach for less than the far ring's own cost; its arrival is 100 ms of script against the far ring's
+// 68, and it re-lists itself every 13 m walked at 3.1 ms a time, where the fine ring does 4.8 ms every 1.2 m.
+//   `per` 6 sizes the pool and the hand lays 4: a cell laid while the pool is empty is recorded as BARE until it
+//   leaves the ring (site(), `!this.free.length`), so the pool must never run dry. Measured, 4 a cell comes to
+//   69% of the pool, which leaves room for the cells that linger past the range.
+//   `innerQ`, `mark`: the fade-in distance and the size of a mark at each tier. A mark is two and a half to
+//   seven metres across its long axis, which at 275 m is six to sixteen pixels of a 720-line picture at 60
+//   degrees (one pixel is 0.44 m out there), where the far ring's own grass touch is two to four pixels and the
+//   comb of five to ten blades the fragment shader cuts into it is under a pixel a blade -- that is the pepper
+//   this ring must not become. `mark` holds a mark to about the same size ON SCREEN at the distance where the
+//   ring fades in (126 m at the top tier, 40 m at the middle one, which has no far ring of its own at all).
+//   `alt` 220: a hand coarser than the far ring's (200) is the last to go as the eye rises, not the first.
+//   `grown`: a mark is laid already grown. Over a ring this large the 0.7 s growing-in (GROW_T) would be seen as
+//   a wave of marks arriving from the feet outward, which is the owner's own complaint about things loading in;
+//   nothing pops without it, because a mark has no size at the rim where cells are listed (NEAR_VERT, `vis`).
+const V = VISTA.on;
+const RINGS_OIL = [RINGS_WC[0], RINGS_WC[1], Object.assign({}, RINGS_WC[2], { pool: VISTA.pool }), {
+  name: 'vista', cell: 13, range: [0, 190 * V, 450 * V], per: 6,
+  inner: [126 * V, 206 * V], innerQ: [[0, 0], [40 * V, 72 * V], [126 * V, 206 * V]], mark: [0, 0.45 * V, V],
+  soft: 0.95, alt: 220, step: 1, vista: 1, grown: 1,
+}];
+const RINGS = LOOK.oil && V > 0 ? RINGS_OIL : RINGS_WC;
 const GROW_T = 0.7;      // seconds a clump laid inside the range takes to grow in (the shader's measure)
 const HOLD_T = 6;        // seconds the strokes wait at most for their ground
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -82,7 +131,12 @@ class Ring {
     this.n = Math.max(8, Math.round((Math.PI * 0.5 * S.R) / cfg.cell));
     this.cellM = (Math.PI * 0.5 * S.R) / this.n;
     const rMax = Math.max(...cfg.range);
-    const N = this.N = Math.ceil((Math.PI * (rMax + cfg.cell + 1) * (rMax + cfg.cell + 1)) / (cfg.cell * cfg.cell * 0.8) * cfg.per * 0.75);
+    // (`pool`, 2026-11-22: the pool is sized for three cells in four laying a full clump. COUNTED on Earth's
+    // forest at the top tier, the whole ring listed at once: the far ring asks for 21,351 marks and HAS 21,351,
+    // so it runs dry, and because clumps are laid nearest first the cells it then records as bare are the ones
+    // at the rim -- the far band was coming up empty before anything was asked of it at 275 m. The oil look's
+    // far ring is given half again as much; the watercolour's pool is what it was. `?farpool=`.)
+    const N = this.N = Math.ceil((Math.PI * (rMax + cfg.cell + 1) * (rMax + cfg.cell + 1)) / (cfg.cell * cfg.cell * 0.8) * cfg.per * 0.75 * (cfg.pool || 1));
     const g = new THREE.InstancedBufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute([-1, 0, 0, 1, 0, 0, -1, 0.5, 0, 1, 0.5, 0, 0, 1, 0], 3));
     g.setIndex([0, 1, 2, 1, 3, 2, 2, 3, 4]);
@@ -149,7 +203,11 @@ class Ring {
     const u = this.material.uniforms;
     u.uCamLocal.value.copy(camLocal).sub(this.origin);
     u.uNear.value.set(RANGE * 0.66, RANGE, this.now, pixel || 0.002);
-    u.uNear2.value.set(cfg.inner[0], cfg.inner[1], cfg.soft, 0);
+    // (the fade-in band is a tier's own where a ring says so: the vista ring is laid at two tiers whose reaches
+    // differ by more than twice, and one band of metres cannot serve both -- at the middle tier it would fade in
+    // where it is already fading out. The three rings above have one band each, as they had.)
+    const inn = (cfg.innerQ && cfg.innerQ[QUALITY.level]) || cfg.inner;
+    u.uNear2.value.set(inn[0], inn[1], cfg.soft, 0);
     // the cell under the eye; when it has moved on, see which cells have come into range or left it
     const il = 1 / camLocal.length(), cx = camLocal.x * il, cy = camLocal.y * il, cz = camLocal.z * il;
     const fo = dirToFace(cx, cy, cz, this.fo), d = this.d;
@@ -199,9 +257,9 @@ class Ring {
       const t0 = performance.now();
       let guard = 0;
       while (this.pending.length && (guard++ < 3 || (guard & 3) || performance.now() - t0 < sliceMs)) {
-        const p = this.pending.pop(), rim = p[0] * R > RANGE * 0.9;
-        this.lay(p[1], p[2], p[3], p[4], rim ? -10 : this.now);
-        if (!rim) this.lastGrown = this.now;
+        const p = this.pending.pop(), grown = !!cfg.grown || p[0] * R > RANGE * 0.9;
+        this.lay(p[1], p[2], p[3], p[4], grown ? -10 : this.now);
+        if (!grown) this.lastGrown = this.now;
       }
       if (!this.pending.length) this.filled = true;
       spent = performance.now() - t0;
@@ -289,7 +347,9 @@ class Ring {
 
   lay(f, i, j, key, born) {
     if (!this.site(f, i, j, key)) return;
-    if (this.cfg.name === 'fine') this.layFine(i, j, born); else this.layBroad(i, j, born);
+    if (this.cfg.name === 'fine') this.layFine(i, j, born);
+    else if (this.cfg.vista) this.layVista(i, j, born);
+    else this.layBroad(i, j, born);
   }
 
   // ---- close by: single flicks in tufts, flowers on stalks, fallen leaves, twigs, stones, moss ----
@@ -522,6 +582,133 @@ class Ring {
         this.put(p[0], p[1], 0, 0.12 * q4, q3 * 6.28, (0.15 + 0.24 * q3) * (1 + 1.1 * tall) * kh, (0.13 + 0.20 * q4) * kw, FAN, q3 * 0.61 + q1 * 0.39, born,
           dens(cr, dk), dens(cg, dk), dens(cb, dk), (q2 - 0.5) * 0.5, flex);
       }
+    }
+  }
+
+  // The turn (iCol.a) that lays a flat touch's long axis ALONG the land's contour here, jittered by `q`: a far
+  // hillside is painted across its form, never up and down it, and a slope whose marks all ran downhill would
+  // read as rain. Where the ground is level there is no contour and the turn is free.
+  // (the shader builds a flat touch's own frame from the ground's normal -- materials.js NEAR_VERT, the `lying`
+  //  branch: t1 = normalize(n x k) with k the constant below, t2 = n x t1, and the touch runs along
+  //  t1*cos(a) + t2*sin(a). The contour is n x uphill, so the turn is that direction read on that frame.)
+  contourTurn(q) {
+    const nx = this.nx, ny = this.ny, nz = this.nz, free = q * 6.2832;
+    if (this.steep < 0.06) return free;
+    const hx = this.ux * this.gu + this.vx * this.gv, hy = this.uy * this.gu + this.vy * this.gv, hz = this.uz * this.gu + this.vz * this.gv;
+    let cx = ny * hz - nz * hy, cy = nz * hx - nx * hz, cz = nx * hy - ny * hx;
+    let l = Math.hypot(cx, cy, cz);
+    if (!(l > 1e-7)) return free;
+    cx /= l; cy /= l; cz /= l;
+    let t1x = ny * 0.4671 - nz * 0.8271, t1y = nz * 0.3126 - nx * 0.4671, t1z = nx * 0.8271 - ny * 0.3126;
+    l = Math.hypot(t1x, t1y, t1z);
+    if (!(l > 1e-7)) return free;
+    t1x /= l; t1y /= l; t1z /= l;
+    const t2x = ny * t1z - nz * t1y, t2y = nz * t1x - nx * t1z, t2z = nx * t1y - ny * t1x;
+    // within a quarter turn either way, so the far ground is not combed
+    return Math.atan2(cx * t2x + cy * t2y + cz * t2z, cx * t1x + cy * t1y + cz * t1z) + (q - 0.5) * 0.9;
+  }
+
+  // ---- THE FAR GROUND (?vista=): a coarse, broad hand for the land past 275 m ----
+  // Only two kinds of mark are laid here: a touch lying on the ground (LYING, a pointed oval) and a squat dab
+  // (DAB, a disc). The fan-brush touch the far ring lays its grass, reeds and splinters with is cut into a comb
+  // of five to ten blades by the fragment shader (materials.js NEAR_FRAG) on a test that either keeps a pixel
+  // or throws it away; at 275 m the whole touch is two to four pixels across, so each blade of that comb is a
+  // fraction of a pixel and the mark would break into pepper -- the owner's first rule ("no grain") in the
+  // other direction. An oval and a disc are one smooth edge each and survive the same reduction. Nothing
+  // stands up out here either: a blade, a reed, a splinter is under a pixel wide at this distance whatever is
+  // done to it.
+  // The colours sit CLOSE to the ground's own (?vistaink= turns it): at 275 m what survives the air is a step of
+  // VALUE and a lean of hue over a whole patch, and a mark that differs from its ground by a lot is a speck.
+  layVista(i, j, born) {
+    const st = this.st, s = this.s, seed = this.seed, cfg = this.cfg, C = cfg.cell;
+    const gr = s.r, gg = s.g, gb = s.b, canopy = this.canopy;
+    const H = (k) => hash3i(i, j, k, seed);
+    const msz = (cfg.mark && cfg.mark[QUALITY.level]) || 1, ink = VISTA.ink;
+    const at = (q1, q2) => [(q1 - 0.5) * C * 0.92, (q2 - 0.5) * C * 0.92];
+    // A 13 m cell is twice the far ring's, and the ground's own plane -- all `put` has to go on -- is that much
+    // worse an answer six metres out from the clump's anchor. MEASURED at Earth's alpine meadow: 29% of these
+    // marks came out over a metre off the land and 6% over three metres, which at 275 m is a speck floating
+    // seven pixels clear of the mountainside, exactly the kind of fault the owner is complaining about. So each
+    // far mark asks the land for the height at its OWN place. It costs one more heightAt a mark (measured: the
+    // ring's arrival goes from 61 to about 100 ms of script), and all of it falls inside the time slice.
+    // (the mark's PLANE is still the clump's: re-deriving a normal would be two more heightAt a mark, and over a
+    //  mark two to five metres across the tilt is worth about two pixels at 275 m)
+    const onLand = (ou, ov, base) => {
+      const S2 = this.S, h = this.s.h, r = S2.R + h;
+      const bx = this.x * r + this.ux * ou + this.vx * ov, by = this.y * r + this.uy * ou + this.vy * ov, bz = this.z * r + this.uz * ou + this.vz * ov;
+      const l = 1 / Math.hypot(bx, by, bz);
+      return S2.heightAt(bx * l, by * l, bz * l) - h - ou * this.gu - ov * this.gv + 0.02 + base;
+    };
+    let left = 4;          // (cfg.per is 6: the pool is sized for six a cell so that it cannot run dry)
+    // what lies flat and bare comes first: the crust of an ice world, the ripples of a dune, the companies of
+    // splinters. Those worlds have no sward, so these marks are the whole of what carries their distance.
+    if (st.crust > 0 && st.crustC && this.crusty > 0.1 && left > 0) {
+      const n0 = Math.min(left, 1 + (H(300) < st.crust * this.crusty * 1.6 ? 1 : 0)), cc = st.crustC;
+      for (let q = 0; q < n0; q++, left--) {
+        const q1 = H(301 + q), q2 = H(305 + q), q3 = H(309 + q), q4 = H(313 + q), p = at(q1, q2);
+        const c = cc[Math.min(cc.length - 1, Math.floor((this.which * 0.75 + q4 * 0.25) * cc.length * 0.999))], m = 1 - 0.30 * ink;
+        this.put(p[0], p[1], onLand(p[0], p[1], 0.03), 0, 0, (0.40 + 0.45 * q3) * msz, (1.3 + 1.5 * q4) * msz, LYING, q3, born,
+          lerp(c[0], gr, m), lerp(c[1], gg, m), lerp(c[2], gb, m), this.contourTurn(q2), 0);
+      }
+    }
+    if (st.ripple > 0 && left > 0) {
+      const n0 = Math.min(left, 1 + (H(320) < st.ripple * 1.4 ? 1 : 0));
+      for (let q = 0; q < n0; q++, left--) {
+        const q1 = H(321 + q), q2 = H(325 + q), q3 = H(329 + q), p = at(q1, q2), d = 1 + 0.22 * ink;
+        this.put(p[0], p[1], onLand(p[0], p[1], 0.03), 0, 0, (0.28 + 0.26 * q3) * msz, (1.8 + 1.8 * q1) * msz, LYING, q3, born,
+          dens(gr, d), dens(gg, d), dens(gb, d + 0.04), this.contourTurn(q2), 0);
+      }
+    }
+    if (st.needle > 0 && this.needly > 0.15 && left > 0) {
+      const n0 = Math.min(left, 1 + (H(340) < st.needle * this.needly ? 1 : 0));
+      for (let q = 0; q < n0; q++, left--) {
+        const q1 = H(341 + q), q2 = H(345 + q), q3 = H(349 + q), q5 = H(353 + q), p = at(q1, q2);
+        const c = st.shard ? st.shard[q5 < 0.5 ? 0 : st.shard.length - 1] : null;
+        let cr, cg, cb;
+        if (c && c.length === 3) { const m = 1 - 0.55 * ink; cr = lerp(c[0], gr, m); cg = lerp(c[1], gg, m); cb = lerp(c[2], gb, m); }
+        else if (q5 < 0.5) { cr = lerp(gr, 0.95, 0.30 * ink); cg = lerp(gg, 0.97, 0.30 * ink); cb = lerp(gb, 1.0, 0.30 * ink); }
+        else { const d = 1 + 0.35 * ink; cr = dens(gr, d); cg = dens(gg, d); cb = dens(gb, d); }
+        this.put(p[0], p[1], onLand(p[0], p[1], 0), 0, 0, (0.9 + 1.1 * q3) * msz, (0.5 + 0.7 * q2) * msz, DAB, q3, born, cr, cg, cb, 0, 0);
+      }
+    }
+    // under the trees: the floor's fallen leaves as one broad drag of the litter colour
+    if (st.litter > 0 && st.litterC && canopy > 0.2 && left > 0) {
+      const n0 = Math.min(left, 1 + (H(360) < st.litter * canopy ? 1 : 0));
+      for (let q = 0; q < n0; q++, left--) {
+        const q1 = H(361 + q), q2 = H(365 + q), q3 = H(369 + q), q4 = H(373 + q), p = at(q1, q2);
+        const c = st.litterC[q4 < 0.4 ? 0 : q4 < 0.78 ? 1 : 2], m = 1 - 0.34 * ink;
+        this.put(p[0], p[1], onLand(p[0], p[1], 0.02), 0, 0, (0.45 + 0.40 * q3) * msz, (1.2 + 1.3 * q1) * msz, LYING, q3, born,
+          lerp(c[0], gr, m), lerp(c[1], gg, m), lerp(c[2], gb, m), this.contourTurn(q2), 0);
+      }
+    }
+    // the sward, as the mass it reads as from here: the shaded side of a slope's grass, the sunlit one, the dry
+    // one, a step of value apart (the same three the far ring picks from, laid as one broad drag instead of a
+    // fan of blades)
+    if (st.blade > 0 && this.meadow > 0.15 && left > 0) {
+      const n0 = Math.min(left, 1 + (H(380) < st.blade * this.meadow * 1.3 ? 1 : 0));
+      const L = st.leaf, tall = sstep(0.52, 0.74, this.rough);
+      for (let q = 0; q < n0; q++, left--) {
+        const q1 = H(381 + q), q2 = H(385 + q), q3 = H(389 + q), q4 = H(393 + q), p = at(q1, q2);
+        const v = q4 < 0.38 ? 2 : q4 < 0.74 ? 1 : 0, c = L ? L[v] : null, m = 1 - (1 - st.gm) * ink;
+        let cr = gr, cg = gg, cb = gb;
+        if (c) { cr = lerp(c[0], gr, m); cg = lerp(c[1], gg, m); cb = lerp(c[2], gb, m); }
+        if (v === 0 && tall > 0.2) { const k2 = 0.45 * tall * ink; cr = lerp(cr, SEED_HEAD[0], k2); cg = lerp(cg, SEED_HEAD[1], k2); cb = lerp(cb, SEED_HEAD[2], k2); }
+        const dk = v === 2 ? 1 + 0.14 * ink : v === 1 ? 1 : 1 - 0.12 * ink;
+        this.put(p[0], p[1], onLand(p[0], p[1], 0.02), 0, 0, (0.50 + 0.50 * q3) * msz, (1.5 + 1.4 * q1) * msz, LYING, q3, born,
+          dens(cr, dk), dens(cg, dk), dens(cb, dk), this.contourTurn(q2), 0);
+      }
+    }
+    // stones last, and only the ones that are there at all: at 275 m a stone under a metre is nothing, so these
+    // are the boulders and the crags, not the pebbles the fine ring lays
+    const nst = Math.min(left, (this.shore > 0.3 && st.rock ? 1 : 0) + (H(400) < st.dab * this.stony * 1.2 ? 1 : 0));
+    for (let q = 0; q < nst; q++, left--) {
+      const q1 = H(401 + q), q2 = H(405 + q), q3 = H(409 + q), q4 = H(413 + q), p = at(q1, q2);
+      const w = (0.55 + 1.5 * q3 * q3) * msz;
+      const c = st.rock ? st.rock[q4 < 0.74 ? 0 : 1] : null, m = 1 - (q4 < 0.74 ? 0.40 : 0.24) * ink;
+      let cr, cg, cb;
+      if (c) { cr = lerp(c[0], gr, m); cg = lerp(c[1], gg, m); cb = lerp(c[2], gb, m); }
+      else { const k2 = 1 + (0.15 + 0.40 * q4) * ink; cr = dens(gr, k2); cg = dens(gg, k2); cb = dens(gb, k2 + 0.1); }
+      this.put(p[0], p[1], onLand(p[0], p[1], 0), 0, 0, w * (0.6 + 0.7 * q1), w, DAB, q3, born, cr, cg, cb, 0, 0);
     }
   }
 }

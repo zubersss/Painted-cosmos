@@ -26,7 +26,7 @@ import { PARTICLES, EVENT, publish } from './particles.js';
 import { clamp01, smoothstep, noise3, fsin, fcos } from './util.js';
 import { snowTransport01 } from './drift.js';
 import { timeAt } from './times.js';
-import { powerWind, KIND, WINDPOWER } from './powers.js';
+import { powerWind, nearPower, ripDrawAt, ripHoldAt, KIND, WINDPOWER, POWERFX } from './powers.js';
 
 // species: row of atmosphere.SPECIES for the fall speed.  life: [min, max] seconds.
 // puff: seconds for which a kicked or blown grain is carried by the parcel of air thrown up with
@@ -292,7 +292,7 @@ export function flameSurge(s, t) {
 // it has burnt out, because a black patch goes on smoking after its flame has gone (fire.js keeps it as ash).
 const smokeOf = (s) => (s.ash ? (s.ashAge < FLAME.smokeAfter ? FLAME.smokeAsh * (1 - s.ashAge / FLAME.smokeAfter) : 0) : s.heat);
 
-const _gp = { dust: 0, repose: 0, liquid: 0, h: 0, mat: MATERIAL_NONE };
+const _gp = { dust: 0, repose: 0, liquid: 0, h: 0, mat: MATERIAL_NONE, unknown: false };
 const _pwl = new Float64Array(4), _covL = {};
 const _sf = {}, _sp = new Float64Array(2), _aw = new Float64Array(2);
 const _wl = {};
@@ -313,6 +313,26 @@ const I_SMOKE = MATERIAL_INDEX.ash;      // (smoke: the grey-brown the table alr
 // a grain can tell the two apart: it is handed a grain's ink and nothing else, not its size, not its speed, not even
 // its age. The painter's table has the slot (render/kitmat.js: the world's blend never touches it).
 const I_EMBER = I_FLAME + 1;
+
+// (2026-11-22) WHERE A POWER'S OWN GRAINS MAY BE BORN: inside the box round the player, as everything else is, or
+// near the source itself. Until today it was the box alone, so a rip fifty metres off had a bare ring round it: the
+// leaves, the dust and the strokes of air were all worked out and then thrown away at this line. A source's reach
+// (s.far) is capped by powers.js at what the wind grid knows of the ground at all, 128 m.
+const inReach = (x, z, fx, fz, Rr, s) => (x > fx - Rr && x < fx + Rr && z > fz - Rr && z < fz + Rr) ||
+  (s.far > 0 && x > s.x - s.far && x < s.x + s.far && z > s.z - s.far && z < s.z + s.far);
+// How far from the player this frame's grains may now lie (for the draw's edge fade; 0 while no power reaches past
+// the box). The painter fades a mark to nothing over the outer fifth of the box it is told about, so a stream of
+// leaves out at a far tear would otherwise be faded away where it is thickest.
+const farOf = (S, fx, fz, Rr) => {
+  let f = 0;
+  for (let i = 0; i < S.count; i++) {
+    const s = S[i];
+    if (!s.placed || !(s.strength > 0) || !(s.far > 0)) continue;
+    const d = Math.hypot(s.x - fx, s.z - fz) + s.far + 6;
+    if (d > f) f = d;
+  }
+  return f > Rr ? f : 0;
+};
 
 export class Loose {
   constructor(particles) {
@@ -381,9 +401,25 @@ export class Loose {
 
   // Ground under grid position (x, z) from the near cache: fills _gp { dust, repose, liquid, h,
   // mat (what the ground there is now: an index into MATERIAL_IDS, snow and mud included) }.
-  _ground(near, x, z, groundY, wet01, snowDepth) {
-    const n = near ? near.nearest(x, z) : -1;
-    if (n < 0) { _gp.dust = 0; _gp.repose = 0; _gp.liquid = 0; _gp.h = groundY; _gp.mat = MATERIAL_NONE; return _gp; }
+  // (2026-11-22) `air`: pass the wind grid for a place that may be OUTSIDE the near cache. The near cache is 32 m
+  // across (physics/index.js: TerrainGrid(17, 2)) and `nearest` falls back to its middle, so out where a power is --
+  // a rip fifty metres off, the far end of a held gust -- this used to hand back the ground AT THE PLAYER and hang
+  // the leaves in mid-air over a slope. With `air` the height and the liquid come from the wind grid's own coarse
+  // ground instead (16 m between nodes: the real height there, to within the relief between two nodes), and
+  // `_gp.unknown` says when nobody has looked at that ground at all, so no grain is made there. Nothing is known
+  // out there of what the ground is MADE of, so a far place gives the pale dust of bare ground and never sand,
+  // litter or snow. Called WITHOUT `air` (the feet, the jets, the waders) nothing is changed.
+  _ground(near, x, z, groundY, wet01, snowDepth, air = null) {
+    const n = near && (air === null || near.known(x, z)) ? near.nearest(x, z) : -1;
+    if (n < 0) {
+      _gp.dust = 0; _gp.repose = 0; _gp.liquid = 0; _gp.h = groundY; _gp.mat = MATERIAL_NONE; _gp.unknown = true;
+      if (air) {
+        const gy = air.terrain.heightAt(x, z, NaN), lq = air.terrain.liquidAt(x, z);
+        if (gy === gy) { _gp.h = gy; _gp.unknown = false; if (lq === lq && lq > gy) _gp.liquid = lq - gy; }
+      }
+      return _gp;
+    }
+    _gp.unknown = false;
     const c = near.cover, a = n * near.CW;
     _gp.dust = c[a + 2] * (1 - smoothstep(0.05, 0.4, wet01));
     _gp.repose = c[a + 3]; _gp.liquid = c[a + 7];
@@ -717,14 +753,22 @@ export class Loose {
     // (the powers, space and time) the places where the world runs at another pace: null while there are none,
     // and then every grain's own step is the world's own (physics/times.js timeAt)
     const slowed = times && times.any ? times : null;
-    for (let kk = 0; kk < LOOSE_KINDS.length; kk++) this._move(LOOSE_KINDS[kk], h, frame, air, near, fx, fz, groundY, g, sigma, devils, blown, slowed);
+    // (2026-11-22) and how far from the player a grain may now be: 0 unless a power reaches past the box (farOf).
+    // Worked out once, not once a kind.
+    const farNow = blown ? farOf(blown, fx, fz, Rr) : 0;
+    for (let kk = 0; kk < LOOSE_KINDS.length; kk++) this._move(LOOSE_KINDS[kk], h, frame, air, near, fx, fz, groundY, g, sigma, devils, blown, slowed, farNow);
   }
 
   // One kind's step (see update, "motion").
-  _move(name, h, frame, air, near, fx, fz, groundY, g, sigma, devils, winds, times) {
+  _move(name, h, frame, air, near, fx, fz, groundY, g, sigma, devils, winds, times, farNow = 0) {
     const P = this.P, Rr = PARTICLES.radius, wv = P._wv, ht = P._ht, wtx = P._wtx, wtz = P._wtz;
     const K = LOOSE[name], b = P.buffers[name];
     b.origin.x = frame.ox; b.origin.y = frame.oy; b.origin.z = frame.oz;
+    // HOW FAR FROM THE PLAYER THIS KIND'S GRAINS NOW LIE, for whoever draws them: the painter fades a mark to
+    // nothing over the outer fifth of the box it is told about (physics/three/expand.js edgeScale, and the same
+    // line in the shader), so the stream of leaves at a far tear would be faded away exactly where it is thickest.
+    // 0 while no power reaches past the box, which is every frame of the ordinary game.
+    b.far = farNow;
     let alive = b._n;
     if (alive === 0) { b.count = 0; return; }
     const Pp = b._p, V = b._v, VT = b._vt, PH = b._ph, LF = b._life, AG = b.age, SZ = b.size, EJ = b._e, MT = b.mat, LT = b.left, HG = b.hag;
@@ -740,7 +784,12 @@ export class Loose {
       // and inside a stopped one it hangs in the air and stays there.
       const hg = times === null ? h : h * timeAt(times, x, z);
       const age = AG[i] + hg;
+      // (2026-11-22) A GRAIN OF A POWER'S OWN MAKING LIVES NEAR THE POWER: outside the box round the player it dies
+      // only if it is also outside every live source's own reach (powers.js nearPower). Until today a rip fifty
+      // metres away deleted its own stream of leaves in front of the player's eyes. With no list -- every frame of
+      // the ordinary game -- and for a grain inside the box, this is the same two comparisons it was.
       let dead = age > LF[i] || Math.abs(x - fx) > Rr + 6 || Math.abs(z - fz) > Rr + 6;
+      if (dead && winds !== null && age <= LF[i] && nearPower(winds, x, z, 6)) dead = false;
       let vx = V[o], vy = V[o + 1], vz = V[o + 2];
       let left = LF[i] - age;                                   // what is left of its life
       if (!dead) {
@@ -954,6 +1003,14 @@ export class Loose {
     }
   }
 
+  // The ground's height at grid (x, z) for a FAR emission: the near cache where it reaches, else the wind grid's
+  // own coarse ground, else `fallback` (pass NaN to make "nobody has looked there" tellable, and make no grain).
+  _heightAt(near, air, x, z, fallback) {
+    let gy = near ? near.heightAt(x, z, NaN) : NaN;
+    if (gy !== gy && air) gy = air.terrain.heightAt(x, z, NaN);
+    return gy === gy ? gy : fallback;
+  }
+
   // Depth of liquid (m) at grid position (x, z): from the near cache, else from the wind grid's
   // coarse ground; 0 where the ground is dry or nothing is known.
   _depthAt(near, air, x, z) {
@@ -973,11 +1030,16 @@ export class Loose {
     for (let k = 0; k < winds.count; k++) {
       const s = winds[k];
       if (!s.placed || !(s.strength > 0.05)) continue;
-      if (Math.abs(s.x - fx) > Rr + 40 || Math.abs(s.z - fz) > Rr + 40) continue;
-      if (s.kind === KIND.zone) { this._wisps(s, h, near, fx, fz, groundY, Rr); continue; }
+      // (2026-11-22) ... and its own grains are made out where IT is (s.far), not round the player, so a far source
+      // is served too -- as far out as the wind grid has looked at the ground at all (grainFar, 128 m), because past
+      // that no grain can be made and the source is better passed over here than asked a hundred times a second.
+      // (With ?powerfar=0 this is the Rr + 40 m it has always been.)
+      const lim = s.far > 0 ? W.grainFar + s.far : Rr + 40;
+      if (Math.abs(s.x - fx) > lim || Math.abs(s.z - fz) > lim) continue;
+      if (s.kind === KIND.zone) { this._wisps(s, h, air, near, fx, fz, groundY, Rr); continue; }
       if (s.kind === KIND.part) {
         // move water: spray thrown off the water along the channel's two walls, and strokes of air along it
-        this._wisps(s, h, near, fx, fz, groundY, Rr);
+        this._wisps(s, h, air, near, fx, fz, groundY, Rr);
         s.carry += W.partSpray * h;
         let guard = 32;
         while (s.carry >= 1 && guard-- > 0) {
@@ -993,11 +1055,13 @@ export class Loose {
         }
         continue;
       }
-      const rate = (s.kind === KIND.jet ? W.liftGust : s.kind === KIND.orb ? W.liftOrb * (s.age < 2.5 ? 1 : 0.15) : W.liftVortex) * sizeRate(s);
+      // (?ripfeel=0 drops a rip back through to the vortex's row and the vortex's branch below, which is exactly
+      //  what it had this morning: one switch puts the whole of today's tear back)
+      const rate = (s.kind === KIND.jet ? W.liftGust : s.kind === KIND.orb ? W.liftOrb * (s.age < 2.5 ? 1 : 0.15) : s.kind === KIND.rip && POWERFX.rip ? W.liftRip : W.liftVortex) * sizeRate(s);
       s.carry += rate * s.strength * h;
       // the air itself, as pale strokes riding it (WINDPOWER.wisp*); the crowns it goes through, losing leaves and
       // now and then a branch (WINDPOWER.tear*, snap*)
-      this._wisps(s, h, near, fx, fz, groundY, Rr);
+      this._wisps(s, h, air, near, fx, fz, groundY, Rr);
       this._tear(s, h, frame, air, near, fx, fz, groundY, Rr);
       let guard = 64;
       while (s.carry >= 1 && guard-- > 0) {
@@ -1012,14 +1076,31 @@ export class Loose {
           x = s.x + s.de * a - s.dn * c; z = s.z + s.dn * a + s.de * c;
           const U = s.speed * s.strength / (1 + 1.2 * a / s.reach) * Math.exp(-(c / w) * (c / w));
           ve = s.de * U * 0.55; vn = s.dn * U * 0.55; vu = U * (0.10 + 0.22 * rng());
+        } else if (s.kind === KIND.rip && POWERFX.rip) {
+          // THE TEAR TAKES THE GROUND UNDER ITS WHOLE REACH, INWARD. Anywhere the tear has taken hold (ripHoldAt),
+          // thrown at seven tenths of the speed the air there is really going (ripDrawAt: the one law, in powers.js,
+          // which the air, the strokes and this all read), with a little of its turn. The radius is spread by the
+          // square root, so the grains are even over the ground and not crowded at the middle.
+          // (Until today a rip fell through to the vortex's branch below, which turns a grain about the middle at
+          // half the DRAW speed -- 15 m/s where the tear's own turn out there is under one -- and lifts it: a ring
+          // of dust spinning at the rim, not a stream pouring in.)
+          const far = s.far > 0 && s.far < s.radius ? s.far : s.radius;
+          const R = far * Math.sqrt(0.06 + 0.94 * rng()), a = rng() * 6.2831853, hold = ripHoldAt(s, R);
+          if (hold < 0.2) continue;                        // the tear has not reached out this far yet
+          const U = s.speed * ripDrawAt(s, R) * s.strength * hold;
+          x = s.x + Math.cos(a) * R; z = s.z + Math.sin(a) * R;
+          ve = -Math.cos(a) * U * 0.7 - Math.sin(a) * U * 0.12 * s.spin;
+          vn = -Math.sin(a) * U * 0.7 + Math.cos(a) * U * 0.12 * s.spin;
+          vu = 0.4 + 1.2 * rng();
         } else {
           const R = s.kind === KIND.orb ? s.radius * (0.25 + 0.6 * rng()) : s.radius * (0.4 + 1.6 * rng()), a = rng() * 6.2831853;
           x = s.x + Math.cos(a) * R; z = s.z + Math.sin(a) * R;
           const sp = s.kind === KIND.orb ? 2.5 : s.speed * 0.5;
           ve = -Math.sin(a) * sp * s.spin - Math.cos(a) * sp * 0.4; vn = Math.cos(a) * sp * s.spin - Math.sin(a) * sp * 0.4; vu = 1.2 + 2.2 * rng();
         }
-        if (Math.abs(x - fx) > Rr || Math.abs(z - fz) > Rr) continue;
-        const gp = this._ground(near, x, z, groundY, wet01, snowDepth), gy = gp.h;
+        if (!inReach(x, z, fx, fz, Rr, s)) continue;
+        const gp = this._ground(near, x, z, groundY, wet01, snowDepth, s.far > 0 ? air : null), gy = gp.h;
+        if (gp.unknown) continue;                          // nobody has looked at the ground out there
         if (gp.liquid > 0.05) {
           // water: spray off its face, and a ring now and then (the water is ruffled)
           this.emit('spray', x, gy + gp.liquid + 0.03, z, ve * 0.6, vu * 0.9 + 0.6, vn * 0.6, 0.7, 0.8, gp.mat);
@@ -1050,7 +1131,7 @@ export class Loose {
   // off as well"). Where there is no canopy over the place the wind passes, nothing happens here.
   _tear(s, h, frame, air, near, fx, fz, groundY, Rr) {
     const rng = this.rng, W = WINDPOWER, cov = _covL;
-    const rate = s.kind === KIND.jet ? W.tearGust : s.kind === KIND.orb ? W.tearOrb : s.kind === KIND.vortex ? W.tearVortex : s.kind === KIND.part ? W.tearPart : 0;
+    const rate = s.kind === KIND.jet ? W.tearGust : s.kind === KIND.orb ? W.tearOrb : s.kind === KIND.vortex ? W.tearVortex : s.kind === KIND.rip && POWERFX.rip ? W.tearRip : s.kind === KIND.part ? W.tearPart : 0;
     if (!(rate > 0)) return;
     s.tear = (s.tear || 0) + rate * sizeRate(s) * s.strength * h;
     let guard = 40;
@@ -1069,17 +1150,33 @@ export class Loose {
         const R = s.radius * (0.5 + 2.2 * rng()), a = rng() * 6.2831853;
         x = s.x + Math.cos(a) * R; z = s.z + Math.sin(a) * R;
         ve = -Math.sin(a) * s.speed * s.spin * 0.8 - Math.cos(a) * 2; vn = Math.cos(a) * s.speed * s.spin * 0.8 - Math.sin(a) * 2; vu = s.up * 0.5;
+      } else if (s.kind === KIND.rip) {
+        // EVERY CROWN INSIDE ITS REACH EMPTIES ITSELF TOWARD IT: a leaf is let go anywhere the tear has taken hold,
+        // at the height it grew at, and starts at the speed of the air where it is, pointed at the middle -- which
+        // is what the owner asked a rip to do ("sucks everything in a long ways in"). Until today the rip was in
+        // none of this table: it tore no leaf from any crown at all.
+        const far = s.far > 0 && s.far < s.radius ? s.far : s.radius;
+        const R = far * Math.sqrt(0.03 + 0.97 * rng()), a = rng() * 6.2831853, hold = ripHoldAt(s, R);
+        if (hold < 0.2) continue;
+        const U = s.speed * ripDrawAt(s, R) * s.strength * hold * 0.8;
+        x = s.x + Math.cos(a) * R; z = s.z + Math.sin(a) * R;
+        ve = -Math.cos(a) * U - Math.sin(a) * U * 0.15 * s.spin;
+        vn = -Math.sin(a) * U + Math.cos(a) * U * 0.15 * s.spin;
+        vu = 0.3 + 1.2 * rng();
       } else {
         const R = s.radius * (0.3 + 0.8 * rng()), a = rng() * 6.2831853;
         x = s.x + Math.cos(a) * R; z = s.z + Math.sin(a) * R;
         ve = -Math.sin(a) * 4; vn = Math.cos(a) * 4; vu = 0.4;
       }
-      if (Math.abs(x - fx) > Rr || Math.abs(z - fz) > Rr) continue;
+      if (!inReach(x, z, fx, fz, Rr, s)) continue;
       if (!air.coverNear(x, z, cov)) continue;
       const can = cov.canopy01 || 0, top = cov.canopyHeight || 0;
       if (!(can > 0.05) || !(top > 2)) continue;                       // no crown here
       if (rng() > can) continue;                                        // thin canopy, fewer leaves
-      const gy = near ? near.heightAt(x, z, groundY) : groundY;
+      // (2026-11-22) the ground out at the power, where the near cache does not reach: NaN where nobody has looked,
+      // and then no leaf (a leaf hung at the player's own height, 50 m away, is a leaf in mid-air)
+      const gy = this._heightAt(near, air, x, z, s.far > 0 ? NaN : groundY);
+      if (gy !== gy) continue;
       const y = gy + top * (0.45 + 0.55 * rng());
       if (!this.emit('leaves', x, y, z, ve, vu, vn, 1.0, 1.0)) { s.tear = 0; break; }
       // a branch: the wind takes one from a crown it is strong in, and it comes down with its own leaves
@@ -1109,10 +1206,10 @@ export class Loose {
   // Pale strokes of air for one source: grains of the leaf kind (light, tumbling, carried by the air they are in), in
   // the ground-material colours of snow and ice, a second or two of life. They are what is seen of a gust over ground
   // with nothing loose on it, of a gathered ball, and of a whirl's column.
-  _wisps(s, h, near, fx, fz, groundY, Rr) {
+  _wisps(s, h, air, near, fx, fz, groundY, Rr) {
     const rng = this.rng, W = WINDPOWER;
     const hush = s.kind === KIND.zone && !(s.gain > 1) && s.age < W.hushTime;      // (a place being stilled, in its first moments)
-    const rate = s.kind === KIND.jet ? W.wispGust : s.kind === KIND.orb ? W.wispOrb : s.kind === KIND.vortex ? W.wispVortex : s.kind === KIND.part ? W.wispPart : (s.gain > 1 ? W.wispZone : hush ? W.wispHush : 0);
+    const rate = s.kind === KIND.jet ? W.wispGust : s.kind === KIND.orb ? W.wispOrb : s.kind === KIND.vortex ? W.wispVortex : s.kind === KIND.rip && POWERFX.rip ? W.wispRip : s.kind === KIND.part ? W.wispPart : (s.gain > 1 ? W.wispZone : hush ? W.wispHush : 0);
     if (!(rate > 0)) return;
     s.wisp = (s.wisp || 0) + rate * sizeRate(s) * (hush ? 1 : s.strength) * h;
     let guard = 48;
@@ -1154,6 +1251,22 @@ export class Loose {
         const R = s.radius * (0.35 + 0.9 * rng()), a = rng() * 6.2831853;
         x = s.x + Math.cos(a) * R; z = s.z + Math.sin(a) * R; y = 0.2 + rng() * rng() * 11;
         ve = -Math.sin(a) * s.speed * s.spin * 0.8; vn = Math.cos(a) * s.speed * s.spin * 0.8; vu = s.up * 0.7; life = 0.085;
+      } else if (s.kind === KIND.rip) {
+        // THE AIR ITSELF POURING IN, which is the one thing a tear over bare rock has to show and the one thing it
+        // had none of: strokes born FAR OUT, low over the ground, flying at the tear at the speed of the air where
+        // they are. This is what the painter's picture already promises -- it lays strokes running into the tear
+        // (world/timefx.js) -- and until today the physics made not one.
+        // Each lives about as long as its own journey takes, so they thin out on the way in instead of piling into
+        // a knot at the middle (the gathered ball's lesson, above).
+        const far = s.far > 0 && s.far < s.radius ? s.far : s.radius;
+        const R = far * (0.5 + 0.5 * rng()), a = rng() * 6.2831853, hold = ripHoldAt(s, R);
+        if (hold < 0.2) continue;
+        // (a touch more turn than the air that far out really has, so the strokes curve into the tear instead of
+        //  ruling straight spokes at it; its own swirl, so one tear's strokes do not curve like another's)
+        const U = s.speed * ripDrawAt(s, R) * s.strength * hold, tw = s.swirl * 0.25 * s.spin;
+        x = s.x + Math.cos(a) * R; z = s.z + Math.sin(a) * R; y = 0.3 + rng() * 3.4;
+        ve = -Math.cos(a) * U - Math.sin(a) * tw; vn = -Math.sin(a) * U + Math.cos(a) * tw; vu = 0.2 * rng();
+        life = Math.min(0.22, R / (U > 1 ? U : 1) * 0.08);          // (0.08: a leaf's own life is 6 to 14 s)
       } else if (hush) {
         // a stilled place: strokes round its rim that drift in a little and sink, and are gone: the air is seen to settle
         const R = s.radius * (0.82 + 0.2 * rng()), a = rng() * 6.2831853;
@@ -1164,8 +1277,9 @@ export class Loose {
         x = s.x + Math.cos(a) * R; z = s.z + Math.sin(a) * R; y = 0.3 + rng() * 3.2;
         ve = s.de * s.push; vn = s.dn * s.push; vu = 0; life = 0.2;
       }
-      if (Math.abs(x - fx) > Rr || Math.abs(z - fz) > Rr) continue;
-      const gy = near ? near.heightAt(x, z, groundY) : groundY;
+      if (!inReach(x, z, fx, fz, Rr, s)) continue;
+      const gy = this._heightAt(near, air, x, z, s.far > 0 ? NaN : groundY);
+      if (gy !== gy) continue;                             // nobody has looked at the ground out there
       if (!this.emit('leaves', x, gy + y, z, ve, vu, vn, 0.35, life * (0.7 + 0.6 * rng()), rng() < 0.7 ? I_SNOW : I_ICE)) { s.wisp = 0; break; }
     }
   }

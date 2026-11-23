@@ -9,6 +9,50 @@ import { FLORA_GLSL } from '../physics/flora.glsl.js';
 import { WATER_GLSL } from '../physics/water.js';
 import { VERT_PARS, VERT_END, FRAG_PARS, FOG_BANK, PAINT } from './chunks.js';
 
+// THE LOOK AT THREE HUNDRED YARDS (the owner, 2026-11-22: "better lighting ... i want things to look high quality and
+// fully rendered even from 300 yards away" -- 275 m). What this file does for that is on three dials, read once from
+// the address and folded into the shaders as plain numbers, so each is free when it is off and the owner can be shown
+// A and B of one still:
+//   ?skyface=0   no surface tells the light which way it faces the sky (chunks.js pcUp keeps its neutral 0.5)
+//   ?floorvar=0  the far floor loses its leaf litter and its second pigment by raw distance again
+//   ?farcrown=0  a far crown goes back to one stamp with each leaf lit or shaded by its own random number
+// Every one of the three is inside #ifdef PC_OIL or on a line only the oil look reaches, so the watercolour game is
+// the program it was, dial or no dial.
+const _q22 = (() => { try { return new URLSearchParams(location.search); } catch (e) { return null; } })();
+const _d22 = (k, d) => (_q22 && _q22.has(k) && isFinite(+_q22.get(k)) ? +_q22.get(k) : d);
+const _gf = (v) => (+v).toFixed(4);      // a number as GLSL must read it: a bare integer there is a type error, not a float
+const SKYFACE = _d22('skyface', 1), FLOORVAR = _gf(_d22('floorvar', 1)), FARCROWN = _gf(_d22('farcrown', 1));
+// Where a far tree's crown sits in its own unit shape: florakit.js farCardGeometry and farTreeGeometry both set their
+// crown about V(0, 0.66, 0) (the core, the shingles and the leaf cards all take it as their middle). The far-tree
+// paint below measures a piece's place in its crown from here, so if that geometry ever moves, this moves with it.
+const FAR_CROWN_Y = _gf(0.66);
+// (the one line a material writes to say which way it faces the sky: nothing at all when the dial is off, and the
+// plain value when it is full, so neither costs an instruction it need not)
+const SKYUP = (e) => (SKYFACE <= 0 ? '' : SKYFACE >= 1 ? `pcUp = ${e};` : `pcUp = mix(0.5, ${e}, ${_gf(SKYFACE)});`);
+// The far air's CEILING and the sky-facing float both live in chunks.js, which is not this file's to write. Neither is
+// taken on faith: each is looked for in the chunk as it stands.
+//   uOilAir.x -- the ceiling. If VERT_PARS declares it, pcFogAmountV below holds the plants' air to it exactly as
+//     pcFogAmount holds the ground's; if it does not, or if it is declared and not attached (which reads 0), the
+//     ceiling is 1, which is no ceiling at all and folds away.
+//   pcUp -- if the PAINT chunk declares it, the vertex path that takes PAINT on its own already has it; if it is
+//     declared only in FRAG_PARS, that path must declare its own or it will not compile. PC_UP_V / PC_UP_F are those
+//     copies, and each is empty when the chunk has one of its own.
+// (copied LINE FOR LINE from chunks.js pcFogAmount, where the measurements and the reasons are written out: the soft
+// knee that bends the top of the curve over so a thing at 275 m keeps a quarter of its own paint, eased off by
+// pcHigh SQUARED as the eye climbs. Its own guard (uOilAir.x over 0.004) is also what keeps this safe where the
+// uniform is declared and not attached, which reads 0.)
+const AIR_CEIL_V = /uniform[^;]*\buOilAir\b/.test(VERT_PARS) ? `
+    if (uOilAir.x > 0.004) {
+      float keep = uOilAir.x, cap = 1.0 - uOilAir.x;
+      float knee = min(uOilAir.y, 1.0 - 2.0 * keep);
+      float U = 1.0 - knee, D = cap - knee;
+      float u = clamp((f - knee) / U, 0.0, 1.0);
+      float fc = knee + U * u * (u - 1.0) * (u - 1.0) + D * u * u * (3.0 - 2.0 * u);
+      f = mix(min(fc, f), f, pcHigh * pcHigh);
+    }` : '    // (chunks.js pcFogAmount has no ceiling on the air in this build: there is nothing here to match)';
+const PC_UP_V = /\bpcUp\b/.test(PAINT) ? '' : 'float pcUp = 0.5;';
+const PC_UP_F = /\bpcUp\b/.test(FRAG_PARS) ? '' : 'float pcUp = 0.5;';
+
 const FOG_VERT = /* glsl */`
 #ifdef PC_OIL
 uniform vec4 uOilC;
@@ -18,17 +62,30 @@ uniform vec2 uAirNear;
 uniform highp sampler3D uNoise3D;
 uniform vec2 uFogBank;
 ${FOG_BANK}
+// THE PLANTS BREATHE THE SAME AIR AS THE GROUND. This is chunks.js pcFogAmount line for line, and it must stay so: a
+// tree standing in a different air from the ground under it is the most visible fault this look can have, so any
+// change there belongs here in the same breath.
+// (2026-11-22) It had drifted, under a comment that said the two matched: 1.6 times where the ground has 2.4, and the
+// curve's shoulder laid on flat where the ground eases it off as the air's own reach grows. On Earth, whose
+// visibility is 185 m, pcHigh is 0 on foot and the two did agree exactly -- which is why it went unseen. Everywhere
+// the air reaches past 200 m they did not: measured at 275 m on Mercury (visibility 1400 m, so pcHigh is 1), the
+// ground was 0.34 of the way into the air and the plants standing on it 0.17, half as far.
 float pcFogAmountV(float dist) {
   #ifdef PC_OIL
-    dist *= mix(uOilC.w, 1.6, clamp((1.0 / max(uFog.x, 1e-6) - 200.0) / 400.0, 0.0, 1.0));     // (as chunks.js pcFogAmount)
+    float pcHigh = clamp((1.0 / max(uFog.x, 1e-6) - 200.0) / 400.0, 0.0, 1.0);
+    dist *= mix(uOilC.w, 2.4, pcHigh);
   #endif
   float f = 1.0 - exp(-dist * uFog.x);
   #ifdef PC_OIL
-    f = f * f * (3.0 - 2.0 * f);
+    f = mix(f * f * (3.0 - 2.0 * f), f, pcHigh);
   #endif
   float q = f * uFog.y;
   float fl = floor(q);
   f = (fl + smoothstep(0.15, 0.85, q - fl)) / uFog.y;
+  #ifdef PC_OIL
+    // (and the air's own ceiling, so a tree at 275 m keeps as much of its paint as the ground it stands on keeps)
+${AIR_CEIL_V}
+  #endif
   return clamp(max(f * uFog.z, uAirNear.x * (1.0 - exp(-dist / max(uAirNear.y, 0.1)))), 0.0, 1.0);
 }
 `;
@@ -259,6 +316,11 @@ vec3 gMark;      // (the powers, fire) what the fire has done where this stroke 
 vec3 gCtrB;       // a dab's own place on the body (set before pcGroundAt; x > 1e20: none, the place is carried from the pixel)
 vec4 gCdx, gCdy, gPdx, gPdy;
 float gMid;
+// gVar: how much of a DAB'S OWN variety the floor keeps here -- its two pigments and its carpet of fallen leaves.
+// It is gMid (raw distance) everywhere but under the leaf dabs, where it is the mark's own width in pixels instead:
+// see where it is set in main, and ?floorvar=.
+float gVar;
+${PC_UP_F}
 #ifdef PC_FIRE
 // WHERE THE FIRE HAS BEEN (the powers, fire; the record is src/data/burnt.js, and shared.js BURNPAINT says which few
 // of its marks are handed down here and why). A mark is a CAPSULE -- the line the fire crept along, as wide as its
@@ -368,9 +430,19 @@ void pcGroundAt(vec2 ds, float w, vec3 rnd, out vec3 c, out float lvl, out float
   vec4 n1 = vec4(0.5), n2 = vec4(0.5);
   if (uOilL.x < 0.5) { n1 = pcNoiseS(Bc, 31.0, w); n2 = pcNoiseS(Bc + 0.21 * 6.3, 6.3, w); }
   c = mix(c, c * uHueA, smoothstep(0.50, 0.72, n1.b) * 0.8);
-  c = mix(c, c * uHueB, smoothstep(0.52, 0.74, n2.r) * 0.6 * gMid);
+  // (the second pigment's patches are kept by the MARK'S size, not by the distance: gVar, set in main. It was gMid,
+  // which fades from 120 m out -- but gMid is near 1 everywhere this 6.3 m field still has a swing to give (at 275 m
+  // the dab's own footprint is 4.5 m and the lookup has averaged the field to its mean), so this changes little by
+  // itself: what carries the far floor's two pigments is the dab's own number in pcGroundPaint, which never faded.)
+  c = mix(c, c * uHueB, smoothstep(0.52, 0.74, n2.r) * 0.6 * gVar);
   c = pcDensity(c, 1.0 + (n1.r - 0.5) * 0.5 * uOilB.z);
-  snowC = pcSnowCover(dot(nLc, normalize(Bc)), rnd.z * 0.5 + n2.b * 0.3 + n1.a * 0.2, parC.z);
+  // WHICH WAY THIS DAB FACES THE SKY (chunks.js pcUp: the sky's fill in a shade, and the warm bounce off the ground
+  // on what faces down). It is the ground's own normal against up AT THE DAB'S CENTRE -- the very number the snow's
+  // cover is already taken from, so it costs nothing -- and being the dab's and not the pixel's, a dab is lit whole,
+  // as everything else here is.
+  float upN = dot(nLc, normalize(Bc));
+  ${SKYUP('upN')}
+  snowC = pcSnowCover(upN, rnd.z * 0.5 + n2.b * 0.3 + n1.a * 0.2, parC.z);
   #ifdef PC_FIRE
     // WHERE THE ICE HAS BEEN MELTED (the owner, 2026-11-19), asked once here at the stroke's own centre and used
     // twice: here, where the snow and the ice give way, and in pcGroundPaint, where the charcoal is laid. Melting
@@ -550,6 +622,7 @@ void main() {
   vec3 nV = normalize(vNV);
   gSunV = normalize((viewMatrix * vec4(uSunDirW, 0.0)).xyz);
   gMid = 1.0 - smoothstep(120.0, 420.0, dist);
+  gVar = gMid;        // (the worlds laid in long strokes keep what they had: gVar is only taken off the distance under the leaf dabs, below)
   vec2 ch = pcGroundChart(vBody, uBodyR);
   gBdx = dFdx(vRel); gBdy = dFdy(vRel);
   vec2 dlx = pcGroundChartD(vBody, gBdx, uBodyR), dly = pcGroundChartD(vBody, gBdy, uBodyR);
@@ -631,6 +704,22 @@ void main() {
   float graze = inversesqrt(max(abs(dot(nV, normalize(-vView))), 0.11));
   vec4 o4 = pcStrokeOct4(dist * uOilS.w * graze, uOilPx.z * uOilS.w);
   vec3 ocl = vec3(o4.w - o4.z, dFdx(o4.w), dFdy(o4.w));
+  // THE FLOOR KEEPS ITS VARIETY AS LONG AS ITS DABS ARE STILL MARKS (the owner, 2026-11-22: fully rendered at 300
+  // yards). gMid fades by RAW DISTANCE, which is right for the floor's mean -- far off a wood's floor is its canopy --
+  // but it was fading the per-dab variety with it, so beyond 420 m a floor under trees had no fallen leaf on it at
+  // all. A dab does NOT shrink with distance: the octaves hold it at a few pixels wherever it lies (chunks.js
+  // pcStrokeOct4), so the variety is kept by the MARK'S OWN WIDTH IN PIXELS. Measured at the default stroke size: a
+  // dab of the finest layer is about 0.66 of its cell wide, which is 4 to 8 px at 720 lines and twice that at 1440,
+  // AT EVERY DISTANCE -- so at 275 m a hillside keeps its light and dark leaves. Where the picture is small (a phone
+  // at half scale, ?stroke= turned down) the dab falls under three pixels and the variety eases out again, which is
+  // what keeps a far hillside from reading as pepper: the owner's first rule is no grain.
+  // (the size a dab is AIMED at, not the size the octave happens to be holding: o4.x is constant through an octave
+  // and so sweeps from the aim down to half of it and jumps back, and a threshold on that would ring the ground with
+  // circles of litter and no litter as the eye moved. The aim is the same number at every distance, as the octaves
+  // are built to make it -- 0.66 of a cell is the dab's width, times three quarters for the sweep -- and it needs
+  // neither the distance nor the angle, both of which cancel: chunks.js pcStrokeOct4.)
+  float dabPx = 0.50 * uOilS.w * uOilA.x * uOilPx.y / 720.0;
+  gVar = max(gMid, ${FLOORVAR} * smoothstep(2.6, 4.2, dabPx));
   float lw = max(length(gBdx), length(gBdy));
   // (a dab's own place: where its centre's chart lies on the sphere, at the ground's height carried there)
   float rB = length(vBody);
@@ -653,7 +742,13 @@ void main() {
     pcGroundAt(ds, w, rnd, c, lvl, snowC, leaf, canopy);
     // (under trees the floor is nearly all fallen leaves, with the earth dark between: the clip's. A world may keep
     // more of its grass there, uGroundK.w: the owner's later references have grass under the trees and leaves strewn on it)
-    float fk = clamp(canopy * 1.6, 0.0, 0.88) * gMid * (uGroundK.w > 0.0 ? uGroundK.w : 1.0);
+    // (the share laid as fallen leaves is kept by the mark's size now, not by the distance: gVar above. It was gMid,
+    // which took the litter off a floor under trees from 120 m and left none at all past 420 m -- the far wood's floor
+    // was its canopy's colour smoothed out, where the near wood's is a carpet of whole leaves with the earth between
+    // them. HONEST TRADE, to be judged in a still: the far floor's MEAN moves with it, toward the litter's own
+    // colour (pcDensity of the canopy wash), because line 413 still takes the dab's ground colour toward that
+    // canopy by gMid. ?floorvar=0.5 is half of it, ?floorvar=0 is exactly what shipped.)
+    float fk = clamp(canopy * 1.6, 0.0, 0.88) * gVar * (uGroundK.w > 0.0 ? uGroundK.w : 1.0);
     acc += rem * cov * pcGroundPaint(c, leaf, fk, rnd, snowC, lvl);
     rem *= 1.0 - cov;
     if (has2 > 0.5 && rem >= 0.004) { acc += rem * pcGroundPaint(c, leaf, fk, rnd2, snowC, lvl); rem = 0.0; }
@@ -661,6 +756,8 @@ void main() {
   gCtrB = vec3(1e30);
   if (uOilL.y > 0.5 && uOilL.y < 1.5) acc = pcTone(pcDensity(mix(vCol2, vCol.rgb, gMid), 1.15), 2.0);
   else if (rem >= 0.004 || uOilC.z < 0.999) {
+    // (the ground that shows between the dabs faces the sky as the land does, at the pixel's own place)
+    ${SKYUP('dot(normalize(vNL), normalize(vBody))')}
     float x0 = dot(nV, gSunV) * 0.5 + 0.5;
     float sun0 = min(pcSunAtSoft(vBody, vPar.z * mix(0.82, 1.0, gMid), 8.0, max(lw, o4.x * 0.5), 0.5), 1.0 - pcCast(vBody, 0.0));
     vec3 bare = pcTone(pcDensity(mix(vCol2, vCol.rgb, gMid), 1.15), pcLevel(mix(min(x0, 0.44) - 0.10 * vPar.z, x0, sun0), 0.05));
@@ -1438,7 +1535,9 @@ uniform float uCanopy;
   uniform vec3 uFarC[8];
   uniform vec4 uFarFam[8];
   uniform float uFarKind[8];
+  uniform vec3 uSunDirL;    // the sun (by night the moon) in the BODY'S own axes, which is the frame a crown's pieces are measured in here. Every painted material is already handed it (baseUniforms); the far program is the only one of these that reads it.
 #endif
+${PC_UP_V}
 ${PAINT}
 // (chunks.js pcDabTint and pcWetWash, as they stand there)
 vec3 pcDabTintV(vec3 c, vec3 rnd, float leafy) {
@@ -1537,6 +1636,18 @@ void main() {
       // its own height in the crown, 0.30 to 1.02 of the tree; the piece's paint is taken at its tapered centre)
       if (aData.y > 4.5) { float tk = uFarTaper[fsi]; cardC.xz *= 1.0 - tk * clamp((aCard.y - 0.30) / 0.72, 0.0, 1.0); lp.xz *= 1.0 - tk * clamp((position.y - 0.30) / 0.72, 0.0, 1.0); }
       else lp.xz *= 1.0 - uFarTaper[fsi] * uv.y * crown;
+      // NO TWO FAR CROWNS SHARE AN OUTLINE (the owner, 2026-11-22: a wood at 300 yards must not read as one stamp
+      // repeated). One mesh stands for every far tree, so until now every far crown had the same silhouette. Each
+      // piece is set a little further out from the crown's middle, or a little further in, by ITS TREE'S number and
+      // its own: 0.80 to 1.20 of its radius, about an even mean, so a crown's size does not grow with it (it must
+      // not: flora.js allows a far chunk's bounding ball chunk.size * 0.75 + 24 m, and a fatter crown would be
+      // culled sooner at the edge of the screen). The piece MOVES WHOLE -- its corners keep their places about its
+      // centre -- so a leaf is not stretched, and the dark core (shade 2) is left exactly where it was: that core is
+      // what stops the pieces reading as confetti.
+      if (aData.y > 4.5 && aData.z < 1.5) {
+        vec3 puff = (cardC - vec3(0.0, ${FAR_CROWN_Y}, 0.0)) * (${FARCROWN} * 0.40 * (fract(inst.z * 7.3 + aData.w * 3.1) - 0.5));
+        cardC += puff; lp += puff;
+      }
     #else
     lp.xz *= 1.0 - uFarTaper[fsi] * uv.y * crown;                 // pines, spires: taper to a point
     #endif
@@ -1645,9 +1756,44 @@ void main() {
       float xl = (dot(mVL, sunVL) * 0.5 + 0.5) * (1.0 - aData.z * 0.35);
       xl = max(xl, pow(max(dot(normalize(cV), sunVL), 0.0), 1.5) * (0.6 + 0.4 * r3.x) * (1.0 - twigL));
       if (snowL) xl = max(xl, 0.58 + 0.2 * r3.y);
-      xl *= mix(0.50, 1.0, pcSunAtV(cB, inst.w * uCanopy * 0.4, r3.z));
+      // Which way this piece faces the sky, for the sky's fill in its shade and the ground's warm bounce under it
+      // (chunks.js pcUp). The crown's mass normal in the BODY'S axes against up there: the same normal the light
+      // above is taken from, so a leaf's fill and a leaf's light agree, and the ground it stands on is doing the
+      // same thing with its own normal.
+      ${SKYUP('dot(normalize(ir * aMass), normalize(vBody))')}
+      float rSunL = r3.z;
+      float shLoL = 0.50;
+      float flrL = 0.30 + 0.15 * r3.x;
+      #ifdef PC_FAR
+        // A FAR CROWN TURNS IN THE LIGHT, INSTEAD OF A COIN FLIP PER LEAF (the owner, 2026-11-22).
+        // Beyond the shadow square -- which is where a far wood stands -- pcSunAtV falls back to the LEAF'S OWN
+        // RANDOM NUMBER against the canopy's level, so which leaves of a crown were in shade had nothing to do with
+        // where the sun was: a stand at 275 m was a uniform speckle at any hour, and the leaves thrown into the deep
+        // paint were scattered through the lit side as confetti. So the number it is asked of becomes the piece's own
+        // place in its crown, dotted with the sun.
+        //   THE SHARE OF LEAVES IN THE SUN DOES NOT MOVE, which matters: the far wood's mean value and the pixel
+        // gate's region means are measured off it. A crown's pieces lie on a ball about its middle, and a ball's
+        // spread along any axis is EVEN, so 0.5 + 0.5 * dot(where it lies, the sun) is spread evenly over 0..1
+        // exactly as the leaf's own number was; the leaf's number stays in as a small even jitter, which is the
+        // same thing as jittering the threshold and leaves the share alone (it keeps the sun's edge broken by
+        // leaves instead of ruled). Inside the shadow square pcSunAtV still reads the real map: this only changes
+        // what it falls back to.
+        //   The one-card far tree (?fartree=blob, an experiment) holds every piece at the crown's middle, so there
+        // is no place in the crown to read: under 0.06 of a unit tree it keeps the number it had.
+        vec3 offU = cardC - vec3(0.0, ${FAR_CROWN_Y}, 0.0);
+        if (dot(offU, offU) > 0.0036) rSunL = mix(r3.z, 0.5 + 0.5 * dot(normalize(ir * offU), uSunDirL) - (r3.z - 0.5) * 0.22, ${FARCROWN});
+        // (and the shade deepened, so a crown has a lit side AND a shaded one: half was all a shaded piece could
+        // lose, and the floor under it held every piece at a middle tone. 0.50 and 0.30 + 0.15 r were set when the
+        // shade was a coin flip, where a deep piece next to a lit one had to stay close to it; with a coherent side
+        // the two can part. NOTE, measured: under pcLevel's oil remap as it stands (chunks.js, 0.30 + 0.62 *
+        // smoothstep(-0.10, 0.30, 2x-1)) everything under xl 0.45 already lands on the same level, so the lower
+        // floor changes no pixel today -- it is here for the wider remap the lighting step is bringing.)
+        shLoL = mix(0.50, 0.30, ${FARCROWN});
+        flrL = mix(flrL, 0.18 + 0.12 * r3.x, ${FARCROWN});
+      #endif
+      xl *= mix(shLoL, 1.0, pcSunAtV(cB, inst.w * uCanopy * 0.4, rSunL));
       xl += (r3.z - 0.5) * 0.25;
-      xl = max(xl, 0.30 + 0.15 * r3.x);
+      xl = max(xl, flrL);
       // (a piece marked as the inside of a crown, shade 2: the core of a far tree of flat pieces, florakit.js facetCore.
       // It is laid in the deep tone whatever the sun: the dark the leaves stand on. Nothing else has a shade over 1.)
       if (aData.z > 1.5) xl = 0.2;
@@ -1731,6 +1877,7 @@ varying vec4 vLeafC;
 varying vec4 vLeafK;
 #define vCardD vLeafC.a
 #define vScaleO vLeafK.a
+${PC_UP_F}
 #endif
 #ifdef PC_FIRE
 varying float vBurnt;     // (the powers, fire) 0 this plant is untouched .. 1 its crown has burned right out
@@ -1766,6 +1913,11 @@ void main() {
   vec3 V = normalize(-vView);
   vec3 sunV = normalize((viewMatrix * vec4(uSunDirW, 0.0)).xyz);
   #ifdef PC_OIL
+    // Which way this piece of bark, crown wash, blade or stone faces the sky (chunks.js pcUp). Up AT THE EYE, turned
+    // into the frame the normal is in: over 275 m of these small worlds (a radius of about 4 km) up leans by under
+    // four degrees, which a fill term cannot show, and a plant has no body-axis normal to hand here. A LEAF does not
+    // come through here at all -- its paint, pcUp and all, is worked out once a leaf in the vertex shader above.
+    ${SKYUP('dot(nV, mat3(viewMatrix) * uUpW)')}
     // (the lighter paint: no noise for a plant's wash; and the speed test's flat plants, shared.js uOilL.y)
     vec4 n1 = uOilL.x > 0.5 ? vec4(0.5) : texture(uNoise3D, vBody / 9.0);
     // (uOilL.y 2: every plant one flat colour; 3: only the far trees, to tell their paint from their shapes)
@@ -2336,6 +2488,9 @@ void main() {
 
 const WASH_FRAG = /* glsl */`
 ${FRAG_PARS}
+#ifdef PC_OIL
+${PC_UP_F}
+#endif
 uniform vec3 uColor;
 uniform vec4 uWash;   // noise scale (1/m), dry brush, wetness, region id
 uniform float uFlat;  // 1 = no light steps (pure wash)
@@ -2371,6 +2526,9 @@ void main() {
   #ifndef PC_UNLIT
     nV = normalize(vNV);
     if (!gl_FrontFacing) nV = -nV;
+    #ifdef PC_OIL
+      ${SKYUP('dot(nV, mat3(viewMatrix) * uUpW)')}      // (which way it faces the sky: chunks.js pcUp, as the ground and the plants set it)
+    #endif
     vec3 sunV = normalize((viewMatrix * vec4(uSunDirW, 0.0)).xyz);
     float x = dot(nV, sunV) * 0.5 + 0.5 + (n1.g - 0.5) * 0.14;
     lvl = mix(pcLevel(x, 0.05), 2.0, uFlat);
@@ -2448,6 +2606,9 @@ void main() {
 
 const FIG_FRAG = /* glsl */`
 ${FRAG_PARS}
+#ifdef PC_OIL
+${PC_UP_F}
+#endif
 uniform vec4 uFig;    // wash turbulence scale (1/m), pooling inside the silhouette, dry-stroke scale, region id
 varying vec3 vObj;
 varying vec3 vNO;
@@ -2459,6 +2620,12 @@ void main() {
   #include <logdepthbuf_fragment>
   vec3 nV = normalize(vNV);
   if (!gl_FrontFacing) nV = -nV;
+  #ifdef PC_OIL
+    // (the figure stands in the same two lights as the land: the sky's fill on its shaded side, the ground's warm
+    // bounce under its chin and its arms -- chunks.js pcUp. It is a small part of the picture and the eye reads it
+    // first, so the matrix here is worth it where it would not be on the floor.)
+    ${SKYUP('dot(nV, mat3(viewMatrix) * uUpW)')}
+  #endif
   vec4 n1 = texture(uNoise3D, vObj * uFig.x);
   vec4 n2 = texture(uNoise3D, vObj * uFig.x * 3.3 + 0.31);
   // the wash: its pigment load drifts, and pools just inside the edge of the form
@@ -2679,6 +2846,7 @@ varying float vLoad;
 varying float vKind;
 #ifdef PC_OIL
 varying vec3 vRootB;
+${PC_UP_F}
 #endif
 #ifdef PC_FIRE
 ${FIRE_GLOW}
@@ -2713,6 +2881,10 @@ void main() {
         r3o = fract(r3o + h1 * vec3(0.37, 0.61, 0.83));      // (each blade of the tuft its own number: its own tone)
       }
       vec3 nVo = normalize(vNV);
+      // (a blade, a pebble, a frost needle faces the sky its own way: chunks.js pcUp, as the ground under it does.
+      // A blade stands up, so it sees about half the sky and takes the ground's warm bounce on its side; the floor
+      // it stands on faces the sky whole. That is the difference this term is for.)
+      ${SKYUP('dot(nVo, mat3(viewMatrix) * uUpW)')}
       vec3 sunVo = normalize((viewMatrix * vec4(uSunDirW, 0.0)).xyz);
       float xo = dot(nVo, sunVo) * 0.5 + 0.5;
       float sunO = min(pcSunAt(vRootB, vS.w * 0.8, 8.0, 0.3), 1.0 - pcCast(vRootB, (r3o.x - 0.5) * 0.3));

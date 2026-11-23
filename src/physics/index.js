@@ -37,6 +37,15 @@ import {
 } from './ship.js';
 
 export const PHYSICS_VERSION = 2;
+
+// (2026-11-23) STILL THE MOMENT: WHAT THE STOPPED PLACE HOLDS. Until today the loose things and the fire asked the
+// time zones (times.js) and the rain and the plants did not, so a frozen leaf hung inside a wood that went on waving
+// and the rain fell straight through the bubble. Both are handed the list now, and this is the switch for it, so that
+// A and B of the same still can be made: both ON by default (the owner asked for the power to work), and `rain` or
+// `plants` set false steps that system exactly as it did at v32. Nothing here reads the address -- the physics is
+// pure -- so the page sets it; the two lines for main.js are in this step's report.
+export const TIMEHOLD = { rain: true, plants: true };
+
 const FETCH_DEFAULT = 800;     // m: fetch assumed for a sea state asked about away from the focus
 // (P29) THE AIR DOWN THERE. The waves, the plants, the loose layer and the dust devils are each worked out for ONE air
 // density, and until now that was the density at the focus: the air where the player is. The wind they are given is
@@ -428,7 +437,9 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
     const t3 = now();
     const dist = f.disturbers || null;
     // (P29) the plants are bent by the air at the plants (rhoGround): their wind load goes straight with the density
-    flora.update(dt, frame, airGrid, near, rhoGround, fx, fz, dist, quality, devils, winds);
+    // (the powers, space and time) and `times`, so a stopped place stops the grass and the trees in it as well as the
+    // loose things: with no bubble open the field is handed null and steps as it always did (flora.js, "held cells")
+    flora.update(dt, frame, airGrid, near, rhoGround, fx, fz, dist, quality, devils, winds, TIMEHOLD.plants ? times : null);
     const t4 = now();
     skyNumbers(here.weather, here.sky);        // the weather as a painter needs it (sky.js)
     // the hull keeps the rain off what is under it
@@ -459,7 +470,9 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
     particles.rips = f.times && f.times.rips ? f.times.rips : null;
     // (the rain, the snow and the hail fall round the eye, so they keep the air at the focus; what is loose lies on the
     // ground and is lifted from it, so it takes the air there: rhoGround)
-    particles.update(dt, frame, airGrid, near, fx, fy, fz, wh, here.weather, here.air.density, cover, bodyId, body.gravity, time, ecx, ecz);
+    // (the last argument, the powers' space and time: every drop and flake steps at the pace of the place it is in,
+    //  as every loose grain already does on the line below. Null with no bubble open, and then it costs one comparison.)
+    particles.update(dt, frame, airGrid, near, fx, fy, fz, wh, here.weather, here.air.density, cover, bodyId, body.gravity, time, ecx, ecz, TIMEHOLD.rain ? times : null);
     loose.update(dt, frame, airGrid, near, fx, fy, fz, wh, here.weather, rhoGround, cover, bodyId, body.gravity, time, dist, here.air.turbulence, moist.wetness01, moist.snowDepth, devils, winds, times);
     // drifts: what lies loose on level ground here, how hard the wind moves it, and what stands in its way
     { const U = Math.hypot(airGrid.cwe, airGrid.cwn), snow = moist.snowDepth;

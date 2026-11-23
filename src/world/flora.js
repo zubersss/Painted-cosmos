@@ -4,8 +4,11 @@
 // in the tier its own distance puts it in.
 //   tier 0  near: the full tree (about 650 triangles)
 //   tier 1  mid: a trunk and two washes (about 180 triangles)
-//   far     one shared 26-triangle form for every species; beyond the thinning distance only
-//           one tree in three is kept and drawn larger ("fewer, larger, softer strokes")
+//   far     one shared form for every species, batched by far cell. In the WATERCOLOUR game, beyond the
+//           thinning distance only one tree in three is kept and drawn larger ("fewer, larger, softer
+//           strokes"); in the OIL look every tree is drawn out to T_FAR and nothing is grown, and a far
+//           cell is four tree cells to a side instead of two so the trees that come back cost no more
+//           draw calls (?farfill=0, ?farcell=2: the thinned ring and the small cell, for a side-by-side)
 // Tiers are assigned per tree on the CPU whenever the camera has moved a few metres, into
 // dynamic instance buffers, so nothing is drawn collapsed. Undergrowth lives in 25 m cells,
 // one mesh per kind, and grows in stroke by stroke as you approach.
@@ -54,6 +57,30 @@ const SHARED = ['position', 'normal', 'uv', 'aMass', 'aData', 'aBranchId', 'aLea
 //  0.8 was measured to cut the frame's triangles by a quarter on foot and a third from the air, for a handover that
 //  moves 18 m. 1 is the behaviour before this.)
 const TREE_DIST = (() => { const q = typeof location !== 'undefined' && location.search ? new URLSearchParams(location.search).get('treedist') : null; const n = q == null ? NaN : +q; return isFinite(n) && n >= 0.5 && n <= 1 ? n : 0.8; })();
+// THE FAR BAND IS FILLED (the owner, 2026-11-22: "I want things to look high quality and fully rendered even from 300
+// yards away"). 300 yards is 275 m, and 275 m fell inside the thinned ring. On the owner's phone the far trees' range
+// comes out at 281 m and the thinning distance at 197 m (T_THIN/T_FAR of it), so between 197 m and 281 m -- the very
+// band the owner is asking about -- ONE TREE IN THREE was drawn, each grown half again as wide and a seventh taller to
+// cover for the two that went. Trees arriving one by one as the player walks forward is exactly the "sharpens as you
+// walk towards it" they are complaining of, and this file's own measured study (in _retier below) says the GROWING is
+// where the fill was lost, not won: thinning the far tier cut triangles by half and put shaded pixels UP by half.
+// So in the oil look there is no thinned ring: the far tier holds every tree out to T_FAR and nothing is grown.
+// COUNTED by driving the real autumn wood in Node at the phone's own picture (576 lines, quality 1): the far tier
+// goes from 3,908 instances all round the eye to 5,868, half again as many, in the same meshes -- and in the band
+// itself the painted area goes UP by about three quarters, because a tree no longer stands in for three at 1.5 times
+// the width and 1.15 times the height. The phone is CPU-bound, so that is spent where there is room; the draw calls
+// below are what is bought back. It has NOT been timed on the owner's device: bench=1 must say.
+// (?farfill=0: the thinned ring as it was, for a side-by-side. The watercolour game keeps it either way.)
+const FAR_FILL = (() => { const q = typeof location !== 'undefined' && location.search ? new URLSearchParams(location.search).get('farfill') : null; return q == null ? 1 : (+q ? 1 : 0); })();
+// WHAT THE FILL IS PAID FOR WITH: fewer, larger far cells, so the trees that come back cost no more DRAW CALLS, which
+// is what the owner's own speed test says the far trees really cost -- 3 ms of a 9.6 ms script in 28 far-tree meshes,
+// where triangles on that device have twice measured as free. A far cell four tree cells to a side instead of two is a
+// quarter as many meshes for the same wood. COUNTED in the same Node run as above: 56 far-tree meshes all round the
+// eye become 18, and the 28 the owner's own table counted inside the view become about 9. The watercolour game keeps
+// the cell it has, so its draw order and its felling costs are untouched.
+// (?farcell=2: the small cell, for a side-by-side. Only 2 or 4: the far cell's key and _release's walk up from a tree
+//  cell are shifts, so the span must be a power of two.)
+const FAR_SPAN = (() => { const q = typeof location !== 'undefined' && location.search ? new URLSearchParams(location.search).get('farcell') : null; const n = q == null ? NaN : +q; return n === 2 ? 2 : 4; })();
 
 // WHICH KITS ARE DRAWN FAR OFF AS LEAF CARDS and not as the old lump (the oil look's far tree, v13). A kit left out
 // of this is silently given the lump, which is why it sits beside FAR_DIMS: both must name every tall kit there is.
@@ -81,7 +108,7 @@ const _p = new THREE.Vector3(), _s = new THREE.Vector3(), _up = new THREE.Vector
 const _Y = new THREE.Vector3(0, 1, 0);
 const _ft = [0, 0, 0, 1], _falling = [];      // (the powers: a felled tree's turn; the trees falling now)
 const _felledAll = [];                        // (every felled tree of this world, read when the list changes)
-const _ff = {}, _dd = [0, 0, 0], _laid = [false, false, false, false];
+const _ff = {}, _dd = [0, 0, 0], _laid = new Array(FAR_SPAN * FAR_SPAN).fill(false);
 
 export class Flora {
   constructor(bodyId, root, bodyUniforms) {
@@ -98,7 +125,12 @@ export class Flora {
     this.queue = [];
     this.lastTreeEval = new THREE.Vector3(1e9, 0, 0); this.lastUnderEval = new THREE.Vector3(1e9, 0, 0);
     this.treeSize = nodeSize(this.R, TREE_LEVEL); this.underSize = nodeSize(this.R, UNDER_LEVEL);
-    this.farSize = this.treeSize * 2;       // far trees are batched in cells twice as large
+    // (how many tree cells to a side go under one far cell, and the shift from a tree cell's index to its far cell's:
+    //  two in the watercolour game, four in the oil look, where the far band is filled -- see FAR_SPAN above)
+    this.farSpan = LOOK.oil ? FAR_SPAN : 2;
+    this.farShift = this.farSpan === 4 ? 2 : 1;
+    this.farFill = !!(LOOK.oil && FAR_FILL);
+    this.farSize = this.treeSize * this.farSpan;       // far trees are batched in cells this many tree cells to a side
     this.rangeScale = 1; this.treeScale = 1; this.farScale = 1; this.lastScale = -1;
     this.lastLaid = -10; this.washNow = 1; this._washWall = 0;
     this.lastRelease = -10;
@@ -110,7 +142,9 @@ export class Flora {
     this.starved = 0;
     this.hidden = false;
     this.prof = { wanted: 0, build: 0, retier: 0 };
-    this.est = { near: 1.0, far: 1.0, under: 2.5, under2: 2.5 };   // what one build step of each kind has been costing, ms
+    // (what one build step of each kind has been costing, ms. A far step lays every tree of its cell, so the larger
+    //  cell starts from a larger guess -- it is only the queue's first guess and is measured from then on.)
+    this.est = { near: 1.0, far: this.farSpan === 4 ? 3.0 : 1.0, under: 2.5, under2: 2.5 };
 
     this.bodyUniforms = bodyUniforms;
     this.look = this.S.look.flora || { tall: [], under: null };
@@ -308,7 +342,10 @@ export class Flora {
     mesh.count = 0;
     mesh.position.copy(chunk.origin);
     mesh.matrixAutoUpdate = false; mesh.updateMatrix();
-    mesh.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 0, 0), chunk.size * 0.75 + 24);
+    // (the allowance over the cell's own half-span: a tree's height, the spread of its crown, and the relief within
+    //  the cell. 24 m as it was; 30 in the oil look, where a far crown's pieces are pushed out from the crown's centre
+    //  to break its outline, so a crown must not be culled at the edge of the screen for those few extra metres.)
+    mesh.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 0, 0), chunk.size * 0.75 + (LOOK.oil ? 30 : 24));
     const origin = chunk.origin, flora = this, camRel = new THREE.Vector3(), lodv = new THREE.Vector4().fromArray(lod);
     mesh.onBeforeRender = function (renderer, scene, camera, geometry, material) {
       // (a tree's ranges follow its size on the screen in the oil look, and the far trees the air they are seen through: update())
@@ -428,13 +465,14 @@ export class Flora {
   _buildTrees(chunk) {
     let n = 0, d;
     if (chunk.kind === 'far') {
-      // the four tree cells under this far cell, concatenated
-      const parts = [];
+      // the tree cells under this far cell, concatenated: farSpan of them to a side, so four cells in the watercolour
+      // game and sixteen in the oil look
+      const parts = [], sp = this.farSpan;
       // (which tree cell each tree came from: while that cell's own trees are not laid, the far form stands in for them)
       chunk.partEnd = []; chunk.partKey = [];
-      for (let b = 0; b < 2; b++) for (let a = 0; a < 2; a++) {
-        const t = treeCell(this.S, chunk.face, chunk.ix * 2 + a, chunk.iy * 2 + b); parts.push(t); n += t.count;
-        chunk.partEnd.push(n); chunk.partKey.push(chunk.face * 1e8 + (chunk.ix * 2 + a) * 1e4 + chunk.iy * 2 + b);
+      for (let b = 0; b < sp; b++) for (let a = 0; a < sp; a++) {
+        const t = treeCell(this.S, chunk.face, chunk.ix * sp + a, chunk.iy * sp + b); parts.push(t); n += t.count;
+        chunk.partEnd.push(n); chunk.partKey.push(chunk.face * 1e8 + (chunk.ix * sp + a) * 1e4 + chunk.iy * sp + b);
       }
       d = new Float32Array(n * INST_STRIDE);
       let o = 0;
@@ -495,13 +533,17 @@ export class Flora {
     // the middle tier pays for the near ground, the explorer and the ship (the frame budget of
     // 600 k triangles): full trees and middle trees hand over a little sooner
     const trim0 = QUALITY.level === 1 ? TRIM[0] : 1, trim1 = QUALITY.level === 1 ? TRIM[1] : 1;
+    // (the filled far band: with it the plain far tier runs all the way to T_FAR and there is no thinned tier at all,
+    //  so nothing in the owner's 300 yards is one tree in three. ?farfill=0, and the watercolour game, keep the ring.)
+    const fill = this.farFill, thinR = fill ? T_FAR : T_THIN;
     let changed = false;
-    // a far cell: are the trees of its four tree cells laid? Where they are not (not built yet, or waiting
+    // a far cell: are the trees of its tree cells laid? Where they are not (not built yet, or waiting
     // for their ground), the far form stands in at any distance, and changes hands when they come
+    // (as many tree cells as the cell's span asks: four with span 2, sixteen with span 4)
     let pe = null, laid = null, part = 0;
     if (chunk.kind === 'far') {
       pe = chunk.partEnd; laid = _laid;
-      for (let q = 0; q < 4; q++) { const nc = this.treeChunks.get(chunk.partKey[q]); laid[q] = !!(nc && nc.built && !nc.held && !nc.dead); }
+      for (let q = 0, nq = chunk.partKey.length; q < nq; q++) { const nc = this.treeChunks.get(chunk.partKey[q]); laid[q] = !!(nc && nc.built && !nc.held && !nc.dead); }
     }
     for (let i = 0; i < n; i++) {
       const dx = rel[i * 3] - cx, dy = rel[i * 3 + 1] - cy, dz = rel[i * 3 + 2] - cz;
@@ -513,8 +555,8 @@ export class Flora {
       let t;
       if (dist < T0 * j * trim0) t = lowQ ? 1 : 0;      // the low tier draws no full trees
       else if (dist < T1 * j * trim1) t = 1;
-      else if (dist < T_THIN * jf) t = 2;
-      else if (dist < T_FAR * jf && (seed * 13.37) % 1 < 0.34) t = 3;   // thinned: one in three, drawn larger
+      else if (dist < thinR * jf) t = 2;
+      else if (!fill && dist < T_FAR * jf && (seed * 13.37) % 1 < 0.34) t = 3;   // thinned: one in three, drawn larger
       else t = -1;
       if (pe) { while (i >= pe[part]) part++; if (t >= 0 && t < 2 && !laid[part]) t = 2; }
       if (t !== tier[i]) { prev[i] = tier[i]; since[i] = now; tier[i] = t; changed = true; }
@@ -566,7 +608,9 @@ export class Flora {
         ab[w] = out ? -Math.max(since[i], 1e-3) : (inTier(prev[i]) ? 0 : since[i]);
         const o = i * INST_STRIDE, mo = i * 16, wo = w * 16;
         if (g.far) {
-          // the unit far tree: size it to the species; thinned ones stand in for three
+          // the unit far tree: size it to the species. A thinned tree (tier 3) stands in for three and is grown to
+          // cover for them -- which is what made the far wood read as sized blobs rather than trees. Where the band is
+          // filled there is no tier 3 at all (see above), so t is never 3 here and nothing is grown.
           const fd = this.species[d[o + 5]].far;
           const big = t === 3 ? 1.5 : 1;
           const sxz = fd[0] * big, sy = fd[1] * (t === 3 ? 1.15 : 1);
@@ -772,7 +816,7 @@ export class Flora {
     if (ch.isTree) {
       this._retier(ch);
       // the far forms that stood in for these trees are lifted out as the trees are laid
-      if (ch.kind === 'near') { const far = this.farChunks.get(ch.face * 1e8 + (ch.ix >> 1) * 1e4 + (ch.iy >> 1)); if (far && far.built && !far.held && !far.dead) this._retier(far); }
+      if (ch.kind === 'near') { const fsh = this.farShift, far = this.farChunks.get(ch.face * 1e8 + (ch.ix >> fsh) * 1e4 + (ch.iy >> fsh)); if (far && far.built && !far.held && !far.dead) this._retier(far); }
     } else {
       for (const m of ch.meshes) m.userData.laid = now;
       this._showUnder(ch);
@@ -879,7 +923,7 @@ export class Flora {
       this.lastTreeEval.copy(camLocal);
       if (this.species.length) {
         this._wanted(TREE_LEVEL, this.treeSize, T1 * kt * (1 + JIT * 0.5) + this.treeSize * 0.75, this.treeChunks, 'near');
-        this._wanted(TREE_LEVEL - 1, this.farSize, T_FAR * this.farScale * (1 + JIT * 0.5) + this.farSize * 0.75, this.farChunks, 'far');
+        this._wanted(TREE_LEVEL - this.farShift, this.farSize, T_FAR * this.farScale * (1 + JIT * 0.5) + this.farSize * 0.75, this.farChunks, 'far');
       }
       this.treeList = Array.from(this.treeChunks.values()).concat(Array.from(this.farChunks.values()));
     }
@@ -917,14 +961,15 @@ export class Flora {
         const el = performance.now() - t0, est = this.est[ch.kind];
         if (el + est > budgetMs && (built > 0 || budgetMs < 2.5) && !(built === 0 && this.starved > 12 && budgetMs > 0)) break;
         const ts = performance.now();
-        // big cells are assembled from four placement cells: prepare one missing cell per
-        // step, so no single step is long
+        // big cells are assembled from several placement cells (four, or sixteen for the oil look's far cell):
+        // prepare one missing cell per step, so no single step is long
         if (ch.kind === 'far' || ch.kind === 'under2') {
-          const ck = ch.kind === 'far' ? 't' : 'u';
+          // (a far cell is farSpan placement cells to a side -- four in the oil look -- an undergrowth cell always two)
+          const ck = ch.kind === 'far' ? 't' : 'u', span = ch.kind === 'far' ? this.farSpan : 2;
           let missing = false;
-          for (let b = 0; b < 2 && !missing; b++) for (let a = 0; a < 2 && !missing; a++) {
-            if (!hasCell(ck, this.S, ch.face, ch.ix * 2 + a, ch.iy * 2 + b)) {
-              if (ck === 't') treeCell(this.S, ch.face, ch.ix * 2 + a, ch.iy * 2 + b); else underCell(this.S, ch.face, ch.ix * 2 + a, ch.iy * 2 + b);
+          for (let b = 0; b < span && !missing; b++) for (let a = 0; a < span && !missing; a++) {
+            if (!hasCell(ck, this.S, ch.face, ch.ix * span + a, ch.iy * span + b)) {
+              if (ck === 't') treeCell(this.S, ch.face, ch.ix * span + a, ch.iy * span + b); else underCell(this.S, ch.face, ch.ix * span + a, ch.iy * span + b);
               missing = true;
             }
           }
@@ -959,7 +1004,19 @@ export class Flora {
       for (let c = 0; c < n; c++) {
         const ch = list[(this.retierCursor + c) % n];
         if (!ch.built || !ch.n || ch.held) continue;
-        if (ch.refill) { ch.refill = false; this._retier(ch, true); continue; }      // (the powers: a tree in it is falling, or has been felled)
+        // (the powers: a tree in it is falling, or has been felled)
+        if (ch.refill) {
+          ch.refill = false; this._retier(ch, true);
+          // A LARGE FAR CELL IS REFILLED WHOLE: the oil look's cell is four tree cells to a side and held 969 trees
+          // in the measured autumn wood, and the ultimate's sixty felled trees can mark eight such cells, all eight
+          // rewritten in the one frame the player is watching the wood go over. MEASURED in Node, that refill is
+          // 0.09 ms for the biggest cell against 0.07 ms for the small one, so the hitch this guards against did not
+          // appear and this is insurance, not a cure: it lets the rest keep their flag and come next frame, a frame
+          // late at worst, which is the trade FALL_RELAY already makes. Only where the cell IS large: the watercolour
+          // game's small cells are rewritten as they always were.
+          if (this.farSpan > 2 && performance.now() - t0 > budgetMs) { this.retierCursor = (this.retierCursor + c + 1) % n; break; }
+          continue;
+        }
         if (ch.washUntil && this.washNow > ch.washUntil) { this._retier(ch, true); continue; }
         const moved = ch.tierPos.distanceTo(camLocal);
         if (moved < 3) continue;

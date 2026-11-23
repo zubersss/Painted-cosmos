@@ -79,7 +79,16 @@ export const G = {
 // by every material; `&stroke=` (a multiple of the stroke's size) and painter.setLook({ oil: {...} }) turn them.
 const _qs = (() => { try { return new URLSearchParams(location.search); } catch (e) { return null; } })();
 const _qn = (k, d) => (_qs && _qs.has(k) && isFinite(+_qs.get(k)) ? +_qs.get(k) : d);
-export const LOOK = { oil: !!(_qs && _qs.get('look') === 'oil') };
+export const LOOK = {
+  oil: !!(_qs && _qs.get('look') === 'oil'),
+  // HOW MANY BANDS THE AIR IS LAID IN (world/index.js, uFog.y; chunks.js pcFogAmount quantises the haze to this many
+  // steps). The watercolour keeps its six. The oil look takes ten, because the oil air is thicker and the ceiling
+  // below holds it to about three quarters: over a long hillside six steps of a sixth each were six ruled terraces,
+  // and ten steps of a tenth are half as tall and twice as many. MEASURED on the autumn wood (visibility 259 m): the
+  // haze at 10 m goes 0.005 to 0.024, at 30 m 0.167 to 0.200, at 60 m 0.468 to 0.434 -- the mean of the curve is the
+  // same, the steps are finer, and the near air wobbles by at most 0.034 either way. `?bands=` turns it.
+  oilBands: _qn('bands', 10),
+};
 MODE.oil = LOOK.oil;      // (for the look data and the surface, which do not load this module: data/mode.js)
 MODE.calm = LOOK.oil && !!(_qs && _qs.get('floor') === 'calm');      // (a calmer forest floor, to compare: data/looks/earth.js)
 if (LOOK.oil) overlayOil(LOOKS);      // (the oil look's own kinds of plant and where they stand: data/mode.js)
@@ -133,6 +142,26 @@ export const OIL = {
   uOilL: { value: new THREE.Vector4(0, 0, 0, 0) },
   // the cast shadows (shadow.js): the map, the body's own space to the map's square, and x how strong (0: no map this
   //    frame), y the bias, z a texel, w where the map's answer gives way to the leaf shadow's pattern
+  // THE AIR'S CEILING AND THE LIGHT'S FOUR VALUES (2026-11-22, the owner: "i want things to look high quality and
+  // fully rendered even from 300 yards away"). THE MEASUREMENT THAT STARTED THIS: on the autumn wood (visibility
+  // 259 m) chunks.js pcFogAmount returns EXACTLY 1.000 for anything 230 m off or farther, so at the owner's 275 m
+  // every pixel is one flat haze colour and nothing the ground, the trees or the water computes is ever seen. That
+  // one fact is the whole complaint.
+  //   x: HOW MUCH OF ITS OWN PAINT THE FAR GROUND KEEPS (`?air=`; 0 is the look as it was, the air takes everything).
+  //      The ceiling it sets is 1 - x, reached with a soft knee from y, so the first sixty metres of the curve do not
+  //      move at all (the near thick pale air is the owner's own reference and is not being touched). MEASURED on the
+  //      autumn wood: the haze reads 0.167 at 30 m (0.167 before), 0.635 at 100 m (0.668), 0.723 at 150 m (0.836) and
+  //      holds at 0.755 from 230 m out instead of 1.000, so a thing at 275 m keeps a quarter of itself. NOT done by
+  //      lowering uOilC.w, which is a rejected change (see the note on uOilC above).
+  //   y: the knee: the share of air below which nothing changes at all (`?airknee=`). 0.46 is where the wood's curve
+  //      stands at 60 m. Held at or under 1 - 2x, which is what keeps the curve rising everywhere (above that the
+  //      soft knee would dip and a far ridge would read CLEARER than a nearer one).
+  //   z: THE LIGHT'S FOUR VALUES (`?litcurve=`; 0 is the remap as it was). As it stood, pcLevel's oil remap floored
+  //      the light at 0.30, so the deepest paint was unreachable in daylight and the middle tone was about seven
+  //      degrees of angle wide: every far form was two flat shapes with a hard join. See chunks.js pcLevel.
+  //   w: LIGHT THAT KNOWS UP FROM DOWN (`?bounce=`; 0 is the shade as it was). The sky's fill scaled by how much a
+  //      surface faces the sky, and a warm bounce off the ground for the downward half: chunks.js pcUp and pcTone.
+  uOilAir: { value: new THREE.Vector4(_qn('air', 0.25), _qn('airknee', 0.46), _qn('litcurve', 1), _qn('bounce', 1)) },
   // the leaf dabs laid once (dabtex.js; made in ensureGlobals from uOilS.z): a texel a dab, and each texel's topmost three
   uDabP: { value: null }, uDabId: { value: null },
   uShTex: { value: null }, uShM: { value: new THREE.Matrix4() }, uShK: { value: new THREE.Vector4(0, 0, 0, 0.86) },
@@ -151,8 +180,11 @@ export const OIL = {
   uLampF: { value: new THREE.Vector4(0, 0, 0, 0) },      // where the wanderer stands (the body's space), w 1 while it does: its shadow by the lantern's light
   // x: the angle one pixel of the scene pass takes (radians)   y: the scene pass's height in pixels (both set every
   // frame)   z: the smallest stroke's width, m (nearer than where that is uOilA.x pixels, strokes keep this width on
-  // the land and grow on the screen, as the clip's do)   w: (not in use)
-  uOilPx: { value: new THREE.Vector4(0.0015, 720, 0.027 * _qn('stroke', 1), 0.085) },
+  // the land and grow on the screen, as the clip's do)   w: THE FAR FLOOR IN MASSES (`?masses=`; 0 is the step as it
+  // was). How far the leaf shadow eases from its hard step to the canopy's own lit share as the dab grows past the
+  // pattern's features, which is what stops the floor at 275 m being light-and-dark confetti that flickers as the
+  // eye moves: chunks.js pcDappleS. (w held 0.085 and was read nowhere.)
+  uOilPx: { value: new THREE.Vector4(0.0015, 720, 0.027 * _qn('stroke', 1), _qn('masses', 1)) },
 };
 
 // WHERE THE FIRE HAS BEEN, FOR THE GROUND'S OWN PAINT (the powers, fire; the paint itself is materials.js TERRAIN_FRAG).

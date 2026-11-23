@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createPhysics } from './index.js';
 import { MATERIAL_INDEX } from './ground.js';
-import { makeWinds, castGust, castZone, castOrb, castVortex, castPart, castRip, partedAt, partShape, turnWind, moveWind, releaseWind, stepWinds, placeWinds, powerWind, windsToDevils, WINDPOWER, KIND } from './powers.js';
+import { makeWinds, castGust, castZone, castOrb, castVortex, castPart, castRip, partedAt, partShape, turnWind, moveWind, releaseWind, stepWinds, placeWinds, powerWind, windsToDevils, nearPower, WINDPOWER, POWERFX, KIND } from './powers.js';
 import { LocalFrame } from './near.js';
 import { FLORA } from './flora.js';          // (the trees' own lean limit, for the one-ability rule)
 import { BODIES } from '../data/bodies.js';
@@ -422,10 +422,15 @@ test('a rip draws everything in from a long way off, turns and lifts at the tear
   // a long way out to the east, and still drawn hard back to the middle (west is -o[0])
   powerWind(S, 40, 0, 2, o);
   assert.ok(o[0] < -20, 'at 40 m the air is barely drawn in: ' + o[0].toFixed(1));
-  powerWind(S, 10, 0, 2, o);
-  const near = o[0];
+  // (2026-11-22, THE RIP AS A TEAR: this was measured at 10 m until today. Ten metres is now inside the rise
+  // toward the lip, where the draw is more than twice this, so the pair is taken from the EDGE OF THE PLATEAU
+  // (R x ripHold) instead. What it holds is unchanged and is the owner's own point: out near the rim the draw is
+  // still most of what it is on the plateau, where a gathered ball's would long have died away. The rise itself
+  // is held by the next test.)
+  powerWind(S, R * WINDPOWER.ripHold, 0, 2, o);
+  const plateau = o[0];
   powerWind(S, 40, 0, 2, o);
-  assert.ok(o[0] < near * 0.6, 'the draw falls away with distance like a ball: near ' + near.toFixed(1) + ' far ' + o[0].toFixed(1));
+  assert.ok(o[0] < plateau * 0.6, 'the draw falls away with distance like a ball: ' + plateau.toFixed(1) + ' on the plateau, ' + o[0].toFixed(1) + ' far out');
   // round it as well as in
   powerWind(S, 20, 0, 2, o);
   assert.ok(Math.abs(o[1]) > 0.5, 'nothing turns round the tear: ' + o[1].toFixed(2));
@@ -439,4 +444,103 @@ test('a rip draws everything in from a long way off, turns and lifts at the tear
   // it is not held: it closes by itself and gives its slot back
   for (let i = 0; i < 60 * 9; i++) stepWinds(S, 1 / 60);
   assert.equal(S.count, 0, 'a rip outlived its life: ' + S.count);
+});
+
+// A TEAR AND NOT A RADIUS (2026-11-22). The air pouring into a hole must go faster the nearer it gets -- the same
+// air through an ever smaller ring -- and the whole of the first rip was one flat plateau instead. The cap is the
+// other half of it: uncapped, a grain at the lip is handed hundreds of m/s and is out of the simulated box in one
+// frame, and the explorer's own wind acceleration spikes.
+test('the tear draws harder the nearer the lip, and never hard enough to throw a grain out of the world', () => {
+  const p = V(0, 0, BODIES.earth.radius), f = frameAt('earth', p), S = makeWinds(), o = new Float64Array(4);
+  const R = 55, W = WINDPOWER;
+  castRip(S, 'earth', p, R, 6.5);
+  for (let i = 0; i < 90; i++) stepWinds(S, 1 / 60);
+  placeWinds(S, f, 'earth');
+  const draw = (r) => { powerWind(S, r, 0, 2, o); return -o[0]; };          // m/s toward the middle (west is -o[0])
+  const edge = draw(R * W.ripHold), lip = draw(8);
+  assert.ok(lip > edge * 1.6, 'the air does not speed up toward the tear: ' + lip.toFixed(1) + ' at 8 m against ' + edge.toFixed(1) + ' on the plateau');
+  // the cap holds everywhere in it, asked every quarter metre
+  let worst = 0;
+  for (let r = 0.25; r < R; r += 0.25) { powerWind(S, r, 0, 2, o); const u = Math.hypot(o[0], o[1], o[2]); if (u > worst) worst = u; }
+  const cap = W.ripDraw * W.ripMax * (1 + W.ripBreath) + W.ripSwirl + W.ripUp;
+  assert.ok(worst <= cap, 'faster than its own cap: ' + worst.toFixed(1) + ' m/s against ' + cap.toFixed(1));
+  assert.ok(worst / 60 < 1.6, 'a grain at the lip crosses ' + (worst / 60).toFixed(2) + ' m in one frame of sixty');
+  // and ?powerfar=0 / ?ripfeel=0 put it back to the flat plateau of the first rip
+  POWERFX.rip = false;
+  try {
+    const T = makeWinds();
+    castRip(T, 'earth', p, R, 6.5);
+    for (let i = 0; i < 90; i++) stepWinds(T, 1 / 60);
+    placeWinds(T, f, 'earth');
+    powerWind(T, 8, 0, 2, o); const a = -o[0];
+    powerWind(T, 20, 0, 2, o); const b = -o[0];
+    assert.ok(Math.abs(a - b) < 0.01 && a > W.ripDraw * 0.99, 'flat with the rise switched off: ' + a.toFixed(2) + ' at 8 m, ' + b.toFixed(2) + ' at 20');
+  } finally { POWERFX.rip = true; }
+});
+
+test('a tear takes hold from the middle outward, not the whole ground in the first frame', () => {
+  const p = V(0, 0, BODIES.earth.radius), f = frameAt('earth', p), S = makeWinds(), o = new Float64Array(4);
+  castRip(S, 'earth', p, 55, 6.5);
+  for (let i = 0; i < 15; i++) stepWinds(S, 1 / 60);                        // a quarter of a second
+  placeWinds(S, f, 'earth');
+  assert.ok(powerWind(S, 6, 0, 2, o) && o[0] < -1, 'the middle is not taken at once: ' + o[0].toFixed(2));
+  assert.equal(powerWind(S, 40, 0, 2, o), false, 'the ground 40 m out is taken in the same instant');
+  for (let i = 0; i < 30; i++) stepWinds(S, 1 / 60);                        // three quarters of a second in all
+  placeWinds(S, f, 'earth');
+  assert.ok(powerWind(S, 40, 0, 2, o) && o[0] < -10, 'the whole reach is not taken within a second: ' + o[0].toFixed(1));
+});
+
+// THE TEAR'S OWN GRAINS, AND THEY LIVE AT THE TEAR (2026-11-22). Until today the rip was in none of the three
+// tables that make grains, and every one of those tables -- and the test that kills a grain -- culled against the
+// box round the PLAYER (24 m). So a tear fifty metres off had a bare ring round it: what little it made was thrown
+// away at the box's wall. Measured here: 679 leaves in the air against 15 before the cast, 390 of them within 20 m
+// of the tear, going in at 18 m/s, and 253 grains of dust off the ground under it.
+test('a rip fifty metres off has its own stream of leaves and dust, out at the tear and going in', () => {
+  const w = setup('earth', 'autumn_woodland');
+  run(w, 3, null);                                   // let the wood and the wind grid's ground settle first
+  const S = makeWinds(), lf = w.physics.particles.leaves, du = w.physics.particles.dust;
+  const l0 = lf._n, d0 = du._n;
+  const s = castRip(S, w.bodyId, add(w.focus, axes(w).e, 48), 45, 6.5);
+  // (the simulation's own arrays: grid x east, z north from the focus, as meanVel above)
+  const watch = (b, m) => { let c = 0, u = 0, k = 0; for (let i = 0; i < b._n; i++) { const dx = b._p[i * 3] - s.x, dz = b._p[i * 3 + 2] - s.z, r = Math.hypot(dx, dz); if (r > m) continue; c++; u += -(dx * b._v[i * 3] + dz * b._v[i * 3 + 2]) / (r || 1); k++; } return [c, k ? u / k : 0]; };
+  let most = 0, atTear = 0, inward = 0, k = 0;
+  run(w, 2, S, () => {
+    if (lf._n > most) most = lf._n;
+    const [c] = watch(lf, 20), [, u] = watch(lf, 50);
+    if (c > atTear) atTear = c;
+    inward += u; k++;
+  });
+  assert.ok(most > l0 + 250, 'the tear made almost nothing: ' + l0 + ' leaves flying before it, ' + most + ' at most after');
+  assert.ok(atTear > 150, 'and they are not out at the tear: ' + atTear + ' within 20 m of it');
+  assert.ok(inward / k > 5, 'they are not going in: ' + (inward / k).toFixed(1) + ' m/s toward the middle');
+  assert.ok(du._n > d0 + 80, 'no dust raised off the ground under it: ' + (du._n - d0));
+  assert.ok(lf.far > 60, 'and whoever draws them is not told they lie out there: ' + (lf.far || 0).toFixed(0) + ' m');
+  // ?powerfar=0: the same cast, and the ground round the tear is bare again (what is left is the part of its reach
+  // that overlaps the box round the player)
+  POWERFX.far = false;
+  try {
+    const q = setup('earth', 'autumn_woodland');
+    run(q, 3, null);
+    const Q = makeWinds(), qf = q.physics.particles.leaves;
+    const qs = castRip(Q, q.bodyId, add(q.focus, axes(q).e, 48), 45, 6.5);
+    let bare = 0;
+    run(q, 2, Q, () => { let c = 0; for (let i = 0; i < qf._n; i++) if (Math.hypot(qf._p[i * 3] - qs.x, qf._p[i * 3 + 2] - qs.z) < 20) c++; if (c > bare) bare = c; });
+    assert.ok(bare < 40 && qf.far === 0, 'the far grains are made with the switch off: ' + bare + ' at the tear against ' + atTear);
+  } finally { POWERFX.far = true; }
+});
+
+test('no two tears turn alike', () => {
+  const o = new Float64Array(4);
+  let plus = 0, minus = 0, lo = 1e9, hi = -1e9;
+  for (let k = 0; k < 6; k++) {
+    const p = V(k * 1.3, 0, BODIES.earth.radius), f = frameAt('earth', p), S = makeWinds();
+    castRip(S, 'earth', p, 55, 6.5);
+    for (let i = 0; i < 90; i++) stepWinds(S, 1 / 60);
+    placeWinds(S, f, 'earth');
+    powerWind(S, S[0].x + 20, S[0].z, 2, o);
+    if (o[1] > 0) plus++; else minus++;                                     // which way it turns, 20 m out
+    const u = -o[0]; if (u < lo) lo = u; if (u > hi) hi = u;                // and how hard it pulls there
+  }
+  assert.ok(plus > 0 && minus > 0, 'six tears all turn the same way: ' + plus + ' one way, ' + minus + ' the other');
+  assert.ok(hi > lo * 1.1, 'and all pull exactly alike: ' + lo.toFixed(1) + ' to ' + hi.toFixed(1) + ' m/s');
 });

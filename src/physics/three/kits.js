@@ -225,7 +225,13 @@ export function createWeatherKit(physics, { makeMaterial, kinds = PARTICLES.kind
         eye.x = track.x - O.x; eye.y = track.y - O.y; eye.z = track.z - O.z;
         eye.vx = track.vx; eye.vy = track.vy; eye.vz = track.vz;
         eye.rx = track.rx; eye.ry = track.ry; eye.rz = track.rz; eye.ux = track.ux; eye.uy = track.uy; eye.uz = track.uz;
-        eye.fx = F.x - O.x; eye.fy = F.y - O.y; eye.fz = F.z - O.z; eye.radius = PARTICLES.radius; eye.pix = pix;
+        eye.fx = F.x - O.x; eye.fy = F.y - O.y; eye.fz = F.z - O.z; eye.pix = pix;
+        // (2026-11-23, THE POWERS) A GRAIN OF A POWER'S OWN MAKING LIVES OUT AT THE POWER and not in the box round
+        // the player. The painter fades a mark to nothing over the outer fifth of the box it is told about, so the
+        // stream of leaves into a tear fifty metres off was faded away exactly where it was thickest. physics/
+        // loose.js publishes b.far: how far from the player that kind's grains now lie, and 0 on every frame of an
+        // ordinary game, which is then exactly the line it was.
+        eye.radius = b.far > PARTICLES.radius ? b.far : PARTICLES.radius;
         // (P10: what the wind itself raises is streamers too: the powder over blowing snow, the fines over blowing sand)
         eye.wall01 = P.kind === 'dust' ? Math.max(physics.here.weather.dustLoad01 || 0, 0.9 * (physics.here.blown ? Math.max(physics.here.blown.snow, physics.here.blown.sand) : 0)) : 0;
         // (rain: more strokes the harder it rains; the share moves as slowly as the sky's number does)

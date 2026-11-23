@@ -35,6 +35,13 @@ vec3 pcRound(vec3 body) {
   float r = max(length(body), 1.0);
   return body * ((uRound.y - r) * uRound.x / r);
 }
+#ifdef PC_OIL
+// (the air's ceiling and the light's four values, shared.js OIL.uOilAir. Declared HERE, above everything else a
+// vertex shader includes, because two things that run in a vertex shader need it: the plants' own copy of the air
+// (materials.js FOG_VERT pcFogAmountV) and a leaf's paint, worked out once a leaf (materials.js PROP_VERT, which
+// includes the PAINT chunk below). Anything that includes VERT_PARS already has it: do not declare it again.)
+uniform vec4 uOilAir;
+#endif
 `;
 
 // Fog in banks (PAINTER 19, the M4 pre-ship round: Uranus' Pearl Fog Flats were an almost empty mint-white page, Venus'
@@ -82,7 +89,18 @@ float pcLevel(float x, float soft) {
     // sun ten degrees up the flat ground is local colour at best; the reference's wood at that hour is bright gold where
     // the sun reaches and violet where it does not. What faces the sun even a little is lit, what is turned or shaded
     // is not, and the angle only settles the few forms in between.)
-    x = 0.30 + 0.62 * smoothstep(-0.10, 0.30, 2.0 * x - 1.0);
+    // (2026-11-22, the owner: "fully rendered even from 300 yards away". WORKED THROUGH, with x back as dot(n, sun):
+    // the old remap floored the light at 0.30, and every step below reads 0.30 as level 1, so the DEEPEST paint was
+    // unreachable in daylight; the middle tone ran from dot 0.052 to dot 0.167, about seven degrees of angle, so on a
+    // sphere 53 per cent of it was one flat shade, 42 per cent one flat light and 6 per cent the turn between: two
+    // flat shapes with a hard join, which is what a far crown, hill or trunk read as. The wider remap gives four
+    // usable values -- the shares on a sphere go 39 / 12 / 11 / 38 per cent -- with the terminator (local colour
+    // meeting shade) at dot 0.026, where a viewer expects it, and the lit key still arriving at dot 0.24 rather than
+    // 1.0, which was the point of the original remap: a low sun lights what faces it at all. ?litcurve= is 0 for the
+    // remap as it was. The deepest paint itself is re-mixed in pcTone, on the same dial: level 0 may not come back as
+    // a RICHER colour, which is the fault the art pass of 18 Nov measured.)
+    float lc = uOilAir.z;
+    x = mix(0.30, 0.22, lc) + mix(0.62, 0.74, lc) * smoothstep(mix(-0.10, -0.35, lc), mix(0.30, 0.55, lc), 2.0 * x - 1.0);
   #endif
   float xs = mix(0.37 + x * 0.30, x, uDayness);   // night with no moon (an airless world, the far side seen from space): a dim, even light, nothing near black
   // Night on the ground is a picture in its own key (PAINTER 16, the M4 critique's first item: night was the day's picture
@@ -127,6 +145,27 @@ vec3 pcOilSunC() { return mix(pow(uLight, vec3(uOilA.z)), vec3(1.0, 0.84, 0.52),
 // (the cool key with its green drawn down: a shade leans to violet and maroon, not to slate)
 vec3 pcOilShadeC() { return pow(uGlaze, vec3(uOilA.w)) * vec3(1.0, uOilD.z, 1.0); }
 vec3 pcBody(vec3 c) { return pcDensity(c, uOilA.y); }
+// WHICH WAY A SURFACE FACES, FOR THE LIGHT THAT KNOWS UP FROM DOWN (2026-11-22). THE CONTRACT, so a material and
+// this chunk cannot drift apart:
+//   WHAT IT IS. pcUp is dot(normalize(vBody), n) -- the body's own up against the normal the surface is shaded by.
+//     1 is flat ground looking straight at the sky, 0 a wall or a tree trunk, -1 the underside of a bough looking
+//     straight at the ground. It is NOT a view direction and NOT a world-space up.
+//   WHO SETS IT. A material sets it at the top of its main, BEFORE its first call to pcTone, the same way it already
+//     sets pcFp. The ground and the near plants have both vBody and their normal to hand; a leaf card has its mass
+//     normal. Anything that does not set it keeps 0.5, which is EXACTLY today's shade: the two terms below are
+//     written so that pcUp = 0.5 scales the sky's fill by 1.0 and adds no bounce at all. So no material has to
+//     change for this to be safe, and each one can be given its own pcUp on its own.
+//   WHERE IT MAY NOT COME FROM. Never from a screen derivative of vBody (the rule at the head of this file): that
+//     would break the strokes into dots. Take it from the normal the material already has.
+//   WHAT IT DOES. pcTone scales the sky's own fill in a shade by how much of the sky the surface can see, and adds a
+//     warm bounce off the lit ground to the half that faces down. That is the term that separates a far stand of
+//     trees into lit crowns, cool floor and warm under-shade instead of one mass, and it survives the air better
+//     than detail does, because it is a hue and a value over a whole region.
+//   THE DIAL. uOilAir.w (?bounce=); 0 is the shade exactly as it was, whatever pcUp says.
+// (it is declared here, inside PAINT, and NOT beside pcFp and pcDist in FRAG_PARS: PAINT is included by the plants'
+// VERTEX shader without FRAG_PARS (materials.js PROP_VERT), and pcTone reads pcUp, so a declaration in FRAG_PARS
+// would not compile the plants at all.)
+float pcUp = 0.5;
 vec3 pcTone(vec3 c, float level) {
   vec3 b = pcBody(c);
   vec3 sunC = pcOilSunC(), shC = pcOilShadeC();
@@ -147,9 +186,30 @@ vec3 pcTone(vec3 c, float level) {
   // (the violet is the cool key's own hue, its green drawn down: a plum by a day's violet key, a deep blue by a night's
   // teal one; a fixed violet turned a teal night's shadows purple)
   vec3 shH = shC / max(dot(shC, vec3(0.3, 0.5, 0.2)), 1e-3) * vec3(1.12, 0.84, 0.84);      // (by day about (1.12, 0.73, 1.12): a plum, red and blue level; with more blue the trunks' shade stood indigo)
+  // (the sky's fill, and now by HOW MUCH OF THE SKY THE SURFACE CAN SEE: pcUp above. 0.52 + 0.96 * pcUp is 1.0 at
+  // pcUp 0.5, which is what a material that does not set pcUp gets, so nothing moves until one does; flat ground
+  // looking up takes 1.48 of it and a trunk 0.52, and the max keeps an underside from taking a negative fill.)
+  float skyK = mix(1.0, max(0.52 + 0.96 * pcUp, 0.0), uOilAir.w);
+  // (and the warm light the lit ground throws back up under a crown: zero at pcUp 0.5, half at a trunk, full under a
+  // bough. The thing's OWN body colour warmed is the cheap stand-in for the floor's colour, which pcTone is not told;
+  // it keeps the thing's hue and lifts and warms it, which is what a painter lays for reflected light.)
+  float grdK = max(0.5 - pcUp, 0.0) * uOilAir.w;
   // (deeper, and half of it the key's hue: the floor's shadows were a wine red where the clip's are a violet umber)
-  vec3 g1 = mix(pcDensity(g0, 1.35), vec3(dot(g0, vec3(0.3, 0.5, 0.2))) * shH * 0.92, 0.50) + pow(uGlaze, vec3(3.0)) * vec3(1.0, 0.8, 0.75) * uOilD.y * (0.35 + 0.65 * uDayness);      // (the sky's fill less blue than the key: on a dark thing it is most of the shade, and the trunks stood indigo)
-  vec3 g2 = pcDensity(g1, 1.7);
+  vec3 g1 = mix(pcDensity(g0, 1.35), vec3(dot(g0, vec3(0.3, 0.5, 0.2))) * shH * 0.92, 0.50) + pow(uGlaze, vec3(3.0)) * vec3(1.0, 0.8, 0.75) * uOilD.y * (0.35 + 0.65 * uDayness) * skyK      // (the sky's fill less blue than the key: on a dark thing it is most of the shade, and the trunks stood indigo)
+          + b * vec3(1.06, 0.92, 0.74) * uOilD.y * 0.8 * grdK * uDayness;
+  // (THE DEEPEST PAINT, level 0. pcDensity(g1, 1.7) takes it down a step by laying the pigment heavier, which makes
+  // it a RICHER colour as well as a darker one: on a shade of (0.50, 0.25, 0.25) it came out at saturation 0.63 where
+  // the shade above it is 0.50. That is the fault the art pass of 18 Nov measured -- the game's darks at 0.93
+  // saturation against the references' 0.33 -- and it did not show before because the old light curve never reached
+  // level 0 in daylight. With the curve widened above it is reached, so the deepest paint is now a step down in
+  // VALUE: a multiply keeps the hue and the saturation and only darkens, and a fifth of it goes to its own grey as
+  // the shade itself does. MEASURED on that shade: the shade is luminance 0.325 at saturation 0.50, the old deepest
+  // paint 0.181 at 0.63 (darker, but a PURER colour than the thing in the light, which is the fault), the new one
+  // 0.215 at 0.43 -- a clear step below the shade and less saturated than it, and 0.215 is about the brightness the
+  // owner's references give their deep conifer green (0.26). Their darks sit at saturation 0.33, which would want
+  // 0.45 of the way to grey rather than a fifth; that is an art decision for the art pass and not one to make
+  // without their eye. On ?litcurve=0 the old paint comes back with the old curve.)
+  vec3 g2 = mix(pcDensity(g1, 1.7), mix(g1, vec3(dot(g1, vec3(0.3, 0.5, 0.2))), 0.20) * 0.66, uOilAir.z);
   vec3 r = mix(g2, g1, clamp(level, 0.0, 1.0));
   r = mix(r, loc, clamp(level - 1.0, 0.0, 1.0));
   r = mix(r, lit, clamp(level - 2.0, 0.0, 1.0));
@@ -206,6 +266,7 @@ uniform vec4 uOilC;
 uniform vec4 uOilD;
 uniform vec4 uOilS;
 uniform vec4 uOilG;
+uniform vec4 uOilAir;  // the air's ceiling and the light's four values (shared.js OIL.uOilAir; also declared in VERT_PARS)
 uniform vec4 uOilL;    // x 1: the lighter paint (phones); y the speed test's flat modes (shared.js)
 uniform vec4 uOilPx;
 uniform mat4 uShM;
@@ -282,6 +343,40 @@ float pcFogAmount(float dist) {
   float q = f * uFog.y;
   float fl = floor(q);
   f = (fl + smoothstep(0.15, 0.85, q - fl)) / uFog.y;
+  #ifdef PC_OIL
+    // A CEILING ON THE GROUND, NOT A LIMIT (2026-11-22, the owner: "i want things to look high quality and fully
+    // rendered even from 300 yards away"). MEASURED on the autumn wood (visibility 259 m, so the dial above takes the
+    // distance 2.66 times): this function returned EXACTLY 1.000 for anything 230 m off or farther, which means every
+    // pixel out there was one flat haze colour and nothing the ground, the trees or the water worked out was ever
+    // seen. The curve is not touched -- lowering uOilC.w is a rejected change, and the near thick pale air is the
+    // owner's own reference -- so instead the TOP of it is bent over with a soft knee: nothing changes below the knee
+    // (uOilAir.y, 0.46, which the wood's curve reaches at 60 m), the slope is still 1 at the knee, and the far end
+    // comes to rest at 1 - uOilAir.x so a thing at 275 m keeps a quarter of its own paint.
+    // The shape is the cubic with slope 1 at the knee and flat at the end, written out without a divide for the
+    // slope; the knee is held at or under 1 - 2 * keep, which is exactly the bound that keeps it RISING everywhere
+    // (slacker than that and the knee dips, and a far ridge would read clearer than a nearer one).
+    // Eased off by pcHigh SQUARED, not pcHigh: from the air the land must still go right back into the air's colour
+    // (the stills from 150 m, the note above), but pcHigh is already 0.15 standing in the wood, and a straight mix
+    // would hand a fifth of the ceiling back before the eye had left the ground.
+    // MEASURED after, on the wood, the ceiling and the oil look's ten bands together (they ship together, and this is
+    // what the player sees) -- haze before, haze now: 30 m 0.167 to 0.200, 60 m 0.468 to 0.434, 100 m 0.668 to 0.656,
+    // 150 m 0.836 to 0.738, 200 m 0.968 to 0.749, and from 230 m out 1.000 to 0.755. So a thing at 275 m keeps 0.245
+    // of its own paint where it kept nothing. ?air=0 is the air exactly as it was, ?bands=6 the bands as they were.
+    // WHAT THIS DOES NOT DO: it does not put DEPTH back past about 230 m, because the curve itself has already
+    // reached 1 there and there is nothing left to tell 275 m from 500 m. What comes back is the thing's own colour
+    // and its value steps, which is what the owner asked for. More depth than that wants a longer visibility or a
+    // smaller uOilC.w, and the second of those is a rejected change.
+    // And on the CLEAR worlds (Mercury 1400 m, Pluto 1600 m) and from the air, pcHigh is 1 and this does nothing at
+    // all: there the air at 275 m was only a third anyway.
+    if (uOilAir.x > 0.004) {
+      float keep = uOilAir.x, cap = 1.0 - uOilAir.x;
+      float knee = min(uOilAir.y, 1.0 - 2.0 * keep);
+      float U = 1.0 - knee, D = cap - knee;
+      float u = clamp((f - knee) / U, 0.0, 1.0);
+      float fc = knee + U * u * (u - 1.0) * (u - 1.0) + D * u * u * (3.0 - 2.0 * u);
+      f = mix(min(fc, f), f, pcHigh * pcHigh);      // (the min is both the identity below the knee and the promise that this can never make the air THICKER than it was)
+    }
+  #endif
   return clamp(max(f * uFog.z, uAirNear.x * (1.0 - exp(-dist / max(uAirNear.y, 0.1)))), 0.0, 1.0);
 }
 
@@ -384,6 +479,19 @@ float pcDappleL(vec3 bodyPos, float canopy, float lift) {
 }
 float pcDapple(vec3 bodyPos, float canopy) { return pcDappleL(bodyPos, canopy, 8.0); }
 #ifdef PC_OIL
+// HOW FAR THE LEAF SHADOW HAS BEEN AVERAGED AWAY UNDER ONE STROKE, 0 none .. 1 wholly (2026-11-22). The lookup in
+// pcDappleS below averages exactly w metres of the pattern (its mip level is log2(64 w / 13), and a texel of the
+// 13 m channel is 0.203 m, so 0.203 * 2^lod = w). The pattern's own features are the 3.25 m cells of its first
+// octave, which carries 0.58 of it. So once a stroke is a good part of a cell wide the step below is firing on noise
+// the size of the stroke itself -- a coin toss per stroke, which is the confetti on the far floor, and the toss
+// CHANGES as the eye moves, which is the flicker. The ease runs over lod 1.4 to 3.2, which is a stroke 0.54 m to
+// 1.87 m wide, a sixth to three fifths of a cell. With the ground's 4.6-pixel stroke at 720 lines that is roughly
+// 75 m to 270 m from the eye (nearer if the caller hands in a dab's width rather than a stroke's, which the ground
+// does), so the near floor is untouched and the floor is settled about where the owner's 275 m is. It is keyed on
+// the mip level and not on a distance, so it needs no telling when the picture's size or the field of view changes.
+// Handed out as its own function so the ground can lay the far floor as a mix of its lit and its shaded paint by the
+// same share (materials.js). ?masses=0 turns it off.
+float pcDappleMass(float w) { return smoothstep(1.4, 3.2, log2(max(64.0 * w / 13.0, 1.0))) * uOilPx.w; }
 // The leaf shadow for one stroke of the oil look (width w, read at the stroke's centre: no derivative is taken there):
 // the same pattern as pcDappleL, with a clean edge, so a stroke lies in the sun or in the shade whole. Under a low sun
 // the pattern is drawn out along the sun's bearing, as the shadows of trunks and crowns are: up to five times at
@@ -405,13 +513,24 @@ float pcDappleS(vec3 bodyPos, float canopy, float lift, float w) {
     if (uOilL.x > 0.5) {
       float a1 = textureLod(uNoise3D, pp / 13.0, log2(max(64.0 * w / 13.0, 1.0))).r;
       float th1 = mix(0.05, 0.585, canopy);
-      return mix(smoothstep(th1 - 0.015, th1 + 0.015, a1), 1.0 - 0.42 * canopy, uWx.x);
+      float s1 = smoothstep(th1 - 0.015, th1 + 0.015, a1);
+      // (the lighter paint reads the 13 m channel alone, so its share in sun is its own: MEASURED over the real
+      // 64^3 noise, 1 - smoothstep(0.30, 1.38, canopy) is within 0.025 of it everywhere)
+      s1 = mix(s1, 1.0 - smoothstep(0.30, 1.38, canopy), pcDappleMass(w));
+      return mix(s1, 1.0 - 0.42 * canopy, uWx.x);
     }
   #endif
   float a = textureLod(uNoise3D, pp / 13.0, log2(max(64.0 * w / 13.0, 1.0))).r;
   float b = textureLod(uNoise3D, pp / 4.1 + 0.37, log2(max(64.0 * w / 4.1, 1.0))).g;
   float th = mix(0.05, 0.585, canopy);
   float s = smoothstep(th - 0.015, th + 0.015, a * 0.68 + b * 0.32);
+  // (and where the stroke has outgrown the pattern, the floor settles on the canopy's own share in sun instead of
+  // tossing a coin for each stroke. THE SHARE IS MEASURED, not guessed, because setting it wrong shifts the far
+  // floor's VALUE away from the near floor's and shows as a ring: over the real 64^3 noise the step's own mean share
+  // of 0.68 R + 0.32 G above the threshold is 1.00 at canopy 0, 0.96 at 0.5, 0.58 at 0.8 and 0.21 at 1.0, and
+  // 1 - smoothstep(0.42, 1.26, canopy) is within 0.020 of that everywhere. A straight 1 - 0.52 * canopy, which is
+  // what this looked like it wanted, is out by 0.22 at canopy 0.5 and by 0.27 at canopy 1.)
+  s = mix(s, 1.0 - smoothstep(0.42, 1.26, canopy), pcDappleMass(w));
   return mix(s, 1.0 - 0.42 * canopy, uWx.x);
 }
 // The lantern's pool (the wanderer's, by night): a stroke within a few metres of the lantern is painted in its warm
