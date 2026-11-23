@@ -470,7 +470,8 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
 
 Head rewritten 2026-11-18, evening (the morning's text and the v12 text it replaced are in the log).
 
-**v33 (23 Nov) IS READY ON `look-proto`: THE TEN-STEP UPGRADE. THE FAR DISTANCE WAS NOT BEING DRAWN AT ALL.**
+**`main` IS AT v33 (23 Nov), pull request #33 merged: THE TEN-STEP UPGRADE. THE FAR DISTANCE WAS NOT BEING DRAWN
+AT ALL.**
 The owner, 23 Nov: *"do a 10 step up grade using ultracode i want better lighting better physics for the powers
 and specifically better looks i want things to look high quality and fully rendered even from 300 yards away."*
 
@@ -499,6 +500,11 @@ and specifically better looks i want things to look high quality and fully rende
   without the colours moving under it.
 - **A RULE THIS LEAVES:** the test of the look is now **what a still taken at 275 m shows**, not what the near
   ground shows.
+- **ONE CHECK WAS NOT FINISHED AND THE OWNER WAS TOLD:** Neptune's snowfield in the oil look. The sky's shader is
+  ONE program for every world and it compiles (Earth proves that), so the risk there is not a broken picture but
+  an ice sky that reads worse -- and `?skyair=0` turns that one step off by itself. The snow world's grab ran for
+  over twenty minutes on this software-drawing machine without finishing; it is the first thing to shoot in the
+  next session.
 
 
 **`main` IS AT v32 (22 Nov), pull request #32 merged: SPACE AND TIME IS FOUR OVERLY POWERFUL ABILITIES, AND THE

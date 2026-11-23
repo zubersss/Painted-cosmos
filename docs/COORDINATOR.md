@@ -3056,3 +3056,7 @@ killed after its edits were on disk but before it could report. Its work was kep
 own tests pass and its diff reads complete -- but it was not written up by the agent that did it, so this entry
 and the commit message are the coordinator's reading of the diff. Said here because a later session should know
 which account is first-hand and which is not.
+- **MERGED: pull request #33, `main` is at v33.** Tests 325 / 49 / 394. Both looks compile. The one check left
+  unfinished, and said to the owner in the same breath: NEPTUNE'S SNOWFIELD has not been looked at -- the snow
+  world's grab ran over twenty minutes here without finishing. The sky is one program for every world and it
+  compiles, so what is unproven is whether the ice sky READS worse, and `?skyair=0` turns that step off alone.
