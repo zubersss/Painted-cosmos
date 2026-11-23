@@ -22,6 +22,24 @@ const _q22 = (() => { try { return new URLSearchParams(location.search); } catch
 const _d22 = (k, d) => (_q22 && _q22.has(k) && isFinite(+_q22.get(k)) ? +_q22.get(k) : d);
 const _gf = (v) => (+v).toFixed(4);      // a number as GLSL must read it: a bare integer there is a type error, not a float
 const SKYFACE = _d22('skyface', 1), FLOORVAR = _gf(_d22('floorvar', 1)), FARCROWN = _gf(_d22('farcrown', 1));
+// THE WATER'S PAINT KNOWS THE FALL, AND WHITE WATER WHERE IT CHURNS (the owner, 2026-11-23: the water should be
+// "constantly moving the way water would be naturally", with "airration"). Until now every dash on every river ran
+// at one fixed rate whatever the slope, and the only foam in the game was the sea's, raised by the wind. The mesher
+// now measures the water's own speed and its churn at each vertex (world/patchgen.js, the attribute aTurb) and the
+// two dials below read them, so the owner can be shown A and B of one still:
+//   ?flow=0   the dashes go back to v33's fixed 0.9 to 1.4 m/s whatever the fall; ?flow=2 twice as fast
+//   ?aer=0    no white water at all (v33's water exactly); ?aer=3 lays it three times as readily, which is how to
+//             judge the paint until the levels themselves fall -- MEASURED on Earth's brook as it stands, the
+//             Froude number is 0.35 to 0.56 and the fall a flat 1.2 %, so the only churn today is at the stony edges
+// Both are inside #ifdef PC_OIL, so the watercolour game is the program it was, dial or no dial. FLOW_VMAX must
+// match patchgen.js's own: it is the metres a second the speed byte runs to.
+const FLOWSPD = _d22('flow', 1), AER = _d22('aer', 1);
+const FLOW_VMAX = _gf(5.0 * Math.max(FLOWSPD, 0)), AER_K = _gf(Math.max(AER, 0));
+// (the dash's pace, as one expression: v33's fixed rate when the dial is off or the mesher gave no number, and the
+// water's own speed with a sixth of spread either way kept from v33, so two patches of dash never march in step)
+const FLOW_EXPR = FLOWSPD > 0
+  ? `vTurb.x > 0.002 ? vTurb.x * ${FLOW_VMAX} * (0.84 + 0.32 * hf) : (0.9 + 0.5 * hf)`
+  : '0.9 + 0.5 * hf';
 // Where a far tree's crown sits in its own unit shape: florakit.js farCardGeometry and farTreeGeometry both set their
 // crown about V(0, 0.66, 0) (the core, the shingles and the leaf cards all take it as their middle). The far-tree
 // paint below measures a piece's place in its crown from here, so if that geometry ever moves, this moves with it.
@@ -72,7 +90,7 @@ ${FOG_BANK}
 // ground was 0.34 of the way into the air and the plants standing on it 0.17, half as far.
 float pcFogAmountV(float dist) {
   #ifdef PC_OIL
-    float pcHigh = clamp((1.0 / max(uFog.x, 1e-6) - 200.0) / 400.0, 0.0, 1.0);
+    float pcHigh = clamp((1.0 / max(uFog.x, 1e-6) - 200.0) / 2400.0, 0.0, 1.0);
     dist *= mix(uOilC.w, 2.4, pcHigh);
   #endif
   float f = 1.0 - exp(-dist * uFog.x);
@@ -1004,6 +1022,11 @@ varying vec4 vLiq;
 varying vec2 vLiqP;
 #ifdef PC_OIL
 varying vec2 vFlow;      // the current (surface.js _riversOil), two bytes about 128/255; 0, 0: still water
+// What the mesher measured of the water here (world/patchgen.js): x the current's own speed, a byte of 5 m/s, and a
+// byte of 0 meaning IT GAVE NONE (a mesh made before this, or the attribute not attached: the paint then keeps the
+// fixed dash rate it had); y how aerated the water is, 0 clear .. 1 the foot of a fall.
+attribute vec4 aTurb;
+varying vec2 vTurb;
 #endif
 varying vec3 vWake;
 #ifdef PC_POWERS
@@ -1061,6 +1084,7 @@ void main() {
   vLiq = aLiq; vLiqP = aLiqP.xy;
   #ifdef PC_OIL
     vFlow = aLiqP.zw;
+    vTurb = aTurb.xy;
   #endif
   vec4 mv = modelViewMatrix * vec4(p + pcRound(vBody), 1.0);
   vView = mv.xyz;
@@ -1091,6 +1115,7 @@ varying vec4 vLiq;
 varying vec2 vLiqP;
 #ifdef PC_OIL
 varying vec2 vFlow;      // the current (surface.js _riversOil), two bytes about 128/255; 0, 0: still water
+varying vec2 vTurb;      // x the water's own speed (0: the mesher gave none), y how aerated it is (world/patchgen.js)
 #endif
 varying vec3 vWake;
 #define PC_PHYS_NO_WAKE
@@ -1376,13 +1401,22 @@ void main() {
     // current's own direction about the middle of a patch some twenty-six metres across (patches with wavy bounds, each
     // with its own dashes and its own pace, 0.9 to 1.4 m a second), and slid along it with the clock. Within a patch the
     // direction is the pixel's own, so the dashes curve with a bend. Still water (a lake, the sea) is laid as before.
+    // AND THE SPEED THE FALL GIVES IT (the owner, 2026-11-23: water "constantly moving the way water would be
+    // naturally ... how it goes down hill"). Until v33 every dash on every river ran at the same 0.9 to 1.4 m/s: the
+    // flow vector was normalised before it was packed and its magnitude thrown away. The mesher now measures the
+    // water's own speed where each vertex stands, from the fall of the liquid's own surface and the depth (Manning's
+    // open channel; world/patchgen.js), and hands it over in vTurb.x -- a byte of 5 m/s. A 0 there means the mesher
+    // gave none (a mesh built before this, or the attribute not attached) and the old fixed rate is kept, so nothing
+    // of the look moves until the number arrives.
+    float flowV = 1.15;      // (never read unless a current turns the chart below; the middle of v33's band)
     vec2 sch = wch, sdx = wdx, sdy = wdy;
+    // (and the churn's own chart, below: it is turned to the current on a far lower floor than the dashes are,
+    // because white water must MOVE even in an eddy, where the body of the water is rightly laid still)
+    vec2 ach = wch, adx = wdx, ady = wdy;
     if (vFlow.x + vFlow.y > 0.004) {
       vec2 fl = vFlow * (255.0 / 127.0) - (128.0 / 127.0);
-      // (a current is a full-length arrow at every point of the mesh; where two that disagree are blended across a
-      // triangle, at a meeting of waters, the blend is short and turns from pixel to pixel: there the water is laid
-      // still, as an eddy is, or its dashes would be a stipple)
-      if (dot(fl, fl) > 0.56) {
+      float coh = dot(fl, fl);
+      if (coh > 0.02) {
         vec3 upF = normalize(vBody);
         vec3 Uf = normalize(abs(upF.y) < 0.9 ? vec3(-upF.z, 0.0, upF.x) : vec3(0.0, upF.z, -upF.y));
         vec2 fc = pcGroundChartD(vBody, Uf * fl.x + cross(upF, Uf) * fl.y, uBodyR);
@@ -1391,8 +1425,14 @@ void main() {
         vec2 cellF = floor(wch / 26.0 + 0.30 * vec2(sin(wch.y * 0.23), sin(wch.x * 0.19)) + 0.5);
         vec2 relF = wch - cellF * 26.0;
         float hf = fract(sin(dot(cellF, vec2(12.9898, 78.233))) * 43758.5453);
-        sch = vec2(dot(relF, fc) - uTime * (0.9 + 0.5 * hf) + hf * 173.0, dot(relF, nc) + hf * 91.0);
-        sdx = vec2(dot(wdx, fc), dot(wdx, nc)); sdy = vec2(dot(wdy, fc), dot(wdy, nc));
+        flowV = ${FLOW_EXPR};
+        vec2 tch = vec2(dot(relF, fc) - uTime * flowV + hf * 173.0, dot(relF, nc) + hf * 91.0);
+        vec2 tdx = vec2(dot(wdx, fc), dot(wdx, nc)), tdy = vec2(dot(wdy, fc), dot(wdy, nc));
+        ach = tch; adx = tdx; ady = tdy;
+        // (a current is a full-length arrow at every point of the mesh; where two that disagree are blended across a
+        // triangle, at a meeting of waters, the blend is short and turns from pixel to pixel: there the water is laid
+        // still, as an eddy is, or its dashes would be a stipple. This is v33's own test, to the number)
+        if (coh > 0.56) { sch = tch; sdx = tdx; sdy = tdy; }
       }
     }
     pcThinLayer(sch, sdx, sdy, woc.x, 11.0, vBody, 60.0, 4.0, wr1, wds, wown, wr2);
@@ -1409,6 +1449,29 @@ void main() {
     w2 = wr2.z < 0.34 * wau ? mix(vec3(0.10, 0.74, 0.60), vec3(0.24, 0.96, 0.56), step(0.5, fract(wr2.z * 31.7))) : w2;
     w1 = wr1.y < wsp * 1.2 ? wsun : w1; w2 = wr2.y < wsp * 1.2 ? wsun : w2;
     c = mix(w2, w1, wown);
+    // AERATED WATER, AS PAINT (the owner, 2026-11-23: "airration" -- the white of a rapid, the lace below a fall,
+    // the stirred edge where water meets rock). The foam above this is the SEA's, raised by the wind, and the game
+    // had no other: nothing anywhere went white because the bed made it. The mesher measures the churn where each
+    // vertex stands (vTurb.y: the Froude number of the flow, the fall of the water's own face, and how thin it runs
+    // over a tilted bed -- world/patchgen.js) and it is laid in the same thin strokes the water itself is painted in,
+    // on their own octave so a mark is never finer than the brush, drawn out half again as long, and carried
+    // downstream at the current's own pace. Never a wash and never a grain, which the look forbids.
+    float aer = min(vTurb.y * ${AER_K}, 1.0) * liq;      // (liq, from above: not lava and not a sea of cloud)
+    if (aer > 0.012) {
+      // the body first: churned water carries so much air that the bed and the mirror stop showing through it, and
+      // its colour goes to a pale MILK of its own wash. Not to white: a flat white area is not water, it is paper.
+      c = mix(c, mix(vec3(0.90, 0.94, 0.95), pcDensity(vLiq.rgb, 1.25), 0.30), aer * 0.66);
+      // then the lace: a share of the fine strokes is bare white, the share growing with the churn, and the milk
+      // shows between them. A smaller base width in pcStrokeOct gives finer strokes NEAR and exactly the same ones
+      // far off, where it clamps to what the brush can hold -- which is why this cannot turn into a speckle.
+      vec2 aoc = pcStrokeOct(dist * 1.1, uOilPx.z * 0.40);
+      vec3 ar1, ar2; vec2 ads; float aown;
+      pcThinLayer(ach, adx, ady, aoc.x, 16.0, vBody, 60.0, 4.0, ar1, ads, aown, ar2);
+      // (at full churn four strokes in five break, and they break to bare paper; a faintly stirred reach breaks a
+      // few and breaks them only part of the way, or the first whisper of churn would be a sparkle of white specks)
+      float ath = 1.0 - aer * 0.78;
+      c = mix(c, vec3(1.0), mix(step(ath, ar2.x), step(ath, ar1.x), aown) * (0.30 + 0.70 * aer));
+    }
   }
   #endif
   float f = pcFogAmount(dist) * (1.0 - 0.45 * farSea) * (1.0 - 0.6 * vLiqP.x);

@@ -133,6 +133,11 @@ export class PlanetTerrain {
       wg.setAttribute('aDepth', new THREE.BufferAttribute(d.water.depth, 1));
       wg.setAttribute('aLiq', new THREE.BufferAttribute(d.water.liq, 4, true));
       wg.setAttribute('aLiqP', new THREE.BufferAttribute(d.water.liqP, 4, true));
+      // (the oil look only: what the mesher measured of the water here -- x the current's own speed, y how
+      // aerated it is. patchgen.js builds it only with MODE.oil, so there is nothing to attach in the
+      // watercolour game, and the paint keeps its fixed dash rate and no churn where it is missing:
+      // render/materials.js, aTurb)
+      if (d.water.turb) wg.setAttribute('aTurb', new THREE.BufferAttribute(d.water.turb, 4, true));
       wg.setIndex(new THREE.BufferAttribute(d.water.indices, 1));
       wg.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 0, 0), d.boundR);
       const wm = new THREE.Mesh(wg, this.waterMaterial);

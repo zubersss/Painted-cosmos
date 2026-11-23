@@ -46,6 +46,11 @@ const params = new URLSearchParams(location.search);
 // (the elemental powers, ?powers=1: said to the modules that must know before they make anything; the powers' own code is
 // loaded further down, and only then)
 if (params.has('powers') && params.get('powers') !== '0') MODE.powers = true;
+// (the animals, ?beasts=N: said to the look data before anything is made. 1 the five at the landing, 2 the rest
+//  of the wood and the water, 3 the coast, the mountain and the canyon. data/mode.js, data/looks/earth.js.
+//  It needs ?look=oil with it: a biome's list of animals rides under its oil overlay. Without the flag not one
+//  module of the creatures is fetched, exactly as none of the powers is.)
+if (params.has('beasts')) MODE.beasts = Math.max(0, Math.min(3, parseInt(params.get('beasts'), 10) || 0));
 // (the turn of the year, ?season= and ?year=: data/season.js. Read here, before any world is made, because a world's
 //  plants take their first colour from where the year stands.)
 seasonFromSearch(location.search);
@@ -139,6 +144,16 @@ async function boot() {
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(58, 1, 0.1, 3e6);
 
+  // WATER THAT RUNS DOWNHILL AND POOLS WHERE IT CANNOT FALL FURTHER (?flow=1; world/drainage.js, the owner,
+  // 23 Nov). Not one byte of it is fetched without the flag. Awaited HERE because the field must land before
+  // the first terrain patch is built: a patch built before it keeps the old levels and will not meet its
+  // neighbours. ?pool=<metres> raises the pools (drainage.js DRAIN_DEF.bias; 0.8 by default).
+  if (params.has('flow') && params.get('flow') !== '0') {
+    try {
+      const { ensureDrainage } = await import('./world/drainage.js');
+      ensureDrainage(params.get('body') || 'earth', params.has('pool') ? { bias: +params.get('pool') } : undefined);
+    } catch (e) { console.warn('flow: the drainage field did not build', e); }
+  }
   const world = prov.createWorld(scene);
   const painter = prov.createPainter(renderer);
   // Painter's targets have half-float attachments: without float colour buffers every pass is an

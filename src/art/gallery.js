@@ -31,6 +31,13 @@ const num = (k, d) => (P.has(k) && P.get(k) !== '' && isFinite(+P.get(k)) ? +P.g
 // in the game is behind the same flag. It must be set before the painter is made, because that is when the programs
 // are compiled (render/materials.js addFire). The gallery has no player and so no abilities: this is the paint only.
 if (P.has('powers') && P.get('powers') !== '0') MODE.powers = true;
+// (the animals, ?beasts=N, and the water that runs downhill, ?flow=1: both before the world is made. The gallery
+//  loads in seconds where the game takes minutes, so this is where they are looked at first.)
+if (P.has('beasts')) MODE.beasts = Math.max(0, Math.min(3, parseInt(P.get('beasts'), 10) || 0));
+if (P.has('flow') && P.get('flow') !== '0') {
+  const { ensureDrainage } = await import('../world/drainage.js');
+  ensureDrainage(P.get('body') || 'earth', P.has('pool') ? { bias: +P.get('pool') } : undefined);
+}
 
 const canvas = document.getElementById('c');
 const renderer = new THREE.WebGLRenderer({ canvas, ...RENDERER_OPTIONS });

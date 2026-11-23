@@ -18,6 +18,25 @@
 // centimetre a metre. A material whose large triangles near the eye poke through others opts back into
 // the fragment write with the define PC_FRAG_LOGDEPTH (and a late renderOrder: one depth-writing shader
 // can turn hierarchical Z off for the rest of the pass on some GPUs).
+
+// THE DIALS THAT ARE BAKED INTO THE SHADER TEXT (2026-11-23). The look's other dials are uniforms (shared.js
+// OIL), which is right for anything the painter changes while the game runs. These two are read once from the
+// address and written into the shader as plain numbers, because a number in the text costs no uniform slot and no
+// instruction, and because at 0 the lines are not written at all: `?farlight=0` is the v33 shader to the
+// character. This file has no imports and is kept that way -- it is text, and node must be able to read it with
+// no browser round it -- so the helpers below are its own, not shared.js's.
+const _qs = (() => { try { return new URLSearchParams(location.search); } catch (e) { return null; } })();
+const _qn = (k, d) => (_qs && _qs.has(k) && isFinite(+_qs.get(k)) ? +_qs.get(k) : d);
+// a GLSL float literal: always with a point and never in exponent form, so a whole number is never read as an int
+const _fl = (x) => { const s = (Math.round(x * 1e4) / 1e4).toFixed(4).replace(/(\.\d*?)0+$/, '$1'); return s.endsWith('.') ? s + '0' : s; };
+
+// THE AIR CARRIES THE LIGHT (`?farlight=`, how much; `?farnear=`, from what thickness of air it starts).
+// See pcFarLight below for the measurements and the care. 0 is the air exactly as it was.
+const FAR_LIGHT = Math.max(0, Math.min(2, _qn('farlight', 0.5)));
+const FAR_FROM = Math.max(0, Math.min(0.85, _qn('farnear', 0.40)));
+const FAR_TO = Math.min(0.88, FAR_FROM + 0.35);                // (the ramp's own width, held clear of the 0.90 where it starts letting go again)
+const _far = (c, h) => (FAR_LIGHT > 0.0005 ? `pcFarLight(${c}, ${h}, f)` : h);
+
 export const VERT_PARS = /* glsl */`
 #include <common>
 #include <logdepthbuf_pars_vertex>
@@ -233,6 +252,51 @@ vec3 pcTone(vec3 c, float level) {
 
 `;
 
+// THE AIR CARRIES THE LIGHT, SO THE FAR LAND KEEPS ITS FORM (2026-11-23, the owner: "a mile of distance that
+// loads and looks good"). The oil air mixed a far thing to ONE FLAT HAZE COLOUR, so all that was left of what the
+// ground, the trees and the water had worked out was the quarter the v33 ceiling holds back. MEASURED on the
+// autumn wood (visibility 259 m): two slopes whose own paint is 0.30 apart in value came out 0.073 apart on the
+// screen at 275 m -- and at 400 m, at 800 m and at a mile, all the same, because the air's curve has saturated
+// by 230 m. A quarter of the separation a painter would give them, which is why a far hillside reads as one shape.
+// The hand to follow is next door: the watercolour path cools a thing toward ITS OWN luminance before it goes to
+// the air. Here the air keeps its hue entirely -- every bit of the colour is still the air's -- and is given the
+// thing's VALUE: the haze is laid at lumH + k * (v - lumH) rather than at lumH, where v is what the surface
+// painted and lumH the air's own light. No new geometry, no new uniform, no draw call.
+// MEASURED, with a JS copy of this function and of pcFogAmount (the wood, haze luminance 0.725, k 0.5):
+//   the 0.30 pair goes 0.073 -> 0.187 apart on the ground past 230 m (2.5 times), and 0.062 -> 0.181 at a mile
+//   from 300 m up (2.9 times); at k 0.6 it is 0.209 and 0.205, which is the reading's own target.
+//   The alpine at a mile from 300 m up: snow 0.761 -> 0.831, lit rock 0.668 -> 0.559, dark rock 0.606 -> 0.433,
+//   a conifer stand 0.591 -> 0.419. So the peak is the lightest thing in the picture again and the conifers are
+//   the darkest, where before they stood within 0.17 of each other.
+//   THE FAR LAND ALSO GOES DOWN IN VALUE, because most paint is darker than this air: the middle of the wood at
+//   400 m goes 0.658 -> 0.554. That is wanted (a rendered still measured the game's far land at 0.78-0.93 against
+//   0.62 in the owner's own twenty oil paintings, see pcOilHaze) but it is a real change and it is what a still
+//   must be looked at for: if the distance reads heavy, the dial comes down, it does not get another term.
+// WHERE IT IS ALLOWED TO WORK, which is most of the care here:
+//   * NOTHING at all until the air is 0.40 of the picture (?farnear=): 60 m in the autumn wood, 500 m on
+//     Mercury, 600 m on Pluto. The near thick pale air is the owner's own reference and is not being touched.
+//     MEASURED: at 10, 20 and 30 m the painted value of a dark trunk does not move by a thousandth; 0.004 at 60 m.
+//   * and it LETS GO AGAIN from 0.90 of air up, so a thing at the very end of the air still vanishes into it.
+//     Without that, land past about 2.5 km seen from the air would keep a share of itself for ever and the
+//     skyline would read as a hard cut-out frieze -- the fault the v33 ceiling was tuned against. At a mile from
+//     300 m up the air is 0.79, so the mile itself keeps the whole of the term; it is gone by 4 km.
+//   * DUST IS NOT AERIAL PERSPECTIVE: in a storm the near air must still hide things, so this goes off with
+//     uAirNear.x exactly as the watercolour's cooling does in pcAtmos below ("dust is warm: it does not cool").
+//   * the ten bands are not made harder: MEASURED, the worst step in the painted value across a tenth of a metre
+//     in the ramp (60-160 m) goes 0.0011 today to 0.0007 with the term, because the gain works against the
+//     haze's own rise there. In the let-go (2.4-4 km from the air) it goes 0.00001 to 0.00005, still nothing.
+// THE CLAMP IS THE SAFETY. At k 0.5 the floor bites below a value of 0.29 and holds the darkest far wood at
+// 0.70 of the air's own light (0.40 on the screen against 0.57 today) -- that is what stops a far wood going to
+// mud, and it is also why the dark pair 0.08/0.38 only separates 0.073 -> 0.107. If a still says the conifers
+// are still flat, the floor is the number to move (0.55 gives 0.187), not k. The ceiling cannot be reached at
+// all below k 1.2 with this air, so nothing is blown out and no channel is clipped.
+const FAR_LIGHT_FN = FAR_LIGHT > 0.0005 ? /* glsl */`
+vec3 pcFarLight(vec3 c, vec3 h, float f) {
+  float w = smoothstep(${_fl(FAR_FROM)}, ${_fl(FAR_TO)}, f) * (1.0 - smoothstep(0.90, 1.0, f)) * (1.0 - uAirNear.x);
+  float lh = dot(h, vec3(0.3, 0.5, 0.2));
+  return h * clamp(1.0 + (${_fl(FAR_LIGHT)} * w) * (dot(c, vec3(0.3, 0.5, 0.2)) - lh) / max(lh, 0.08), 0.70, 1.40);
+}` : '';
+
 export const FRAG_PARS = /* glsl */`
 #include <common>
 #include <logdepthbuf_pars_fragment>
@@ -333,7 +397,16 @@ float pcFogAmount(float dist) {
     // (from the air the land must still go back into the air's colour toward the horizon: at 1.6 times, with the curve
     // below, the land a kilometre off stood as strong as the land underfoot, and the wood from the ship was one flat
     // sheet of colour: the stills from 150 m. So 2.4 times there, and the curve only on the ground.)
-    float pcHigh = clamp((1.0 / max(uFog.x, 1e-6) - 200.0) / 400.0, 0.0, 1.0);
+    // THE 200 AND THE 2400 STAND IN THREE PLACES AND NONE MAY BE CHANGED ALONE: here, materials.js pcFogAmountV
+    // (the plants) and world/index.js AIR_HIGH_0 / AIR_HIGH_W (the lit air). CHANGED 2026-11-23 from 400 to 2400,
+    // in all three in one commit (v34), because the day's reading measured what the 400 was doing: climbing in the autumn wood, the share of its own paint the land a mile off
+    // keeps goes 24 % on foot, 18 % at 30 m, 6 % at 40 m, 0 % at 50 m and 60 m, 2 % at 70 m, 10 % at 100 m, 21 % at
+    // 160 m -- a hilltop and a low hover are the worst places in the game to look far, because this lets the
+    // ceiling below go at 45 m of height, where the visibility is still only 723 m and far too short to carry the
+    // land instead. 2400 would let it go exactly as the visibility finishes its own ramp to 2600 m, measured as a
+    // steady 19-25 % all the way up and at most 0.013 of haze different on the ground -- which is what was done.
+    // It is a change to the air itself, in three files, and it still wants a still taken from a hilltop.
+    float pcHigh = clamp((1.0 / max(uFog.x, 1e-6) - 200.0) / 2400.0, 0.0, 1.0);
     dist *= mix(uOilC.w, 2.4, pcHigh);
   #endif
   float f = 1.0 - exp(-dist * uFog.x);
@@ -398,7 +471,8 @@ vec3 pcOilHaze(vec3 h) {
   vec3 warm = mix(pow(h, vec3(uOilC.x)), vec3(0.95, 0.85, 0.63), 0.75 * pcGold());
   return mix(warm, vec3(0.48, 0.50, 0.63), uOilS.x);
 }
-vec3 pcAtmos(vec3 c, float f) { return mix(c, pcOilHaze(uHaze), f); }
+${FAR_LIGHT_FN}
+vec3 pcAtmos(vec3 c, float f) { return mix(c, ${_far('c', 'pcOilHaze(uHaze)')}, f); }
 vec3 pcAtmosWash(vec3 c, float f) {
 #else
 vec3 pcAtmos(vec3 c, float f) {
@@ -421,7 +495,7 @@ vec3 pcAtmosV(vec3 c, float f, vec3 viewPos) {
   vec3 sunV = normalize((viewMatrix * vec4(uSunDirW, 0.0)).xyz);
   float toward = pow(max(dot(normalize(viewPos), sunV), 0.0), 3.0) * uDayness * (1.0 - uMoon) * (1.0 - uWx.x);
   h = mix(h, min(mix(pcOilSunC(), vec3(1.0), 0.5) * 1.05, vec3(1.0)), toward * uOilC.y);
-  return mix(c, h, f);
+  return mix(c, ${_far('c', 'h')}, f);      // (where ?farlight= is on, the thing's own light is carried into the air it stands in here: pcFarLight above. It is laid on the haze AFTER the sun's glow, so toward the sun, where the air goes to white, the gain can only be 1 or under and nothing burns out.)
 }
 vec3 pcAtmosVWash(vec3 c, float f, vec3 viewPos) {
 #else

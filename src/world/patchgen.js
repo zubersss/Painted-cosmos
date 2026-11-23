@@ -3,6 +3,8 @@
 // be unit-tested in Node and moved into a worker later without changes.
 import { faceToDir } from './cubesphere.js';
 import { makeSample, NOLQ } from './surface.js';
+import { MODE } from '../data/mode.js';
+import { BODIES } from '../data/bodies.js';
 
 export const PATCH_N = 32;                 // cells per patch edge (even, for geomorphing)
 const N = PATCH_N, V = N + 1, E = N + 3;   // E: sample grid with a one-vertex apron for normals
@@ -37,11 +39,45 @@ export const PATCH_VERTS = V * V + 4 * V;
 const _d = [0, 0, 0];
 const _px = new Float64Array(E * E), _py = new Float64Array(E * E), _pz = new Float64Array(E * E);
 const _hh = new Float32Array(E * E), _lq = new Float32Array(E * E);
-const CS = 19;   // floats kept per sample: wash, far wash, parameters, liquid look, strata
+const CS = 21;   // floats kept per sample: wash, far wash, parameters, liquid look, strata, the current, the fall
 const _col = new Float32Array(E * E * CS);
 let _s = null;
 
 function b8(v) { v = v * 255 + 0.5; return v < 0 ? 0 : v > 255 ? 255 : v | 0; }
+function sstep(a, b, x) { const t = (x - a) / (b - a); return t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t); }
+
+// THE WATER KNOWS ITS OWN FALL (the owner, 2026-11-23: the water should be "constantly moving the way water would be
+// naturally", and there should be "airration"). Two numbers are measured at every water vertex and packed into one
+// byte each for the paint (render/materials.js, the attribute aTurb): how fast the water runs here, and how aerated
+// it is. Both come out of the sample grid the patch already has -- the liquid's own surface and the bed under it --
+// so they cost no new sampling and no new memory beyond the four bytes. Only in the oil look.
+//
+// WHAT THE SURFACE MAY HAND OVER, AND WHAT HAPPENS WITHOUT IT. The drainage work (surface.js, drainage.js) knows the
+// fall and the pooling of the water properly, which a patch's own grid can only guess at. Two OPTIONAL fields on the
+// sample are read here, and nothing breaks when a surface sets neither:
+//   s.fspd  how fast the water runs at this point, metres a second, 0 to about 8. Above 0 it is used in place of the
+//           Manning estimate below. 0 or absent: the estimate stands.
+//   s.turb  how aerated this point is, 0 (clear) to 1 (the foot of a fall). It is taken as a FLOOR under the churn
+//           measured here, so a surface can make white water where the grid cannot see why (a plunge pool, a weir).
+//           It also lets standing water churn: everywhere else the churn is held to water that has a current, so
+//           that a pond, a lake and the sea keep the wind-raised whitecaps they already have.
+// With neither, a patch of the oil look still gets a speed from its own liquid surface and a churn from its own bed,
+// and when the levels start to fall the same arithmetic lights up by itself with nothing more to write here.
+const FLOW_VMAX = 5.0;      // m/s the speed byte runs to; one byte is 0.0196 m/s. A brook runs 1-2 m/s (MEASURED
+                            // below), the foot of a fall several; past 5 the dashes would outrun the eye.
+// Manning's open channel, v = R^(2/3) sqrt(fall) / n, is what sets the speed. n 0.063 is a mountain stream with
+// cobbles (Chow's table gives 0.04 to 0.07 for one). It was picked so that the speed MEASURED on Earth's own brook
+// -- 1.2 % of fall, 0.54 m deep -- comes out at 1.16 m/s, the middle of the fixed 0.9 to 1.4 m/s band that v33 ran
+// every dash at and that the owner accepted (task 23). So a typical reach looks as it did; what changes is that a
+// shallow edge now crawls at a quarter of that and a steep stretch races.
+const MANNING_N = 0.063;
+// The hydraulic radius is the depth, held to 0.55 m: in Manning a deeper channel runs FASTER (less of it is rubbing
+// the bed), which is right for a uniform channel but wrong for a pool, where the water is slow because the channel
+// is wide -- and the width is the one thing a patch cannot see. The cap stands in for it, so that past half a metre
+// the depth stops mattering. MEASURED: Earth's channel at the spawn runs 0.8 to 1.1 m deep at 1.2 % of fall, which
+// with this cap comes out at 1.18 m/s -- the middle of the old fixed band. A cap of 0.80 put it at 1.51, just above
+// the band, and every vertex of the channel at the cap anyway.
+const MANNING_RMAX = 0.55;
 
 // A patch is built as a resumable job so that terrain generation never takes more than its
 // time slice: beginPatch() -> stepPatch(job, deadline) until it returns the data.
@@ -81,6 +117,7 @@ export function stepPatch(job, deadline) {
         _col[c + 6] = s.dry; _col[c + 7] = s.wet; _col[c + 8] = s.canopy; _col[c + 9] = s.aux;
         _col[c + 10] = s.qr; _col[c + 11] = s.qg; _col[c + 12] = s.qb; _col[c + 13] = s.qk; _col[c + 14] = s.qglow; _col[c + 15] = s.qcloud; _col[c + 16] = s.strata;
         _col[c + 17] = s.fu || 0; _col[c + 18] = s.fv || 0;      // (the oil look's rivers: the current, surface.js; 0 everywhere else)
+        _col[c + 19] = s.fspd || 0; _col[c + 20] = s.turb || 0;  // (the drainage field's own speed and churn, where a surface gives them; 0 otherwise)
       }
     }
   }
@@ -172,6 +209,24 @@ export function stepPatch(job, deadline) {
   if (anyWater) {
     const wpos = new Float32Array(V * V * 3), wdep = new Float32Array(V * V);
     const wliq = new Uint8Array(V * V * 4), wlp = new Uint8Array(V * V * 4);
+    // THE FALL AND THE CHURN, one byte each (the paint's attribute aTurb; see the note by FLOW_VMAX above):
+    //   x  the current's speed, 0 .. FLOW_VMAX m/s. A byte of 0 means NO NUMBER WAS GIVEN -- a mesh built before
+    //      this, or the attribute not bound -- and the paint then keeps v33's fixed dash rate, so nothing of the
+    //      look changes until the byte arrives. Still water that was measured gets 1, not 0.
+    //   y  how aerated the water is, 0 .. 1. 0 is clear water, which is what all of it was.
+    //   z, w  spare, and left at 0.
+    // Nothing is built outside the oil look (the watercolour game has no dashes to run and no churn to paint), so
+    // `turb` is null there and terrain.js attaches nothing.
+    const wturb = MODE.oil ? new Uint8Array(V * V * 4) : null;
+    const cellM = size / N;                                        // this patch's sample spacing, metres (= S.foot)
+    const grav = (BODIES[S.id] && BODIES[S.id].gravity) || 9.0;    // for the Froude number below
+    // The bed is FRACTAL and the water's surface is not. MEASURED at the spawn, the same 60 wet points read at every
+    // patch level's own spacing: the water's own fall is 0.01202 at 0.77 m and 0.01201 at 24.5 m -- the same number,
+    // so the SPEED does not change when a patch splits. The bed's slope goes 0.199 at 0.77 m to 0.047 at 24.5 m, a
+    // factor of 4.2, which would make the white edge below jump every time a patch split. So the bed's slope is
+    // carried to one reference spacing by its own measured exponent (0.42, fitted to those six readings, reference
+    // 1.53 m): normalised, the same six come out 0.149 to 0.207 instead of 0.047 to 0.199. One pow a patch.
+    const bedK = Math.pow(cellM / 1.53, 0.42);
     for (let j = 0; j < V; j++) for (let i = 0; i < V; i++) {
       const k = (j + 1) * E + (i + 1), o = (j * V + i) * 3;
       const h = _hh[k], lq = _lq[k];
@@ -183,9 +238,48 @@ export function stepPatch(job, deadline) {
       const c = k * CS, q = (j * V + i) * 4;
       wliq[q] = b8(_col[c + 10]); wliq[q + 1] = b8(_col[c + 11]); wliq[q + 2] = b8(_col[c + 12]); wliq[q + 3] = b8(_col[c + 13]);
       wlp[q] = b8(_col[c + 14]); wlp[q + 1] = b8(_col[c + 15]);
-      // (the current's direction as two bytes about 128; 0, 0: still water, and everything outside the oil look)
+      // (the current's direction as two bytes about 128; 0, 0: still water, and everything outside the oil look.
+      // It stays a UNIT direction: the paint's own test for a current that two triangles disagree about reads its
+      // length, so the speed is carried beside it and not in it)
       const fu = _col[c + 17], fv = _col[c + 18];
       if (fu !== 0 || fv !== 0) { wlp[q + 2] = Math.max(1, Math.min(255, Math.round(128 + 127 * fu))); wlp[q + 3] = Math.max(1, Math.min(255, Math.round(128 + 127 * fv))); }
+      // Every vertex of the water grid is given a speed of 1 (a measured, standing still), and only the ones the
+      // water really reaches are measured properly -- the same test the water's cells are kept by below, because in
+      // a wood the liquid level is set for every point of the biome and most of it lies well under the ground.
+      // The 1 matters: a byte of 0 tells the paint NO NUMBER WAS GIVEN, and a dry corner of a triangle at the
+      // water's edge would then drag the speed under the paint's floor and the dashes there would jump back to the
+      // old fixed rate -- a band of faster water along every margin.
+      if (wturb) { wturb[q] = 1; if (has && lq > h - 0.5) {
+        // THE FALL of the water's own surface across this cell. A neighbour with no liquid is read as this vertex's
+        // own level, so the fall eases to nothing at the bank instead of jumping off the end of the water.
+        const lw = _lq[k - 1] > -1e5 ? _lq[k - 1] : lq, le = _lq[k + 1] > -1e5 ? _lq[k + 1] : lq;
+        const ld = _lq[k - E] > -1e5 ? _lq[k - E] : lq, lu = _lq[k + E] > -1e5 ? _lq[k + E] : lq;
+        const gu = (le - lw) * 0.5, gv = (lu - ld) * 0.5;
+        const fall = Math.sqrt(gu * gu + gv * gv) / cellM;        // metres of fall to the metre
+        const dep = lq - h;
+        const rr = dep < 0.05 ? 0.05 : dep > MANNING_RMAX ? MANNING_RMAX : dep;
+        let v = Math.cbrt(rr * rr) * Math.sqrt(fall) / MANNING_N;
+        if (_col[c + 19] > 0) v = _col[c + 19];                   // the drainage field's own speed, where there is one
+        if (v > FLOW_VMAX) v = FLOW_VMAX;
+        // AND THE CHURN. Three things make white water, and the whitest of the three wins:
+        //  - the Froude number past about 0.8: the flow is near or over critical and breaks over itself (a rapid);
+        //  - the water's own face falling more than a few per cent in the cell: the lace under a lip;
+        //  - thin water over a tilted bed: the stirred white edge where a brook runs over its stones.
+        // MEASURED on Earth's spawn brook today: Froude 0.35 to 0.56 and the fall a flat 1.2 % at every patch level,
+        // so the first two are ZERO until the levels themselves fall. The third is what shows now, at the edges.
+        const bu = (_hh[k + 1] - _hh[k - 1]) * 0.5, bv = (_hh[k + E] - _hh[k - E]) * 0.5;
+        const bedS = Math.sqrt(bu * bu + bv * bv) * bedK / cellM;
+        const fr = v / Math.sqrt(grav * (dep > 0.05 ? dep : 0.05));
+        const hint = _col[c + 20];
+        let aer = Math.max(sstep(0.80, 1.35, fr), sstep(0.035, 0.16, fall),
+          sstep(0.55, 0.06, dep) * sstep(0.12, 0.45, bedS) * (0.35 + 0.65 * sstep(0.15, 0.80, v)));
+        // only running water churns of itself: a pond, a lake and the sea have no current here, and their own
+        // whitecaps are raised by the wind and already painted. A surface that says otherwise (`turb`) is believed.
+        if (fu === 0 && fv === 0) aer = 0;
+        if (hint > aer) aer = hint;
+        wturb[q] = v >= FLOW_VMAX ? 255 : Math.max(1, Math.round(255 * v / FLOW_VMAX));
+        wturb[q + 1] = aer <= 0 ? 0 : aer >= 1 ? 255 : Math.round(255 * aer);
+      } }
     }
     const widx = [];
     for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
@@ -193,7 +287,7 @@ export function stepPatch(job, deadline) {
       if (wdep[a] > -0.45 || wdep[b] > -0.45 || wdep[c] > -0.45 || wdep[d] > -0.45) widx.push(a, b, d, a, d, c);
     }
     // thin water (a brook) is left to the terrain's far colour on coarse patches
-    if (widx.length && (level >= 5 || widx.length > N * N * 6 * 0.08)) water = { positions: wpos, depth: wdep, liq: wliq, liqP: wlp, indices: new Uint16Array(widx) };
+    if (widx.length && (level >= 5 || widx.length > N * N * 6 * 0.08)) water = { positions: wpos, depth: wdep, liq: wliq, liqP: wlp, turb: wturb, indices: new Uint16Array(widx) };
   }
   return {
     origin: [ox, oy, oz], positions: pos, normals: nor, morph: mor, colors: col, colors2: col2, params: par,
