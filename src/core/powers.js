@@ -30,6 +30,31 @@ const FIRE_WHY = {
   'the ground there has no height': 'nothing here will burn',
   'off-world': 'nothing here will burn',
 };
+// THE ONE REFUSAL THAT IS ABOUT DISTANCE and not about the ground, in the world's own words
+// (src/physics/index.js fuelAt): outside the air grid's own +/-128 m nobody has looked at the ground at all, so no
+// fire may be lit there. The aim reaches 300 m now (_aim below) and the fire does not, so a fire ability that
+// lights nothing must say THAT and not 'nothing here will burn', which sends the player looking for better ground
+// when the ground was never the matter.
+const FIRE_TOO_FAR = 'too far: nobody has looked at the ground there';
+
+// THE AIM'S OWN SWITCH (?aimray=0), so the owner can be shown A and B of the same still and can turn it off.
+// Off: the aim is exactly the pitch rule of every version up to v32 -- 6 m looking steeply down, 30 m level -- and
+// no power ever lands further than thirty metres away. On (the default): the view is marched against the real land
+// out to POWERS.aimMax, and the aim, the ring and the fold go to what it meets.
+const AIM_RAY = (() => {
+  try { const q = new URLSearchParams(location.search).get('aimray'); return q == null ? true : q !== '0'; }
+  catch { return true; }                                   // (no address to read: Node, the tests, the gallery)
+})();
+
+// THE FOLD'S OWN SWITCH (?foldair=0), the second half of the same day's work and separate from the aim's, so the
+// owner can be shown either on its own. Off: the v32 fold exactly -- one gust cast at the far end whose front
+// crawls out at 26 m/s while the explorer travels at 180, a landing that may be on the face of a lake, and a dead
+// stop on arrival. On (the default): the air is carried with the player, the fold stops short of deep water, and
+// you land running (see _fold, _dryStop, _stepFold).
+const FOLD_AIR = (() => {
+  try { const q = new URLSearchParams(location.search).get('foldair'); return q == null ? true : q !== '0'; }
+  catch { return true; }
+})();
 
 // The abilities of wind, in the order of the keys 1 .. 7 and of the touch fan. hold: it lasts while the hand is down.
 export const ABILITIES = Object.freeze([
@@ -112,6 +137,21 @@ export const TIMEPOWERS = Object.freeze({
   foldReach: 3.4,         // times the ordinary aim: how far a fold carries you (about a hundred metres level)
   foldTime: 0.55,         // s the world takes to rush past: long enough to see, short enough not to wait
   foldEase: 2.6,          // how hard the rush eases out at the end (1 is linear; higher arrives softer)
+  // (2026-11-22) THE AIM REACHES THE REAL LAND NOW (_aim), so a fold goes to WHERE YOU LOOKED when that is
+  // further than the old hundred metres. These five numbers keep that honest and bounded.
+  foldMax: 560,           // m: the furthest a fold may carry you. It is what a fold HELD TO THE FULL already
+                          // carried you before the aim could see past thirty metres (30 x foldReach x the hold's
+                          // own 5), so the cap shortens nothing that exists; it is here because the ground you
+                          // land on has to be made while you travel, and because the aim can now say 300 m.
+  foldSpeed: 185,         // m/s: the pace of the rush. A hundred metres in 0.55 s is 180 m/s and the owner saw
+                          // that and asked for nothing faster, so a LONGER fold now takes longer instead of
+                          // going faster: life = distance / this (and the old 0.55 s is its floor).
+  foldLifeMax: 1.2,       // s: ... and never longer than this, so the longest fold is a fast one again
+  foldLand: 6.5,          // m/s left along the travel when you arrive. Under the body's own run (7.4 m/s,
+                          // player/explorer.js runSpeed), so no pace limit of the explorer's has to fight it and
+                          // with the hands off the stick it bleeds away in a stride.
+  foldAirTail: 0.8,       // s the carried air takes to ease out once the rush is over. Its own gustLife is 3.8 s,
+                          // which left a 57 m/s gale standing where you landed for three seconds.
   // THE RIP. A tear held open where you look, which draws everything in from a long way off.
   ripReach: 55,           // m: how far out it takes hold
   ripUlt: 120,            // m: ... and held to the full
@@ -150,7 +190,13 @@ export const FIREPOWER = Object.freeze({
 export const POWERS = Object.freeze({
   hands: 1.15,            // m above the feet: where a gust leaves
   ahead: 0.9,             // m ahead of the explorer: where a gust leaves
-  aimNear: 6, aimFar: 30, // m: how far out the aim lies, looking steeply down .. level
+  aimNear: 6, aimFar: 30, // m: how far out the aim lies, looking steeply down .. level -- the PITCH rule, which
+                          // is now only the floor and the fallback (see _aim and AIM_LADDER)
+  aimMax: 300,            // m: how far out the view is marched against the land. The owner, 2026-11-22: "fully
+                          // rendered even from 300 yards away" -- 300 yards is 275 m, so the aim must reach past
+                          // it or the thing they are looking at can never be the thing a power acts on.
+  eye: 1.62,              // m above the feet: where the view's ray leaves. The same eye the first-person camera
+                          // uses (player/camera.js, 1.62), because the ray must be the one the player sees along.
   orbAhead: 2.4,          // m ahead of the explorer: where a gathered ball is held at first
   orbSpeed: 13,           // m/s: how fast a held ball follows the aim
   orbReach: 18,           // m: how far out a ball can be carried
@@ -193,6 +239,33 @@ const AIM_SIZE = {
 };
 const unit = (a) => { const l = Math.hypot(a.x, a.y, a.z) || 1; return { x: a.x / l, y: a.y / l, z: a.z / l }; };
 
+// THE LADDER THE VIEW IS MARCHED DOWN, in metres from the eye (see _march). Nine rungs: close together near the
+// explorer, where a metre of the answer matters, and far apart out at the end, where it does not. The crossing is
+// then found by one straight line through the two heights that bracket it, so the aim never sits ON a rung -- a
+// plain halving would have left it a quarter of the last gap, which is twenty metres, out at three hundred.
+const AIM_LADDER = Object.freeze([6, 12, 22, 40, 70, 110, 160, 220, 300]);
+// and how much of it is walked on a frame when nothing is pressed: the whole ladder is walked on the press and on
+// the lift, which are the two frames the number is really spent on. Four or five frames to a sweep, so the ring is
+// at most 70 ms stale while the player is only looking about, which cannot be seen on a ring.
+const AIM_RUNGS = 2;
+
+// HOW FAR OUT AN ABILITY CAN REALLY ACT (m), for the few whose work does NOT happen at the aim: a gust is a pulse
+// that leaves the hands and is spent at WINDPOWER.gustReach; the gathered ball is carried on the end of an arm;
+// the channel is a length of wind along the ground; the knife is a blade; the lance lays its fires from the feet
+// outward. With the aim reaching 300 m their ring would otherwise be drawn on a far ridge where nothing of the
+// cast will ever arrive, which is a worse lie than the short aim was.
+// An ability NOT in here acts AT the aim and reaches as far as the eye does: wind control, the whirl, the rip, the
+// stopped sphere, the fold, and every fire (the fire has a wall of its own at 128 m, which the world itself says).
+// A missing entry is a cap of none and never a throw -- the freeze of 2026-11-22 came out of a table with holes.
+const AIM_REACH = {
+  gust: WINDPOWER.gustReach * 2.5,                    // castGust: reach x (0.5 + 0.5 size), and sizeMax is 4
+  bellows: WINDPOWER.gustReach * 2.5,                 // (bellows is a gust from the hands too)
+  gather: POWERS.orbReach,
+  part: WINDPOWER.partReach * 1.9,                    // castPart: reach x (0.7 + 0.3 size)
+  knife: POWERS.knifeReach * 1.9,                     // _knife: reach x (0.7 + 0.3 size)
+  lance: FIREPOWER.lanceStep * FIREPOWER.lanceN,
+};
+
 export class Powers {
   constructor() {
     this.winds = makeWinds();
@@ -202,7 +275,11 @@ export class Powers {
     this._wait = 0;
     this.orb = null;            // the gathered ball, while held
     this.part = null;           // the parted channel (move water), while held
-    this.aim = { ok: false, p: { x: 0, y: 0, z: 0 }, fwd: { x: 0, y: 0, z: 1 }, dist: 0, from: { x: 0, y: 0, z: 0 }, size: 0 };
+    // (dist: the one number every ability and the ring read. pitchDist: what the old pitch rule alone would have
+    //  said, which is dist's floor and the fold's own reach; ray: what the march of the view against the land
+    //  found, 0 for a view that meets nothing. Both are kept here and not added later, because the aim is read
+    //  thousands of times and a shape that grows after it is made is a shape that is re-made.)
+    this.aim = { ok: false, p: { x: 0, y: 0, z: 0 }, fwd: { x: 0, y: 0, z: 1 }, dist: 0, pitchDist: 0, ray: 0, from: { x: 0, y: 0, z: 0 }, size: 0 };
     this.casts = 0;             // how many casts so far (for tests and the read-out)
     // HOLD TO GROW IT (the owner, 2026-11-17): while the power is held the circle grows from 1 to WINDPOWER.sizeMax
     // over chargeTime seconds, and letting go casts it at that size. A tap is the smallest and casts at once.
@@ -235,6 +312,16 @@ export class Powers {
     this.timeCasts = 0;         // how many of the third element have been cast (for tests and the read-out)
     this.list = ABILITIES;      // the element in the hand: ABILITIES (wind), FIRE_ABILITIES or TIME_ABILITIES
     this.element = 0;           // 0 wind, 1 fire, 2 space and time (setElement below)
+    // THE AIM'S MARCH, carried between frames (_march): which rung of AIM_LADDER is next, the ray the sweep began
+    // on, the bracket's near end, and the last whole sweep's answer. They are declared HERE and not made on the
+    // first march, because this runs every frame of a game and an object whose shape grows after it is built is
+    // an object the engine has to build again.
+    this._mi = 0; this._mDist = 0; this._mBody = null;
+    this._mox = 0; this._moy = 0; this._moz = 0;
+    this._mdx = 0; this._mdy = 0; this._mdz = 1;
+    this._mcos = 1; this._mL = 0; this._mGap = 0;
+    this._md = { x: 0, y: 0, z: 1 };
+    this._farAim = false;       // the last kindling's aim was beyond what the world has looked at (_fireSpot)
   }
 
   // WHAT THE FIRE BURNED IN THE FRAME JUST GONE, written into the record that lasts (data/burnt.js), the way the
@@ -473,19 +560,44 @@ export class Powers {
     return felled;
   }
 
-  // Where the power acts: from the explorer along the view, level, and as far out as the view looks down.
-  _aim(sim) {
+  // Where the power acts: from the explorer along the view, and as far out as the view really meets the land.
+  //
+  // UNTIL v32 THIS WAS A FUNCTION OF THE PITCH ALONE: six metres looking steeply down, thirty level, and the
+  // ground was never asked. So every power landed at most thirty metres away whatever the player was looking at --
+  // aim at the wood on the far ridge, hold, let go, and the grass at your feet went over while the ridge never
+  // moved. (The owner, 2026-11-22: the world must read as real at three hundred yards, which is 275 m.) The real
+  // view ray is MARCHED against the land now, out to POWERS.aimMax, and the aim goes to the first place the ground
+  // stands above it.
+  //
+  // THE PITCH RULE IS KEPT AS A FLOOR, not thrown away: the aim is whichever of the two is FURTHER. So a look at
+  // the sky (which the march never meets), a look at flat ground inside thirty metres, a world that cannot be
+  // sampled, and ?aimray=0 are all exactly what they were, and nothing the owner already likes about a cast at
+  // their own feet changes. The march can only ever send the aim further out.
+  //
+  // `full`: walk the whole ladder in this one call (the press and the lift). Otherwise two rungs of it, carried on
+  // across frames -- see _march.
+  _aim(sim, full = false) {
     const A = this.aim, cam = sim.footCam, ex = sim.ex;
     A.ok = false;
     if (!cam || !ex || !sim.bodyId) return A;
     const p = ex.p, up = unit(p);
-    // the view's direction, level at the explorer
+    // the view's direction, level at the explorer. (cam.viewFwd is ALREADY the levelled yaw and the pitch is kept
+    // beside it: player/camera.js builds the real look from the two, and so does _march. This levelling is
+    // therefore a no-op that is left in because nothing promises viewFwd stays exactly tangent as the sphere turns
+    // under the explorer.)
     let f = cam.viewFwd; const k = f.x * up.x + f.y * up.y + f.z * up.z;
     f = unit({ x: f.x - up.x * k, y: f.y - up.y * k, z: f.z - up.z * k });
     const t = Math.min(1, Math.max(0, (cam.pitch + 0.9) / 0.9));
-    A.dist = POWERS.aimNear + (POWERS.aimFar - POWERS.aimNear) * t;
+    A.pitchDist = POWERS.aimNear + (POWERS.aimFar - POWERS.aimNear) * t;
+    A.dist = A.pitchDist;
     A.fwd = f;
     A.from = add(add(p, f, POWERS.ahead), up, POWERS.hands);
+    A.ray = AIM_RAY ? this._march(sim, p, up, f, cam.pitch, full) : 0;
+    if (A.ray > A.dist) A.dist = A.ray;
+    // and no further than this ability's own work can travel (AIM_REACH: a gust is spent at 85 m however far the
+    // eye sees, and a ring drawn past that would promise what the cast cannot do)
+    const cap = AIM_REACH[this.list[this.ability].id];
+    if (cap > 0 && A.dist > cap) A.dist = cap;
     // the place on the ground out there (the land's own height, or the water's face)
     const q = add(p, f, A.dist), d = unit(q);
     let r = Math.hypot(p.x, p.y, p.z);
@@ -493,6 +605,68 @@ export class Powers {
     A.p = { x: d.x * r, y: d.y * r, z: d.z * r };
     A.ok = true;
     return A;
+  }
+
+  // THE VIEW MARCHED AGAINST THE LAND. Returns the distance ALONG THE GROUND to the first place the land (or the
+  // face of the water) stands above the view ray, or 0 for a view that meets nothing inside POWERS.aimMax -- the
+  // sky, or a world that will not answer.
+  //
+  // IT IS AMORTISED, because this is nine samples of the world and the owner's phone is at its sixty-a-second cap.
+  // With nothing pressed only AIM_RUNGS rungs are walked a frame and the sweep is committed when it finishes, so
+  // the ring lags by four or five frames and nothing else does: the press and the lift each walk the whole ladder
+  // in one call, and those are the only two frames the number is spent on. The ray is taken ONCE when a sweep
+  // begins and the rest of the sweep is marched down that same ray, or a turning view would leave a bracket with
+  // one end on one ray and the other on another.
+  //
+  // MEASURED on the build machine (Node, no graphics card): sampleSurface is 5.6 microseconds a call, so two rungs
+  // a frame is 11 us of a 16,700 us frame and the whole ladder on a press is 51 us. Nothing is allocated: one
+  // scratch direction, reused, and the bracket's near end at the eye needs no sample at all (the ground there is
+  // POWERS.eye below it, exactly).
+  _march(sim, p, up, f, pitch, full) {
+    const raw = sim.sampleSurface;
+    if (!raw) return 0;
+    if (this._mBody !== sim.bodyId) { this._mBody = sim.bodyId; this._mi = 0; this._mDist = 0; }   // another world: begin again
+    const d = this._md;
+    if (full) this._mi = 0;
+    let n = full ? AIM_LADDER.length : AIM_RUNGS;
+    while (n-- > 0) {
+      if (!this._mi) {
+        // a new sweep: the ray as it is this instant, from the eye, and the near end of the first bracket
+        const c = Math.cos(pitch), s = Math.sin(pitch);
+        this._mox = p.x + up.x * POWERS.eye; this._moy = p.y + up.y * POWERS.eye; this._moz = p.z + up.z * POWERS.eye;
+        this._mdx = f.x * c + up.x * s; this._mdy = f.y * c + up.y * s; this._mdz = f.z * c + up.z * s;
+        this._mcos = c > 0.02 ? c : 0.02;              // along the ray -> along the ground (a near-vertical view: a floor, not a division by nothing)
+        this._mL = 0; this._mGap = -POWERS.eye;
+        this._mi = 0;
+      }
+      const L = AIM_LADDER[this._mi];
+      const qx = this._mox + this._mdx * L, qy = this._moy + this._mdy * L, qz = this._moz + this._mdz * L;
+      const rr = Math.hypot(qx, qy, qz);
+      let rs = 0;
+      if (rr > 1e-6) {
+        const il = 1 / rr; d.x = qx * il; d.y = qy * il; d.z = qz * il;
+        try { const g = raw(sim.bodyId, d); if (g) rs = Math.max(g.radius || 0, g.liquidRadius || 0); } catch { rs = 0; }
+      }
+      if (!(rs > 0)) { this._mDist = 0; this._mi = 0; break; }        // the world cannot say: the pitch rule stands
+      const gap = rs - rr;                                            // + : the land is above the ray here
+      if (gap >= 0) {
+        // the crossing, by one straight line through the two heights that bracket it. (_mGap is below the land and
+        // so negative, gap is above it and so positive, which is why the span is written this way round: the first
+        // version of this line had the two the other way about, the span came out negative, every refine fell back
+        // to u = 0 and the aim always landed exactly ON the rung before the hit -- 22 m where the ground really
+        // crossed the ray at 24.8. Caught in Node against a known slope before any still was made.)
+        const span = gap - this._mGap;
+        let u = span > 1e-6 ? -this._mGap / span : 0;
+        if (!(u > 0)) u = 0; else if (u > 1) u = 1;
+        const hit = (this._mL + (L - this._mL) * u) * this._mcos;
+        this._mDist = hit > POWERS.aimMax ? POWERS.aimMax : hit;
+        this._mi = 0;
+        break;
+      }
+      this._mL = L; this._mGap = gap;
+      if (++this._mi >= AIM_LADDER.length) { this._mDist = 0; this._mi = 0; break; }   // it meets nothing: the sky
+    }
+    return this._mDist > 0 ? this._mDist : 0;
   }
 
   // Once a frame. sim: the Sim (state, explorer, camera, sampleSurface).
@@ -540,7 +714,9 @@ export class Powers {
       // frame, for ever, with the last complete picture still up. That is a freeze with no way out of it.
       // Two things now stand in its way: every ability has a ring above, and an unknown one shows an ordinary ring
       // instead of throwing. tests/powers.test.mjs walks every ability of every element through this line.
-      const A = this._aim(sim), id = this.list[this.ability].id, ring = AIM_SIZE[id];
+      // (the aim's march walks its WHOLE ladder on the press and on the lift -- the two frames the number is
+      //  really spent on, and the lift is the cast itself -- and two rungs of it on every other frame: _march)
+      const A = this._aim(sim, pressed || released), id = this.list[this.ability].id, ring = AIM_SIZE[id];
       const base = ring ? ring(A.dist) : 2;
       A.size = A.ok ? base * (id === 'gust' || id === 'knife' ? 1 + (this.size - 1) * 0.6 : this.size) : 0;
     }
@@ -643,6 +819,7 @@ export class Powers {
     else if (f.kind === FUEL.none) this._say(FIRE_WHY[f.why] || 'nothing here will burn');
     else if (f.wet >= FIRE.wetStop * 0.8) this._say('too damp to catch');
     else if (!(f.fuel > 0.25)) this._say('too little here to carry it');
+    else if (this._farAim) this._say('too far: it falls short');
     return f;
   }
 
@@ -697,21 +874,21 @@ export class Powers {
     const el = Math.hypot(ex, ey, ez) || 1; ex /= el; ey /= el; ez /= el;
     const nx = up.y * ez - up.z * ey, ny = up.z * ex - up.x * ez, nz = up.x * ey - up.y * ex;
     const R = (great ? FIREPOWER.meteorUlt : FIREPOWER.meteorR) * (0.7 + 0.3 * size);
-    let lit = 0;
+    let lit = 0, bad = null;              // bad: the first patch the world refused, so the word can be its own reason
     // the middle first, then the ring: a stone leaves a hole with fire round it
     const mid = ph.lightFire(this.fires, sim.bodyId, A.p, size + 1);
-    if (mid && mid.kind !== FUEL.none) lit++;
+    if (mid && mid.kind !== FUEL.none) lit++; else bad = mid;
     for (let i = 0; i < FIREPOWER.meteorN; i++) {
       const a = (i / FIREPOWER.meteorN) * 6.2831853 + (this.casts % 7) * 0.21;
       const c = Math.cos(a) * R, d = Math.sin(a) * R;
       const q = ph.lightFire(this.fires, sim.bodyId, { x: A.p.x + ex * c + nx * d, y: A.p.y + ey * c + ny * d, z: A.p.z + ez * c + nz * d }, size);
       if (!q) break;                                    // the list is full: the ring is as wide as it could be
-      if (q.kind !== FUEL.none) lit++;
+      if (q.kind !== FUEL.none) lit++; else if (!bad) bad = q;
     }
     // and the blast: a gust out of the middle, which the trees, the leaves, the dust and the fire itself all read
     castVortex(this.winds, sim.bodyId, A.p, this.casts % 2 ? -1 : 1, great ? WINDPOWER.ultSize : FIREPOWER.meteorBlast * size);
     this.casts++; this.fireCasts++;
-    this._say(lit ? (great ? 'a falling star' : 'a meteor falls') : 'it falls on nothing that will burn');
+    this._say(lit ? (great ? 'a falling star' : 'a meteor falls') : this._fireNone(bad, 'it falls on nothing that will burn'));
     return lit;
   }
 
@@ -722,15 +899,15 @@ export class Powers {
     if (!ph || !ph.lightFire || !this.aim.ok) return 0;
     const A = this.aim, f = A.fwd, p0 = sim.ex.p;
     const n = Math.max(2, Math.round(FIREPOWER.lanceN * grow)), step = FIREPOWER.lanceStep;
-    let lit = 0;
+    let lit = 0, bad = null;
     for (let i = 1; i <= n; i++) {
       const k = i * step;
       const q = ph.lightFire(this.fires, sim.bodyId, { x: p0.x + f.x * k, y: p0.y + f.y * k, z: p0.z + f.z * k }, size);
       if (!q) break;
-      if (q.kind !== FUEL.none) lit++;
+      if (q.kind !== FUEL.none) lit++; else if (!bad) bad = q;
     }
     this.fireCasts++;
-    this._say(lit ? 'a lance of fire' : 'nothing along there will burn');
+    this._say(lit ? 'a lance of fire' : this._fireNone(bad, 'nothing along there will burn'));
     return lit;
   }
 
@@ -754,17 +931,17 @@ export class Powers {
     let sx = up.y * hz - up.z * hy, sy = up.z * hx - up.x * hz, sz = up.x * hy - up.y * hx;
     const sl = Math.hypot(sx, sy, sz) || 1; sx /= sl; sy /= sl; sz /= sl;
     const n = Math.max(3, Math.round(FIREPOWER.cinderN * grow));
-    let lit = 0;
+    let lit = 0, bad = null;
     for (let i = 0; i < n; i++) {
       const r = (i + 0.5) / n;                                       // along the wind, spread out
       const a = r * FIREPOWER.cinderFar * grow;
       const b = ((((i * 2654435761) >>> 0) % 1000) / 1000 - 0.5) * FIREPOWER.cinderWide * grow;
       const q = ph.lightFire(this.fires, sim.bodyId, { x: A.p.x + hx * a + sx * b, y: A.p.y + hy * a + sy * b, z: A.p.z + hz * a + sz * b }, Math.max(1, size - 1));
       if (!q) break;
-      if (q.kind !== FUEL.none) lit++;
+      if (q.kind !== FUEL.none) lit++; else if (!bad) bad = q;
     }
     this.fireCasts++;
-    this._say(lit ? (lit === 1 ? 'one cinder catches' : lit + ' cinders catch') : 'the cinders find nothing');
+    this._say(lit ? (lit === 1 ? 'one cinder catches' : lit + ' cinders catch') : this._fireNone(bad, 'the cinders find nothing'));
     return lit;
   }
 
@@ -778,16 +955,16 @@ export class Powers {
     const sl = Math.hypot(sx, sy, sz) || 1; sx /= sl; sy /= sl; sz /= sl;
     const span = FIREPOWER.wallSpan * grow, step = FIREPOWER.wallStep;
     const n = Math.max(2, Math.round(span / step));
-    let lit = 0;
+    let lit = 0, bad = null;
     for (let i = 0; i < n; i++) {
       const t = (i / (n - 1) - 0.5) * span;
       const p = { x: A.p.x + sx * t, y: A.p.y + sy * t, z: A.p.z + sz * t };
       const q = ph.lightFire(this.fires, sim.bodyId, p, size);
       if (!q) break;                                  // the list is full: the wall is as long as it could be
-      if (q.kind !== FUEL.none) lit++;
+      if (q.kind !== FUEL.none) lit++; else if (!bad) bad = q;
     }
     this.fireCasts++;
-    if (grow === 1) this._say(lit ? 'a wall of fire' : 'nothing here will carry a wall');
+    if (grow === 1) this._say(lit ? 'a wall of fire' : this._fireNone(bad, 'nothing here will carry a wall'));
     return lit;
   }
 
@@ -853,17 +1030,66 @@ export class Powers {
   _fold(sim, size = 1) {
     if (!this.aim.ok) { this._say('nowhere to fold to'); return false; }
     const A = this.aim, T = TIMEPOWERS;
-    // where it carries you: along the aim, as far as the aim reaches times foldReach (and the ground there)
-    const far = add(sim.ex.p, A.fwd, A.dist * T.foldReach * (size > 1 ? 1 + (size - 1) * 0.5 : 1));
-    const p0 = { x: sim.ex.p.x, y: sim.ex.p.y, z: sim.ex.p.z };
-    this.fold = { bodyId: sim.bodyId, p0, p1: far, t: 0, life: T.foldTime };
-    // THE WORLD POURING IN: a gust along the way, from the far end back to the feet, so what is loose comes WITH
-    // the world instead of being blown away from it.
+    // HOW FAR IT CARRIES YOU. Until v32 this was the aim times foldReach, and the aim was never more than thirty
+    // metres, so every fold was about a hundred. The aim reaches the real land now (_aim), so a fold goes to WHERE
+    // YOU LOOKED when that is further -- which is the design's own word for it, "you are there" -- and is never
+    // shorter than it was, because the two are taken whichever is the greater. foldMax bounds the whole thing.
+    const grow = size > 1 ? 1 + (size - 1) * 0.5 : 1;
+    // (?aimray=0: the v32 fold exactly -- the pitch rule's aim times foldReach, uncapped, over foldTime)
+    let want = (AIM_RAY ? Math.max(A.dist, A.pitchDist * T.foldReach) : A.dist * T.foldReach) * grow;
+    if (AIM_RAY && want > T.foldMax) want = T.foldMax;
+    const p0 = { x: sim.ex.p.x, y: sim.ex.p.y, z: sim.ex.p.z }, up0 = unit(p0);
+    // DO NOT STAND THEM ON THE FACE OF A LAKE: the fold stops at the last dry ground short of the water.
+    let stopped = false;
+    if (FOLD_AIR) {
+      const stop = this._dryStop(sim, p0, A.fwd, want);
+      if (stop >= 0) {
+        // the water is at their feet and there is nowhere dry to go: it says so and is not spent
+        if (stop < 2) { this._say('the water is in the way'); return false; }
+        want = stop; stopped = true;
+      }
+    }
+    const far = add(p0, A.fwd, want);
+    // and the rush takes as long as the distance asks at the pace the owner already saw, between the old half
+    // second and foldLifeMax: a fold three times as long is not three times as fast
+    const life = AIM_RAY ? Math.min(T.foldLifeMax, Math.max(T.foldTime, want / T.foldSpeed)) : T.foldTime;
     const back = { x: -A.fwd.x, y: -A.fwd.y, z: -A.fwd.z };
-    castGust(this.winds, sim.bodyId, far, back, 1.35, WINDPOWER.sizeMax, false);
+    this.fold = { bodyId: sim.bodyId, p0, p1: far, t: 0, life, back, air: null };
+    // THE AIR AT THE FOLD'S OWN SPEED. Until v32 ONE gust was cast at the FAR END pointing back at the feet -- and
+    // a gust's front runs out at WINDPOWER.gustFront, 26 m/s, while the fold carries the explorer at about 180. So
+    // the air the owner asked for ("the world is getting pulled towards you") was left a hundred metres behind in
+    // the first frame and the eye went through still air the whole way. ONE source is cast instead, AT THE HANDS,
+    // pointing back along the travel, and _stepFold CARRIES IT with them for the whole rush: the air at the eye is
+    // at the gust's full speed from the first frame and eases to about a third of it by the end, which is the
+    // pulse running out behind them. It is never cast per frame -- there are six slots in all
+    // (physics/powers.js WINDPOWER.max) and a gust a frame would fill them in a tenth of a second and leave
+    // nothing for the next ability.
+    if (FOLD_AIR) this.fold.air = castGust(this.winds, sim.bodyId, add(p0, up0, POWERS.hands), back, 1.35, WINDPOWER.sizeMax, false);
+    else castGust(this.winds, sim.bodyId, far, back, 1.35, WINDPOWER.sizeMax, false);     // (?foldair=0: the v32 gust, at the far end, left there)
     this.timeCasts++;
-    this._say('space folds');
+    this._say(stopped ? 'the fold stops at the water' : 'space folds');
     return true;
+  }
+
+  // HOW FAR ALONG THE WAY THE GROUND IS STILL DRY (m), or -1 for "go the whole way" (the owner's fold used to set
+  // them down standing on the face of a lake for a frame). Thirteen samples along the fold's line, which is 47 m
+  // apart on the longest fold the cap allows and 8 m on an ordinary hundred-metre one: a brook can be folded over
+  // and a lake cannot. It fails SAFE in every direction -- a sample that cannot be had, and a start already in the
+  // water (they are swimming, and a fold out of a lake must still work), both give -1, because a wet landing is
+  // better than a power that refuses for a bad sample.
+  _dryStop(sim, p0, f, len) {
+    if (!sim.sampleSurface || !(len > 0)) return -1;
+    const N = 12, deep = 0.35;        // m of standing water that is more than a boot (explorer.js: wading slows at 1.0, floats at 1.25)
+    let dry = 0;
+    for (let i = 0; i <= N; i++) {
+      const L = len * i / N;
+      let g = null;
+      try { g = sim.sampleSurface(sim.bodyId, unit(add(p0, f, L))); } catch { return -1; }
+      if (!g || !(g.radius > 0)) return -1;
+      if ((g.liquidRadius || 0) - g.radius > deep) return i ? dry : -1;
+      dry = L;
+    }
+    return -1;                        // dry the whole way
   }
 
   // One frame of a fold: the world drawn past, eased out at the end. Called from update while this.fold lives.
@@ -876,7 +1102,34 @@ export class Powers {
     // fast at the first instant, settling at the end: 1 - (1 - x)^ease
     const u = 1 - Math.pow(1 - x, TIMEPOWERS.foldEase);
     const p = { x: f.p0.x + (f.p1.x - f.p0.x) * u, y: f.p0.y + (f.p1.y - f.p0.y) * u, z: f.p0.z + (f.p1.z - f.p0.z) * u };
-    const ok = this._step(sim, p);
+    // LAND THEM RUNNING. Until v32 the speed was zeroed on every frame of the rush INCLUDING the last, so a
+    // hundred-metre fold ended in a dead stop and the gait and the camera started again from nothing. The last
+    // frame keeps TIMEPOWERS.foldLand along the travel, levelled where they arrive; every frame before it is still
+    // zeroed, because the position is written outright there and a kept speed would only let gravity pile up a
+    // fall to be paid for on arrival.
+    let v = null;
+    if (x >= 1 && FOLD_AIR) {
+      const uq = unit(p);
+      let vx = f.p1.x - f.p0.x, vy = f.p1.y - f.p0.y, vz = f.p1.z - f.p0.z;
+      const kk = vx * uq.x + vy * uq.y + vz * uq.z;
+      vx -= uq.x * kk; vy -= uq.y * kk; vz -= uq.z * kk;
+      const ll = Math.hypot(vx, vy, vz);
+      if (ll > 1e-3) { const s = TIMEPOWERS.foldLand / ll; v = { x: vx * s, y: vy * s, z: vz * s }; }
+    }
+    const ok = this._step(sim, p, v);
+    // THE AIR CARRIED WITH THEM: the same source, moved and turned, never cast again. A slot that has been taken
+    // for another cast since is let go instead of being dragged about -- a recycled slot is YOUNGER than the fold,
+    // because take() wipes the age (physics/powers.js), and the two ages run together to within a frame otherwise.
+    const a = f.air;
+    if (a) {
+      if (a.kind === KIND.jet && a.bodyId === f.bodyId && a.age + 1e-3 >= f.t) {
+        const q = sim.ex.p, uq2 = unit(q);
+        moveWind(a, add(q, uq2, POWERS.hands));
+        turnWind(a, f.back);
+        // the rush is over: the air eases out over foldAirTail instead of standing at the arrival for three seconds
+        if (x >= 1) { const end = a.age + TIMEPOWERS.foldAirTail; if (end < a.life) a.life = end; }
+      } else f.air = null;
+    }
     if (x >= 1 || !ok) { this.fold = null; return ok; }
     return true;
   }
@@ -884,14 +1137,15 @@ export class Powers {
   // Put the explorer on the ground at a place in this world's own axes. (sim.teleport respawns the whole world,
   // which is right for crossing a solar system and wrong for a fold of a hundred metres: the sim moves the
   // explorer by writing ex.p itself, and so does this.)
-  _step(sim, p) {
+  // `v`: what to leave their speed at (body-local, m/s), or nothing to zero it.
+  _step(sim, p, v = null) {
     if (!p || !sim.ex || !sim.sampleSurface) return false;
     try {
       const d = unit(p);
       const g = sim.sampleSurface(sim.bodyId, d);
       const r = Math.max(g.radius, g.liquidRadius || 0) + 0.05;
       sim.ex.p = { x: d.x * r, y: d.y * r, z: d.z * r };
-      if (sim.ex.v) { sim.ex.v.x = 0; sim.ex.v.y = 0; sim.ex.v.z = 0; }
+      if (sim.ex.v) { sim.ex.v.x = v ? v.x : 0; sim.ex.v.y = v ? v.y : 0; sim.ex.v.z = v ? v.z : 0; }
       return true;
     } catch { return false; }
   }
@@ -925,14 +1179,25 @@ export class Powers {
     return w;
   }
 
+  // THE WORD FOR A FIRE THAT LIT NOTHING: the world's own reason where it gave one -- chiefly 'too far away to
+  // light', now that the aim reaches three hundred metres and the fire reaches a hundred and twenty-eight -- and
+  // the ability's own words otherwise. Without this a cast at the far ridge said 'nothing here will burn' and sent
+  // the player looking for drier ground when the ground was never the matter.
+  _fireNone(q, word) { return (q && q.kind === FUEL.none && FIRE_WHY[q.why]) || word; }
+
   // The place a kindling really starts: the aim if it will burn, else the nearest ground short of it (and a step to
   // each side) that will. Returns the aim itself when nothing near it burns, so the ability's own flame still shows
   // and the word on the screen can say why.
+  // (_farAim: the aim ITSELF was refused for being beyond what the world has looked at. The kindling then falls
+  //  short along the same line and lights where the ground is known, which is the right thing to do and was until
+  //  now done in silence -- the fire simply appeared a hundred metres nearer than the ring with no word at all.)
   _fireSpot(sim, aim) {
     const ph = sim.physics;
+    this._farAim = false;
     if (!ph.fuelAt || !this.aim.ok) return aim;
     const o = this._fuel || (this._fuel = {});
     if (ph.fuelAt(sim.bodyId, aim, o).kind !== FUEL.none) return aim;
+    this._farAim = o.why === FIRE_TOO_FAR;
     const from = this.aim.from, dx = aim.x - from.x, dy = aim.y - from.y, dz = aim.z - from.z;
     const up = unit(sim.ex.p);
     // the aim's right, for the two steps aside (the river runs along the view as often as across it)

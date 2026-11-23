@@ -406,7 +406,16 @@ async function boot() {
   const sim = game.sim;
   // The elemental powers (?powers=1; docs/POWERS.md): loaded only when asked for.
   if (params.has('powers') && params.get('powers') !== '0') {
-    Promise.all([import('./core/powers.js'), import('./ui/powers.js')]).then(([core, ui]) => {
+    Promise.all([import('./core/powers.js'), import('./ui/powers.js'), import('./physics/powers.js')]).then(([core, ui, phys]) => {
+      // (2026-11-23) A AND B OF THE NEWEST PHYSICS, from the address, so a pair of stills can be made of each:
+      //   ?ripfeel=0   the tear as it first was: a flat plateau arriving everywhere at once, every cast alike
+      //   ?powerfar=0  every grain of every power back inside the box round the PLAYER (a far tear loses its stream)
+      //   ?timehold=0  the rain and the plants step as they did at v32 inside a stopped place
+      if (phys && phys.POWERFX) {
+        if (params.get('ripfeel') === '0') phys.POWERFX.rip = false;
+        if (params.get('powerfar') === '0') phys.POWERFX.far = false;
+      }
+      if (prov.TIMEHOLD && params.get('timehold') === '0') { prov.TIMEHOLD.rain = false; prov.TIMEHOLD.plants = false; }
       const powers = new core.Powers();
       core.attachPowerInputs(powers, window);
       ui.attachPowersUi(powers, hudRoot);

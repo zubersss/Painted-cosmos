@@ -70,5 +70,8 @@ export async function loadProviders(search) {
     createExplorer: mods.art.createExplorer,
     createShip: mods.art.createShip,
     createPhysics: mods.physics.createPhysics || null,
+    // (space and time: the switch that holds the rain and the plants inside a stopped place, so ?timehold=0 can
+    //  make the A of an A/B. physics/index.js TIMEHOLD; null with the stand-in physics of the tests.)
+    TIMEHOLD: mods.physics.TIMEHOLD || null,
   };
 }
