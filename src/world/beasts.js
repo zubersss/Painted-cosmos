@@ -111,7 +111,9 @@ export class Beasts {
     // bird or fish would be built as a four-legged animal, which is worse than not drawing it. Its routines
     // still run (it lives, it is hunted, it is counted), it simply is not painted until its plan is cut.
     // Coordinator, 2026-11-23, wiring stage one: the heron and the trout are in this case.
-    this.drawable = this.rows.map((r) => !r || !r.plan || r.plan === 'walker');
+    // (which plans have a body built: beastkit.js has the walker and, since 2026-11-23, the BIRD -- two legs,
+    //  a folded wing where the fore pair would be, and a bill. A fish still has none and is not drawn.)
+    this.drawable = this.rows.map((r) => !r || !r.plan || r.plan === 'walker' || r.plan === 'bird');
     this._lastH = -1; this._lastQ = -1;
     this._counts = new Int32Array(this.rows.length);
     this._nearest = new Float32Array(this.rows.length);

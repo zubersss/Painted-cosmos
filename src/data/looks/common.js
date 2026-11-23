@@ -136,10 +136,12 @@ export const FAUNA_GUILDS = Object.freeze(['grazer', 'ground', 'climber', 'hunte
 // draws it. Said plainly: a stage-2 row will stand and walk; it will not yet look like itself.
 export const FAUNA_PLAN = Object.freeze({
   walker: { legF: 0.52, girth: 0.78, neck: 0.14, neckUp: 0.45, head: 0.20, snout: 0.70, ear: 0.08, earUp: 0.75, tail: 0.20, brush: 0.5, horn: 0, limbW: 0.9, coat: 64, marks: '' },
-  bird: { legF: 0.45, girth: 0.80, neck: 0.12, neckUp: 0.60, head: 0.10, snout: 0.80, ear: 0, earUp: 0, tail: 0.18, brush: 0.4, horn: 0, limbW: 0.6, coat: 40, marks: '' },
+  // (bodyK: how much of the room above the legs the barrel takes. A bird carries its body low and its neck
+  //  high, so half -- world/beastkit.js walkerLayout.)
+  bird: { legF: 0.45, girth: 0.80, neck: 0.12, neckUp: 0.60, head: 0.10, snout: 0.80, ear: 0, earUp: 0, tail: 0.18, brush: 0.4, horn: 0, limbW: 0.6, coat: 40, marks: '', bodyK: 0.50 },
   fish: { legF: 0, girth: 0.55, neck: 0, neckUp: 0, head: 0.08, snout: 0.5, ear: 0, earUp: 0, tail: 0.10, brush: 0.3, horn: 0, limbW: 0, coat: 24, marks: '' },
 });
-const SHAPE_KEYS = ['plan', 'high', 'legF', 'len', 'girth', 'neck', 'neckUp', 'head', 'snout', 'ear', 'earUp', 'tail', 'brush', 'horn', 'limbW', 'coat', 'marks', 'col', 'span', 'bill', 'depth', 'fin'];
+const SHAPE_KEYS = ['plan', 'high', 'legF', 'len', 'girth', 'neck', 'neckUp', 'head', 'snout', 'ear', 'earUp', 'tail', 'brush', 'horn', 'limbW', 'coat', 'marks', 'col', 'span', 'bill', 'depth', 'fin', 'bodyK'];
 
 // THE KINDS OF ONE WORLD, in the one order everything else must use. `stage` is MODE.beasts: 1 is the five
 // built first, 2 the rest of the wood and the water, 3 the coast, the mountain and the canyon.
