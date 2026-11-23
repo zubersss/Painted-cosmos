@@ -28,7 +28,7 @@
 // NOTHING IS ALLOCATED AFTER THE FIRST FRAME. The buffers are made once at their cap and written in place,
 // PHYSICS' particles' own discipline. One pass over the agents, no Vector3, no Matrix4, no closures.
 import * as THREE from 'three';
-import { QUALITY, SCREEN } from '../render/shared.js';
+import { QUALITY, SCREEN, SHADOW_CROWD } from '../render/shared.js';
 import { mulberry32 } from './noise.js';
 import { BEAST_ATTRS, SHAPES, MAX_SPECIES, beastGeometry, beastFarGeometry, beastPlan, planUniforms, speciesUniforms, distanceForPixels, FAR_SHAPE } from './beastkit.js';
 // one source for the state codes and the shape rows: the routines and the material read them from here too
@@ -58,7 +58,11 @@ const CAP_FAR = num('beastfarcap', 320, 1, 2048);
 const WASH_T = 0.55;                                           // seconds an animal takes to wash in (flora.js' own)
 const ORIGIN_STEP = 64;                                        // metres the eye moves before the instances' origin follows
 
-export const BEAST_SWITCHES = { NEAR_PX, CULL_PX, COAT_PX, COAT_ON, ALL_NEAR, CAP_NEAR, CAP_FAR };
+const SHADOW_ON = (() => {
+  try { const q = new URLSearchParams(location.search).get('beastshadow'); if (q != null) return +q ? 1 : 0; } catch { /* no address */ }
+  return 1;
+})();
+export const BEAST_SWITCHES = { NEAR_PX, CULL_PX, COAT_PX, COAT_ON, ALL_NEAR, CAP_NEAR, CAP_FAR, SHADOW_ON };
 
 // ---- the crowd ---------------------------------------------------------------------------------------
 export class Beasts {
@@ -81,6 +85,10 @@ export class Beasts {
     this.capNear = opts.capNear || CAP_NEAR;
     this.capFar = opts.capFar || CAP_FAR;
     this.budgetOne = opts.budgetOne !== false;
+    // how a near mesh's shadow twin is built (render/beastmat.js makeBeastShadowMaterial), handed in rather
+    // than imported, and ?beastshadow=0 to see the floor without them
+    this.makeShadowMaterial = opts.makeShadowMaterial || null;
+    this.shadowOn = SHADOW_ON;
     this.sp = this.rows.map(() => null);          // one entry a species, built when it is first wanted
     this.far = null;
     this.origin = new THREE.Vector3();
@@ -167,6 +175,15 @@ export class Beasts {
       scale: geo.userData.scale, parts: plan.count, table: this.table, washWeights: false,
     });
     const mesh = this._instanced(geo, mat, this.capNear, false);
+    // IT CASTS ITS OWN SHADOW. The shadow pass draws the scene once with an override material, which cannot
+    // pose anything, so until now a walking animal cast nothing and read as pasted onto the floor. The entry
+    // carries the way to build the shadow twin, so render/shadow.js never imports the creatures.
+    // (Only the NEAR meshes: the far crowd is marks at a distance, and v13 took the far trees out of this pass
+    //  for the same reason -- the owner's phone measured -3.6 ms.)
+    if (this.shadowOn && this.makeShadowMaterial) {
+      mesh.userData.crowdEntry = { mesh, material: mat, makeShadow: this.makeShadowMaterial };
+      SHADOW_CROWD.add(mesh.userData.crowdEntry);
+    }
     mesh.userData.coatStart = geo.userData.coatStart;
     mesh.userData.indexCount = geo.userData.indexCount;
     this.sp[i] = { geo, mat, mesh, row, plan, h: row.high, reach: row.high * 0.6 + row.len * 0.7 };
@@ -324,6 +341,7 @@ export class Beasts {
     if (want >= 0) { this.ensure(want); if (!this.budgetOne) for (let i = 0; i < nr; i++) if (!this.sp[i]) this.ensure(i); }
   }
   dispose() {
+    for (const s of this.sp) if (s && s.mesh && s.mesh.userData.crowdEntry) SHADOW_CROWD.delete(s.mesh.userData.crowdEntry);
     for (const s of this.sp) if (s) { this.group.remove(s.mesh); s.mesh.geometry.dispose(); s.geo.dispose(); if (s.mat.dispose) s.mat.dispose(); }
     if (this.far) { this.group.remove(this.far.mesh); this.far.mesh.geometry.dispose(); this.far.geo.dispose(); if (this.far.mat.dispose) this.far.mat.dispose(); }
     this.sp = this.rows.map(() => null); this.far = null;

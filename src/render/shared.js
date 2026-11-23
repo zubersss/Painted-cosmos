@@ -383,6 +383,13 @@ export function syncBurnt(bodyId, cam) {
 // way to its sun in its own space, and how strong a shadow is now (none under a closed sky or in the middle of twilight).
 // (air: the density of the air on the ground, 1/m, and shaft: how strong the light in the air is, for the shafts)
 export const SHADOW = { root: null, sunDirL: new THREE.Vector3(0, 1, 0), strength: 0, air: 0, shaft: 0, alt: 0 };      // (alt: the eye's height over the land, m)
+// THE CROWDS THAT CAST A SHADOW OF THEIR OWN. The shadow pass draws the scene once with an override material,
+// which cannot pose anything; a figure posed by a matrix palette is drawn again from `userData.pcCaster` on a
+// SCENE CHILD. An instanced crowd (world/beasts.js) is neither: its meshes hang under the body's root, and
+// marking THAT as a caster would walk every mesh on the world, every frame, looking for the handful that pose.
+// So a crowd puts its own meshes here and takes them out when it is freed. Small, exact, and no walk.
+// (Each entry: { mesh, material } -- the painted material, from which render/shadow.js builds the shadow twin.)
+export const SHADOW_CROWD = new Set();
 // (a tool may reach every painted material ever made: tools/lab.mjs swaps their shaders without a reload)
 export const MATERIALS = new Set();
 export function register(m, kind, opts) {

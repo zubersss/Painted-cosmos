@@ -159,6 +159,8 @@ export function createWorld(scene) {
       makeMaterial: (kind, info) => M.makeBeastMaterial(st.bu, Object.assign({}, info, {
         name: info.row && (info.row.name || info.row.id), gravity: grav,
       })),
+      // how a near mesh's shadow twin is built, handed in so render/shadow.js never imports the creatures
+      makeShadowMaterial: M.makeBeastShadowMaterial,
     });
     st.fauna = F.makeFauna({ rows: faunaLives(kinds), seed: 1 });
     // the one scratch sample and the one ground probe the routines ask thousands of times a second
