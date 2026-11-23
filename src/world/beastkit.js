@@ -259,9 +259,18 @@ const atT = (tab, t) => { const x = clamp01(t) * (tab.length - 1), i = Math.min(
 // this, so a hinge can never sit somewhere the limb is not.
 export function walkerLayout(S) {
   const legLen = S.high * S.legF;                       // the ground to the shoulder joint
-  const rv0 = Math.max(0.02, (S.high - legLen) * 0.5);  // the barrel's half height
+  // the barrel's half height. A WALKER's body fills everything above its legs; a long-necked bird's does not,
+  // and assuming it does leaves a heron no room for its neck and gives it a kiwi's body (SEEN, 2026-11-23, in
+  // the silhouette drawn from these very triangles). `bodyK` is how much of that room the barrel really takes.
+  const rv0 = Math.max(0.02, (S.high - legLen) * 0.5 * (S.bodyK == null ? 1 : S.bodyK));
   const ru0 = rv0 * S.girth;
-  const cy0 = S.high - rv0 * (atT(RV, 0.22) + atT(CYO, 0.22));   // so the withers is exactly at the shoulder height
+  // Where the barrel's centre line runs. A WALKER's withers sits at the shoulder height, so the body hangs from
+  // the top of the animal; a SHALLOW body (bodyK under 1) would then float there with daylight under it and the
+  // legs reaching up at nothing -- SEEN in the silhouette. A bird's body instead SITS ON its legs, and whatever
+  // is left over is its neck, which is the whole shape of a heron.
+  const cy0 = S.bodyK != null && S.bodyK < 0.999
+    ? legLen + rv0 * 0.62
+    : S.high - rv0 * (atT(RV, 0.22) + atT(CYO, 0.22));   // so the withers is exactly at the shoulder height
   const L = S.len;
   const zAt = (t) => -L * 0.5 + L * t;                  // the chest at -Z (the animal faces -Z), the rump at +Z
   const cyAt = (t) => cy0 + rv0 * atT(CYO, t);
@@ -358,8 +367,27 @@ export function beastPlan(shape) {
     { name: 'horn', parent: WP.HEAD, pivot: skull, axis: AX_X },
   ];
   for (let i = 0; i < P.length; i++) Object.assign(P[i], WALK_SWING[i]);
+  // A BIRD STANDS ON TWO LEGS AND FOLDS THE OTHER PAIR. (The owner, 23 Nov: the heron and the trout were
+  // promised and only the walker was built, so a bird would have been drawn as a four-legged animal -- which is
+  // why world/beasts.js refuses to draw a plan it has no body for.)
+  // Nothing of the rig changes. The FORE pair is renamed, and that is the whole trick: render/beastmat.js finds
+  // a leg BY ITS NAME (roleOf, legOf), so a part called `wl_u` has no leg number, takes no stride and is never
+  // solved -- it simply hangs where the rest pose puts it, which is exactly what a folded wing does. The HIND
+  // pair keeps its names and becomes the bird's two legs, and the walk table already puts those two half a
+  // cycle apart (phaseWalk [0, 0.5, 0.25, 0.75] -> 0.25 and 0.75), which IS a biped's walk. The trot table
+  // (0.5 and 0) is the same half cycle at speed.
+  // The ears become the crest and the horn the BILL: both hang off the head, both already exist as parts, and a
+  // heron at eleven pixels is its bill and its neck before it is anything else.
+  const bird = S.plan === 'bird';
+  if (bird) {
+    P[WP.FL_U].name = 'wl_u'; P[WP.FL_L].name = 'wl_l';
+    P[WP.FR_U].name = 'wr_u'; P[WP.FR_L].name = 'wr_l';
+    P[WP.HORN].name = 'bill';
+    // a folded wing does not swing with the stride and a bill does not flick like an ear
+    for (const i of [WP.FL_U, WP.FL_L, WP.FR_U, WP.FR_L, WP.HORN]) { P[i].phase = 0; P[i].amp = 0; P[i].idleAmp = 0; P[i].idleRate = 0; }
+  }
   const plan = {
-    name: 'walker', shape: S, layout: Y, parts: P, count: P.length,
+    name: bird ? 'bird' : 'walker', shape: S, layout: Y, parts: P, count: P.length,
     // the whole-animal dials the material applies to the ROOT, which has no hinge of its own
     body: {
       // the body rises and falls TWICE a stride, highest as the legs pass (the explorer's own rule,
@@ -429,6 +457,10 @@ export function beastGeometry(shape, seed, lod, opts = {}) {
   const C = opts.col || S.col;
   const Y = walkerLayout(S), L = S.len, rnd = rng((seed | 0) * 2654435761 + 17);
   const near = !lod;
+  // (a bird: two legs, a folded wing where the fore pair would be, and a bill where a horn would be --
+  //  beastPlan above renames those parts so the rig never strides them. world/beasts.js will not draw a
+  //  plan it has no body for, which is why the heron was absent rather than four-legged.)
+  const BIRD = S.plan === 'bird';
   const seg = near ? 9 : 5, legSeg = near ? 6 : 3;
   const bodyRings = near ? 8 : 6;
   const B = new BeastBuilder(S.high);
@@ -532,11 +564,30 @@ export function beastGeometry(shape, seed, lod, opts = {}) {
     const fu = s < 0 ? WP.FL_U : WP.FR_U, fl = s < 0 ? WP.FL_L : WP.FR_L;
     const hu = s < 0 ? WP.HL_U : WP.HR_U, hl = s < 0 ? WP.HL_L : WP.HR_L;
     const legCol = (p, t) => mixc(hide(0.1, 0.5), C.dark, 0.18 + 0.5 * t * t);
+    if (BIRD) {
+      // A FOLDED WING, not a fore leg: TWO FLAT BLADES lying along the flank -- the coverts from the shoulder
+      // back over the body, and the primaries past them to beyond the rump, lower and darker. `stroke` is the
+      // look's own flat piece (four triangles, one colour, a crisp edge), which is what a folded wing IS at any
+      // size this animal is ever drawn; a round limb here reads as a sausage strapped to the ribs.
+      // They are parts of the rig but take no stride, because render/beastmat.js finds a leg by its NAME and
+      // these are called wl_* and wr_*.
+      const wy = Y.cyAt(0.5) + Y.rv0 * 0.30, wx = s * Y.ruAt(0.5) * 1.02;
+      const nrm = [s, 0, 0];
+      // the coverts: broad, the body's own wash a little deepened, lying flat along the flank
+      B.part = fu; B.limb0 = 0; B.limb1 = 0;
+      B.stroke([wx, wy, Y.zAt(0.42)], norm([0, -0.10, 1]), nrm, L * 0.62, Y.rv0 * 1.15,
+        mixc(hide(0.35, 0.45), C.side, 0.30), { dry: 1, seed: 0.4 });
+      // the primaries: narrower, darker, reaching past the rump and tipped down
+      B.part = fl; B.limb0 = 0; B.limb1 = 0;
+      B.stroke([wx * 0.86, wy - Y.rv0 * 0.34, Y.zAt(0.88)], norm([0, -0.26, 1]), nrm, L * 0.52, Y.rv0 * 0.66,
+        mixc(C.side, C.dark, 0.52), { dry: 1, seed: 0.7 });
+    } else {
     // the fore leg: shoulder down and back to the elbow, then down and forward to the foot
     B.part = fu; B.limb0 = 0; B.limb1 = 1;
     B.limb(Y.shoulder(s), Y.elbow(s), lw * 0.115, lw * 0.072, { seg: legSeg, over: lw * 0.10, mid: near ? 2 : 0, lump: 0.004, col: (p, t) => mixc(hide(0.2, 0.3), C.dark, 0.10 * t), dry: 0.42, bulge: 0.12 });
     B.part = fl; B.limb0 = 0; B.limb1 = 1;
     B.limb(Y.elbow(s), Y.ffoot(s), lw * 0.072, lw * 0.040, { seg: legSeg, over: lw * 0.085, mid: near ? 2 : 0, lump: 0.003, col: legCol, dry: 0.42, cap: 0.10 });
+    }
     // the hind leg: hip down and FORWARD to the stifle, then the lower part kinked BACK through the hock.
     B.part = hu; B.limb0 = 0; B.limb1 = 1;
     B.limb(Y.hip(s), Y.stifle(s), lw * 0.145, lw * 0.082, { seg: legSeg, over: lw * 0.10, mid: near ? 2 : 0, lump: 0.004, col: (p, t) => mixc(hide(0.25, 0.8), C.dark, 0.10 * t), dry: 0.42, bulge: 0.18 });
@@ -544,14 +595,30 @@ export function beastGeometry(shape, seed, lod, opts = {}) {
     B.limb(Y.stifle(s), Y.hfoot(s), lw * 0.082, lw * 0.040, { seg: legSeg, over: lw * 0.085, mid: near ? 3 : 1, lump: 0.003, col: legCol, dry: 0.42, cap: 0.10, kink: [0, 0, L * 0.075] });
     // the hoof or paw: a small flattened lump, the darkest wash on the animal. Not at the far drawing:
     // at four pixels a hoof is nothing, and eight of them cost more triangles than the eight legs.
-    if (near) for (const [pt, part] of [[Y.ffoot(s), fl], [Y.hfoot(s), hl]]) {
+    if (near) for (const [pt, part] of (BIRD ? [[Y.hfoot(s), hl]] : [[Y.ffoot(s), fl], [Y.hfoot(s), hl]])) {
       B.part = part; B.limb0 = 0.9; B.limb1 = 1;
       B.blob([pt[0], pt[1] + lw * 0.028, pt[2]], lw * 0.050, lw * 0.042, lw * 0.062, { seg: near ? 6 : 4, rings: near ? 5 : 3, lump: 0.002, col: () => C.dark, dry: 0.5 });
     }
   }
 
+  // ---- 14 THE BILL, for a bird: a long straight dagger carried on the horn's part ---------------------
+  // A heron at eleven pixels is its bill and its neck before it is anything else, so this is not detail: it is
+  // the silhouette. It sits on WP.HORN (renamed `bill` by beastPlan), which hangs off the head and so swings
+  // with it; `S.snout` is how long it is as a share of the head, from the row's own numbers.
+  if (BIRD) {
+    B.part = WP.HORN; B.limb0 = 0; B.limb1 = 1;
+    const skull = add(Y.poll, mul(Y.hDir, S.head * 0.34));
+    // ITS OWN LENGTH, from the row (`bill`, metres). The first version of this invented one from the head and
+    // the snout and came out at 0.60 m on a one-metre bird -- four and a half times a grey heron's. The data
+    // already said 0.13 and nobody had read it.
+    const bl = S.bill > 0 ? S.bill : S.head * 1.2;
+    const tip = add(skull, mul(Y.hDir, bl));
+    B.limb(skull, tip, Math.max(0.006, bl * 0.20), Math.max(0.002, bl * 0.05),
+      { seg: near ? 5 : 3, over: S.head * 0.08, mid: near ? 1 : 0, lump: 0.001,
+        col: (p, t) => mixc(C.pale, C.dark, 0.10 + 0.35 * t), dry: 0.55, cap: 0.06 });
+  }
   // ---- 14 the antler, where the row asks for one ----------------------------------------------------
-  if (S.horn > 0.01) {
+  if (!BIRD && S.horn > 0.01) {
     B.part = WP.HORN; B.limb0 = 0; B.limb1 = 1;
     const skull = add(Y.poll, mul(Y.hDir, S.head * 0.30));
     for (const s of [-1, 1]) {
