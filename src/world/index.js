@@ -616,7 +616,17 @@ export function createWorld(scene) {
       mist = mist || 1;
       const alt = camR - ground;
       const atmH = Math.max(1, body.atmosphereHeight || 1);
-      const space01 = body.atmosphereHeight > 0 ? THREE.MathUtils.smoothstep(camR - body.radius, atmH * 0.55, atmH * 1.15) : 1;
+      // HOW FAR TOWARD SPACE THE EYE IS. This was measured from SEA LEVEL (camR - body.radius) while the
+      // ground's own air, since v34, is measured from THE LAND UNDER THE EYE. MEASURED 2026-11-23 in the
+      // gallery, 420 m over the alpine meadow at noon with the sun 48 degrees up: the eye stood 830 m over the
+      // datum on a 410 m range, so the SKY read 0.909 of the way to space -- black, with stars -- while the
+      // GROUND read thick air and 2,600 m of visibility. A sunlit landscape under a midday starfield.
+      // Earth's peaks were doubled to 968 m on the 19th and her air is 800 m, so a range stands clean through
+      // the sky; that is the real cause and it is older than this change, but until v34 the ground went dark
+      // with the sky and the two at least agreed. With the mountain air on, the sky now reads the same height
+      // the ground does. ?mtnair=0 gives back exactly the old pair.
+      const spaceH = MTN_AIR ? alt : camR - body.radius;
+      const space01 = body.atmosphereHeight > 0 ? THREE.MathUtils.smoothstep(spaceH, atmH * 0.55, atmH * 1.15) : 1;
       const e = bu.uSunDirL.value.dot(_up);
       _east.crossVectors(Y, _up).normalize();
       const am = bu.uSunDirL.value.dot(_east) > 0;
