@@ -25,6 +25,7 @@ import { clamp, clamp01, smoothstep, oscStep, TAU } from './util.js';
 import { scrollField } from './near.js';
 import { devilWind } from './features.js';
 import { powerWind, windsBend, WINDPOWER } from './powers.js';
+import { timeAt } from './times.js';
 import { wakeAt } from './wind.js';    // (P16: from wind.js, not air.js; air.js imports this module, and the cycle broke the browser in 6d5c02a)
 
 export const FLORA = Object.freeze({
@@ -205,6 +206,22 @@ function oscCoef(w, z, dt, o, i) {
   _tmp2[0] = 0; _tmp2[1] = 1; oscStep(_tmp2, 0, 0, w, z, dt); o[i + 1] = _tmp2[0]; o[i + 3] = _tmp2[1];
 }
 
+// (the powers, space and time) HOW FAST THE WORLD RUNS OVER A WHOLE BEND CELL of half-width `half` about (x, z).
+// The field's cells are 8 m and a bubble's rim band is 3.1 m at the smallest (times.js TIMEPOWER), so the centre
+// alone would leave a ring of swaying grass inside the painted ball. Five taps -- the centre and the four corners --
+// combined by the rule timeAt itself uses where bubbles overlap: the pace furthest from the world's own wins, so a
+// cell any corner of which is held is held. Called only for the cells the caller has already found to be at or
+// inside the box round the open bubbles.
+function cellRate(T, x, z, half) {
+  let k = timeAt(T, x, z);
+  for (let c = 0; c < 4; c++) {
+    const r = timeAt(T, x + (c & 1 ? half : -half), z + (c & 2 ? half : -half));
+    if (r < k) k = r;
+    else if (k >= 1 && r > k) k = r;        // (a hastened place, where nothing is slowing it)
+  }
+  return k;
+}
+
 export class FloraField {
   constructor() {
     const N = FLORA.N, M = FLORA.nearN;
@@ -225,6 +242,9 @@ export class FloraField {
     this._st = new Float32Array(M * M * 2);      // the lean a pushed plant keeps for a while (the wake)
     this._can = new Float32Array(N * N);         // canopy closure per bend cell
     this._cpl = new Float32Array(N * N * 4);     // scratch for the crown coupling
+    // (the powers, space and time) how fast the world runs in each bend cell. Written and read only on a frame where a
+    // bubble is open, so the ordinary game never touches it; it holds 1 (the world's own time) until one is.
+    this._trate = new Float32Array(N * N).fill(1);
     // (P17) the grid centres start as -0: Math.round hands back -0 for a focus just west or south of the anchor, and a
     // field that held small integers until then changes its kind of storage at that moment. V8 then threw away the
     // optimised push step and rebuilt it every other frame (300 times in 12 s at Neptune's storm coast, measured with
@@ -293,7 +313,9 @@ export class FloraField {
   //   frame: LocalFrame.  air: AirGrid (already updated this frame).  near: TerrainGrid of the
   //   near field (2 m nodes) or null.  rho: air density at the focus.  (fx, fz): focus in grid
   //   coordinates.  disturbers: frame.disturbers (see index.js).  quality: 0 | 1 | 2.
-  update(dt, frame, air, near, rho, fx, fz, disturbers, quality, devils, winds) {
+  //   times: the places where the world runs at another pace (times.js), or nothing -- which is
+  //   every frame of the ordinary game, and then this method is what it was to the last digit.
+  update(dt, frame, air, near, rho, fx, fz, disturbers, quality, devils, winds, times = null) {
     const N = this.N, cell = this.cell, M = this.M, nc = this.nearCell;
     if (this.frameVersion !== frame.version) {
       this.frameVersion = frame.version; this.reset();
@@ -331,6 +353,27 @@ export class FloraField {
     let gsum = 0, se = 0, sn = 0, tsum = 0, sce = 0, scn = 0;
     const swirl = !!devils && devils.count > 0;
     const blown = !!winds && winds.count > 0;      // (the wind the explorer makes, powers.js)
+    // (the powers, space and time: 2026-11-23) HELD CELLS. Still the moment stops the loose things and the rain where
+    // they are; the grass and the trees went on swaying inside the bubble, which read as a trick rather than as time
+    // held. The two oscillators below are stepped for the WHOLE field with one set of coefficients (oscCoef, above),
+    // so a cell cannot be given a step of its own length -- but it can be given its own coefficients. A step of
+    // rate x h, to first order, is the same update with
+    //     A11 = 1 + rate (a11 - 1),  A12 = rate a12,  A21 = rate a21,  A22 = 1 + rate (a22 - 1),
+    // which at rate 1 is the coefficients themselves and at rate 0 is the identity: the cell keeps its bend AND its
+    // velocity to the last digit, so a wood frozen mid-sway starts moving again from the lean it held, not from rest.
+    // (The note that asked for this said `vel *= rate`; that is wrong at rate 0 -- it throws the cell's stored sway
+    //  away -- and the scaling belongs to the whole state, not to the bend alone.)
+    // Null with no bubble open, and then this costs one comparison for the whole field and the lines below are the
+    // lines of v32 unchanged.
+    const slowed = times && times.any ? times : null;
+    // AT THE RIM. A cell is 8 m across and the smallest bubble is 14 m in radius with a rim band of 3.1 m, so asking
+    // the pace at the cell's centre alone would hold a patch of grass up to 4 m SHORT of the painted sphere -- grass
+    // swaying inside the ball is the one thing that says the power has not worked. The cell is asked at its centre and
+    // its four corners instead and held at whichever pace is furthest from the world's own (cellRate below, the same
+    // rule timeAt uses where bubbles overlap), so the held patch always COVERS the ball and overruns it by at most
+    // half a cell. The patch is still 8 m coarse: that is as fine as this field gets.
+    const hcell = cell * 0.5, tbox = slowed !== null && slowed.bany === true;
+    if (slowed !== null) this._trate.fill(1);
     // HOW FAR A PLANT MAY BE LAID OVER. A real tree's trunk leans 17 degrees in the worst gale and no further
     // (FLORA.stiffMax, measured trees): the world's own weather never gets past it. The explorer's wind is not
     // weather, and the owner asked to lay a stand over the way they send it (2026-11-17), so while any of their wind
@@ -369,20 +412,43 @@ export class FloraField {
         const zc = _s[11] > FLORA.stiffHeight ? _s[11] : FLORA.stiffHeight, wkc = _s[9] < 1 && _s[9] > 0.01 ? wakeAt(_s[9], _s[10], zc) / _s[9] : 1;
         const ls = kq * sp * hs * hs, lt = kq * sp * ht * ht * wkc * wkc;
         const tse = we * ls, tsn = wn * ls, tte = we * lt, ttn = wn * lt;
+        // this cell's own pace, and its own coefficients for it (see "held cells" above). At rate 1 -- every cell of
+        // every frame of the ordinary game -- A is a, B is b, and the four lines below are v32's to the last digit.
+        let A11 = a11, A12 = a12, A21 = a21, A22 = a22, B11 = b11, B12 = b12, B21 = b21, B22 = b22, tr = 1;
+        // (the box round every open bubble, widened by half a cell: a cell no part of which can be in one is turned
+        //  away on four comparisons, so the five taps are paid only by the cells at the bubble and in it)
+        if (tbox && x + hcell >= slowed.bx0 && x - hcell <= slowed.bx1 && z + hcell >= slowed.bz0 && z - hcell <= slowed.bz1) {
+          tr = cellRate(slowed, x, z, hcell);
+          this._trate[n] = tr;
+          if (tr !== 1) {
+            A11 = 1 + tr * (a11 - 1); A12 = tr * a12; A21 = tr * a21; A22 = 1 + tr * (a22 - 1);
+            B11 = 1 + tr * (b11 - 1); B12 = tr * b12; B21 = tr * b21; B22 = 1 + tr * (b22 - 1);
+          }
+        }
         let d = bend[o] - tse, v = vel[o];
-        bend[o] = tse + a11 * d + a12 * v; vel[o] = a21 * d + a22 * v;
+        bend[o] = tse + A11 * d + A12 * v; vel[o] = A21 * d + A22 * v;
         d = bend[o + 1] - tsn; v = vel[o + 1];
-        bend[o + 1] = tsn + a11 * d + a12 * v; vel[o + 1] = a21 * d + a22 * v;
+        bend[o + 1] = tsn + A11 * d + A12 * v; vel[o + 1] = A21 * d + A22 * v;
         d = bend[o + 2] - tte; v = vel[o + 2];
-        bend[o + 2] = tte + b11 * d + b12 * v; vel[o + 2] = b21 * d + b22 * v;
+        bend[o + 2] = tte + B11 * d + B12 * v; vel[o + 2] = B21 * d + B22 * v;
         d = bend[o + 3] - ttn; v = vel[o + 3];
-        bend[o + 3] = ttn + b11 * d + b12 * v; vel[o + 3] = b21 * d + b22 * v;
+        bend[o + 3] = ttn + B11 * d + B12 * v; vel[o + 3] = B21 * d + B22 * v;
         wind[o] = we * h2; wind[o + 1] = wn * h2;
         const g01 = 0.5 + 0.5 * _s[2];
         wind[o + 2] = g01 < 0 ? 0 : g01 > 1 ? 1 : g01;
-        wind[o + 3] = _s[3] * sp * h2;
+        // (tb has a name only so that the line below it can be read back out of the field as it always was: the store
+        //  rounds to a float32, and tsum is the field's own mean -- it must not drift by that rounding)
+        const tb = _s[3] * sp * h2;
+        wind[o + 3] = tb;
         this._can[n] = _s[7];
         gsum += wind[o + 2]; se += we * hs; sn += wn * hs; tsum += wind[o + 3]; sce += we * ht * wkc; scn += wn * ht * wkc;
+        // ... and the FINE EDDIES of a held cell are held too. The flutter of a blade, and a branch's thrash and its
+        // ringing, are not in the bend field at all: the shader and plantBend build them from this turbulence channel
+        // (as an intensity, turbulence over wind: flora.glsl.js `fm` and `Io`) and from phases that run for the whole
+        // field, so a cell whose lean stood still went on shimmering and thrashing. Taking the channel down with the
+        // cell's pace puts all three out. It is written AFTER tsum on purpose: how gusty the air is REPORTED to be
+        // (physics.here) is the weather's business, and a bubble must not change the weather.
+        if (tr !== 1) wind[o + 3] = tb * tr;
       }
     }
     // ---- crowns loading their neighbours --------------------------------------------------------
@@ -392,7 +458,14 @@ export class FloraField {
       for (let j = 1; j < N - 1; j++) for (let i = 1; i < N - 1; i++) {
         const n = j * N + i, c = can[n];
         if (c < 0.2) continue;
-        const k = 1 - Math.exp(-kc * c), o = n * 4, l = o - 4, r = o + 4, d = o - N * 4, u = o + N * 4;
+        const o = n * 4, l = o - 4, r = o + 4, d = o - N * 4, u = o + N * 4;
+        // (the powers, space and time) at the held cell's own pace as well. This blends a crown toward its four
+        // neighbours by about 1.5 % a frame at 60 Hz (crownCoupling 0.9), which is some 60 % of the way in a second:
+        // without the rate a frozen crown was dragged back into the sway of the live wood around it within a second,
+        // which is the very fault this step is mending. The rate was taken in the loop above; with no bubble open
+        // this is one comparison for the whole pass.
+        let k = 1 - Math.exp(-kc * c);
+        if (slowed !== null) k *= this._trate[n];
         // position and velocity both: touching crowns share load and damp their relative motion
         bend[o + 2] += ((cp[l] + cp[r] + cp[d] + cp[u]) * 0.25 - cp[o]) * k;
         bend[o + 3] += ((cp[l + 1] + cp[r + 1] + cp[d + 1] + cp[u + 1]) * 0.25 - cp[o + 1]) * k;
