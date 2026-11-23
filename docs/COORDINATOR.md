@@ -3060,3 +3060,38 @@ which account is first-hand and which is not.
   unfinished, and said to the owner in the same breath: NEPTUNE'S SNOWFIELD has not been looked at -- the snow
   world's grab ran over twenty minutes here without finishing. The sky is one program for every world and it
   compiles, so what is unproven is whether the ice sky READS worse, and `?skyair=0` turns that step off alone.
+
+### 2026-11-23 OWNER: a mile of distance, a living water system, and 25 animals in every biome
+- OWNER (verbatim): "Ok I want things even further away to load and look good up to 1 mile make however many agents
+  you need to do this task i also want it optimized for performance and quality so dont lose either of those doing
+  this task and I also want the oceans and the water system to feel more alive and real it should constantly be
+  moving the way water would be naturally how it goes down hill and pools in areas it can't find go downhill any
+  further or just the natural lakes and ponds and oceans and the oceans and the bigger lakes should have waves and
+  airration and fjords and waterfalls also animals they're should at least be 25 different animals in every biome
+  draw them in the same artstyle make sure its animated and moves and each animal has there own routine and
+  patterns that interact with the other animals in the ecosystem I want some animals to hunt others and others to
+  be herbivores and fish and predators for them as well same for different bird types and all other animals for
+  the biomes focus on the artstyle and animation for these make sure its really good"
+- **THREE ASKS: (1) a MILE of distance, without losing speed or quality; (2) WATER THAT IS ALIVE -- flowing
+  downhill, pooling, waves, aeration, fjords, waterfalls; (3) ANIMALS: at least 25 to a biome, in this game's own
+  hand, animated, each with a routine, hunting and being hunted, fish and birds, a whole ecosystem.**
+
+**THE FIRST THING TO SAY, AND IT IS ARITHMETIC, NOT OPINION. THESE WORLDS ARE 4 km ACROSS.** Earth here has a
+radius of 4,000 m (`src/data/bodies.js`): the whole world is **16 miles round**. So:
+- standing, eye 1.7 m up, **the horizon is 117 metres away**;
+- a thing one mile off lies **319 m BELOW the eye's own plane** -- the ground has curved out from under it;
+- to see a mile of ground you must be **about 320 m up**: from 300 m the horizon is 0.98 miles, from 800 m it is
+  1.65 miles, from 2 km it is 2.8 miles.
+**So "a mile" cannot be delivered to a player standing on the ground.** What CAN be delivered, and is worth
+doing, is: (a) everything to the horizon and the hills that rise above it, which on a hilltop is already most of
+a mile; (b) **the view from the air, where a mile is real and where the game is weakest today**; (c) if the owner
+wants a mile from the ground, the worlds themselves must get bigger, which moves the orbits, the travel times and
+the whole balance of the game -- a decision only they can make, and it is put to them, not taken here.
+
+**AND THE SCALE OF THE ANIMALS, said plainly.** There are **42 biomes across ten bodies** (`src/data/looks/`).
+Twenty-five to a biome is **1,050 creatures**, each modelled in code, animated, and given a routine -- and most
+of those biomes are on Mercury, the Moon, Venus, Jupiter, Saturn, Uranus, Neptune and Pluto, where an animal is a
+piece of alien design, not a deer. What is deliverable to the standard the owner asks for ("focus on the artstyle
+and animation, make sure its really good") is: **the creature system itself -- body, gait, routine, ecosystem --
+and Earth's twenty-five first, properly**; then one world at a time after that. That is the plan unless the owner
+says otherwise.
