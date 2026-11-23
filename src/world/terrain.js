@@ -10,6 +10,48 @@ import { faceToDir, nodeSize, FACES } from './cubesphere.js';
 import { makeTerrainMaterial, makeWaterMaterial } from '../render/materials.js';
 import { QUALITY, LOOK, SCREEN } from '../render/shared.js';
 
+// (?waterbound=0 puts the water's bounding sphere back to the whole patch's, for an A and a B of the draw calls.)
+const WATER_BOUND = (() => {
+  try { const q = new URLSearchParams(location.search).get('waterbound'); if (q != null) return +q ? 1 : 0; } catch { /* no address */ }
+  return 1;
+})();
+
+// HOW BIG A PIECE OF WATER MUST BE ON THE PICTURE TO BE WORTH ITS OWN DRAW CALL, in pixels of the picture's
+// height. MEASURED 2026-11-23 in the autumn wood, oil look: 41 of the frame's 232 draw calls were water, and
+// the wood's water is a BROOK. A patch gets its own water surface as soon as one of its triangles is wet
+// (patchgen.js:290), so a stream two metres across drags a draw call behind it over every patch it crosses, all
+// the way to the horizon -- where it is a thread thinner than a pixel and nobody can see it. This is the same
+// rule the animals are drawn by (world/beastkit.js distanceForPixels) and it is honest both ways: a SEA has a
+// huge sphere and is kept at any distance, a far brook has a tiny one and goes.
+// (?waterpx=0 draws every piece of water however small, which is what v34 did; raise it to drop water sooner.)
+const WATER_PX = (() => {
+  try { const q = new URLSearchParams(location.search).get('waterpx'); const v = +q; if (q != null && isFinite(v)) return Math.max(0, v); } catch { /* no address */ }
+  return 2.5;
+})();
+const WATER_FOV_T = Math.tan(58 * Math.PI / 360);     // (the game's own vertical field on foot: core/game.js)
+
+// The smallest ball this patch's WET vertices fit in, in the patch's own frame: the midpoint of their box, and
+// the farthest vertex from it. A quarter of a metre is added because a wave lifts the surface above the mesh.
+function waterSphere(pos, fallbackR) {
+  const n = pos.length / 3;
+  if (!n) return new THREE.Sphere(new THREE.Vector3(0, 0, 0), fallbackR);
+  let x0 = Infinity, y0 = Infinity, z0 = Infinity, x1 = -Infinity, y1 = -Infinity, z1 = -Infinity;
+  for (let i = 0; i < n; i++) {
+    const x = pos[i * 3], y = pos[i * 3 + 1], z = pos[i * 3 + 2];
+    if (x < x0) x0 = x; if (x > x1) x1 = x;
+    if (y < y0) y0 = y; if (y > y1) y1 = y;
+    if (z < z0) z0 = z; if (z > z1) z1 = z;
+  }
+  const cx = (x0 + x1) * 0.5, cy = (y0 + y1) * 0.5, cz = (z0 + z1) * 0.5;
+  let r2 = 0;
+  for (let i = 0; i < n; i++) {
+    const dx = pos[i * 3] - cx, dy = pos[i * 3 + 1] - cy, dz = pos[i * 3 + 2] - cz;
+    const d2 = dx * dx + dy * dy + dz * dz;
+    if (d2 > r2) r2 = d2;
+  }
+  return new THREE.Sphere(new THREE.Vector3(cx, cy, cz), Math.sqrt(r2) + 0.25);
+}
+
 const SPLIT_BY_QUALITY = [0.68, 1.12, 1.25];   // a node splits when the camera is nearer than this * its size
 const MORPH_A = 0.76;       // morph band: [MORPH_A, MORPH_B] * the distance at which it merges
 const MORPH_B = 0.98;
@@ -139,7 +181,13 @@ export class PlanetTerrain {
       // render/materials.js, aTurb)
       if (d.water.turb) wg.setAttribute('aTurb', new THREE.BufferAttribute(d.water.turb, 4, true));
       wg.setIndex(new THREE.BufferAttribute(d.water.indices, 1));
-      wg.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 0, 0), d.boundR);
+      // THE WATER'S OWN BOUNDS, NOT THE PATCH'S. (MEASURED 2026-11-23 in the autumn wood: 41 of the frame's 232
+      // draw calls were water, and the wood's water is a brook. A patch gets a water mesh as soon as ONE of its
+      // triangles is wet -- patchgen.js:290 -- and the mesh was then given the WHOLE patch's bounding sphere, so
+      // a twenty-metre sliver of stream could not be culled while any corner of its hundred-metre patch was on
+      // the screen. Measuring the wet vertices themselves lets the frustum throw the sliver away.)
+      wg.boundingSphere = WATER_BOUND ? waterSphere(d.water.positions, d.boundR)
+        : new THREE.Sphere(new THREE.Vector3(0, 0, 0), d.boundR);
       const wm = new THREE.Mesh(wg, this.waterMaterial);
       wm.position.copy(mesh.position);
       wm.matrixAutoUpdate = false; wm.updateMatrix();
@@ -152,6 +200,9 @@ export class PlanetTerrain {
       };
       this.group.add(wm);
       node.water = wm;
+      // the water's own size, for the screen-size test in _place below (0 falls back to the whole patch)
+      node.waterR = wg.boundingSphere ? wg.boundingSphere.radius : d.boundR;
+      node.waterC = wg.boundingSphere ? wg.boundingSphere.center.clone() : null;
     }
     node.center.copy(origin);
     node.boundR = d.boundR;
@@ -228,6 +279,23 @@ export class PlanetTerrain {
 
   // `ahead`: the node is not drawn yet (an ancestor is still easing into its own look); its children are
   // asked for all the same, so the ground is ready the moment it may be shown.
+
+  // IS THIS PIECE OF WATER WORTH A DRAW CALL? Its own ball (not the patch's) measured on the picture the game is
+  // really drawing. A sea's ball is hundreds of metres across and stays; a brook's is a few metres and goes once
+  // it is thinner than WATER_PX pixels. The eye's distance is taken to the ball's centre, in the body's own axes.
+  _waterWorthIt(n) {
+    const r = n.waterR;
+    if (!(r > 0)) return true;                       // (no measurement: draw it, as v34 did)
+    let cx = n.center.x, cy = n.center.y, cz = n.center.z;
+    if (n.waterC) { cx += n.waterC.x; cy += n.waterC.y; cz += n.waterC.z; }
+    const dx = cx - this.camLocal.x, dy = cy - this.camLocal.y, dz = cz - this.camLocal.z;
+    const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    if (d < r * 2) return true;                      // standing in it or beside it
+    const h = Math.max(1, SCREEN.outH || 720);
+    const px = (h * 0.5) * (r * 2) / (Math.max(0.01, d) * WATER_FOV_T);
+    return px >= WATER_PX;
+  }
+
   _select(node, ahead) {
     node.lastUsed = this.frame;
     const d = this._nodeDist(node);
@@ -287,7 +355,9 @@ export class PlanetTerrain {
     for (const n of vis) {
       if (n.fresh) n.shown = !this.instant && n.parent && n.parent.seen >= fr - 1 ? this.now : -1e9;
       else if (this.instant) n.shown = -1e9;
-      n.mesh.visible = true; if (n.water) n.water.visible = true;
+      n.mesh.visible = true;
+      // (a piece of water is drawn only while it is worth a draw call on the picture: WATER_PX at the top)
+      if (n.water) n.water.visible = WATER_PX <= 0 || this._waterWorthIt(n);
     }
     let easing = false;
     for (const n of vis) { n.seen = fr; if (this.now - n.shown < EASE_T) easing = true; }

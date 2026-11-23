@@ -226,6 +226,11 @@ uniform vec3 uOrigin;
 uniform vec3 uCamLocal;
 uniform vec3 uWashIn;  // x the wash clock now (s), y when this mesh was first laid, z how long a wash takes (flora.js' own)
 uniform float uTime;
+// (the shadow pass, PC_BSHADOW: how far from the sun this vertex is, in the square's own units. The SAME vertex
+//  shader poses the animal for its shadow as for its paint -- a second copy would drift and a deer would walk in
+//  the picture while standing still in its own shadow. render/shadow.js FIG_SH_FRAG writes it.)
+uniform float uInv;
+varying float vS;
 #ifdef PC_OIL
 uniform vec3 uSunDirW;
 uniform vec3 uGlaze;
@@ -526,6 +531,7 @@ void main() {
     vFlat = vec4(pcTone(co, lvo), 1.0);
   }
   #endif
+  vS = -mv.z * uInv;                 // (the shadow pass reads this; the paint pass leaves it unread)
   gl_Position = projectionMatrix * mv;
   ${VERT_END}
 }
@@ -689,6 +695,33 @@ export function makeBeastMaterial(bodyU, opts = {}) {
     aInst: [0, 0, 0.5, 0], aGait: [0, 0, 0, 0], aSpec: [0, 0, 0, 1], color: [0.6, 0.5, 0.4],
   });
   return register(m, 'beast', opts);
+}
+
+// ===================================================================================================
+// THE SAME ANIMAL, CAST FROM THE SUN. (The owner, 2026-11-23: the deer does not sit into the floor. It did
+// not: render/shadow.js knew two kinds of caster -- the plain scene, drawn with one override material, and a
+// FIGURE posed by a matrix palette (`uPart`) -- and an instanced creature is neither, so it cast nothing.)
+//
+// THE RULE THIS OBEYS: the shadow uses THE VERY SAME VERTEX SHADER as the paint, with PC_BSHADOW defined, and
+// shares every pose uniform BY REFERENCE. A second copy of the posing arithmetic would drift the first time
+// either was touched, and the animal would walk in the picture while standing still in its own shadow. All
+// that changes is the fragment: how far from the sun this pixel is, which is what the square holds.
+export function makeBeastShadowMaterial(src, uInv) {
+  const u = src.uniforms, own = { uInv: uInv || { value: 1 } };
+  // every uniform the vertex shader reads, by reference, so the shadow is posed on the same numbers
+  for (const k of ['uBPivot', 'uBAxis', 'uBSwing', 'uBRole', 'uBGait', 'uBSeg', 'uBRest', 'uBKnee', 'uBBody',
+    'uBMove', 'uBPose', 'uBWalk', 'uBTrot', 'uBFig', 'uOrigin', 'uCamLocal', 'uWashIn', 'uTime',
+    'uSunDirW', 'uUpW', 'uFog', 'uOilB', 'uOilC']) if (u[k]) own[k] = u[k];
+  const m = new THREE.ShaderMaterial({
+    name: 'pc-shadow-beast',
+    defines: Object.assign({}, src.defines, { PC_BSHADOW: 1 }),
+    uniforms: own,
+    vertexShader: src.vertexShader,
+    fragmentShader: 'varying float vS;\nvoid main() { gl_FragColor = vec4(vS, 0.0, 0.0, 1.0); }\n',
+    side: THREE.DoubleSide,
+  });
+  m.defaultAttributeValues = Object.assign({}, src.defaultAttributeValues);
+  return m;
 }
 
 // Which way the material is built, for the log and for a test: what is on, and how many vec4 of vertex

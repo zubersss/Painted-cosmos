@@ -82,6 +82,23 @@ const FAR_FILL = (() => { const q = typeof location !== 'undefined' && location.
 //  cell are shifts, so the span must be a power of two.)
 const FAR_SPAN = (() => { const q = typeof location !== 'undefined' && location.search ? new URLSearchParams(location.search).get('farcell') : null; const n = q == null ? NaN : +q; return n === 2 ? 2 : 4; })();
 
+// THE OUTER UNDERGROWTH'S CELL, the same trade the far trees took in v13 and for the same measured reason.
+// MEASURED 2026-11-23 in the autumn wood, oil look: of a frame's 232 draw calls, 38 were undergrowth -- more than
+// the shadow pass (27) and more than every tall tree put together (38 across four kits). The undergrowth is drawn
+// in two tiers: a fine one out to about 44 m, and an outer one to UNDER_FAR. The outer tier's cell was two
+// undergrowth cells to a side; at four it is a QUARTER as many meshes for exactly the same plants in exactly the
+// same places, because floraplace.js lays a plant from its position in the world and not from the cell it lands in
+// (the far trees' own note above says the same, and 56 far meshes became 18 when their cell was widened).
+// What it costs: an outer cell holds four times as many plants, so it is built and freed in bigger lumps -- the
+// world's 5 ms slice absorbs that, and the tier is beyond 44 m where a wash-in is not watched.
+// (?undercell=1 is the old pair, for an A and a B of the draw calls. The WATERCOLOUR GAME KEEPS THE OLD CELL
+//  whatever the address says, so the live game's draw order and its own costs are untouched.)
+const UNDER2_SHIFT = (() => {
+  try { const q = new URLSearchParams(location.search).get('undercell'); const n = q == null ? NaN : +q;
+    if (n === 1) return 1; if (n === 2) return 2; } catch { /* no address */ }
+  return 2;
+})();
+
 // WHICH KITS ARE DRAWN FAR OFF AS LEAF CARDS and not as the old lump (the oil look's far tree, v13). A kit left out
 // of this is silently given the lump, which is why it sits beside FAR_DIMS: both must name every tall kit there is.
 // which kits have a WOODEN STEM worth drawing in the branch pass, and which get a trunk on their far card.
@@ -932,7 +949,10 @@ export class Flora {
       // (R1 W2.3: at every height, by the distance from the eye; the radius at the ground is the reach)
       const rU = 44 * ([0.42, 0.82, 1.0][QUALITY.level] || 1) + this.underSize * 0.6, rU2 = UNDER_FAR * k * 1.25 + this.underSize * 1.2;
       this._wanted(UNDER_LEVEL, this.underSize, rU, this.underChunks, 'under', rU);
-      this._wanted(UNDER_LEVEL - 1, this.underSize * 2, rU2, this.under2Chunks, 'under2', rU2);
+      // (the outer tier's cell: two undergrowth cells to a side as it was, or four in the oil look -- UNDER2_SHIFT
+      //  at the head of this file, and `?undercell=1` for the old pair)
+      const u2 = LOOK.oil ? UNDER2_SHIFT : 1;
+      this._wanted(UNDER_LEVEL - u2, this.underSize * (1 << u2), rU2, this.under2Chunks, 'under2', rU2);
     }
     let t1 = performance.now(); if (t1 - t0 > prof.wanted) prof.wanted = t1 - t0;
     this.kit.patch.setDrawRange(0, QUALITY.level === 0 ? 60 : Infinity);   // the low tier: five blades a patch

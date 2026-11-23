@@ -12,7 +12,7 @@
 // change as the eye moves. The ground is not drawn into it (it shades itself by the light's angle), so a tree behind
 // a rise still throws its shadow through the rise: not seen in a wood on level ground.
 import * as THREE from 'three';
-import { SHADOW, OIL, QUALITY } from './shared.js';
+import { SHADOW, SHADOW_CROWD, OIL, QUALITY } from './shared.js';
 
 export const SHADOW_LAYER = 2;
 
@@ -279,6 +279,25 @@ export class ShadowMap {
       cam.layers.enableAll();
       const au = renderer.autoClear; renderer.autoClear = false;
       try { renderer.render(o, cam); } finally { for (const [m, src] of swapped) m.material = src; cam.layers.set(SHADOW_LAYER); renderer.autoClear = au; }
+    }
+    // THE CROWDS (world/beasts.js): an instanced herd, posed by the SAME vertex shader that paints it, so a
+    // walking animal's shadow walks with it. Each near mesh is one more draw call in this pass and it buys the
+    // one thing that made a deer read as pasted onto the floor rather than standing on it.
+    if (SHADOW_CROWD.size) {
+      const au2 = renderer.autoClear; renderer.autoClear = false;
+      cam.layers.enableAll();
+      for (const e of SHADOW_CROWD) {
+        const mesh = e.mesh;
+        if (!mesh || !mesh.visible || !mesh.count || !mesh.parent) continue;
+        let sm = this._figMats.get(e.material);
+        // the crowd hands in its OWN way of building the shadow twin, so this file never imports the
+        // creatures: with the animals off, not one byte of render/beastmat.js is fetched (the powers' rule).
+        if (!sm) { if (typeof e.makeShadow !== 'function') continue; sm = e.makeShadow(e.material, this.mat.uniforms.uInv); this._figMats.set(e.material, sm); }
+        const src = mesh.material;
+        mesh.material = sm;
+        try { renderer.render(mesh, cam); } finally { mesh.material = src; }
+      }
+      cam.layers.set(SHADOW_LAYER); renderer.autoClear = au2;
     }
     // (the map taken down and smoothed: for the light in the air and for the ground's strokes, chunks.js pcSunAtSoft)
     renderer.setRenderTarget(this.rtAir); renderer.render(this.airTri, this.airCam);
