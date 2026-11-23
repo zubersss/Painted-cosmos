@@ -3218,3 +3218,51 @@ Four things, and the fourth is new and is the one they can feel:
    cost is not, and only `bench=1` on the owner's own device can settle that.
 
 Report only when all four are done.
+
+### 23 Nov — SPEED TEST 9 FROM THE OWNER'S PHONE (v35). THE COORDINATOR'S DIAGNOSIS WAS WRONG.
+
+Adreno 740 (a flagship Snapdragon), picture 1028x480, screen 823x384 at 3.75, **tier 1, paint lighter** -- the
+reduced settings already -- and **script 11.3 ms, 219 draw calls, 2,022,000 triangles a frame.**
+
+**THE GAME RUNS AT TEN FRAMES A SECOND.** The settled "as set" rows are 101.4, 101.4, 103.5, 103.4 ms. Not
+"a little laggy": a tenth of what the owner asked for.
+
+**WHAT I TOLD THEM AND WHY IT WAS WRONG.** I measured 232 draw calls in software here, multiplied by the phone's
+old 0.107 ms a call, got 24.8 ms, and called draw calls the lag. The device says: **219 calls and 11.3 ms of
+script, against a 101 ms frame.** The CPU is a ninth of it. Everything else is the GPU painting, and my fifth off
+the draw calls cut things the device measures at about one millisecond. **CLAUDE.md's own warning -- this machine
+draws in software and has been wrong twice about why the phone is slow -- was right a third time, and it was
+right about me.**
+
+**WHAT THE DEVICE ACTUALLY SAYS.** Only the rows measured against the SETTLED as-set rows (10 onward) can be
+trusted; the test itself says the first rows ran while the wood was still building. Of those:
+
+| row | saves | what it means |
+| --- | --- | --- |
+| 16 no trees | **-84.7 ms** | **the trees are five sixths of the frame** |
+| 15 no near trees | **-62.7 ms** | the NEAR trees alone are 63 ms |
+| 12 plants written the instant the fragment starts | -47.3 ms | everything after a fragment starts costs 47 ms |
+| 11 plants one flat colour | -46.4 ms | ... and the footprint, the noise read and the discards are only 0.9 of it |
+| 13 a leaf in its own colour | **-0.0 ms** | a leaf's own paint is FREE (v22 moved it to the vertex shader; that worked) |
+| 14 no air laid on the plants | -2.0 ms | the air is cheap |
+| 19 no ground drawn | -5.2 ms | the ground is nearly free |
+| 21 no shadows at all | -4.1 ms | the shadows are cheap |
+| 23 trees cast no shadow | -1.4 ms | so is their share of them |
+| 17 no small plants | **-0.7 ms** | **THE UNDERGROWTH IS FREE** -- which is what v35 spent its effort on |
+| 18 no water drawn | **-0.0 ms** | **THE WATER IS FREE** -- as v35 said honestly, its water work bought nothing |
+
+And the sharpness rows (27-30) say the frame is fragment-bound beyond doubt: half again as sharp is **+69 ms**,
+twice as sharp **+184 ms**, every pixel the screen has **+355 ms**.
+
+**THE REAL NUMBER TO ATTACK IS 2,022,000 TRIANGLES**, nearly all of them tiny leaf cards. A triangle under about
+eight pixels wastes most of a GPU quad, and an alpha discard breaks early-Z, so two million small cards is far
+worse than two million large ones. The old note in this log that "triangles on that device have twice measured as
+free" was taken on a smaller scene AND IS NOT TRUE AT THIS COUNT. Row 9, "far trees as lumps", saves 28.8 ms for
+exactly this reason: a lump is a handful of big triangles.
+
+**THE HONEST POSITION, to be put to the owner and not decided here:** there is no tweak from 10 to 60 on this
+device. Sixty needs the trees' cost cut by about five sixths, which is a change to HOW A WOOD IS DRAWN, not a
+dial -- and the owner's standing instruction is to keep the quality. That is their choice to make.
+
+**A NOTE FOR WHOEVER READS THIS NEXT: the owner's phone is the only instrument. Three times now a reading taken
+here has pointed at the wrong thing. Measure the device, or do not claim a cause.**
