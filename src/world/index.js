@@ -58,11 +58,15 @@ if (typeof location !== 'undefined' && /[?&]flow=[^0&]/.test(location.search)) i
 
 // THE ANIMALS (?beasts=N with ?look=oil; the owner, 23 Nov). The three modules are fetched only behind the
 // flag, exactly as the powers are, and a body gets its own crowd the first time the eye is on it.
-let BEASTMOD = null;
-const beastsReady = (MODE.beasts && LOOK.oil)
-  ? Promise.all([import('./beasts.js'), import('../render/beastmat.js'), import('../physics/fauna.js')])
-      .then(([B, M, F]) => { BEASTMOD = { B, M, F }; }).catch((e) => { console.warn('beasts: not loaded', e); })
-  : null;
+// MODE.beasts IS NOT SET YET when this module's body runs: main.js and gallery.js set it in their own bodies,
+// which run after every static import of theirs. (MEASURED 2026-11-23: asked here, the flag was 0 and not one
+// animal was ever fetched, in a page whose address said beasts=1.) So the fetch is started on first use.
+let BEASTMOD = null, beastsAsked = false;
+function askBeasts() {
+  if (beastsAsked) return; beastsAsked = true;
+  Promise.all([import('./beasts.js'), import('../render/beastmat.js'), import('../physics/fauna.js')])
+    .then(([B, M, F]) => { BEASTMOD = { B, M, F }; }).catch((e) => { console.warn('beasts: not loaded', e); });
+}
 
 export function createWorld(scene) {
   const bodies = new Map();
@@ -806,8 +810,9 @@ export function createWorld(scene) {
       // The lives are stepped FIRST and the crowd is written from them in the same frame: an animal is born
       // on faunaCtx.t and washes in against that same clock, so the two must not be a frame apart.
       // The crowd is written after the flora, which has already placed itself from this camera.
-      if (MODE.beasts && LOOK.oil && BEASTMOD) {
-        makeBeasts(st);
+      if (MODE.beasts && LOOK.oil) {
+        askBeasts();
+        if (BEASTMOD) makeBeasts(st);
         if (st.beasts && st.fauna) {
           const fc = st.faunaCtx;
           // (THE PLANET'S radius, not the ground's at the eye: fauna.js turns a unit direction into a place

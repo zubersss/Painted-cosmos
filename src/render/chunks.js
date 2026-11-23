@@ -397,15 +397,15 @@ float pcFogAmount(float dist) {
     // (from the air the land must still go back into the air's colour toward the horizon: at 1.6 times, with the curve
     // below, the land a kilometre off stood as strong as the land underfoot, and the wood from the ship was one flat
     // sheet of colour: the stills from 150 m. So 2.4 times there, and the curve only on the ground.)
-    // THE 200 AND THE 400 STAND IN THREE PLACES AND NONE MAY BE CHANGED ALONE: here, materials.js pcFogAmountV
-    // (the plants) and world/index.js AIR_HIGH_0 / AIR_HIGH_W (the lit air). NOT CHANGED, 2026-11-23, but the day's
-    // reading measured what they do: climbing in the autumn wood, the share of its own paint the land a mile off
+    // THE 200 AND THE 2400 STAND IN THREE PLACES AND NONE MAY BE CHANGED ALONE: here, materials.js pcFogAmountV
+    // (the plants) and world/index.js AIR_HIGH_0 / AIR_HIGH_W (the lit air). CHANGED 2026-11-23 from 400 to 2400,
+    // in all three in one commit (v34), because the day's reading measured what the 400 was doing: climbing in the autumn wood, the share of its own paint the land a mile off
     // keeps goes 24 % on foot, 18 % at 30 m, 6 % at 40 m, 0 % at 50 m and 60 m, 2 % at 70 m, 10 % at 100 m, 21 % at
     // 160 m -- a hilltop and a low hover are the worst places in the game to look far, because this lets the
     // ceiling below go at 45 m of height, where the visibility is still only 723 m and far too short to carry the
     // land instead. 2400 would let it go exactly as the visibility finishes its own ramp to 2600 m, measured as a
-    // steady 19-25 % all the way up and at most 0.013 of haze different on the ground. It is a change to the air
-    // itself, in three files, and wants its own still.
+    // steady 19-25 % all the way up and at most 0.013 of haze different on the ground -- which is what was done.
+    // It is a change to the air itself, in three files, and it still wants a still taken from a hilltop.
     float pcHigh = clamp((1.0 / max(uFog.x, 1e-6) - 200.0) / 2400.0, 0.0, 1.0);
     dist *= mix(uOilC.w, 2.4, pcHigh);
   #endif

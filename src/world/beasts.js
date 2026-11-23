@@ -30,7 +30,7 @@
 import * as THREE from 'three';
 import { QUALITY, SCREEN } from '../render/shared.js';
 import { mulberry32 } from './noise.js';
-import { BEAST_ATTRS, SHAPES, beastGeometry, beastFarGeometry, beastPlan, planUniforms, speciesUniforms, distanceForPixels, FAR_SHAPE } from './beastkit.js';
+import { BEAST_ATTRS, SHAPES, MAX_SPECIES, beastGeometry, beastFarGeometry, beastPlan, planUniforms, speciesUniforms, distanceForPixels, FAR_SHAPE } from './beastkit.js';
 // one source for the state codes and the shape rows: the routines and the material read them from here too
 export { STATE, SHAPES, MAX_PARTS, MAX_SPECIES, BEAST_ATTRS } from './beastkit.js';
 
@@ -86,6 +86,14 @@ export class Beasts {
     this.origin = new THREE.Vector3();
     this.clock = 0;
     this.table = speciesUniforms(this.rows);      // the washes and proportions the far material reads
+    // THE FAR CROWD'S TABLE HOLDS MAX_SPECIES (16) AND NO MORE. Stage one is 7 rows and well inside it; at
+    // ?beasts=2 Earth has 27 kinds and ?beasts=3 has 42, and from the seventeenth on the far mesh would paint
+    // an animal with no washes at all. Said out loud rather than discovered in a still.
+    if (this.rows.length > MAX_SPECIES && typeof console !== 'undefined') {
+      console.warn('beasts: ' + this.rows.length + ' kinds, but the far crowd\'s table holds ' + MAX_SPECIES
+        + '. The ones past that are drawn with their own mesh near and unpainted far. Raise MAX_SPECIES'
+        + ' (world/beastkit.js) and check the uniform count in render/beastmat.js before trusting ?beasts=2 or 3.');
+    }
     this.prof = { near: 0, far: 0, draws: 0, over: 0, built: 0, ms: 0 };
     // the hand-over distances, one a species, worked out from the picture: filled by _ranges
     this.dNear = new Float32Array(this.rows.length);
