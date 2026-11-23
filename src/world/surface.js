@@ -1018,6 +1018,37 @@ class Surface {
     o.lq = lq;
     // (the oil look's rivers: the current where there is water, in this place's two tangent axes: _riversOil)
     o.fu = c.fu; o.fv = c.fv;
+    // WHERE THE WATER FALLS, IT IS WHITE. (The owner, 23 Nov: waterfalls. The drainage field already knows how
+    // steeply the water SURFACE drops here and how much country drains through, and patchgen.js was built with a
+    // socket for exactly these two and nothing has ever filled it -- see its own note at :60.)
+    //   o.turb  how aerated, 0 clear to 1 the foot of a fall. patchgen takes it as a FLOOR under the churn it
+    //           measures off its own grid, so this can only ADD white, never take it away.
+    //   o.fspd  how fast the water runs, m/s. It REPLACES patchgen's Manning estimate, which is only as good as
+    //           the patch's spacing; the field's fall is the same number at every patch level.
+    // A lip on this Earth falls about 0.17 m a metre against under 0.01 on a pool, so fall * 6 saturates at a
+    // lip and is nothing on still water -- the drainage agent's own ready-made value. It is held to water that
+    // really has a catchment, so a damp hollow does not foam.
+    // THESE TWO ARE ALWAYS WRITTEN, never only when there is something to say. The sample object is made ONCE
+    // and handed to every call (makeSample), so a field that is only SET when it is interesting keeps its last
+    // interesting value for every point after it. MEASURED, and it is why this note exists: written the other
+    // way, one lip's churn smeared across the whole planet and ONE HUNDRED PER CENT of wet points came back as
+    // falling water -- the oceans would have gone white. The field itself was right all along: only 7.2 per cent
+    // of wet points have any fall at all and the sea's median is exactly zero.
+    o.turb = 0; o.fspd = 0;
+    if (this.drain && lq !== NOLQ) {
+      const dr = this.drain.flow(this._drain(c));
+      const fall = dr.fall;
+      if (fall > 0.012) {
+        const through = this.drain.through(dr);
+        const real = through > 3 ? 1 : through > 1 ? (through - 1) * 0.5 : 0;
+        const t = Math.min(1, fall * 6) * real;
+        if (t > 0) {
+          o.turb = t;
+          // a fall runs fast: the free-fall speed over the drop the field measured, held to the paint's own range
+          o.fspd = Math.min(8, Math.sqrt(2 * 9.0 * Math.min(6, fall * 24)) * 0.55 + 0.6);
+        }
+      }
+    }
     if (full && this.clearings.length) {
       for (const cl of this.clearings) {
         const dx = x - cl.x, dy = y - cl.y, dz = z - cl.z;
