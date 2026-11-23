@@ -484,6 +484,55 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
 
 Head rewritten 2026-11-18, evening (the morning's text and the v12 text it replaced are in the log).
 
+**`look-proto` IS AT v34 (23 Nov), NOT YET MERGED: WATER THAT RUNS DOWNHILL AND POOLS, TWO AIR FIXES, AND THE
+ANIMALS (STAGE ONE OF THREE).**
+The owner, 23 Nov: *"I want things even further away to load and look good up to 1 mile ... the oceans and the
+water system to feel more alive and real ... animals, there should at least be 25 different animals in every
+biome, drawn in the same artstyle, animated, each with their own routine ... focus on the artstyle and animation
+for these make sure its really good."*
+
+- **THE FULL ACCOUNT, with every measurement, is in `docs/COORDINATOR.md` under 23 Nov (later).** This is the
+  short version and what is left.
+- **WHAT THE DESIGN FOUND BEFORE A LINE WAS WRITTEN, and it is why this round looks the way it does:** the
+  rivers did not run downhill (a channel's course is the zero contour of a noise field, which on a sphere is a
+  CLOSED LOOP, and no function falls all the way round a loop); there were **no lakes at all** -- nothing in the
+  engine filled a basin; and where two waters met the game put **a wall of land between them**. The oceans, by
+  contrast, were already excellent (four wave trains, fetch measured upwind to 2.5 km, refraction, shoaling,
+  whitecaps, surf and swash) and were left alone.
+- **BUILT AND MEASURED:** `world/drainage.js` (new) solves one filled drainage field a world (Earth 79 ms,
+  255 KB); the wood's water is now level in reaches and steps at lips (dead-level steps **3 of 366 -> 157 of
+  365**); **lakes exist**, 1,689 filled nodes on Earth, level to 0.00 m over 655 points; the painted current
+  runs with the land (alignment **-0.424 -> +0.643**, uphill wet points **239 -> 0**); the water's paint carries
+  the current's real speed and lays white water where it churns. **The live watercolour game is bit-identical:
+  80,000 samples, 29 fields, both looks, 0 differ.**
+- **THE AIR, two fixes that had to ship in one commit.** Earth's peaks were doubled to 968 m on the 19th and
+  Earth's air is 800 m, so a range a mile off was painted at FULL STRENGTH -- a flat frieze. The ground's air is
+  now taken from the land under the eye, and the hilltop constant moves `400 -> 2400` in all three files that
+  hold it. **MEASURED: the land a mile off kept 24 / 0 / 21 per cent of its own colour at 0 / 50 / 160 m of
+  height; it now keeps a steady 19-25.** Either fix alone is worse than neither.
+- **THE ANIMALS.** Four new files: a parametric body built in code, an instanced crowd, a material that poses
+  the animal **in the vertex shader** so a herd is ONE draw call, and the lives (a whole-planet ledger of counts
+  that keeps living unwatched, a 220 m band where animals are individuals, herds as one record, hunting).
+  **MEASURED: a planet's wildlife steps for 0.127 ms once a second.** Earth's forty kinds are written as rows of
+  numbers beside her plants.
+- **THREE FAULTS WERE FOUND IN THE WIRING AND EACH WOULD HAVE SHIPPED AS "the animals are built":** (1) the
+  density dial read `+Q.get('lifedens')`, which is `+null` = **0** when the key is absent, so **not one animal
+  would ever have appeared on any world**; (2) `MODE.beasts` is set in `main.js`'s own body, which runs after its
+  static imports, so a module-scope test of it read 0 in a page whose address said `beasts=1`; (3) only the
+  WALKER body plan is built, and it was being built whatever a row's `plan` said, so **the heron and the trout
+  would have been drawn as four-legged animals**. All three mended; the third is now an explicit `drawable`
+  guard, and **of the five the owner was promised, three can be drawn today** -- the bird and the fish live, are
+  hunted and are counted, and are not painted.
+- **WHAT IS NOT DONE AND MUST NOT BE CALLED DONE:** the river still does not reach the sea (what stands between
+  them on Earth is a **30-50 m sea cliff**, not a berm -- the answer is a waterfall off it, stage two); no
+  waterfalls, no fjords, no plunge pools; the sea's own aeration is untouched; the chain of pools still rises
+  and falls along the drawn channel (the closed-loop finding above); the bird, fish, crawler and upright body
+  plans are not built; animals walk through trees, each other and the player; nothing of them is saved;
+  `?beasts=2` and `?beasts=3` exceed the far crowd's 16-kind table and warn in the console.
+- **SWITCHES:** `?flow=1` `?pool=<m>` `?aer=0..3` `?beasts=1` `?beastpx=` `?beastlod=near` `?lifedens=0..4`
+  `?lifeband=` `?lifehunt=0` `?farlight=` `?mtnair=0`. With the flags off the game is exactly what it was.
+- **SUITES:** `tests/` 325, `src/world/`+`src/data/looks/` 65, `src/physics/` 416. All pass, 0 fail.
+
 **`main` IS AT v33 (23 Nov), pull request #33 merged: THE TEN-STEP UPGRADE. THE FAR DISTANCE WAS NOT BEING DRAWN
 AT ALL.**
 The owner, 23 Nov: *"do a 10 step up grade using ultracode i want better lighting better physics for the powers

@@ -3103,3 +3103,72 @@ says otherwise.
   them**, and all four settle full (Neptune: 249 patches, 208 plant cells, 152 meshes drawn). So the script side
   of the ten steps is good on a world that is not Earth; what is unproven is only whether the ICE SKY READS worse.
   `?skyair=0` turns that one step off. **First thing to shoot in the next session, on a quiet machine.**
+
+### 23 Nov, later — v34 BUILT: water that runs downhill and pools, two air fixes, and the animals (stage one)
+
+Eight agents in one workflow, disjoint file sets, all reading the 267 KB design. Then the coordinator wired
+them together, because the creature system has no owner of its own. **Everything below is MEASURED; what was
+SEEN is marked as seen and nothing else is.**
+
+**THE WATER.** `src/world/drainage.js` (new, 397 lines) solves one coarse filled drainage field a world: a
+64-a-face cube-sphere grid (24,576 nodes, 98.2 m cells on Earth), priority-flood every depression to its own
+sill, then the flow tree down the filled surface. **Earth 79 ms to build, 255 KB; one read 0.067 us.** Worlds
+with no liquid get no field at all.
+- The wood's water level was `L - 0.4`, a noise field, which climbed every hill the channel crossed. It is now
+  the field's standing level. **MEASURED over 10 km of one traced channel: dead-level steps 3 of 366 -> 157 of
+  365; longest level reach 15 m -> 280 m; lips 0 -> 1.6 a km.**
+- **LAKES, WHICH DID NOT EXIST IN THE ENGINE AT ALL.** 1,689 of Earth's 24,576 nodes stand filled over 1.2 m.
+  A basin fills to its sill and the water is level over the whole of it: **0.00 m spread across 655 points.**
+- The painted current takes its SIGN from the land's fall. **Alignment with downhill -0.424 -> +0.643; wet
+  points running uphill by more than 60 degrees, 239 of 368 -> 0 of 367.**
+- Two waters within a metre of each other are now ONE water, so neither is bermed out by the other. On Earth
+  this fires at 893 of 20,000 points, worst 3.80 m of ground; on Neptune, Venus and Jupiter, nowhere at all.
+- **THE LIVE GAME IS BIT-IDENTICAL** with no field attached: 80,000 samples x 29 fields, both looks, 0 differ.
+- **THE RIVER STILL DOES NOT REACH THE SEA** and the design's reason was wrong: what stands between them on
+  Earth is a 30-50 m SEA CLIFF, not a 1.3 m berm. The right answer is a waterfall off that cliff. Stage two.
+- **THE CHAIN OF POOLS STILL RISES AND FALLS ALONG THE DRAWN CHANNEL** (+2.31 m over the longest wet run).
+  That is structural: a river's course here is the zero contour of a noise field, which on a sphere is a closed
+  loop, and no function runs downhill all the way round a loop. What changed is that the water is LEVEL within
+  each reach and falls at each lip, and that following the water's own direction it never climbs.
+
+**THE WATER'S PAINT.** `patchgen.js` measures the current's own speed and how aerated it is at every water
+vertex (two new bytes, oil look only) and `materials.js` paints white water where it churns and runs the dashes
+at the speed the fall gives them. **SEEN: 310 of 310 water geometries in the gallery carry the new attribute.**
+`?aer=0` is v33's water exactly, for the A side of a still; `?aer=3` is how to judge the paint.
+
+**THE AIR, two fixes that had to ship together.**
+- The ground's air is now measured from the land UNDER THE EYE. Earth's peaks were doubled to 968 m on the 19th
+  and Earth's air is 800 m, so a range a mile off was being painted at full strength as a flat frieze.
+- The hilltop constant, `400 -> 2400`, in all three files that hold it (`chunks.js`, `materials.js`,
+  `world/index.js`) in one breath. **MEASURED: the land a mile off kept 24 / 0 / 21 per cent of its own colour
+  at 0 / 50 / 160 m of height; it now keeps a steady 19-25.** Alone, the first fix without the second makes a
+  range at a mile VANISH, which is why they are one commit.
+- And the haze now carries the far land's own light (`pcFarLight`, `?farlight=`, default 0.5), so a hillside a
+  mile off keeps its lit and its shaded sides apart instead of flattening into one value.
+
+**THE ANIMALS.** Four new files: a parametric four-legged body built in code (`world/beastkit.js`), the
+instanced crowd (`world/beasts.js`), a material that POSES the animal in the vertex shader so a herd is ONE
+draw call (`render/beastmat.js`), and the lives themselves (`physics/fauna.js`, 1,482 lines, 22 tests): a
+whole-planet ledger of counts in 1,536 cells x 8 guilds that keeps living unwatched, a near band of 220 m where
+animals are real individuals, herds as ONE record with the members as springs on it, and hunting with stalk,
+rush and kill. Earth's forty kinds are rows of numbers beside her plants (`data/looks/earth.js`).
+**MEASURED: a whole planet's wildlife steps for 0.127 ms once a second; the drawing is the whole cost, which
+is why the walk is arithmetic in the shader.**
+
+**THREE FAULTS FOUND IN THE WIRING, each of which would have shipped as "the animals are built":**
+1. **NOT ONE ANIMAL WOULD EVER HAVE APPEARED.** `physics/fauna.js` reads its dials with `+Q.get(k)`, and
+   `Q.get` of a key that is not in the address is `null`, which `+` turns into **0**. For the one dial whose
+   range includes zero -- `lifedens` -- that reads as "the owner asked for none", so `stock()` returned at its
+   second line. **MEASURED at Earth's first site: 0 lives after 20 s; after the fix, 27 lives and 11 herds.**
+2. **THE MODULES WERE NEVER FETCHED.** `MODE.beasts` is set in `main.js`'s and `gallery.js`'s own bodies, which
+   run AFTER every static import of theirs, so a module-scope test of the flag inside `world/index.js` read 0 in
+   a page whose address said `beasts=1`. The fetch is now started on first use.
+3. **A FOUR-LEGGED FISH.** `beastkit.js` builds ONE body plan, the walker, and builds it whatever a row's `plan`
+   says -- so the grey heron and the brown trout would have been drawn as four-legged animals. `world/beasts.js`
+   now has a `drawable` guard: they live, they are hunted, they are counted, and they are not painted until
+   their own plans are cut. **The owner must be told this: of the five promised, three can be drawn today.**
+
+**SWITCHES:** `?flow=1` `?pool=<m>` `?aer=0..3` `?beasts=1..3` `?beastpx=` `?lifedens=0..4` `?lifeband=`
+`?lifehunt=0` `?farlight=` `?mtnair=0`. With the flags off the game is what it was.
+
+**SUITES:** `tests/` 325 pass, `src/world/` + `src/data/looks/` 65 pass, `src/physics/` 416 pass. 0 fail.
