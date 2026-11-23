@@ -82,9 +82,14 @@ class Surface {
     for (const e of Object.values(EASELS[bodyId] || {})) if (e[5] > 0) { const k = 1 / Math.hypot(e[0], e[1], e[2]); this.clearings.push({ x: e[0] * k, y: e[1] * k, z: e[2] * k, r: e[5] }); }
     this.pads = [];        // [{x,y,z, r, r2, h}] levelled places (a first landing chosen by eye)
     this._b = makeB();
-    this._ctx = { x: 0, y: 0, z: 0, baseReady: false, L: 0, s: 1e9 };
+    this._ctx = { x: 0, y: 0, z: 0, baseReady: false, L: 0, s: 1e9, dr: null };
     this._wtmp = new Float32Array(this.sites.length);
     this._spawn = null;
+    // WHERE THE WATER RUNS (the owner, 23 Nov: water should "go down hill and pool in areas it can't find
+    // go downhill any further"). Null until world/drainage.js attaches a solved field; nothing of it is
+    // imported or built without its switch, so with the switch off every level below is what it always was.
+    this.drain = null;
+    this._dw = null;      // scratch biome weights for waterBaseAt (made on first use: only drainage asks)
   }
 
   _buildSites() {
@@ -190,12 +195,27 @@ class Surface {
   }
 
   // ---- shared fields ------------------------------------------------------------------------
+  // The wood's base level: one noise at 1,900 m, amplitude 12 m. It is what the wood's valley floor and
+  // (until the drainage field) the water's surface both stood on, so world/drainage.js needs it by name.
+  _bigL(x, y, z) {
+    const f0 = this.R / 1900;
+    return 24 + 12 * this.nA.n3(x * f0 + 3.1, y * f0 - 1.7, z * f0 + 8.2);
+  }
+
+  // Where the water runs at this point, read ONCE per sample and only for the samples that want it: a
+  // wood's level, and the few samples that lie in a channel and need to know which way is downstream.
+  // Asking for it in _base instead cost every coast, canyon and alpine sample a lookup for nothing.
+  _drain(c) {
+    if (c.dr || !this.drain) return c.dr;
+    c.dr = this.drain.at(c.x, c.y, c.z, this._dr || (this._dr = this.drain.out()));
+    return c.dr;
+  }
+
   _base(c) {
     if (c.baseReady) return;
     c.baseReady = true;
     const R = this.R, x = c.x, y = c.y, z = c.z;
-    const f0 = R / 1900;
-    c.L = 24 + 12 * this.nA.n3(x * f0 + 3.1, y * f0 - 1.7, z * f0 + 8.2);
+    c.L = this._bigL(x, y, z);
     // the stream network: the zero contour of a warped noise field. s is the distance in
     // metres from the nearest stream centre line (true distance near the stream, where the
     // field is divided by its gradient; a looser pseudo distance far away).
@@ -334,6 +354,19 @@ class Surface {
         let fu = -dv / dl, fv = du / dl;
         // (a tributary runs toward the river: the way along its line on which the river's field falls toward zero)
         if (win !== 0 && (fu * gu + fv * gv) * (cf > 0 ? 1 : -1) > 0) { fu = -fu; fv = -fv; }
+        // WHICH WAY IS DOWNSTREAM. The line above only knows the channel's own line, and took one way round
+        // it for the whole world; measured over 400 wet points on Earth it agreed with the water's own
+        // downhill 0.059 of the way (1 would be downhill, 0 no relation) and 124 of the 400 ran uphill by
+        // more than 60 degrees. The drainage field knows which way the land falls, so the direction stays
+        // ALONG the channel -- the dashes must run with the river, not across it -- and only its sign is
+        // taken from the fall. In a dead-level pool there is no fall to read and the old way round stands.
+        if (this.drain) {
+          const dr = this.drain.flow(this._drain(c));
+          if (dr.fall > 2e-4) {
+            const du2 = dr.fx * ux + dr.fy * uy + dr.fz * uz, dv2 = dr.fx * vx + dr.fy * vy + dr.fz * vz;
+            if (fu * du2 + fv * dv2 < 0) { fu = -fu; fv = -fv; }
+          }
+        }
         c.fu = fu; c.fv = fv;
       }
     }
@@ -399,7 +432,24 @@ class Surface {
     let rockBump = 0;
     if (rk > 0) { const f5 = R / 6.8; rockBump = rk * (1.9 + 1.5 * Math.abs(nC(x * f5, y * f5, z * f5 + 13.0))); }
     b.h = L + hb + (hill * 24 + mid * 4.5) * rise + sm + mi + rockBump;
-    b.lq = L - 0.4;
+    // WHERE THE WATER STANDS. Was `L - 0.4`: the base level itself, so the water climbed every hill the
+    // channel crossed (measured 2026-11-23 on Earth: 18.2 m of climb and 988 uphill steps in 10 km of one
+    // channel). Now it is the drainage field's own standing level (world/drainage.js): DEAD LEVEL over a
+    // filled basin, which is what makes a pond read as water, and a staircase of level reaches and lips
+    // down a slope. Inside the channel the level is never below the bed, so the shallow run between two
+    // pools stays wet and fast instead of going dry: that is the riffle, and it is why a reach reads as
+    // deep at its foot and bright over stones at its head.
+    if (this.drain) {
+      const dr = this._drain(c);
+      const pl = this.drain.poolLevel(dr.level, dr.fill, L);
+      // the lift is taken off the channel's DEEPEST bed, and off L alone, not off the bed under this
+      // point: a sheet laid over the local bed would have followed hb's own parabola and tilted up
+      // toward each bank by half a metre, and the widened pools (c.pool) would have made it wander
+      // along the course as well. Standing 0.25 m over the brook's deepest line means a riffle is a
+      // narrow thread of water down the middle of a wider stony bed, which is what a low reach looks
+      // like; a pool covers the whole channel and more.
+      b.lq = pl + Math.max(0, L - 0.70 - pl) * (1 - smoothstep(w0, w0 + 2.5, s));
+    } else b.lq = L - 0.4;
     if (!full) return;
     const fg = R / 125, fp = R / 270, fv = R / 26;
     // (the oil look may open a wood: the biome's oil.glade = [from, to] in place of 0.24, 0.62: more and wider glades of
@@ -901,7 +951,7 @@ class Surface {
     const top = this.biomeWeights(x, y, z, w);
     o.top = top;
     const c = this._ctx; c.x = x; c.y = y; c.z = z; c.baseReady = false;
-    c.fu = 0; c.fv = 0;
+    c.fu = 0; c.fv = 0; c.dr = null;
     const b = this._b;
     let h = 0;
     const gw = this._gw, gl = this._gl;
@@ -933,11 +983,27 @@ class Surface {
     // edge of the group the ground is lifted into a low berm above the liquid, so it never
     // ends in a wall and never tilts.
     let lq = NOLQ;
+    // TWO WATERS AT THE SAME LEVEL ARE ONE WATER (the owner, 23 Nov: water should reach the sea and the
+    // lakes). The rule above counts each group on its own, so where a wood's stream meets a sea neither
+    // holds 0.55 of the weight, both are bermed out, and a wall of land stands between two waters that
+    // are at the same height. With the drainage field attached, a group whose level agrees with another's
+    // within SAME metres is merged with it: their weights add, so the berm never fires and the water runs
+    // through. Levels that genuinely disagree -- a lava river beside a water marsh -- keep the old wall.
+    const SAME = 1.0;
+    const glv = this._glv || (this._glv = new Float64Array(4));
+    let nG = 0;
+    for (let g = 0; g < 4; g++) if (gw[g] > 0) { glv[g] = gl[g] / gw[g]; nG++; }
     for (let g = 0; g < 4; g++) {
       if (gw[g] <= 0) continue;
-      const lv = gl[g] / gw[g], k = smoothstep(0.55, 0.78, gw[g]);
+      let wg = gw[g], lv = glv[g];
+      if (nG > 1 && this.drain) {
+        let sw = gw[g], sl = gl[g];
+        for (let g2 = 0; g2 < 4; g2++) if (g2 !== g && gw[g2] > 0 && Math.abs(glv[g2] - lv) <= SAME) { sw += gw[g2]; sl += gl[g2]; }
+        wg = sw; lv = sl / sw;
+      }
+      const k = smoothstep(0.55, 0.78, wg);
       if (k < 1) { const t = lv + 1.2, d = h - t; h += (1 - k) * (0.5 * (h + t + Math.sqrt(d * d + 0.36)) - h); }
-      if (gw[g] >= 0.55 && lv > lq) lq = lv;
+      if (wg >= 0.55 && lv > lq) lq = lv;
     }
     // a first landing chosen by eye stands on a levelled place: the ground within its radius is drawn to the
     // spot's own height and eased back into the land round it (room for the ship wherever the view is best)
@@ -992,6 +1058,28 @@ class Surface {
     const o = this._ho || (this._ho = makeSample(this.nB));
     this.sample(x, y, z, o, false);
     return o.h;
+  }
+
+  // THE HYDROLOGICAL BASE of a place: the level still water would stand at here if the land were smooth.
+  // world/drainage.js solves its grid on this and on nothing else, and nothing else in the game reads it.
+  //   - a wood (group 0) and standing pools (group 2): the wood's own base level, which is what the water
+  //     stood on before the drainage field and what the valley floor is built on (`rise` in _forest
+  //     smooths the hills away within 95 m of a channel, so near water the ground IS this level);
+  //   - a sea (group 1): the sea's one level, so the sea is where a world's water pours out to;
+  //   - ground with no liquid of its own: `divide` metres above the base, so the solve routes water round
+  //     it instead of through it. 30 m by default, over the wood's own 24 m of hill.
+  // Lava (group 3) is left out on purpose: it does not obey a water drainage.
+  // Measured 2026-11-23: 0.613 us a call against 2.995 us for heightAt, and it is smooth at 1,900 m where
+  // heightAt has 3.4 m detail that a 98 m grid would alias into 25 m steps of water level.
+  waterBaseAt(x, y, z, w, divide) {
+    const ww = w || this._dw || (this._dw = new Float32Array(this.nB));
+    this.biomeWeights(x, y, z, ww);
+    let w0 = 0, w1 = 0, w2 = 0;
+    for (let i = 0; i < this.nB; i++) { const g = this.lqGroup[i]; if (g === 0) w0 += ww[i]; else if (g === 1) w1 += ww[i]; else if (g === 2) w2 += ww[i]; }
+    const L = this._bigL(x, y, z);
+    const wl = w0 + w1 + w2;
+    const base = wl > 1e-6 ? ((w0 + w2) * L + w1 * this.sea) / wl : L;
+    return base + (divide === undefined ? 30 : divide) * (1 - Math.min(1, wl));
   }
 
   // A good first landing spot: earth -> a clearing by the stream in the first forest site,

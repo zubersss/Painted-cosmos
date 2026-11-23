@@ -10,7 +10,7 @@ import { SEASON, stepSeason } from '../data/season.js';
 import { BODIES, BODY_IDS, SUN } from '../data/bodies.js';
 import { getLook } from '../data/looks.js';
 import { NearGround } from './nearground.js';
-import { getSurface, sampleSurfacePure, getVistasPure, getStandPure } from './surface.js';
+import { getSurface, sampleSurfacePure, getVistasPure, getStandPure, makeSample, NOLQ } from './surface.js';
 import { PlanetTerrain } from './terrain.js';
 import { sampleObstaclesPure } from './obstacles.js';
 import { makeSky, makeSkyUniforms, makeSkyGlaze } from './sky.js';
@@ -22,6 +22,7 @@ import { makeLeafFall } from './leaffall.js';
 import { makeTimeFx } from './timefx.js';
 import { makeKitMaterial, biomeInks, KIT_INK, KIT_PALETTE, FIRE_MATS } from '../render/kitmat.js';
 import { MODE } from '../data/mode.js';
+import { faunaKinds, faunaShapes, faunaLives } from '../data/looks/common.js';
 import { defaultBodyUniforms, makeWashMaterial, makeNearMaterial, syncFireGlow } from '../render/materials.js';
 
 const _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _q = new THREE.Quaternion();
@@ -31,6 +32,37 @@ const Y = new THREE.Vector3(0, 1, 0), _hup = new THREE.Vector3();
 // the wash that, laid with k more pigment (the density model), comes out as c
 function undens(c, k) { return k < 1e-4 ? c : (-(1 - k) + Math.sqrt((1 - k) * (1 - k) + 4 * k * Math.min(1, Math.max(0, c)))) / (2 * k); }
 function lerp3(out, a, b, t) { out.set(a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t); }
+
+// chunks.js pcFogAmount reads the eye's "height" from the AIR'S OWN REACH, not from the altitude:
+// `pcHigh = clamp((1/uFog.x - 200) / 400)`. post.js's lit air (SHADOW.air in castShade below) must agree with the
+// ground's air to the number, so those two numbers are written out here too.
+// THE SAME TWO NUMBERS NOW STAND IN THREE PLACES AND NONE MAY BE CHANGED ALONE (checked 2026-11-23):
+//     src/render/chunks.js:336   pcFogAmount  -- the ground, the water, the far trees
+//     src/render/materials.js:93 pcFogAmountV -- the plants, in the vertex shader (that file's own note says it is
+//                                chunks.js "line for line, and it must stay so"; it had drifted once, 2026-11-22,
+//                                and went unseen because on Earth's 185 m pcHigh is 0 on foot)
+//     here                       SHADOW.air   -- the light in the air, post.js OIL_FRAG
+// 2026-11-23: the reading's fix for the hilltop fault (the far land vanishing between 40 and 90 m of height)
+// raises the 400 to 2400. It is a change in all THREE, in one breath, or a tree stands in a different air from
+// the ground under it and the lit air says one thing while the air itself says another.
+// (chunks.js:687 and :696, pcStrokeOct, read the same reach with their own divisor of 1300 to lay broader strokes
+//  from the ship. That is a different question -- how wide a mark is -- and is not part of that change.)
+const AIR_HIGH_0 = 200, AIR_HIGH_W = 2400;
+
+// WATER THAT RUNS DOWNHILL AND POOLS (?flow=1; world/drainage.js, the owner 23 Nov). main.js builds the field
+// for the world the game starts on, before the first terrain patch; this is for a world the eye arrives at
+// later. ensureDrainage builds once and then returns in 0.007 ms, so asking every frame is free.
+// Not one byte of drainage.js is fetched without the flag.
+let DRAIN = null;
+if (typeof location !== 'undefined' && /[?&]flow=[^0&]/.test(location.search)) import('./drainage.js').then((m) => { DRAIN = m; }).catch(() => {});
+
+// THE ANIMALS (?beasts=N with ?look=oil; the owner, 23 Nov). The three modules are fetched only behind the
+// flag, exactly as the powers are, and a body gets its own crowd the first time the eye is on it.
+let BEASTMOD = null;
+const beastsReady = (MODE.beasts && LOOK.oil)
+  ? Promise.all([import('./beasts.js'), import('../render/beastmat.js'), import('../physics/fauna.js')])
+      .then(([B, M, F]) => { BEASTMOD = { B, M, F }; }).catch((e) => { console.warn('beasts: not loaded', e); })
+  : null;
 
 export function createWorld(scene) {
   const bodies = new Map();
@@ -101,6 +133,43 @@ export function createWorld(scene) {
     state.set(id, st);
   }
 
+  // ---- THE ANIMALS ---------------------------------------------------------------------------------------
+  // One crowd (the drawing: world/beasts.js + render/beastmat.js) and one ledger of lives (the routines:
+  // physics/fauna.js) a body, built the first time the eye is on that body and never rebuilt. The three
+  // modules are already in hand by then (beastsReady, at the top of this file); if they are not, or the body
+  // names no animals, nothing is made and nothing is drawn.
+  // THE ORDER IS THE CONTRACT: faunaKinds hands each kind its `sp`, and the routines' rows and the crowd's
+  // bodies both come off that one array in that one order, so an animal's number means the same thing on both
+  // sides. data/looks/common.js says so in as many words.
+  function makeBeasts(st) {
+    if (st.beasts !== undefined) return;             // (null once tried and declined: try once, not every frame)
+    if (!BEASTMOD) return;
+    st.beasts = null;
+    const kinds = faunaKinds(st.look, MODE.beasts);
+    if (!kinds.length) return;
+    const { B, M, F } = BEASTMOD;
+    const shapes = faunaShapes(kinds).map((k) => Object.assign({ name: k.id }, k));
+    const grav = st.body.gravity || 9.0;
+    st.beasts = new B.Beasts({
+      group: st.root, species: shapes, fov: 58,
+      makeMaterial: (kind, info) => M.makeBeastMaterial(st.bu, Object.assign({}, info, {
+        name: info.row && (info.row.name || info.row.id), gravity: grav,
+      })),
+    });
+    st.fauna = F.makeFauna({ rows: faunaLives(kinds), seed: 1 });
+    // the one scratch sample and the one ground probe the routines ask thousands of times a second
+    const _s = makeSample(0);
+    st.faunaCtx = {
+      bodyId: null, R: st.body.radius, g: grav, t: 0, day01: 0.5, day: st.body.dayLength || 1500, eye: null,
+      groundAt(id, px, py, pz, o) {
+        const S = getSurface(id), il = 1 / (Math.hypot(px, py, pz) || 1);
+        S.sample(px * il, py * il, pz * il, _s, true);
+        o.r = S.R + _s.h; o.lq = _s.lq === NOLQ ? F.NOLIQ : S.R + _s.lq;
+        o.trees = _s.trees; o.under = _s.under; o.glade = _s.glade; o.canopy = _s.canopy; o.rock = _s.rock;
+      },
+    };
+  }
+
   // A far world as a dab: one ball in the wash it shows from afar (its cloud deck, or the mean
   // of its grounds), lit by its own sun.
   function makeDab(st) {
@@ -150,6 +219,18 @@ export function createWorld(scene) {
   const SKY_STROKE = (() => {
     try { const q = new URLSearchParams(location.search).get('skystroke'); if (q != null && isFinite(+q)) return Math.max(0, Math.min(1.5, +q)); } catch { /* no address */ }
     return null;
+  })();
+  // `?mtnair=` : THE GROUND'S AIR MEASURED FROM THE LAND UNDER THE EYE, not from the body's base radius. 1 on,
+  // 0 the air exactly as it was. See world.update (air01) for what it does and what it was measured to do.
+  // THE OIL LOOK ONLY, because it is the oil look's own peaks that stand above the air: MEASURED over the real
+  // surface in node, Earth's oil ground reaches 948 m with 13.5 % of it above the 440 m where its ground air
+  // starts to open; the watercolour game's reaches 502 m with 0.29 % above it. The watercolour is the live game
+  // and its share of this fault is a thirtieth of the oil look's, so it is left exactly as it is.
+  const MTN_AIR = (() => {
+    if (!LOOK.oil) return 0;
+    try { const q = new URLSearchParams(location.search).get('mtnair'); if (q != null && isFinite(+q)) return +q ? 1 : 0; } catch { /* no address */ }
+    try { if (typeof process !== 'undefined' && process.env && process.env.PC_MTNAIR != null && isFinite(+process.env.PC_MTNAIR)) return +process.env.PC_MTNAIR ? 1 : 0; } catch { /* not node */ }
+    return 1;
   })();
   // The wash clock (s): what washes in, eases and grows runs on it. It follows the game's own frame time
   // while the game's clock runs (a test that steps the clock sees what a player sees at that pace) and the
@@ -314,6 +395,9 @@ export function createWorld(scene) {
     // the frame time, smoothed over about twenty frames: one long frame changes nothing
     wallDt += ((lastWall ? Math.min(1000, nowW - lastWall) : 16) - wallDt) * 0.05; lastWall = nowW;
     const active = activeBodyId && state.has(activeBodyId) ? state.get(activeBodyId) : null;
+    // (?flow=1: the drainage field for a world the eye has arrived at. It is built once -- 79 ms on Earth, at
+    //  the moment the arrival veil is up -- and every call after that returns the same field in 0.007 ms.)
+    if (DRAIN && active) DRAIN.ensureDrainage(active.id);
     // PHYSICS' flora field for the body it is running on (it has already updated this frame)
     syncPhysFlora(physics && physics.fields && active && (!physics.here || !physics.here.bodyId || physics.here.bodyId === active.id) ? physics.fields.flora : null);
     const physHere = physics && physics.fields && active && (!physics.here || !physics.here.bodyId || physics.here.bodyId === active.id);
@@ -643,7 +727,27 @@ export function createWorld(scene) {
       // (an airless world is "in space" for its sky at any height, but its land still goes back in paler bands, as a
       // painter lays a far plain: the look's visibility holds near the ground and gives way to space's clear air as the
       // eye rises. It was 40 km on the ground: the Moon's horizon stood as a crisp ruled line of boulders; ARTPASS wish 6)
-      const air01 = body.atmosphereHeight > 0 ? space01 : THREE.MathUtils.smoothstep(alt, 250, 2500);
+      // THE GROUND'S AIR IS MEASURED FROM THE LAND UNDER THE EYE, NOT FROM THE DATUM (2026-11-23; `?mtnair=0` is
+      // exactly what it was, and the watercolour game is untouched -- see MTN_AIR above).
+      // `space01` is the eye's height over the body's BASE radius. The ground's air read it, so where the LAND
+      // itself stands high the painter's model called the land's own surface "space" and opened the 40 km term
+      // below it: a range a mile off was then painted at FULL strength, a flat cut-out frieze with no aerial
+      // perspective at all. (This is the "sugar icing" the earlier note chased with colour and never caught: the
+      // peaks were doubled on 2026-11-19 -- looks/earth.js amp 470 -> 920, the oil look only -- and nobody raised
+      // the sky over them.)
+      // MEASURED in node over the real oil surface: 13.5 % of Earth's oil ground, and 21.9 % of Pluto's, stands
+      // above the height where its own ground air begins to open (Earth 440 m of a highest 948; Pluto 66 m of
+      // 277). Standing on the highest ground by the alpine stand, 848 m, the land a mile off kept 98 % of its own
+      // paint; from 300 m over the meadow, 94 %. AFTER: 23 % and 21 %, which is what the wood keeps at the same
+      // height, so the peaks sit BEHIND the near ridges instead of being pasted on at the same key.
+      // `alt` (above) is already the eye's height over the land under it, which is what the thickness of the air
+      // one looks through actually depends on, so the GROUND's air reads that. bodies.js atmosphereHeight is NOT
+      // touched: it is a PHYSICS contract (air density, weather, wind). The sky, the limb (uFog.w), the aurora,
+      // the night key, the dust and the leaf fall all keep the old `space01`, so the blast radius of this is the
+      // ground's air and nothing else.
+      // (An airless world's land already went by `alt`, which is why that branch is unchanged.)
+      const air01 = body.atmosphereHeight > 0 ? (MTN_AIR ? THREE.MathUtils.smoothstep(alt, atmH * 0.55, atmH * 1.15) : space01)
+        : THREE.MathUtils.smoothstep(alt, 250, 2500);
       const vis = (v0 * mist + (v1 - v0 * mist) * THREE.MathUtils.smoothstep(alt, 6, 160)) * (hazeK + (1 - hazeK) * air01) + 40000 * air01;
       bu.uFog.value.set(1 / vis, LOOK.oil ? LOOK.oilBands : 6, 1 - air01 * 0.9, space01 * st.limbK);      // (the oil look lays the air in ten bands, not six: shared.js LOOK.oilBands, `?bands=`. The watercolour's six are untouched.)
       if (bu.uFogBank) bu.uFogBank.value.set(bank * (1 - air01), look.bankSize || 150);
@@ -698,6 +802,26 @@ export function createWorld(scene) {
       for (const k of Object.keys(bu)) { const a = du[k].value, b = bu[k].value; if (a && a.copy) a.copy(b); else du[k].value = b; }
       lighting.bodyId = st.id; lighting.sunElevation = e; lighting.dayness = dayness; lighting.altitude = alt; lighting.space01 = space01;
       lighting.hours = (12 + Math.atan2(-_sunTrue.dot(_east), e) * 12 / Math.PI + 24) % 24;
+      // ---- THE ANIMALS' OWN FRAME -------------------------------------------------------------------
+      // The lives are stepped FIRST and the crowd is written from them in the same frame: an animal is born
+      // on faunaCtx.t and washes in against that same clock, so the two must not be a frame apart.
+      // The crowd is written after the flora, which has already placed itself from this camera.
+      if (MODE.beasts && LOOK.oil && BEASTMOD) {
+        makeBeasts(st);
+        if (st.beasts && st.fauna) {
+          const fc = st.faunaCtx;
+          // (THE PLANET'S radius, not the ground's at the eye: fauna.js turns a unit direction into a place
+          //  with it, so the ground's own radius here would move every animal on the world.)
+          fc.bodyId = st.id; fc.R = body.radius; fc.g = body.gravity || 9.0;
+          fc.t += Math.min(0.1, Math.max(0, dt)); fc.day01 = lighting.hours / 24; fc.day = body.dayLength || 1500;
+          fc.eye = _camL;
+          BEASTMOD.F.stepFauna(st.fauna, dt, fc);
+          st.beasts.update(dt, _camL, st.fauna.agents, fc.t);
+          // the kills are read and cleared, or the list fills and fauna.lostKills counts what was missed.
+          // (Nothing keeps a carcass yet: that is the next stage, and the crows wait on it.)
+          if (st.fauna.kills.count) BEASTMOD.F.clearKills(st.fauna);
+        }
+      }
     } else {
       // deep space: no atmosphere anywhere
       skyU.uAtmo.value.set(1, 1, 0.03, 1);
@@ -741,7 +865,7 @@ export function createWorld(scene) {
     // air the light's own colour, gold through the look's golden hours; by the sun only, and strongest when it is low)
     {
       const fx = active.bu.uFog.value.x, reach = 1 / Math.max(fx, 1e-6), k4 = OIL.uOilC.value.w;
-      SHADOW.air = fx * (k4 + (2.4 - k4) * Math.min(1, Math.max(0, (reach - 200) / 400)));
+      SHADOW.air = fx * (k4 + (2.4 - k4) * Math.min(1, Math.max(0, (reach - AIR_HIGH_0) / AIR_HIGH_W)));      // (the twin of chunks.js:336; see AIR_HIGH_* at the top of this file)
       const se = active.bu.uSunDirW.value.dot(active.bu.uUpW.value);
       const lowSun = 1 - THREE.MathUtils.smoothstep(se, 0.48, 0.86);
       // (how far this world takes the golden hours: a look's oil.gold; all the way on Earth, a third elsewhere)
@@ -888,8 +1012,14 @@ export function createWorld(scene) {
       // (the plants as well as the ground: a world can keep every patch of its ground and still have the WOOD
       //  arrive late, which is what a player sees. world/flora.js standing(), walked only when asked.)
       const f = st.flora ? st.flora.standing(p, r) : { cells: 0, meshes: 0 };
+      // the animals, when they are on: how many lives are being stepped, how many are drawn with their own body
+      // and how many as one of the far crowd, what that costs in draws, and how long each side took this frame.
+      const bz = st.beasts ? st.beasts.prof : null, fa = st.fauna ? st.fauna.prof : null;
       return { patches: st.terrain.patchCount, visible: st.terrain.visible.length, queue: st.terrain.busy,
-        cells: f.cells, meshes: f.meshes, floraQueue: st.flora ? st.flora.busy : 0 };
+        cells: f.cells, meshes: f.meshes, floraQueue: st.flora ? st.flora.busy : 0,
+        lives: st.fauna ? st.fauna.n0 : 0, beastNear: bz ? bz.near : 0, beastFar: bz ? bz.far : 0,
+        beastDraws: bz ? bz.draws : 0, beastOver: bz ? bz.over : 0,
+        beastMs: bz ? +bz.ms.toFixed(3) : 0, faunaMs: fa ? +fa.ms.toFixed(3) : 0 };
     },
     sky,
   };

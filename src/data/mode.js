@@ -5,7 +5,21 @@
 // the prototype it comes with the oil look; read this, not `oil`, wherever the explorer's own behaviour is meant.
 // `powers`: the elemental powers are on (main.js sets it from the address, ?powers=1, before anything is made; docs/POWERS.md).
 // `calm`: a calmer forest floor to compare (render/shared.js sets it from ?floor=calm; data/looks/earth.js).
-export const MODE = { oil: false, powers: false, calm: false, get wanderer() { return this.oil; } };
+// `beasts`: THE ANIMALS (the owner, 2026-11-23: "at least 25 different animals in every biome ... animated, with
+//   routines, hunting and hunted, fish and birds"). A NUMBER and not a yes-or-no, so the forty kinds can be let in a
+//   handful at a time and the owner can be shown A and B of the same still:
+//     0  off. No module of the creatures is imported at all, exactly as none of the powers is without ?powers=1.
+//     1  THE FIVE, all within sight of where the explorer lands: red deer, red fox, brown hare, grey heron, brown
+//        trout -- a herbivore, a hunter, the hunted, a bird, a fish, and two real hunts between them.
+//     2  ... and the rest of the wood and the water: raven, boar, wolf, lynx, squirrel, marten, badger, tawny owl,
+//        goshawk, kingfisher, teal, otter, beaver, frog, dragonfly, and the five swarms.
+//     3  ... and the coast, the mountain and the canyon: the whole forty of data/looks/earth.js `fauna`.
+//   Every kind carries its own `stage` saying which number lets it in, so raising the flag never moves an animal
+//   that was already standing: it only adds more beside it.
+//   THE CREATURES ARE AN OIL-LOOK FEATURE. Each biome's list of animals rides under its `oil.over` (so the live
+//   watercolour game cannot see one) and overlayOil below is what lays those lists on, which it only does with the
+//   oil look. So ?beasts=1 without ?look=oil finds no animals anywhere, which is the safe way round.
+export const MODE = { oil: false, powers: false, calm: false, beasts: 0, get wanderer() { return this.oil; } };
 
 // THE OIL LOOK'S OWN CONTENT, laid over the looks ONCE when the look is switched on (render/shared.js calls this; with
 // the look off nothing is touched, so the default game's worlds are what they were). A look may name kinds of tall
