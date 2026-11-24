@@ -79,9 +79,9 @@ const TREESWAY = typeof location !== 'undefined' && /[?&]treesway=whole\b/.test(
 // ?pines=1 (24 Nov, the coordinator: the tall pines 20 to 60 m off read as bare poles): the kinds whose foliage is thin
 // needles -- the tall pine and the spruce, needles 7.5 to 8 cm across -- keep each needle at least NEEDLE_PX pixels
 // across on the screen (materials.js PROP_VERT, uNeedle), so a pine at range is a dark needle mass on its bare lower
-// stem and not specks round a pole. Its length, its place, its paint and the triangles are as before. OFF until the
-// look director passes it (?pines=0 or no switch: exactly as before); the speed test swaps it (setNeedles).
-const PINES = typeof location !== 'undefined' && /[?&]pines=1\b/.test(location.search || '');
+// stem and not specks round a pole. THE DEFAULT since the look director passed it (24 Nov, 'pines2', for v39.3);
+// ?pines=0 is the old way, exactly as before. The speed test swaps it (setNeedles).
+const PINES = !(typeof location !== 'undefined' && /[?&]pines=0\b/.test(location.search || ''));
 const NEEDLE_KITS = new Set(['tallpine', 'spruce']), NEEDLE_PX = 3.0;
 // (only a kind whose crown is leaves one by one, and nothing else, can be split: parts 0 bark, 5 leaf, 6 snow on a
 //  bough. A kind with crowns of washes (part 1: the green wood's conifer) keeps the one program.)
