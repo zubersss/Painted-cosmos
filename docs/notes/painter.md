@@ -87,7 +87,8 @@ FV7 of `docs/lead/FARVIEW-DESIGN.md`. A second session (A2, branch `trees-near`)
 the same time: this lane touches only the far parts of `flora.js`, `florakit.js`, the plant material's far branch,
 `render/impostor.js`, `render/shadow.js` and new rows in `core/bench.js`.
 
-**State (update this line every step):** (24 Nov, about 13:45) look-proto v39 (d9d9ed7) merged into trees-far and
+**State (update this line every step):** (24 Nov, about 13:50) F PASSED the small crowns as the default with its
+colour fixes (1 km seam: S matched 0.46, V 0.68 against the roof's 0.74, "leave the 8 degrees of hue"). look-proto v39 (d9d9ed7) merged into trees-far and
 pushed (my far trees compile under the new light: guard not tripped, swap 21 ms). NEXT, ON THE COORDINATOR'S WORD
 "v39.2 is on look-proto" (it carries F's colour fixes, look-director up to 64f1742): merge origin/look-proto, make the
 small crowns the default (IMP.small 12, ?impsmall=0 the opt-out), run the 1 km seam check F asked for (hue and
@@ -98,7 +99,7 @@ either way). The same with F's colour fixes is being measured in a scratch copy 
 coordinator): the split trees drawn whole in the shadow pass behind `?shwhole=1` (OFF), row 'split trees whole in
 shadow pass'; MEASURED on foot with ?trees2=1: 226 -> 207 draws (every visible casting split mesh), picture
 byte-identical; the default is the coordinator's call. The bake fix's 1-2/255 difference: accepted by the coordinator.
-Scratch worktrees `seam` and `ld` (never pushed). URGENT FIX DONE for v39.1 (the coordinator): during
+Scratch worktree `ld` (trees-far + look-director 64f1742, never pushed) kept until v39.2 lands; `seam` removed. URGENT FIX DONE for v39.1 (the coordinator): during
 the bake over frames the far wood was gone; now today's far trees stand in until the bake is done and hand over in that
 frame (flora.js impWant / impOn, _impReady; impostor.js step(), onReady, bakeTick), the bake counts as busy from the
 frame it is asked for. SEEN, gallery autumn wood 16.8 h on foot, phone settings: mid-bake (step 5 of 78, not ready,
