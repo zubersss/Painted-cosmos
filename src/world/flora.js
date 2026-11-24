@@ -22,7 +22,7 @@ import { makePropMaterial, TREE_DEPTH, TREE_GUARD } from '../render/materials.js
 import { ImpostorAtlas, makeImpostorMaterial, impostorQuadGeometry, IMP, IMP_SHADOW, makeImpostorShadowMaterial, bakeTick } from '../render/impostor.js';
 import { treeCell, underCell, hasCell, TREE_LEVEL, UNDER_LEVEL } from './obstacles.js';
 import { QUALITY, G, LOOK, SCREEN, SHADOW, SHADOW_CROWD } from '../render/shared.js';
-import { SHADOW_LAYER, SHADOW_TIERS, SHADOW_WHOLE, SHADOW_OPTS } from '../render/shadow.js';
+import { SHADOW_LAYER, SHADOW_TIERS, SHADOW_WHOLE, SHADOW_OPTS, FAR_SHADOW } from '../render/shadow.js';
 import { FELLED, FELL, felledAt, fallingOn, felledOn, fallTurn } from '../data/felled.js';
 
 // tier ranges in metres at quality 2; scaled by RANGE_SCALE at lower tiers
@@ -574,7 +574,7 @@ export class Flora {
     // (an impostor mesh's own shadow, from the air: render/impostor.js IMP_SHADOW; on the shadow pass's list while the eye
     //  is up there, see update)
     if (far && this.mats && mat === this.mats.imp) {
-      mesh.userData.crowdEntry = { mesh, material: mat, makeShadow: makeImpostorShadowMaterial };
+      mesh.userData.crowdEntry = { mesh, material: mat, makeShadow: makeImpostorShadowMaterial, viewCull: true };
       if (this._impSh) SHADOW_CROWD.add(mesh.userData.crowdEntry);
     }
     // (the oil look's cast shadows, render/shadow.js: trees, bushes and stones cast; blades and flowers do not)
@@ -1110,6 +1110,10 @@ export class Flora {
   // game runs for the speed test's row: only the impostor program is compiled again. Returns the setting before, or null.
   setCrownMass(on) { const m = this.mats && this.mats.imp; if (!m) return null; const was = !!m.defines.PC_MASS; if (on) m.defines.PC_MASS = 1; else delete m.defines.PC_MASS; m.needsUpdate = true; return was; }
   get crownMass() { const m = this.mats && this.mats.imp; return !!(m && m.defines.PC_MASS); }
+  // The far crowns' shadows on the ground from the air (render/shadow.js FAR_SHADOW, ?farshadow=1), for the speed test's
+  // row: on or off while the game runs (the shadow square, the casters' list at the next update, the twin's whole crown).
+  setFarShadow(on) { const was = FAR_SHADOW.on; FAR_SHADOW.on = !!on; return was; }
+  get farShadow() { return FAR_SHADOW.on; }
   // The far impostors in the weather group's gust bands (render/impostor.js GUST, ?gustbands=1), for the speed test's row:
   // false keeps the bands off the crowns (the ground keeps them). Returns null where the impostors do not take them.
   setImpGust(on) { const u = this.mats && this.mats.imp && this.mats.imp.uniforms.uImpGust; if (!u) return null; const was = u.value > 0.5; u.value = on ? 1 : 0; return was; }
@@ -1340,7 +1344,8 @@ export class Flora {
     this.treeScale = ts; this.farScale = fs;
     // THE IMPOSTORS' SHADOWS, FROM THE AIR ONLY (?impshadow=1; T6's option): above 60 m no near or middle tree stands in the
     // shadow square, and the far crowns throw their own; on the ground the pass is left as it was.
-    const impSh = !!(IMP_SHADOW && this.impOn && (SHADOW.alt || 0) > 60);
+    // (and the far crowns' shadows beside them, ?farshadow=1: render/shadow.js FAR_SHADOW, the same list and the same 60 m)
+    const impSh = !!((IMP_SHADOW || FAR_SHADOW.on) && this.impOn && (SHADOW.alt || 0) > 60);
     if (impSh !== !!this._impSh) {
       this._impSh = impSh;
       for (const ch of this.farChunks.values()) for (const m of ch.meshes) if (m.userData.crowdEntry) { if (impSh) SHADOW_CROWD.add(m.userData.crowdEntry); else SHADOW_CROWD.delete(m.userData.crowdEntry); }
