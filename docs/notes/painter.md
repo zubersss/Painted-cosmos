@@ -538,7 +538,9 @@ pass's lines at dynres 1; the oil look draws every tier at full size). PROVED in
 to 1 (v39.5's real-pixel thresholds): 1024x480 at 150 m 0 pixels, 420 m 0, 1 km 241 pixels at most 3 of 255 (the trees
 settling between grabs); 1920x1080 at 150 m 0 pixels. ONE DYNRES STEP DOWN (setRenderScale 0.85, 408 lines) at 150 m:
 139,248 pixels differ between the device anchor and v39.5's thresholds, which are the crowns v39.5 flips (crop sheet
-A1_r39_dynres_step_crop_ABC). F PASSED THE PAINT CUT on the look (its keep waits for massV, massT on the phone).
+A1_r39_dynres_step_crop_ABC). F PASSED R3.9 on the device anchor for v39.7 and THE PAINT CUT on the look (its keep
+waits for massV, massT on the phone): trees-far as of 0a0cd3f is clear from F's side. Waiting: the owner's next phone run
+(rows massV, massT, farShadow re-run, impMinPx, the pair).
 Before: THE IMPOSTORS' PAINT CHEAPER (the coordinator's top priority
 after the owner's phone table: 'far trees one flat colour' saved as much as no far trees, so the cost is the paint per
 pixel; F: R3.9 first). DONE, ALL THE SAME PICTURE, ALL ON: f898935 R3.9 (thresholds in px of 480 lines; 0 pixels at
