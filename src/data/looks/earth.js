@@ -21,6 +21,14 @@ const K = (a, b) => glazec(pig(a), pig(b));         // two washes laid one over 
 // (THE CLOAK'S BLUE is the one accent of its strength, LOOK-RULES R2.5: src/art/models.js CLOAK_BLUES, hue about 226.
 // The look director, 24 Nov: no flower head in hue 210-240 at a saturation over 0.45; bluebells and gentians sit in the
 // violet-blues, 245-265. src/data/looks/flora.test.mjs holds it.)
+// THE BOULDERS AS PAINTED STONE (the flora lane, `?stone=1`, OFF until the look director passes its pair; world/flora.js
+// reads a biome's `oil.stone` over its undergrowth's `rock`): the look director on the outer undergrowth's boulders (24 Nov,
+// u2cells-am02): "smooth blue-violet pebbles, cooler and smoother than anything around them; give them the rock family the
+// mountains now use (C's grey-violet with the warm lean, farview ROCK_LOOK) ... warm grey in the sun". The lit face the
+// mountains' WARM grey a little lighter (Davy's grey with raw umber, diluted), the shaded and lower faces their MID grey
+// with a touch of cobalt violet (Davy's with Payne's grey): the same pigments as ROCK_LOOK.mtn, so a boulder in the meadow
+// is a piece of the mountain above it. (The boulder's faces, light and steps are the shared prop paint's: unchanged.)
+const STONE_EARTH = [dilute(M('davysGrey', 'rawUmber', 0.3), 0.15), mixc(M('davysGrey', 'paynesGrey', 0.35), pig('cobaltViolet'), 0.1)];
 const FLORA_TF = {      // the green wood: carpets under the open canopy, campion and foxglove at the edges, buttercup in damp glades
   // (the blades' own greens, F10 / LOOK-RULES R2.4, olive-gold in the light. MEASURED 24 Nov, the lit grass of the 1.8 m
   // stills, ?bladegreen=0 -> on: hue 70 -> 66 here and 72 -> 64 at the autumn landing, V 0.71 -> 0.69 and 0.72 -> 0.66, S
@@ -905,7 +913,7 @@ export default {
         // (the oil look: a green wood in the autumn wood's hand: a floor of moss and grass greens over warm earth with
         // last year's leaves in it, the canopy's greens pure; one tree in six a conifer)
         oil: { pal: { low: [0.56, 0.46, 0.34], mid: [0.60, 0.52, 0.34], high: [0.58, 0.50, 0.36], litter: [0.80, 0.70, 0.36], canopyA: [0.74, 0.88, 0.36], canopyB: [0.46, 0.74, 0.32],
-          grassLight: [0.82, 0.90, 0.38], grassMid: [0.58, 0.78, 0.34], moss: [0.44, 0.64, 0.32], mud: [0.48, 0.40, 0.32] }, tallMix: 0.84, flora: FLORA_TF,
+          grassLight: [0.82, 0.90, 0.38], grassMid: [0.58, 0.78, 0.34], moss: [0.44, 0.64, 0.32], mud: [0.48, 0.40, 0.32] }, tallMix: 0.84, flora: FLORA_TF, stone: STONE_EARTH,
           // THE GREEN WOOD AND THE GOLD WOOD ARE ONE WOOD IN TWO DRESSES -- same terrain recipe, same tree kits,
           // differing only in palette and in which of the two leaf dresses they wear. So they keep ONE list of
           // animals between them, which is why the five built first furnish a third of Earth's biomes on their
@@ -937,7 +945,7 @@ export default {
         // (2026-11-16, after the owner's references of autumn woods: the floor is GRASS, green in the stands and bright
         // yellow-green in the glades, with the leaves strewn on it; wider glades; conifers in groups among the broadleaves)
         oil: { pal: { low: [0.58, 0.42, 0.34], mid: [0.66, 0.48, 0.34], high: [0.62, 0.46, 0.36], litter: [0.96, 0.78, 0.30], canopyA: [0.98, 0.86, 0.30], canopyB: [0.94, 0.62, 0.24],
-          grassLight: [0.84, 0.87, 0.32], grassMid: [0.64, 0.75, 0.30], moss: [0.44, 0.62, 0.30], mud: [0.56, 0.50, 0.34] }, glade: [0.10, 0.46], flora: FLORA_AW,
+          grassLight: [0.84, 0.87, 0.32], grassMid: [0.64, 0.75, 0.30], moss: [0.44, 0.62, 0.30], mud: [0.56, 0.50, 0.34] }, glade: [0.10, 0.46], flora: FLORA_AW, stone: STONE_EARTH,
           // (?floor=calm, 2026-11-17: the glades' grass was a loud lemon in the owner's recording of v8.1. A calmer floor to
           // set beside it: the sunlit grass an olive gold, the tufts with it. Not the look until the owner picks it.)
           palCalm: { grassLight: [0.78, 0.76, 0.38], grassMid: [0.58, 0.66, 0.32] },
@@ -1002,7 +1010,7 @@ export default {
         //     tenth of the dilution, and the snow sits at 560, which leaves the lower half of every peak as dark
         //     rock. The references want "the snow mountains the lightest thing in the picture" (Sohlberg), and that
         //     asks for everything else to be DARKER, not for more white.
-        oil: { flora: FLORA_AM, over: { ground: ['sapGreen', 'rawUmber', 'neutralTint'],
+        oil: { flora: FLORA_AM, stone: STONE_EARTH, over: { ground: ['sapGreen', 'rawUmber', 'neutralTint'],
           // THIRTEEN KINDS on the mountain (in groups per hectare, by name; see the green wood above). The ibex
           // is the darkest thing you can put on snow the references want to be the lightest thing in the
           // picture, and the eagle is the one animal you meet from ABOVE. The trout is here for a tarn that
@@ -1026,7 +1034,7 @@ export default {
       // motionless in the lift off the 52 m cliff above -- that lift is the real wind field and not an
       // animation, and it is the cheapest spectacular thing in the whole list. Sixty gulls on a stack is one
       // field read and sixty bodies solved in the shader, not sixty solves.
-      oil: { flora: FLORA_SC, over: { life: { gull: 0.02, seal: 0.015, cormorant: 0.03, crab: 0.06, sheep: 0.08, fox: 0.03,
+      oil: { flora: FLORA_SC, stone: STONE_EARTH, over: { life: { gull: 0.02, seal: 0.015, cormorant: 0.03, crab: 0.06, sheep: 0.08, fox: 0.03,
         raven: 0.05, hare: 0.25, heron: 0.04, teal: 0.02, otter: 0.015, eagle: 0.004, vulture: 0.004,
         swallow: 0.03, herring: 0.006 } } } }),
     B('desert_canyon', 'Desert Canyon', 'canyon',

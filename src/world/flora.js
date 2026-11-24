@@ -233,6 +233,10 @@ const UNDER2_SHIFT = (() => {
 // ferns, bushes, flowers and boulders where those stand, 615-754 m away, past the 110 m reach, so none of them is drawn
 // near the eye in the oil look (and the obstacles, which read the right cells, are bushes and rocks one cannot see).
 // With it on, a cell reads its own (1 << shift) a side.
+// THE BOULDERS AS PAINTED STONE (the flora lane, `?stone=1`, OFF until the look director passes its pair): in the oil look a
+// biome's `oil.stone` (data/looks/earth.js: the mountains' warm grey and grey-violet) colours its undergrowth's boulders,
+// and a boulder stands a quarter of its height down in the ground (a flat stone a sixth), its foot hidden in the grass.
+const STONE = (() => { try { return new URLSearchParams(location.search).get('stone') === '1'; } catch { return false; } })();
 let U2SPAN = (() => { let on = true; try { const v = new URLSearchParams(location.search).get('u2cells'); on = v !== '0' && v !== 'false'; } catch { /* no address */ }
   return on && LOOK.oil ? 1 << UNDER2_SHIFT : 2; })();
 
@@ -520,7 +524,7 @@ export class Flora {
     // (the oil look may give a biome's undergrowth its own colours: the biome's oil.under, laid over its washes)
     if (!m) {
       const b = this.S.biomes[bi];
-      const U = Object.assign({}, this.U, b.under, LOOK.oil && b.oil ? b.oil.under : null);
+      const U = Object.assign({}, this.U, b.under, LOOK.oil && b.oil ? b.oil.under : null, STONE && LOOK.oil && b.oil && b.oil.stone ? { rock: b.oil.stone } : null);
       m = this._underMats(U, '-' + bi); this.pal.set(bi, m);
       // A BIOME MAKES ITS OWN UNDERGROWTH MATERIALS, here and lazily, and they are not the ones the constructor
       // registered: without this the trees of a wood turned from summer to autumn and THE FLOOR BENEATH THEM DID
@@ -953,10 +957,12 @@ export class Flora {
       const mesh = this._instanced(chunk, geo, mat, list.length, lod, false);
       const im = mesh.instanceMatrix.array, ia = mesh.userData.inst.array;
       let x0 = 1e9, y0 = 1e9, z0 = 1e9, x1 = -1e9, y1 = -1e9, z1 = -1e9;
+      const sink = STONE && LOOK.oil && list === lists.rock;      // (?stone: a boulder's foot in the ground)
       for (let a = 0; a < list.length; a++) {
         const o = list[a] * INST_STRIDE;
         _p.set(d[o], d[o + 1], d[o + 2]);
         _up.copy(_p).normalize();
+        if (sink) _p.addScaledVector(_up, -(d[o + 5] === U_STONE ? 0.045 : 0.12) * d[o + 3]);
         _q.setFromUnitVectors(_Y, _up);
         _q2.setFromEuler(_e.set(d[o + 11] * Math.cos(d[o + 4] * 3.0), d[o + 4], d[o + 11] * Math.sin(d[o + 4] * 3.0), 'YXZ'));
         _q.multiply(_q2);
