@@ -76,6 +76,41 @@ The weather group lands the rain field (its section 9.3: `fields.rain` at 32 a f
 - NEXT for W1, if the review asks: stronger meanders on the big rivers (references: long S-bends); the main river by the
   landing is now a brook (a spring with a larger catchment would bring a wider one past it: one number in Earth's look).
 
+### W2 THE BODIES OF WATER (branch `water-bodies`, session_01R5Bri2xowNiwS1SnP3VG3f; READ THIS to pick W2 up)
+
+Branch `water-bodies` = lane 0 + look-proto v37.1 + `origin/design-water` (W1's rivers, merged 24 Nov for `net.mouths` and
+`net.lakes`). Files W2 owns: `src/world/hydro.js`, `src/world/falls.js`, `src/render/fallmat.js`, their tests, the look keys
+`oil.lakeK`, `oil.ponds`, `oil.puddles`, `oil.fjords`, and its speed-test rows through `WATER_BENCH`.
+
+- **STEP 1 + 2 (built 24 Nov): `src/world/hydro.js` and `src/world/hydro.test.mjs`.** Every number is in `HYDRO_DEF`.
+  - LAKES (`?lakes=1`, `lakeCarve`): in a filled basin the wood's relief over the base level shrinks by `lakeK` (0.78) as the
+    fill goes from lakeMin to 1.6 lakeMin, and the bed is let down up to 1.4 m more. MEASURED (Node, Earth, the wood's basins'
+    points, 25 a node): wet 20.6 % -> 71.8 %; the four big basins 71 to 86 % (islands remain); lake 11 (780 m from the landing)
+    14 -> 53 %; lakes dead level; the landing in no basin, its ground and water unchanged, the nearest water to it still 10 m.
+  - THE MOUTH CUT (`?falls=1`): TRACED: the "26 m shelf and sheer wall" at a mouth are surface.js sample()'s BERM over the
+    wood-sea blend (the coast recipe there is open sea at -11 to -22 m), and the wall is where the wood's weight falls under
+    0.0015. A corridor runs from 18 m up the river's end, turning down the wood's weight, to that wall (found at load by
+    walking the unchanged surface, the lip bisected to 0.1 m). In it the wood's b.lq and the coast's c.lqC carry the cut's
+    level (so sample() merges the groups and no berm fires) and both recipes return the same bed and banks; the banks rise to
+    the shelf measured beside each station at load. MEASURED at Earth's main mouth (E6/E7): water 20.80 m at the river's
+    end, 19.59 m at the lip 383 m on, bed 1.2 m under it, banks to 24-25.6 m, then the sea floor at -22.1 m: a 19.5 m fall.
+    9 falls on Earth (of 21 mouths: 10 cross a biome the hooks cannot cut, 2 end on land). `S.hydro.falls` lists them.
+  - FJORDS (`?fjord=1`, rivers at least 8 m wide): the corridor and the river's own last reach at the sea's level, 40-90 m
+    wide, floor 12 m down, steep walls; the river falls into its head. Built and mapped only (`map-fjord13-B.jpg`); not seen.
+  - PONDS (`?ponds=1`, a biome's or the world's `oil.ponds` = the chance a 120 m cell holds one): only on low ground (the
+    wood's hills under 9 m), no basin, 22 m from running water, rim spread under 1.4 m, 80 m from a clearing; level 0.22 m
+    under the lowest of eight rim points (held in: tested at 1.3 radii); bent-ellipse outline 6-22 m. Earth at 0.3: 102.
+  - PUDDLES (`?puddles=1`, `oil.puddles`): `c.cap` (m at full wetness, at most 0.12) in the 15 m relief's hollows on slopes
+    under 3 %. MEASURED near the landing: 2.6 % of dry ground, mean 3 cm. Drawn by W3's mesher and `uWet` (not built here).
+  - LOAD (here): cuts 45 ms, ponds 25-30 ms (both at load, once a world).
+- **ASKED OF LANE 0 (24 Nov, waiting):** two lines in surface.js sample() so a water part can set its own churn and speed
+  (`c.turbW`, `c.fspdW`): without them the cut and a pond take the drainage field's slope across the coast blend and paint
+  WHITE all along (turb 0.26-0.47 measured in the cut). hydro.js already sets both.
+- Maps (Node, data drawn top down, not the renderer): `docs/shots/painter/water-w2/` (A today | B with the parts).
+- Scratch tools (not committed, in the session's scratchpad): `map.mjs` (top-down PNG of sample()), `cutprof.mjs` (a cut's
+  long profile and cross sections against the bare surface), `lakes2.mjs`, `ponds.mjs`, `puddles.mjs`, `mouths.mjs`.
+- NEXT: step 3, `src/world/falls.js` + `src/render/fallmat.js` (the sheet, the plunge pool, the spray); then the look keys.
+
 ## Stations and tools
 
 The stations E0..E12 are in the design's appendix B; the camera helper for the gallery in appendix A (`window.__off`,
