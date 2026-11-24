@@ -449,7 +449,14 @@ Branch `water-bodies` = lane 0 + look-proto v37.1 + `origin/design-water` (W1's 
   0.151); 400 m still short (0.105 and 0.089 against 0.138 and 0.117). The POINTED DASH ENDS are W3's (waterchunk.js, all
   water at the new paint); F's full sheet and the strait crop go when they land. F passes ?wsea for the coordinator's
   default decision only if it then reads at least as well as v37 in all four rows.
-- NEXT: W3's pointed ends, then the sheet to F; after the branches meet (the coordinator's call): the pool's pcThinLayer to W3's
+- **400 m sparkle (water-sea b053b4b):** the light and dark shares grow 8 points each from 200 to 600 m out; strait / coast
+  400 m spread 0.120 / 0.108 (p95 0.85); F: on target. **The sun path in gold (cba04ab, F's note):** the sea's light strokes
+  toward the sun take pcOilSunC by the square of the sun's side (a path, not half the sea), cap 0.90. SEEN at 18.3 h facing
+  the low sun (`sea-sunpath-1818-white-then-gold.jpg` on water-sea): gold dashes down the strait, where white read as floes.
+  F now owns the sky's gold on the water generally (look-director cbf7f41, ?goldsky).
+- The lab (tools/lab.mjs serve) hit the machine's two-hour limit twice; later stills come from tools/shot.mjs one-offs with
+  the scratch helper and sunview.js (scratch only).
+- NEXT: W3's pointed ends, then the full sheet and the strait crop to F; after the branches meet (the coordinator's call): the pool's pcThinLayer to W3's
   pcWStrokes, pcFallMilk and the FALL_ colours into waterchunk.js.
 - Camera places for the falls views: `fallsView(S)` and the scratch `fallcams.mjs` (sea60, sea150, air400, bank, E7).
 
