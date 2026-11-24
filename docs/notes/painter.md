@@ -282,8 +282,13 @@ PASS by the look director after its three data notes (ceb7f3a: the green wood's 
 with its flowers on top, the near rings' stones light). The coast's and wetland's S(V<.3) rose only because their darks
 all but went (the share under V 0.30, 0.87 -> 0.52 % and 2.97 -> 1.28 %); the remainder, cushions in shade, is taken by the
 look director in the shared shade (pcShadeLeaf now also quiets dark saturated yellow-greens, on look-director): it reaches
-this lane through look-proto. NEXT: FV6 with C (the interface proposed: bloomTint writes o.fr/fg/fb/fd into the sample;
-waiting for C to name a free ground-sample slot, the coordinator having warned the sample is at 25 floats in v39.2).
+this lane through look-proto. FV6 (meadows from the air), THE FLORA HALF DONE (f7b710a, 3783688; behind ?bloomfar=1, 0 by default): bloomTint writes
+into every full sample o.fd (the drift's cover, 0..1) and o.fi (its colour as an index 0..15 into bloomPalette(S).colours,
+16 colours built once a world from its flower kinds, whites held to 0.80; o.fc, RGB565, also written), and with the switch
+on stops mixing the drift into the far colour (o.r2..b2). AGREED WITH C: C adds one 4-byte attribute plus its parent in
+patchgen.js (cover, index / 15, two bytes spare), hands the palette to TERRAIN_FRAG as a uniform vec3[16], and lays a dab
+whose hash is under cover x 0.9 in the flower colour whole; C starts it after the coast cliff is reviewed. THEN: A/B stills
+at 150 m, 400 m and 1 km (the meadow, the autumn wood's glades), ?bloomfar=0 against 1, to C and F; flip it on together.
 A lesson recorded: af83f25 copied data/looks/earth.js from a scratch copy older than a merge and dropped the look director's
 `airTop` (found by the 420 m proof, fixed in 2f779d8); never copy a whole shared file over a merge, apply the lane's diff. ASKED OF THE FAR-VIEW LANE through the coordinator: a ground dab that takes a drift's colour WHOLE
 (pointillist) from `bloomAt`, the one thing that would make drifts read from 150 m and a mile.
