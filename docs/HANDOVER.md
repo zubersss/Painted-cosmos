@@ -259,7 +259,8 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
     request into `main` and merges it itself. The gate it keeps before doing so is in the log
     (the default game unchanged by pictures, the three test suites, `node tests/all.mjs --only
     static,unit`, the default game's page booting; the full check straight after; undo at once
-    if it fails: it did once, v8's request at run time, undone as v8.1). A LATER SESSION asks the
+    if it fails: it did once, v8's request at run time, undone as v8.1). CONFIRMED AGAIN FOR THE
+    FIRST ACCOUNT on 2026-11-24 ("Yes you have the permission the merge"). A LATER SESSION asks the
     owner once whether this still stands (`CLAUDE.md` says "only when the owner asks in that
     session", and was not changed). This amends item 7.
 42. **The elemental powers, wind first (2026-11-17; the owner away for several hours).** The
