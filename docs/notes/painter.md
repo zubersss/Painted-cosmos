@@ -97,6 +97,24 @@ the phone prices both in one run.
 **Next:** A/B stills (5/10/18/30/45 m, autumn and green wood, phone and desktop) -> commit T2 split -> stills of cards
 and T5 (pixel-identical check) -> commit -> T3 (the middle tree) -> report each step to the coordinator and the look
 director (session_01R5Brhzz2JPPF6Ecz6XRQHx).
+**THE GRAIN FIX (after the look director's review of T1, 24 Nov; it supersedes the T1 paragraph below where they
+differ).** Every leaf of a stroke now takes the stroke's ONE normal (the crown's front surface) and ONE inner shade, and is
+written at the stroke's own depth, so overlapping strokes are laid whole (no texel of the one behind pokes through);
+strokes 4.5 texels (so at least 2.5 px at the phone's level; `?impstroke=`); half the inner shade a stroke's depth gives
+(`?impdeep=`) and 0.35 of a near leaf's light jitter (`?impjit=`), so a crown reads as a lit mass and a shaded one; no
+read of the shadow map (a texel's place would cut a stroke at a shadow's edge); the silhouette by COVER: the four texels
+round the point weighed bilinearly, nothing laid under a half (a quarter on a multisampled picture, with alpha to
+coverage), so the outline is a smooth line at the pixel, not stair-steps (4 fetches a fragment instead of 1); the shade
+through the shared `pcShadeLeaf` wherever chunks.js has it (look-director c4306fc; detected in the text, else pcTone);
+nothing of a crown under V 0.18 (the ruling for the darkest conifer); the level a stroke is read from is coarser on a
+taller picture (about 3.5 px at 1080 lines, not yet seen on a desktop). ON FOOT the conifer kinds keep today's far form
+(their dark spikes, which the look director judged better on the skyline) below 40 m of height and become impostors
+from the air; the broadleaves are impostors at every height (`?impfoot=all|none`; flora.js tier 4 = far as impostor).
+MEASURED (phone, 150 m): lit crowns hue 67, S 0.60 (ruling: under about 80 and 0.75), but V 0.91 (R1.2c's lit canopy
+0.60-0.82: the lit step of the shared data colour, not a gain of the impostor's); V under 0.18 1.4 % of the picture
+(today 13.5 %); S(V<0.3) 0.35 -> 0.16. On foot the frame is 719k triangles (all impostors 609k, today 1,247k): the
+conifer cards cost about 145k. Stills `A1_grainfix_*`, 3x crops `A1_grainfix_crops_3x.jpg`.
+
 **T1, far trees as painted impostors (`src/render/impostor.js`; `?fartree=impostor`).** For every kind drawn far off as
 leaves (`CAN_CARD`), its lod-0 tree (one variant; `?impvar=2` two) is baked once per world, in a frame hook the first
 time an impostor is drawn (the painter's hooks run outside a render; the renderer is handed over by the first impostor

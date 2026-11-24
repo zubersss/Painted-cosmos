@@ -37,8 +37,10 @@ const _qn = (k, d, lo, hi) => { const v = _q && _q.has(k) ? +_q.get(k) : NaN; re
 export const IMP = {
   views: 8,                                              // views to a side of the hemi-octahedron (64 in all)
   tile: Math.round(_qn('impres', 96, 16, 128) / 8) * 8,  // texels to a view at the finest level (?impres=; a multiple of 8)
-  stroke: _qn('impstroke', 3.4, 1, 8),                   // a stroke's size in texels at every level (?impstroke=)
-  jit: _qn('impjit', 0.5, 0, 1),                         // how much of a near leaf's own light jitter a stroke keeps (?impjit=)
+  stroke: _qn('impstroke', 4.5, 1, 8),                   // a stroke's size in texels at every level (?impstroke=; 3.6 keeps it
+                                                         //  at 2.5 screen px or more at the level picked, the look director)
+  jit: _qn('impjit', 0.35, 0, 1),
+  deep: _qn('impdeep', 0.5, 0, 1),                       // (a crown seen far off reads as a lit mass and a shaded one, not as its depths)                         // how much of a near leaf's own light jitter a stroke keeps (?impjit=)
   cols: 4,                                               // tree variants laid side by side in the atlas
   // (the quad stands at the tree's middle. It stood 0.35 of the tree's radius toward the eye, and then a big tree's quad
   //  came out nearer than a small tree's standing just in front of it: SEEN, a young oak at 50 m drawn as a bare stump,
@@ -98,6 +100,7 @@ uniform float uPad;
 uniform vec2 uLeafK;      // x a leaf drawn this much larger, y and never under this many metres from its centre to a corner
 uniform vec3 uCC;         // the crown's middle (the middle of the box round its leaves' centres)
 uniform vec3 uCRad;       // and that box's half sizes: the crown's ball, as an ellipsoid
+uniform float uDeepK;     // how much of a stroke's depth behind the crown's front surface is its inner shade (IMP.deep)
 varying vec3 vEnc;
 varying vec3 vN;
 varying float vDep;
@@ -109,6 +112,7 @@ void main() {
   float cls = 1.0, id;
   vec3 n, ctr;
   vInner = 0.0;
+  float vFlat = 0.0;
   if (part < 0.5) {
     // wood: the TRUNK (aBranchId -1) thickened by a fifth of a texel of this level, so a far trunk is a line and not a
     // row of dots; the limbs are left as they are and go as the tree gets small, as a painter would leave them out
@@ -147,13 +151,19 @@ void main() {
       nf = normalize((pf - uCC) / (uCRad * uCRad));
       deep = clamp(max(tf, 0.0) / (0.9 * min(uCRad.x, min(uCRad.y, uCRad.z)) + 1e-3), 0.0, 1.0);
     }
-    n = normalize(nf * 0.85 + normalize(aMass) * 0.15);
-    vInner = deep;
+    // (ONE NORMAL AND ONE INNER SHADE A STROKE, nothing of the leaf's own: the look director's review of the first
+    //  impostors, 24 Nov: single texels of a stroke took a step of their own from their leaf's mass normal or inner
+    //  shade -- the speckle. Every leaf of a stroke is written at the stroke's own depth too (below), so where two
+    //  strokes overlap the nearer one is laid whole and no texel of the one behind pokes through.)
+    n = nf;
+    vInner = deep * uDeepK;
+    vFlat = 1.0;
   }
-  vEnc = vec3(id, cls, clamp(max(aData.z, vInner), 0.0, 1.0));
+  vEnc = vec3(id, cls, clamp(vFlat > 0.5 ? vInner : aData.z, 0.0, 1.0));
   vN = n;
   vDep = dot(ctr - uC, uD) / uR;
   gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
+  if (vFlat > 0.5) { vec4 pz = projectionMatrix * modelViewMatrix * vec4(ctr, 1.0); gl_Position.z = pz.z / pz.w * gl_Position.w; }
 }
 `;
 const BAKE_FRAG = /* glsl */`
@@ -262,7 +272,7 @@ export class ImpostorAtlas {
     rt.texture.colorSpace = THREE.NoColorSpace;
     const mat = new THREE.ShaderMaterial({
       vertexShader: BAKE_VERT, fragmentShader: BAKE_FRAG, side: THREE.DoubleSide,
-      uniforms: { uC: { value: new THREE.Vector3() }, uR: { value: 1 }, uD: { value: new THREE.Vector3(0, 0, 1) }, uCell: { value: 1 }, uCellK: { value: 1 }, uPad: { value: 0 }, uLeafK: { value: new THREE.Vector2(1, 0) }, uCC: { value: new THREE.Vector3() }, uCRad: { value: new THREE.Vector3(1, 1, 1) } },
+      uniforms: { uC: { value: new THREE.Vector3() }, uR: { value: 1 }, uD: { value: new THREE.Vector3(0, 0, 1) }, uCell: { value: 1 }, uCellK: { value: 1 }, uPad: { value: 0 }, uLeafK: { value: new THREE.Vector2(1, 0) }, uCC: { value: new THREE.Vector3() }, uCRad: { value: new THREE.Vector3(1, 1, 1) }, uDeepK: { value: IMP.deep } },
     });
     const scene = new THREE.Scene();
     const mesh = new THREE.Mesh(this.geos[0], mat);
@@ -427,7 +437,10 @@ void main() {
   vec2 o = (vec2(col, row) * N + cell) * T;
   vTile = vec4(o / uImpAtlas.xy, vec2(T) / uImpAtlas.xy);
   float px = 2.0 * max(hwv.x * length(ir[0]), hwv.y * length(ir[1])) / max(di * uOilPx.x, 1e-4);
-  vLod = clamp(floor(log2(T / max(px, 1e-3)) + 0.5), 0.0, uImpK.w);
+  // (a stroke at least about 2.5 px on the phone's 372 lines and about 3.5 px at 1080 (the look director, R3.3): the
+  //  level is taken coarser by as much on a taller picture)
+  float lb = log2(1.0 + 0.4 * clamp((uOilPx.y - 372.0) / 708.0, 0.0, 1.5));
+  vLod = clamp(floor(log2(T / max(px, 1e-3)) + 0.5 + lb), 0.0, uImpK.w);
   // the tree's own colour run (as PROP_VERT and PROP_FRAG lay it for the crowns)
   vec3 lA = uFarA[sp], lB = uFarB[sp], lC = uFarC[sp];
   vec4 famL = uFarFam[sp];
@@ -483,10 +496,27 @@ void main() {
   #include <logdepthbuf_fragment>
   // (the speed test, shared.js uOilL.y = 4: written at once, before the atlas is read or anything is cut away)
   if (uOilL.y > 3.5 && uOilL.y < 4.5) { pcWrite(vec3(0.42, 0.40, 0.32), 0.0, vec3(0.0, 0.0, 1.0), -vView.z, 3.0); return; }
+  // THE SILHOUETTE BY COVER, NOT BY THE TEXEL'S SQUARE (the look director: stair-steps at the pixel). The four texels
+  // round the point are read; how much of them is tree, weighed as the point lies among them, is the cover. Where it is
+  // under a half (a quarter on a multisampled picture, which alpha to coverage then edges) nothing is laid; the paint
+  // is the nearest texel of tree. So the outline is the cover's own smooth line through the texels, at the pixel.
   float T = uImpK.z * exp2(-vLod);
-  vec2 uq = clamp(vQuad, 0.5 / T, 1.0 - 0.5 / T);
-  vec4 t = textureLod(uImpTex, vTile.xy + uq * vTile.zw, vLod);
-  if (t.a < 0.002) discard;
+  int li = int(vLod + 0.5);
+  vec2 lsz = vec2(textureSize(uImpTex, li));
+  vec2 t0 = vTile.xy * lsz, tq = vec2(T);
+  vec2 tc = t0 + clamp(vQuad * tq, vec2(0.5), tq - 0.5) - 0.5;
+  vec2 i0 = floor(tc), fq = tc - i0;
+  vec2 lo = t0, hi = t0 + tq - 1.0;
+  vec4 a00 = texelFetch(uImpTex, ivec2(clamp(i0, lo, hi)), li);
+  vec4 a10 = texelFetch(uImpTex, ivec2(clamp(i0 + vec2(1.0, 0.0), lo, hi)), li);
+  vec4 a01 = texelFetch(uImpTex, ivec2(clamp(i0 + vec2(0.0, 1.0), lo, hi)), li);
+  vec4 a11 = texelFetch(uImpTex, ivec2(clamp(i0 + vec2(1.0, 1.0), lo, hi)), li);
+  vec4 o4 = step(vec4(0.002), vec4(a00.a, a10.a, a01.a, a11.a));
+  float cover = mix(mix(o4.x, o4.y, fq.x), mix(o4.z, o4.w, fq.x), fq.y);
+  if (cover < (uOilG.z > 0.5 ? 0.25 : 0.5)) discard;
+  // (the nearest texel that is tree)
+  vec4 t = fq.x < 0.5 ? (fq.y < 0.5 ? a00 : a01) : (fq.y < 0.5 ? a10 : a11);
+  if (t.a < 0.002) t = o4.x > 0.5 ? a00 : o4.y > 0.5 ? a10 : o4.z > 0.5 ? a01 : a11;
   // a tree being laid (or lifted) as it changes hands: broken touches anchored to the tree, as PROP_FRAG does
   if (vWash < 0.999) {
     float vd = length(vView);
@@ -511,9 +541,6 @@ void main() {
   #endif
   // (the speed test's flat plants, 2 and 3: every far tree one flat colour, its outline kept)
   if (uOilL.y > 1.5 && uOilL.y < 3.5) { pcWrite(cls < 0.5 ? vBB : vLA * 0.7, 0.0, vec3(0.0, 0.0, 1.0), -vView.z, 3.0); return; }
-  // the stroke's centre on the body: the quad's point moved along the line of sight to where the stroke lies
-  float s = (e.a - 1.0) / 254.0 * 2.0 - 1.0;
-  vec3 cB = vBody + vDepth * (s - uImpAtlas.w);
   vec3 r3 = vec3(id, fract(id * 13.7), fract(id * 5.1));
   float ms = dot(n, vSunK);
   ${SKYUP('dot(n, vUpK)')}
@@ -522,12 +549,9 @@ void main() {
   float canopy = vInst.w * uCanopy * 0.4;
   float rSun = mix(r3.z, 0.5 + 0.5 * ms - (r3.z - 0.5) * 0.22 * ${'${IMPJIT}'}, ${'${FARCROWN}'});
   float sun = mix(step(mix(0.05, 0.585, canopy), rSun), 1.0 - 0.42 * canopy, uWx.x);
-  if (uShK.x >= 0.004) {
-    vec3 q = (uShM * vec4(cB, 1.0)).xyz;
-    vec2 a = abs(q.xy);
-    float inside = (1.0 - smoothstep(uShK.w, 0.97, max(a.x, a.y))) * uShK.x;
-    if (inside >= 0.004) sun = mix(sun, min(sun, step(q.z - uShK.y, textureLod(uShTex, q.xy * 0.5 + 0.5, 0.0).r)), inside);
-  }
+  // (no read of the shadow map: a texel's own place on the quad would cut a stroke in two at a shadow's edge, one step
+  //  a stroke being the rule; the far crowns are beyond what the near and middle trees throw on them, and they cast
+  //  nothing themselves unless ?impshadow=1 -- and then their crowns take the crown's own light, as here)
   vec3 c;
   float rid = 3.0;
   if (cls < 0.5) {
@@ -555,11 +579,18 @@ void main() {
     xl += (r3.z - 0.5) * 0.25 * ${'${IMPJIT}'};
     xl = max(xl, mix(0.30 + 0.15 * r3.x, 0.18 + 0.12 * r3.x, ${'${FARCROWN}'}));
     if (cls > 2.5) xl = 0.2;
-    c = pcTone(cs, pcLevel(xl, 0.03));
+    float lv = pcLevel(xl, 0.03);
+    // (the shade of a crown through the shared foliage shade where the build has it, chunks.js pcShadeLeaf, as a
+    //  near leaf takes its own; otherwise pcTone alone)
+    c = ${'${IMPSHADE}'};
+    // (nothing of a crown under V 0.18: the look director's floor for the darkest conifer, R1.2c)
+    float vmx = max(c.r, max(c.g, c.b));
+    if (vmx < 0.18) c *= 0.18 / max(vmx, 1e-3);
     rid = 4.0 + fract(vInst.z * 7.0 + id * 0.37) * 0.9;
   }
   if (!(uOilL.y > 5.5 && uOilL.y < 6.5)) c = pcAtmosV(c, vFog, vView);
-  pcWrite(c, 0.0, vec3(0.0, 0.0, 1.0), -vView.z, rid);
+  // (the first target's alpha is the cover, for alpha to coverage, as the plants write theirs)
+  pcWrite(c, clamp(cover, 0.0, 1.0), vec3(0.0, 0.0, 1.0), -vView.z, rid);
 }
 `;
 
@@ -580,10 +611,12 @@ export function makeImpostorMaterial(bodyU, atlas, farMat, farcrown = FARCROWN) 
     defines: Object.assign({ PC_IMPOSTOR: 1, PC_IMP_NV: Math.max(1, atlas.n), PC_NFAR: fu.uFarA.value.length }, _q && _q.get('impdebug') === '1' ? { PC_IMP_DEBUG: 1 } : null),
     uniforms: makePaintUniforms(bodyU, own),
     vertexShader: IMP_VERT,
-    fragmentShader: IMP_FRAG.split('${FARCROWN}').join(fc).split('${IMPJIT}').join((+IMP.jit).toFixed(4)),
+    fragmentShader: IMP_FRAG.split('${FARCROWN}').join(fc).split('${IMPJIT}').join((+IMP.jit).toFixed(4))
+      .split('${IMPSHADE}').join(/vec3\s+pcShadeLeaf\s*\(/.test(FRAG_PARS) ? 'mix(pcShadeLeaf(cs), pcTone(cs, lv), smoothstep(1.2, 2.0, lv))' : 'pcTone(cs, lv)'),
     side: THREE.DoubleSide,
   });
   m.userData.pcPainted = true;
+  m.alphaToCoverage = true;      // (the silhouette's cover: IMP_FRAG)
   m.userData.impAtlas = atlas;
   register(m, 'impostor', null);
   return m;

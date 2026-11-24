@@ -98,6 +98,12 @@ const FAR_IMP = typeof location !== 'undefined' && /[?&]fartree=impostor\b/.test
 // -28.7 ms, 'at a third' -38.1). ?treenear= and ?treemid= set them in metres at the phone's scale (?treenear=27&
 // treemid=57 is the hand-over as it was); without the impostors nothing changes unless they are given.
 const PHONE_TS = 0.30;
+// WHICH KINDS ARE IMPOSTORS ON FOOT (the look director's review of 24 Nov: on foot the far conifers lost their clean dark
+// spikes as impostors): 'conifers' (the default) keeps today's far form for the tapering kinds below IMP_AIR metres of
+// height; ?impfoot=all makes every kind an impostor on foot too, ?impfoot=none keeps today's far form for every kind
+// on foot. From the air every kind is an impostor.
+const IMP_FOOT = (() => { try { const v = new URLSearchParams(location.search).get('impfoot'); return v === 'all' || v === 'none' ? v : 'conifers'; } catch { return 'conifers'; } })();
+const IMP_AIR = 40;
 const HAND = (() => {
   try {
     const q = new URLSearchParams(location.search), num = (k) => { const v = q.get(k); const n = v == null ? NaN : +v; return isFinite(n) && n > 1 && n < 400 ? n : null; };
@@ -344,6 +350,10 @@ export class Flora {
       for (const sp of this.species) {
         if (!sp.canCard) { sp.impLayer = -1; continue; }
         sp.impLayer = geos.length;
+        // (on foot this kind keeps today's far form: the conifers' dark spikes, which the look director judged
+        //  better on the skyline than their impostors, 24 Nov; ?impfoot=all makes every kind an impostor on foot,
+        //  ?impfoot=none none)
+        sp.footCards = IMP_FOOT === 'none' || (IMP_FOOT !== 'all' && sp.far[2] >= 0.5);
         geos.push(sp.geo0[0]);
         if (IMP.variants > 1) geos.push(sp.geo0[1]);
       }
@@ -640,7 +650,7 @@ export class Flora {
     // groups: which trees can appear in which mesh
     const groups = {};
     const add = (key, i, geo, mat, far) => {
-      const g = groups[key] || (groups[key] = { list: [], geo, mat, far: !!far, imp: key === '2i', mesh: null, tierKey: key[0] });
+      const g = groups[key] || (groups[key] = { list: [], geo, mat, far: !!far, imp: key === '4i', mesh: null, tierKey: key[0] });
       g.list.push(i);
     };
     for (let i = 0; i < n; i++) {
@@ -648,8 +658,11 @@ export class Flora {
       this._layTree(chunk, i);
       if (chunk.kind === 'far') {
         const spf = this.species[d[o + 5]], cf = spf && spf.cardFar;
-        if (this.impOn && spf && spf.impLayer >= 0) add('2i', i, this.kit.impQuad, this.mats.imp, true);
-        else add(cf ? '2c' : '2', i, cf ? this.kit.farCards : this.kit.far, this.mats.far, true);
+        // (an impostor kind is in the impostor mesh; a kind that keeps today's far form on foot is in that mesh too,
+        //  and _retier says which of the two draws it: see IMP_FOOT)
+        const im4 = this.impOn && spf && spf.impLayer >= 0;
+        if (im4) add('4i', i, this.kit.impQuad, this.mats.imp, true);
+        if (!im4 || spf.footCards) add(cf ? '2c' : '2', i, cf ? this.kit.farCards : this.kit.far, this.mats.far, true);
       }
       else {
         const kind = d[o + 5], v = d[o + 6] % 2, sp = this.species[kind];
@@ -690,6 +703,7 @@ export class Flora {
     // (the filled far band: with it the plain far tier runs all the way to T_FAR and there is no thinned tier at all,
     //  so nothing in the owner's 300 yards is one tree in three. ?farfill=0, and the watercolour game, keep the ring.)
     const fill = this.farFill, thinR = fill ? T_FAR : T_THIN;
+    const impK = this.impOn && chunk.kind === 'far', onFoot = (SHADOW.alt || 0) < IMP_AIR;
     let changed = false;
     // a far cell: are the trees of its tree cells laid? Where they are not (not built yet, or waiting
     // for their ground), the far form stands in at any distance, and changes hands when they come
@@ -713,6 +727,8 @@ export class Flora {
       else if (!fill && dist < T_FAR * jf && (seed * 13.37) % 1 < 0.34) t = 3;   // thinned: one in three, drawn larger
       else t = -1;
       if (pe) { while (i >= pe[part]) part++; if (t >= 0 && t < 2 && !laid[part]) t = 2; }
+      // (far, as an impostor: tier 4; a kind that keeps today's far form on foot stays tier 2 below IMP_AIR metres)
+      if (t === 2 && impK) { const spi = this.species[d[i * INST_STRIDE + 5]]; if (spi && spi.impLayer >= 0 && !(spi.footCards && onFoot)) t = 4; }
       if (t !== tier[i]) { prev[i] = tier[i]; since[i] = now; tier[i] = t; changed = true; }
     }
     chunk.tierPos.copy(this.camLocal);
@@ -722,7 +738,7 @@ export class Flora {
     if (changed) this.lastLaid = now;
     const mat = chunk.mat;
     for (const g of chunk.groups) {
-      const want = g.tierKey === '0' ? 0 : g.tierKey === '1' ? 1 : 2;
+      const want = g.tierKey === '0' ? 0 : g.tierKey === '1' ? 1 : g.tierKey === '4' ? 4 : 2;
       let c = 0;
       const list = g.list;
       const inTier = (t) => t === want || (want === 2 && t === 3);
