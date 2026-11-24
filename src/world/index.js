@@ -783,6 +783,14 @@ export function createWorld(scene) {
       const sunless = Math.min(1, Math.max(oc, storm * 1.5));
       tmpKey.light.lerp(_pale.set(0.94, 0.955, 0.99), sunless * 0.85);
       bu.uStorm.value = Math.min(1, Math.max(storm * 1.3, (sk ? sk.snowfall * air : 0) * 0.8)) * 0.9 * dayness;      // (and a snowfield under falling snow is in shadow: blue-grey, the flakes white on it)
+      // (the oil look: a storm the 3D clouds hold over the eye counts as one, even where the physics key is lighter --
+      //  world.clouds.overhead01 x overheadStorm01, group D's read-only numbers, 0 with the deck off or failed; and
+      //  under a storm the land's light steps down, chunks.js pcLevel. ?stormsky=0 and ?stormland=0 take them out.)
+      if (LOOK.oil) {
+        const wc = WXHOOK.clouds, ov = LOOK.stormSky && wc ? Math.min(1, (+wc.overhead01 || 0) * (+wc.overheadStorm01 || 0)) : 0;
+        if (ov > 0) bu.uStorm.value = Math.max(bu.uStorm.value, Math.min(1, ov * 1.3) * 0.9 * dayness);
+        OIL.uLookS.value.x = LOOK.stormLand || 0;
+      }
       tmpKey.glaze.multiply(_pale.set(1 - 0.10 * storm, 1 - 0.08 * storm, 1 - 0.02 * storm));
       // the far washes: lost into the pale band under the cloud, into grey water, into the ground's own dust
       tmpKey.zenith.lerp(_pale.copy(_storm).lerp(_white, 0.16), oc * 0.92);
