@@ -559,6 +559,9 @@ vec3 pcGroundPaint(vec3 c, vec3 leaf, float fk, vec3 rnd, float snowC, float lvl
   vec3 k = pcDabTint(mix(cg, leaf, f), rnd, f);
   #endif
   k = mix(pcWetWash(k, 1.0 - snowC), mix(vec3(0.94, 0.955, 1.0), vec3(0.86, 0.90, 1.0), rnd.x * 0.6), snowC);
+  #ifdef PC_ROCKF
+    k = mix(pcRockTemp(k), k, snowC);       // (a rock face warm in its lit plane, cool violet in its shade: render/farground.js)
+  #endif
   // (GRASS in the shade is a deep green, its own colour laid heavier with half the cool key over it, as a leaf's shade
   // is; under the key whole a shaded meadow was a violet-brown floor: the owner's references of 2026-11-16 have the
   // shade on grass blue-green. Only where the stroke's wash is green; earth, litter, rock and snow shade as they did.)
@@ -905,7 +908,7 @@ void main() {
       bareC = mix(bareC, canM.rgb, canM.a);
     #endif
     #ifdef PC_BLOOMF
-      bareC = mix(bareC, pcBloomPal(vBloomI), 0.45 * vBloomK * uBloomOn);      // (the ground between the dabs takes a share of the drift)
+      bareC = mix(bareC, pcBloomPal(mix(vBloomI.x, vBloomI.y, step(325.0, dist))), mix(0.45, 0.2, smoothstep(250.0, 400.0, dist)) * vBloomK * uBloomOn);      // (far off a smaller share: with every drift on a slope taking the slope's kind, a whole hillside was washed in one strong red at 1 km, SEEN by flora B)      // (the ground between the dabs takes a share of the drift)
     #endif
     float lvl0 = pcLevel(mix(min(x0, 0.44) - 0.10 * vPar.z, x0, sun0), 0.05);
     #ifdef PC_ROCKF

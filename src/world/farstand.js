@@ -37,8 +37,10 @@ export const GROUND_SEASON = (() => { const v = _q && _q.has('groundseason') ? +
 export function groundSeasonOn(bodyId) { return !!(MODE.oil && GROUND_SEASON && CANOPY_WORLDS[bodyId]); }
 
 // ?rockfield=0|1: ROCK FACES, STRATA AND SNOW THAT READ FROM AFAR (the far view's FV4: render/farground.js ROCK_FRAG, and
-// the snow shed off steep faces by patchgen.js). Read once.
-export const ROCKFIELD = (() => { const v = _q && _q.has('rockfield') ? +_q.get('rockfield') : 0; return isFinite(v) && v > 0; })();
+// the snow shed off the sheerest faces by patchgen.js). ON BY DEFAULT since v39.4 (the look director passed the coast cliff
+// and the mountains, 24 Nov); ?rockfield=0 is the picture before it. The oil look on Earth only: the watercolour game is
+// untouched (MODE.oil, LOOK.oil). Read once.
+export const ROCKFIELD = (() => { const v = _q && _q.has('rockfield') ? +_q.get('rockfield') : 1; return isFinite(v) && v > 0; })();
 export function rockfieldOn(bodyId) { return !!(MODE.oil && ROCKFIELD && CANOPY_WORLDS[bodyId]); }
 
 // ?bloomfar=1: THE FLOWER DRIFTS FROM THE AIR (FV6(b), with flora B: world/bloom.js writes each full sample's drift

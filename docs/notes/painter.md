@@ -13,20 +13,29 @@ sky to a mile: look director), FV2-T and FV7 (the far trees and the air speed te
 `src/render/materials.js`, `src/world/terrain.js`, `src/world/patchgen.js`, `src/world/surface.js` (recipes and far
 colour only). NOT chunks.js, post.js, shared.js, world/index.js (look director), NOT flora.js, florakit.js (trees groups).
 
-**STATE (24 Nov, second session):** FV2 and FV3 ON by default (FV2 merged into look-proto as v39). FV4 step 2, THE
-COAST CLIFF, built and SEEN at E-W2's widest fall, behind `?rockfield=1` (still off by default; the look director
-called step 1 fine to turn on once FV3's summer re-measure on look-proto is in). The canopy's 3 px floor (look director)
-built: `?canfloor=` (2.6 px; 0 none), its stills being taken. The ground's "30 ms from the air" is CLOSED (A2 measured
-about 50 patches and 60k vertices at 400 m: no such cost); my side note: terrain.js sets `material.uniformsNeedUpdate` for
-every patch, so three.js re-sends 59 uniforms per patch (4.7 us a patch here, 0.6 ms a frame at 150 m up: a small saving
-for later, e.g. a short uniform list after the first patch of a frame, textures always). SLOTS: in v39.2 the water keeps
-sample slot 23 (`still`), my snowK moves to 24 (the coordinator did it); W3's runoff cap/swell go to 25/26. QUEUED (in
-order): the mountain faces; merge v39.2 and check a ?rockfield=1 still, re-measure FV3 summer on foot for the look
-director; FV6(b) bloom from the air with flora B (a new 4-byte ground attribute: cover and a palette index, o.fd / o.fi
-from world/bloom.js on design-flora, palette bloomPalette(S).colours as a uniform vec3[16], behind ?bloomfar=1); E's
-runoff bed in dry colours where c.capOnly (behind ?runoff=1), the sand colour and the bar's under. Scratch: a worktree of
-farview + water-bodies (not pushed) for the falls stills; `fallcam.sh` places the camera relative to the widest fall
-(window.__pcGallery.state, S.hydro.falls).
+**STATE (24 Nov, second session, evening):** FV2 and FV3 ON by default. FV4 (THE COAST CLIFF AND THE MOUNTAINS) is ON
+BY DEFAULT from farview d4cab64 (`?rockfield=0` the opt-out; the oil look on Earth only), for v39.4, PASSED by the look
+director on the condition that snow wins over rock (done: d4cab64 + 77ba0b6; stills for that pass in
+`docs/shots/painter/farview/fv4_mountains_*` and `fv4_alpine_*`). The coast cliff ACCEPTED at all heights. The canopy's
+3 px floor (`?canfloor=`) and THE SHORT UNIFORM LIST (world/terrain.js `pickUniformList`, `?uplist=0`; pixel proof 0 of
+491,520 changed) go into v39.3. v39.2 merged into farview (57e5cca). FV3 re-measured under v39's grass shade: S(V<0.3)
+0.39 with and without it (no longer worse). FV6(b) the flower drifts' far half (with flora B, `?bloomfar=1`, OFF): built,
+compiled and seen in B's scratch merges; B's findings fixed (steep fade, slope's kind far off, smaller far share); B
+re-renders before the two of them flip it. THE MOUNTAINS, what is in: one grey-violet family above 35 to 90 m
+(`ROCK_LOOK.earth.mtn`, pigment mixes), rock from about 30 deg up the range, the rock's light in three planes split by
+the SUN'S BEARING (`pcRockPlanes`: toward it the local colour plus half a step, side the shade less 1.8, away less 2.4,
+a shaded gully deeper), a warm/cool lean by plane (`pcRockTemp`: the rock's own warm tone on the lit plane, a cool
+violet 1.25 blue in shade), snow-laid vertices report no beds (no rock on snow). HONEST: at noon with the sun behind
+the eye (the look director's audit views) the planes are weak and the rock low in colour (S median 0.07 to 0.10, asked
+0.15 to 0.22); at a low sun they read. Next for the mountains (v39.5): a stronger noon split, measured at those views.
+QUEUED: the wood from the air (glades where the stand thins, each crown's shadow beside it: the look director's audit 2
+item 1, my part when they name the lane); D's gust bands into pcGroundPaint (aa699c1's patch) when uPhysGust and
+pcGustBand are on look-proto; E's far water lines in farground.js (agreed); E's runoff bed (c.capOnly) in dry colours;
+the sand colour and the bar's under; the bench row for the short list (core/bench.js is not mine: lines sent).
+NOTES: the lab's background process dies at its 2-hour limit (restart it with a 7200000 timeout); a fresh browser's
+first page compiles every shader (several minutes) and the far trees' impostor bake makes a gallery page take about 15
+minutes in software (use `fartree=old` on both halves of an A/B). Scratch worktrees (not pushed): `wtf2` = farview +
+design-water, for the falls stills (`bin/fallcam.sh` places the camera from S.hydro.falls).
 
 **STATE (24 Nov, end of the first session):** FV2 and FV3 built, seen, pushed, ON by default; FV4 a first step, pushed,
 OFF by default (`?rockfield=1`). Reviews asked of the look director and the coordinator for all three (stills in
