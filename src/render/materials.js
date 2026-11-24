@@ -2027,6 +2027,13 @@ void main() {
       float lvL = pcLevel(xl, 0.03);
       vec3 deepL = pcShadeLeaf(cs);      // (L2: the one foliage shade, chunks.js)
       vLeafC.rgb = mix(deepL, pcTone(cs, lvL), smoothstep(1.2, 2.0, lvL));
+      // (?pines: a conifer's needle mass from 20 m out sits at the references' deep green, about V 0.26 (#39432e), not
+      //  near-black: the look director's ruling. A needle darker than that is lifted to it, its hue kept, from 12 m to
+      //  20 m; a lighter one is left as it is; within 12 m nothing changes. Only trunks in shade go down to 0.08-0.18.)
+      if (uNeedle > 0.0 && aData.y < 5.5) {
+        float vN = max(max(vLeafC.r, vLeafC.g), vLeafC.b), tN = 0.24 * smoothstep(12.0, 20.0, length(cV));
+        if (vN < tN) vLeafC.rgb *= tN / max(vN, 0.02);
+      }
       vLeafK.rgb = cs;
       #ifdef PC_FIRE
         // (the powers, fire) A LEAF ON A CROWN THAT HAS BURNED GOES BLACK BEFORE IT GOES ALTOGETHER. Its paint is taken
