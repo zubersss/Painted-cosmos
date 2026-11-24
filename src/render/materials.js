@@ -555,6 +555,9 @@ vec3 pcGroundPaint(vec3 c, vec3 leaf, float fk, vec3 rnd, float snowC, float lvl
   vec3 k = pcDabTint(mix(cg, leaf, f), rnd, f);
   #endif
   k = mix(pcWetWash(k, 1.0 - snowC), mix(vec3(0.94, 0.955, 1.0), vec3(0.86, 0.90, 1.0), rnd.x * 0.6), snowC);
+  #ifdef PC_ROCKF
+    k = mix(pcRockTemp(k), k, snowC);       // (a rock face warm in its lit plane, cool violet in its shade: render/farground.js)
+  #endif
   // (GRASS in the shade is a deep green, its own colour laid heavier with half the cool key over it, as a leaf's shade
   // is; under the key whole a shaded meadow was a violet-brown floor: the owner's references of 2026-11-16 have the
   // shade on grass blue-green. Only where the stroke's wash is green; earth, litter, rock and snow shade as they did.)

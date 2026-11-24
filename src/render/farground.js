@@ -401,6 +401,7 @@ float gRock = 0.0;        // how much this dab is a rock face (set in pcGroundAt
 float gCliff = 0.0;       // this dab is a cliff's rock (0 or 1: whole dabs), set with gRock
 float gGully = 0.0;       // how far into a gully the cliff dab lies: its light goes down (pcGroundAt)
 float gRockLw = 1.0;      // (main) the surface's metres per pixel here (lw): how many pixels a bed spans
+float gRockT = 0.0;       // the rock dab's temperature by its plane: +0.8 lit (warm) .. -1 turned away (cool), pcRockPlanes
 float gFaceOn = 0.0;      // (main) this pixel is steep enough that the upright charts may lay its dabs
 float gFaceD = 0.0;       // (main) the dab being painted lies on an upright chart
 #ifdef PC_ROCKDEBUG
@@ -598,10 +599,22 @@ float pcRockPlanes(float lvl, vec3 nV, float sunny) {
   // at all, SEEN at 150 m at noon; the references' rock is mid-value.)
   // (the lit plane only for a face squarely toward the sun's bearing, over 0.55: from 0.35 a range seen with the sun behind
   // the eye was all one lit plane, flat grey, SEEN at 420 m at noon)
+  // (the side plane less 1.8 and a TEMPERATURE split, the look director's two numbers before v39.3: the lit plane leans
+  // to the sun's colour, the side and the away planes to the cool violet shade key, so the two sides read by hue as well
+  // as by value even with the sun behind the eye, gRockT for pcRockTemp)
   float s1 = smoothstep(-0.20, -0.10, b), s2 = smoothstep(0.50, 0.60, b);
-  float lp = max(pcLevel(0.75, 0.02) - mix(mix(2.4, 1.4, s1), 0.5, s2) - 0.5 * gGully * (1.0 - s2), 0.0);
+  float lp = max(pcLevel(0.75, 0.02) - mix(mix(2.4, 1.8, s1), 0.5, s2) - 0.5 * gGully * (1.0 - s2), 0.0);
+  gRockT = mix(mix(-1.0, -0.75, s1), 0.8, s2);
   lp = mix(min(lp, 1.0), lp, sunny);
   return mix(lvl, lp, gRock);
+}
+// the rock dab's paint leaned warm or cool by its plane (pcRockPlanes' gRockT): toward the sun's own colour a little on
+// the lit plane, toward a cool violet on the shaded ones (the shade key's hue, as the references paint rock in shade)
+vec3 pcRockTemp(vec3 k) {
+  if (gRock <= 0.0) return k;
+  vec3 sunC = pcOilSunC(); sunC /= max(dot(sunC, vec3(0.3, 0.5, 0.2)), 1e-3);
+  vec3 t = gRockT > 0.0 ? mix(vec3(1.0), sunC, 0.35 * gRockT) : mix(vec3(1.0), vec3(0.90, 0.87, 1.16), -gRockT);
+  return clamp(k * mix(vec3(1.0), t, gRock), 0.0, 1.0);
 }
 #endif`;
 
