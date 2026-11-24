@@ -87,11 +87,12 @@ FV7 of `docs/lead/FARVIEW-DESIGN.md`. A second session (A2, branch `trees-near`)
 the same time: this lane touches only the far parts of `flora.js`, `florakit.js`, the plant material's far branch,
 `render/impostor.js`, `render/shadow.js` and new rows in `core/bench.js`.
 
-**State (update this line every step):** (24 Nov, about 14:50) the coordinator merged ea41746 into v39.3. NEXT: the
-far impostors' part of D's gust bands from the air (D: session_01R5Bri2bBgFSfCmxpKKuURT); my proposal sent to D (per
-tree, read once at its foot: a gust state that lifts the cap one light level, each tree at its own threshold, so a band is
-a patch of crowns flipped; the ?farwind lean stays), waiting for D's field, look and uniforms; then build behind a switch
-with a bench row. STAND BY for F's audit (may name the far trees). Before that: SMALL CROWNS ARE THE DEFAULT (`?impsmall=0` the old
+**State (update this line every step):** (24 Nov, about 15:30) THE FAR CROWNS IN D'S GUST BANDS built and pushed,
+DORMANT until F's binding (render/shared.js PHYS.uPhysGust): render/impostor.js GUST (per tree, read once at its foot,
+each tree at its own threshold 0.15 + 0.45 seed, the ground's pale cooler step; ?gustbands=1 or ?wx2=1 from the address),
+flora.setImpGust, row 'far crowns: no gust bands' at 150 m. SEEN in a scratch merge with design-weather d2f4277 and D's
+two patches (gust held at 1.0): about 9 percent of the picture changes at 150 m and 600 m, turned crowns V +0.04 S -0.15
+(`A1_gust_*`); sent to F and D; not judged in motion. Waiting: F on the step's strength; F's audit. Before that: SMALL CROWNS ARE THE DEFAULT (`?impsmall=0` the old
 way), after F passed them with its colour fixes, and F signed off the real-branch pair (ea41746); look-director at 64f1742 merged into trees-far on the coordinator's
 word (8f3848d; the impostor.js conflict kept my azL line and added F's pcSummerTree line). SEEN on the real branch,
 phone settings, autumn wood 15.4 h, roof on (`A1_small_default_*`): 1 km, the impostor zone hue 92 S 0.36 V 0.56 with
