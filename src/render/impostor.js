@@ -60,9 +60,9 @@ export const IMP = {
 };
 // CROWN MASS (the look director's audit 2, finding 1, 24 Nov: "from the air the wood is confetti, not trees ... the
 // colour changes every 2-3 pixels, stroke by stroke, where the references change it crown by crown"; the coordinator:
-// top priority). OFF by default until the look director has passed it (then on, with ?crownmass=0 the old way);
-// ?crownmass=1 to see it. IMP_FRAG CROWN MASS.
-const CROWNMASS = !!(_q && _q.get('crownmass') === '1');
+// top priority). ON by default since the look director passed it (24 Nov: "at 420 m it is the first time the game's
+// wood from the air reads as the references' patchwork"); ?crownmass=0 the old way. IMP_FRAG CROWN MASS.
+const CROWNMASS = !(_q && _q.get('crownmass') === '0');
 // (the weather group's gust bands seen from the air, ?gustbands=1 ONLY (the coordinator kept them out of ?wx2's
 //  defaults until the look director passes them; D, 24 Nov): read from the address here, never imported, the contract
 //  for the weather's modules; IMP_VERT GUST)
@@ -884,7 +884,9 @@ export function makeImpostorMaterial(bodyU, atlas, farMat, farcrown = FARCROWN) 
   if (wind) Object.assign(own, PHYS, { uStiff: { value: 1 }, uPlantHeight: { value: 12 } });
   // (the gust bands: compiled in only where the shared binding exists, render/shared.js PHYS.uPhysGust -- no unbound
   //  uniform anywhere -- and only with ?gustbands=1, read from the address as the weather's contract asks)
-  if (CROWNMASS) { own.uMassK = { value: new THREE.Vector4(0.0, 7.0, 30.0, 4.0) }; own.uMassK2 = { value: new THREE.Vector4(1.0, 0.65, 0, 0) }; }      // (CROWN MASS: IMP_FRAG)
+  // (CROWN MASS: IMP_FRAG. Its uniforms always, so the speed test can switch it either way while the game runs:
+  //  flora.setCrownMass)
+  own.uMassK = { value: new THREE.Vector4(0.0, 7.0, 30.0, 4.0) }; own.uMassK2 = { value: new THREE.Vector4(1.0, 0.65, 0, 0) };
   const gust = GUSTBANDS && !!PHYS.uPhysGust;
   if (gust) Object.assign(own, PHYS, { uImpGust: { value: 1 } });      // (the whole PHYS block by reference, as with the lean: FLORA_GLSL is compiled for the bands)
   const m = new THREE.ShaderMaterial({

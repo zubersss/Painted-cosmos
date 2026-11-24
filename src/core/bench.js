@@ -371,7 +371,8 @@ export function attachBench(pc) {
     const form0 = (() => { const f = flora(); return f ? (f.farForm || (f.impWant || f.impOn ? 'impostor' : cards0 ? 'cards' : 'lump')) : 'cards'; })();
     // the rows themselves: [label, on, off]
     const shw0 = (() => { const f = flora(); return f ? !!f.shadowWhole : true; })();
-    const gust0 = (() => { const f = flora(); const u = f && f.mats && f.mats.imp && f.mats.imp.uniforms.uImpGust; return !!u; })();      // (the far crowns take the gust bands: impGust)      // (the shadow pass's whole-draw setting as the run starts: shWhole)
+    const gust0 = (() => { const f = flora(); const u = f && f.mats && f.mats.imp && f.mats.imp.uniforms.uImpGust; return !!u; })();
+    const cm0 = (() => { const f = flora(); return f ? !!f.crownMass : true; })();      // (the far crowns as masses as the run starts: crownMass)      // (the far crowns take the gust bands: impGust)      // (the shadow pass's whole-draw setting as the run starts: shWhole)
     const T0 = {
       leaves: ['near trees: leaves only', nearPart('leaves'), nearPart(null)],
       wood: ['near trees: wood only', nearPart('wood'), nearPart(null)],
@@ -400,6 +401,8 @@ export function attachBench(pc) {
       //  the row asks the other way from how the run started; flora.setShadowWhole)
       // (the far impostors in the gust bands, ?gustbands=1: the crowns keep their paint where a band passes; the ground
       //  keeps its bands. Only asked from the air, where the impostors are the wood: flora.setImpGust)
+      // (crown mass, the look director's audit finding 1: the row asks the other way from how the run started)
+      crownMass: [cm0 ? 'far crowns stroke by stroke' : 'far crowns as masses', () => { const f = flora(); if (f && f.setCrownMass) f.setCrownMass(!cm0); }, () => { const f = flora(); if (f && f.setCrownMass) f.setCrownMass(cm0); }],
       impGust: ['far crowns: no gust bands', () => { const f = flora(); if (f && f.setImpGust) f.setImpGust(false); }, () => { const f = flora(); if (f && f.setImpGust) f.setImpGust(true); }],
       shWhole: [shw0 ? 'split trees by part in shadow pass' : 'split trees whole in shadow pass',
         () => { const f = flora(); if (f && f.setShadowWhole) f.setShadowWhole(!shw0); }, () => { const f = flora(); if (f && f.setShadowWhole) f.setShadowWhole(shw0); }],
@@ -702,7 +705,7 @@ export function attachBench(pc) {
       [AS, null, null],
       T0.mid45, T0.hand, T0.pack,
       ...airAt(150, 30, [T0.noFar, T0.blob, T0.imp, T0.farFlat, T0.a2c, T0.farStill, ...(gust0 ? [T0.impGust] : [])]),
-      ...airAt(400, 45, [T0.noFar, T0.blob, T0.imp, T0.noSh]),
+      ...airAt(400, 45, [T0.noFar, T0.blob, T0.imp, T0.noSh, T0.crownMass]),
       onFoot,
       [AS + ', last', null, null],
     ];
