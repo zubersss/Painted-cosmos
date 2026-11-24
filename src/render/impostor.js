@@ -583,13 +583,21 @@ void main() {
       // (CROWN MASS: the colours stand in STANDS, as the canopy roof lays them (render/farground.js pcCanFam) and as the
       //  references from the air paint them, "a patchwork: stands of orange, amber, yellow and red broadleaves": a share
       //  of the trees (uMassK2.x) take their stand's place on the family run, a stand being a block of 32 m of the body,
-      //  and the rest their own, so the share of each colour stays the far trees' own. One place a tree drew its own:
+      //  and the rest their own (the stand's place weighted by the references' canopy, below). One place a tree drew its own:
       //  neighbouring crowns of a few px yellow, red, orange in turn, the confetti seen at 150 m with one colour a tree.)
       vec3 cellS = floor((io + uOrigin) / 32.0);
       float tfS = fract(sin(dot(cellS, vec3(12.9898, 78.233, 37.719))) * 43758.5453);
-      tf = fract(inst.z * 5.17) < uMassK2.x ? tfS : tf;
+      bool standPick = fract(inst.z * 5.17) < uMassK2.x;
     #endif
     float cF = tf < 0.4 ? tf * 0.5 : (tf < 0.8 ? 0.3 + (tf - 0.4) * 0.75 : 0.75 + (tf - 0.8) * 1.25);
+    #ifdef PC_MASS
+      // (a STAND's place on the run is weighted by the references' measured canopy, the look director, 24 Nov (the 18 Nov
+      //  table: of the canopy about 19 per cent lemon, 53 amber, 25 orange, 3 red): a fifth of the stands yellow, half
+      //  amber -- the run's middle --, a quarter orange, one in twenty red. With the far tree's own split (four yellow,
+      //  four orange, two red) whole yellow stands were a sixth of the 150 m wood in bright yellow. Only the stand's pick:
+      //  the near trees' own leaf mix and the look data are left as they are.)
+      if (standPick) cF = tfS < 0.2 ? tfS : (tfS < 0.7 ? 0.35 + (tfS - 0.2) * 0.5 : (tfS < 0.95 ? 0.6 + (tfS - 0.7) : 0.85 + (tfS - 0.95) * 3.0));
+    #endif
     float a0 = clamp(cF - 0.13, 0.0, 1.0), b0 = clamp(cF + 0.13, 0.0, 1.0);
     vec3 pa = a0 < 0.5 ? mix(lA, lB, a0 * 2.0) : mix(lB, famL.rgb, a0 * 2.0 - 1.0);
     vec3 pb = b0 < 0.5 ? mix(lA, lB, b0 * 2.0) : mix(lB, famL.rgb, b0 * 2.0 - 1.0);
@@ -917,7 +925,7 @@ export function makeImpostorMaterial(bodyU, atlas, farMat, farcrown = FARCROWN) 
   //  uniform anywhere -- and only with ?gustbands=1, read from the address as the weather's contract asks)
   // (CROWN MASS: IMP_FRAG. Its uniforms always, so the speed test can switch it either way while the game runs:
   //  flora.setCrownMass)
-  own.uMassK = { value: new THREE.Vector4(0.0, 7.0, 30.0, 4.0) }; own.uMassK2 = { value: new THREE.Vector4(1.0, 0.65, 0.35, 10.0) };
+  own.uMassK = { value: new THREE.Vector4(0.0, 7.0, 30.0, 4.0) }; own.uMassK2 = { value: new THREE.Vector4(1.0, 0.65, 0.35, 30.0) };
   const gust = GUSTBANDS && !!PHYS.uPhysGust;
   if (gust) Object.assign(own, PHYS, { uImpGust: { value: 1 } });      // (the whole PHYS block by reference, as with the lean: FLORA_GLSL is compiled for the bands)
   const m = new THREE.ShaderMaterial({
