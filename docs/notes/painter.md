@@ -458,7 +458,28 @@ ruling: the spruce budgeted by bough ONLY in its middle form (the near spruce as
 the 3 px floor, the needle mass held at V >= 0.24 from 20 m (median 0.231 against 0.169 at 20 m, seen); 3.0 refused.
 Stills `A2_pines2_*`. +2,934 triangles at the landing. A denser far spruce (baked from a by-bough tree) is for A1, after
 A1's crown masses; F raises it. Both needle blocks of PROP_VERT sit inside `#ifdef PC_OIL`: the watercolour game is
-untouched.
+untouched. (24 Nov, late: A1 asked what that bake needs; told: the middle form spruceGeometry(seed, 1, needleTop) with
+its needles grown 2.2 and floored at V 0.24, as the middle spruce is at 30 m.)
+
+**NEAR LEAVES AS SHARDS (`?nearleaf=1`, OFF by default; the look director's audit 2, R3.6, `crop_leafcards_foot.jpg`).**
+BUILT on F's terms: a tall tree's leaf within 3.5 m of the eye shrinks about its own centre, to 0.55 at 1.0 m on a
+smoothstep from 3.5 m, whole and crisp, no fade; from 3.5 m out nothing changes (materials.js PROP_VERT `uNearLeaf`,
+flora.js `NEARLEAF`, set on the tall materials only; the uniform can be flipped live). In motion a leaf shrinks as the
+eye comes near: to be watched on the owner's device. SEEN (phone settings 1024 x 480 and 936 x 372): to the eye the
+pairs are the same; under a maple's crown from 1.5, 3 and 6 m the switch changes 490, 114 and 33 pixels (a handful of
+dark leaves nearest the eye), and in the stream views, autumn and summer, nothing beyond the frame-to-frame motion of
+the water (stills `A2_nearleaf_*`). WHY SO LITTLE: F's crop is the TOP LEFT OF THE SUMMER STILL `sum_foot_12.jpg`
+(300 x 140 at x2: matched to 4 of 255), a maple whose trunk is some 11 m off and whose crown reaches over the eye; F's
+build had design-water in it, which moved the river, and in this branch's world no tree stands within 11.5 m of that
+camera, so the view cannot be made again here. From the leaves' size in F's still (a maple's near leaf is built
+0.33 x 0.22 m, x 1.2 for the kind, x 0.7 to 1.3; fov 55 at 480 lines is 461 px to the radian): the few biggest pieces,
+50-85 px, are leaves 3 to 4.5 m off; most, 20-30 px, are leaves 7 to 15 m off that the THINNING has grown. The leaf
+thinning's start follows the picture's height (flora.js: ts = range scale x picture height / 1080, never under half):
+at 480 lines, the audit's size, a near tree thins from 6.5 m (0.24 x 90 x 0.3) and grows each kept leaf 1.3 times at
+10 m and 1.65 at 15 m; on a picture 720 to 1440 lines tall it would thin from about 8.6 to 13 m (worked out from the
+code, not rendered). So the audit's near leaves at 7-15 m are larger than a phone at full size shows them. The maple's
+near leaves already have six corners (kitbuild.js leafCards `round`): F's option (2) is in place for it. Open: F's
+ruling on what to do next (reported 24 Nov, late).
 
 **THE PINES AS POLES (24 Nov, the coordinator's urgent check and the first cure, `?pines=1`).**
 Not the split: on v39.1 the poles are the same with the one program (0.2 of 255; stills `A2_pines-v391_*`), and every
