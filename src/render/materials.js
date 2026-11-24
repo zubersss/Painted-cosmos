@@ -1753,9 +1753,16 @@ void main() {
       //  the sea's level. Ponds, lakes and rivers keep the calmer values alone, as water-paint has them by default)
       float sk = wStill * smoothstep(40.0, 220.0, dist) * liq, so = step(0.75, vOpen);      // (only where every pixel takes the sea's level: vOpen 0.75 and over, wpL's own rule)
       c = mix(c, pcDensity(c, 1.45), sk * so);
-      wThL = mix(wThL, mix(0.74, mix(0.80, 0.88, wChop), so), sk); wThD = mix(wThD, 0.22, sk);      // (in a strait's chop the light strokes fewer still)
-      cdeep = mix(cdeep, mix(pcDensity(c, 1.65) * vec3(0.92, 0.94, 1.0), pcDensity(c, 1.40) * vec3(0.93, 0.95, 1.0), so), sk);
-      clight = mix(clight, mix(c, wLightC, mix(0.40, 0.36, so)), sk);
+      // THE SEA'S SPARKLE (the look director, measured: the new sea one mid blue-grey, its value spread half v37's): over the
+      // deep body, a few whole light strokes, more and brighter on the sun's side (to about value 0.88, never over 0.90),
+      // and a few whole dark troughs (to about 0.42). Ponds and lakes keep the calm values (so 0).
+      vec3 rfS = reflect(-normalize(vToCam), up), shS = uSunDirL - up * dot(uSunDirL, up); rfS -= up * dot(rfS, up);
+      float sunS = (dot(rfS, rfS) > 1e-8 && dot(shS, shS) > 1e-8 ? smoothstep(-0.1, 0.8, dot(normalize(rfS), normalize(shS))) : 0.0) * max(uDayness, uMoon);
+      float thLs = mix(0.85, 0.78, sunS) + 0.03 * wChop;
+      wThL = mix(wThL, mix(0.74, thLs, so), sk); wThD = mix(wThD, mix(0.22, 0.16, so), sk);
+      vec3 lS = mix(c, wLightC, mix(0.62, 0.85, sunS)); float mS = max(lS.r, max(lS.g, lS.b)); lS *= mS > 0.90 ? 0.90 / mS : 1.0;
+      cdeep = mix(cdeep, mix(pcDensity(c, 1.65) * vec3(0.92, 0.94, 1.0), pcDensity(c, 1.85) * vec3(0.92, 0.94, 1.0), so), sk);
+      clight = mix(clight, mix(mix(c, wLightC, 0.40), lS, so), sk);
     }
     #endif
     float wsp = pow(max(dot(reflect(-normalize(vToCam), up), uSunDirL), 0.0), wSunE) * wSunK * max(uDayness, uMoon) * (1.0 - uWx.x);
