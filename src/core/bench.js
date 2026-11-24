@@ -592,7 +592,7 @@ export function attachBench(pc) {
       //  on cards (?trees2=cards). Each against the "as set" row above, built afresh while the test runs.)
       ...T2ROWS,
       ['no trees', () => show(/^pc-prop-(tall|far)/, false), () => show(/^pc-prop-(tall|far)/, true)],
-      ['no small plants', () => show(/^pc-prop-(?!tall|far)/, false), () => show(/^pc-prop-(?!tall|far)/, true)],
+      ['no small plants', () => show(/^pc-prop-(?!tall|far|under2)/, false), () => show(/^pc-prop-(?!tall|far|under2)/, true)],
       // (the flora lane) what the near grass costs (all of it: GRASS's first row), and its finest ring alone. Its material's own `visible` is
       // the switch: the ring's update moves its mesh, never this.
       ['near grass: the blades only (the fine ring and the carpet)', () => nearRings((r) => { r.material.visible = r.cfg.name === 'fine' || !!r.cfg.carpet; }),
@@ -741,11 +741,15 @@ export function attachBench(pc) {
     // ?bench=foot: the frame on foot at the landing without the trees' questions (the owner's 33 ms, 24 Nov). With the
     // two short programs and the impostors as the default trees the frame is expected near 22 ms (derived, never
     // measured), so these rows are asked off the cap, where they can be read: each against the "as set" row before it.
+    const UNDER0 = (() => { try { return new URLSearchParams(location.search).get('under') === '1'; } catch (e) { return false; } })();
     const footSteps = [
       [AS, null, null],
       ...GRASS,
       [AS, null, null],
-      ['no small plants', () => show(/^pc-prop-(?!tall|far)/, false), () => show(/^pc-prop-(?!tall|far)/, true)],
+      ['no small plants', () => show(/^pc-prop-(?!tall|far|under2)/, false), () => show(/^pc-prop-(?!tall|far|under2)/, true)],
+      // (the flora lane's undergrowth with a body, package O, world/underkit.js: in a speed test the kits are always placed,
+      //  shown only if the run started with ?under=1, and this row asks the other way; 'no small plants' leaves them alone)
+      [UNDER0 ? 'no undergrowth' : 'with the undergrowth', () => show(/^pc-prop-under2/, !UNDER0), () => show(/^pc-prop-under2/, UNDER0)],
       ['no ground drawn', () => ground(false), () => ground(true)],
       ['ground one flat colour', () => B({ flat: 1 }), () => B({ flat: 0 })],
       [AS, null, null],

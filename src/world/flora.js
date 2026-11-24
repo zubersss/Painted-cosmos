@@ -15,7 +15,8 @@
 import * as THREE from 'three';
 import { getSurface } from './surface.js';
 import { dirToFace, faceToDir, nodeSize } from './cubesphere.js';
-import { INST_STRIDE, U_GRASS, U_FERN, U_BUSH, U_ROCK, U_FLOWER, U_STONE, U_REED, U_SHARD } from './floraplace.js';
+import { INST_STRIDE, U_GRASS, U_FERN, U_BUSH, U_ROCK, U_FLOWER, U_STONE, U_REED, U_SHARD, U_KIT0 } from './floraplace.js';
+import { underKit } from './underkit.js';      // (the flora lane's undergrowth with a body, ?under=1: world/underkit.js)
 import { SEASON, leafNow } from '../data/season.js';
 import { FLORA_PHYS, TALL_KITS, farCardGeometry, farBlobGeometry, sortLeafCards, leafDrawCount, farTreeGeometry, grassGeometry, grassPatchGeometry, reedGeometry, fernGeometry, bushGeometry, rockGeometry, flowerGeometry, shardGeometry } from './florakit.js';
 import { makePropMaterial, TREE_DEPTH, TREE_GUARD } from '../render/materials.js';
@@ -924,6 +925,7 @@ export class Flora {
       const pk = biomes[d[o + 6]] && biomes[d[o + 6]].under ? d[o + 6] : -1;
       let lists = sets.get(pk);
       if (!lists) { lists = { gn: [], gf: [], fern: [], reed: [], flower: [], bush: [], rock: [], shard: [] }; sets.set(pk, lists); }
+      if (kind >= U_KIT0) { if (!grass) { const kl = lists.kits || (lists.kits = new Map()); (kl.get(kind) || kl.set(kind, []).get(kind)).push(i); } continue; }
       if (kind === U_GRASS) { if (grass) (d[o + 7] < 0.55 ? lists.gn : lists.gf).push(i); }
       else if (grass) continue;
       else if (kind === U_FERN) lists.fern.push(i);
@@ -979,6 +981,8 @@ export class Flora {
       make(lists.bush, this.kit.bush, M.bush, [0, UNDER_FAR, 0.3, 0.8], 0, true);
       make(lists.rock, this.kit.rock, M.rock, [0, UNDER_FAR, 0.3, 0.85], 0);
       make(lists.shard, this.kit.shard, M.shard, [0, UNDER_FAR, 0.3, 0.85], 0);
+      // (the undergrowth with a body, ?under=1 only: a list per kit, in the kit's own material for its biome)
+      if (lists.kits) for (const [kind, list] of lists.kits) { const K = underKit(this, kind, d[list[0] * INST_STRIDE + 6]); if (K) make(list, K.geo, K.mat, K.lod, 0, true); }
     }
   }
 

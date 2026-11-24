@@ -4,11 +4,30 @@
 import { faceToDir } from './cubesphere.js';
 import { makeSample, NOLQ } from './surface.js';
 import { hash3i, smoothstep, clamp } from './noise.js';
+import { MODE } from '../data/mode.js';
 
 // kinds
 export const K_BIRCH = 0, K_PINE = 1, K_BIRCH_AUTUMN = 2;
 export const U_GRASS = 0, U_FERN = 1, U_BUSH = 2, U_ROCK = 3, U_FLOWER = 4, U_STONE = 5, U_REED = 6, U_SHARD = 7;
 const SMALL = [['grass', U_GRASS], ['fern', U_FERN], ['bush', U_BUSH], ['rock', U_ROCK], ['flower', U_FLOWER], ['reed', U_REED], ['shard', U_SHARD]];
+
+// THE UNDERGROWTH WITH A BODY (package O / F4 of docs/lead/FLORA-DESIGN.md, the flora lane; `?under=1`, the oil look
+// only, OFF by default until the look director passes it). Plants with a body -- heather and gorse on the cliff tops,
+// and more as they are built -- are kits (world/underkit.js), placed here on a grid of their own in each undergrowth
+// cell, in patches, from a biome's `oil.flora.plants` (pure data, data/looks/<world>.js). Each kit is a kind of its
+// own, U_KIT0 + its place in UNDER_KITS; world/flora.js meshes each in a list of its own. Off, nothing below runs and
+// every cell is placed exactly as before.
+export const U_KIT0 = 16;
+export const UNDER_KITS = ['heather', 'gorse'];
+const KIT_GRID = 9;      // candidates a side in an undergrowth cell (about 2.7 m apart on Earth)
+let _u2 = null;
+export function under2On() {
+  // (also in a speed test, ?bench=, where the kits are placed whatever the address says and shown only with ?under=1,
+  //  so its row can ask the other way: core/bench.js; world/underkit.js starts their materials hidden without it)
+  if (_u2 == null) { try { const q = new URLSearchParams(location.search); _u2 = q.get('under') === '1' || q.has('bench'); } catch (e) { _u2 = false; } }
+  return _u2 && MODE.oil;
+}
+export function setUnder2(on) { _u2 = !!on; }      // (tests and the speed test: the address is read once)
 
 const STRIDE = 12;   // x y z (body-local position), scale, yaw, kind, variant (trees) or biome index (undergrowth), seed, hue, value, canopy, lean
 export const INST_STRIDE = STRIDE;
@@ -179,5 +198,47 @@ export function placeUnder(S, face, level, ix, iy, grid) {
         reed ? -0.2 - 0.8 * r5 : (r5 - 0.5) * 2 + (s.glade - 0.5) * 0.8, reed ? 0.5 + 0.8 * r4 : (r4 - 0.5) * 2 * 0.6, s.canopy, 0.1 * r1);
     }
   }
+  if (under2On()) placeKits(S, face, level, ix, iy, out);
   return { count: out.length / STRIDE, data: new Float32Array(out) };
+}
+
+// (the undergrowth with a body, above: each candidate picks one of its biome's plants by their shares; a plant grows in
+// PATCHES of about `drift` metres (its own noise, two octaves, so a patch has a ragged edge), as heather and gorse stand
+// on a cliff top in clumps with turf between; `hab` keeps it off ground it does not grow on, ramps as bloom.js reads
+// them: canopy (the wood's roof), under (open sward), rock, wet (near water), each [a, b] full past b, none before a)
+function ramp(r, x) { return r ? smoothstep(r[0], r[1], x) : 1; }
+function placeKits(S, face, level, ix, iy, out) {
+  const s = _s, R = S.R;
+  const span = 2 / (1 << level), u0 = -1 + ix * span, v0 = -1 + iy * span;
+  const seed = cellSeed(face, level, ix, iy, 911), g = KIT_GRID;
+  for (let b = 0; b < g; b++) {
+    for (let a = 0; a < g; a++) {
+      const r1 = hash3i(a, b, 1, seed), r2 = hash3i(a, b, 2, seed), r3 = hash3i(a, b, 3, seed), r4 = hash3i(a, b, 4, seed), r5 = hash3i(a, b, 5, seed);
+      faceToDir(face, u0 + span * (a + 0.05 + 0.9 * r1) / g, v0 + span * (b + 0.05 + 0.9 * r2) / g, _d);
+      const top0 = S.biomeWeights(_d[0], _d[1], _d[2], s.w), b0 = S.biomes[top0];
+      const P = b0 && b0.oil && b0.oil.flora && b0.oil.flora.plants;
+      if (!P || !P.length) continue;
+      let pl = null, acc = 0;
+      for (const q of P) { acc += q.share || 0; if (r4 < acc) { pl = q; break; } }
+      if (!pl) continue;
+      const k = UNDER_KITS.indexOf(pl.kit);
+      if (k < 0) continue;
+      // the patch first (no sample needed: most candidates fall between patches)
+      const d = pl.drift || 12, o = 13.7 * (k + 1), fq = R / d, fq2 = fq * 2.7;
+      const n = S.nC.n3(_d[0] * fq + o, _d[1] * fq - o, _d[2] * fq + 0.5 * o) + 0.4 * S.nC.n3(_d[0] * fq2 - o, _d[1] * fq2 + o, _d[2] * fq2 - o);
+      const patch = smoothstep(pl.edge != null ? pl.edge : 0.05, (pl.edge != null ? pl.edge : 0.05) + 0.25, n);
+      if (r3 >= patch * (pl.dens != null ? pl.dens : 0.8)) continue;
+      S.sample(_d[0], _d[1], _d[2], s, true);
+      if (s.lq !== NOLQ && s.lq > s.h - 0.05) continue;                 // (nothing with a body stands in water)
+      if (S.biomes[s.top] !== b0) continue;                              // (the biome the plant belongs to)
+      const h = pl.hab;
+      if (h) {
+        const wet = s.s == null ? 0 : 1 - smoothstep(1.5, 22, s.s);
+        const fit = ramp(h.canopy, Math.min(1, s.canopy || 0)) * ramp(h.under, s.under || 0) * ramp(h.rock, Math.min(1, s.rock || 0)) * ramp(h.wet, wet);
+        if (hash3i(a, b, 7, seed) >= fit) continue;
+      }
+      const sc = (pl.size ? pl.size[0] + (pl.size[1] - pl.size[0]) * r5 : 0.7 + 0.6 * r5) * (0.8 + 0.4 * patch), rr = R + s.h - 0.03;
+      out.push(_d[0] * rr, _d[1] * rr, _d[2] * rr, sc, r2 * 6.2831853, U_KIT0 + k, s.top, hash3i(a, b, 6, seed), (r5 - 0.5) * 2, (r3 - 0.5) * 1.2, s.canopy, 0.06 * r1);
+    }
+  }
 }

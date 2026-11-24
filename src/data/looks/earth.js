@@ -96,6 +96,15 @@ const FLORA_SC = {      // the sea cliffs: thrift along the edge, campion on the
     // (the year: the cliff top's autumn is heather, pink-purple spikes in the short turf)
     { kind: 'heather', shape: 'spike', c: M('roseMadder', 'cobaltViolet', 0.5), head: [0.06, 0.12], stalk: [0.15, 0.30], heads: [1, 1], drift: 10, peak: 8, share: 0.8, season: [0.35, 1], bold: 1 },
   ],
+  // (package O, ?under=1 only, world/underkit.js: the plants with a body; the design's "purple heather and yellow gorse
+  // in large patches on the cliff tops: the one thing that tells a coast from a meadow". share: of the kit candidates;
+  // drift: a patch's size in m; dens: how full a patch; size: the kit's scale; hab: ramps as bloom.js reads them)
+  plants: [
+    { kit: 'heather', share: 0.55, drift: 14, dens: 0.85, size: [0.7, 1.3], hab: { canopy: [0.35, 0.10], rock: [0.85, 0.45] },
+      c: { leaf: [M('sapGreen', 'davysGrey', 0.45), M('oliveGreen', 'davysGrey', 0.35), M('hookersGreen', 'davysGrey', 0.40)], accent: M('roseMadder', 'cobaltViolet', 0.5) } },
+    { kit: 'gorse', share: 0.35, drift: 18, dens: 0.70, size: [0.8, 1.4], hab: { canopy: [0.30, 0.05], rock: [0.80, 0.40] },
+      c: { leaf: [M('hookersGreen', 'sapGreen', 0.30), M('oliveGreen', 'hookersGreen', 0.50), M('hookersGreen', 'neutralTint', 0.30)], accent: pig('lemonYellow') } },
+  ],
 };
 const FLORA_DC = {      // the desert canyon: sparse, after rain, in the washes and at the foot of the walls
   blooms: [
