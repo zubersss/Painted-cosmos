@@ -1083,6 +1083,10 @@ varying vec2 vTurb;
 // (the water's new paint, ?wpaint=2: aTurb.w is how STILL the water is here, 0 a current .. 1 a pond, a lake, the sea,
 // as the mesher measured it: world/patchgen.js. A byte of 0 everywhere without the switch, and nothing reads it)
 varying float vStill;
+// (THE SHORE, lane W2: the way toward land times how near it is, two bytes about 128 in the current's frame; the sea only,
+// world/shore.js and patchgen.js. Not bound, it reads 0, 0, which is passed on as none)
+attribute vec2 aShore;
+varying vec2 vShore;
 #endif
 #ifdef PC_RUNOFF
 // (the water that comes and goes with the rain, ?runoff=1: x the depth that exists only in the wet, a byte of 0.6 m; y how
@@ -1159,6 +1163,7 @@ void main() {
     vTurb = aTurb.xy;
     #ifdef PC_WPAINT
       vStill = aTurb.w;
+      vShore = aShore.x + aShore.y < 0.002 ? vec2(128.0 / 255.0) : aShore;
     #endif
   #endif
   vec4 mv = modelViewMatrix * vec4(p + pcRound(vBody), 1.0);
@@ -1194,6 +1199,7 @@ varying vec2 vTurb;      // x the water's own speed (0: the mesher gave none), y
 #ifdef PC_WPAINT
 uniform float uWPaint;   // the water's new paint (?wpaint=2): 1 on, 0 v37's (the speed test's row); render/waterchunk.js
 varying float vStill;    // how still the water is here, 0 a current .. 1 a pond, a lake, the sea (world/patchgen.js)
+varying vec2 vShore;     // the way toward land times its nearness, about 128/255 none (the sea only; world/shore.js, lane W2)
 #endif
 #ifdef PC_RUNOFF
 uniform vec4 uRunoff;    // the world's wetness now, the streams' rise (m), the brown (world/waterstate.js)
@@ -1541,7 +1547,22 @@ void main() {
       vec3 Uf = normalize(abs(up.y) < 0.9 ? vec3(-up.z, 0.0, up.x) : vec3(0.0, up.z, -up.y));
       vec2 fc = pcGroundChartD(vBody, Uf * fl.x + cross(up, Uf) * fl.y, uBodyR);
       fc = dot(fc, fc) > 1e-12 ? normalize(fc) : vec2(1.0, 0.0);
-      vec2 kc = pcGroundChartD(vBody, cross(up, pcPhysWaterDir(sdir)), uBodyR);
+      // THE SHORE (lane W2, world/shore.js; the look director: "a swell's crests lie roughly parallel to the shore as
+      // waves come in"): PHYSICS turns the waves toward a shore only within its sea map round the player, so near land
+      // the mesher hands over the way toward it and how near (vShore), and the wind's waves are turned toward it by that
+      // much, as a swell turns to meet a shore; the strokes then lie along the turned crests. Waves already running out to
+      // sea are left as they are. Out in open water (vShore none) the wind's own crests, as before.
+      vec3 D3w = pcPhysWaterDir(sdir); D3w -= up * dot(D3w, up); D3w = dot(D3w, D3w) > 1e-12 ? normalize(D3w) : Uf;
+      vec2 shm = vShore * (255.0 / 127.0) - (128.0 / 127.0);
+      float shw = min(length(shm), 1.0);
+      if (shw > 0.02) {
+        vec3 nL = normalize(Uf * shm.x + cross(up, Uf) * shm.y);
+        float cA = dot(D3w, nL), sA = dot(cross(D3w, nL), up);
+        float ang = atan(sA, cA) * shw * smoothstep(-0.95, -0.6, cA);
+        D3w = D3w * cos(ang) + cross(up, D3w) * sin(ang);
+      }
+      vec3 kc3 = cross(up, D3w);
+      vec2 kc = pcGroundChartD(vBody, kc3, uBodyR);
       kc = dot(kc, kc) > 1e-12 ? normalize(kc) : vec2(1.0, 0.0);
       float still = max(vStill, 1.0 - smoothstep(0.30, 0.56, coh));
       wStill = still;
@@ -1555,7 +1576,7 @@ void main() {
       // this paint, E4 at the phone's size). The squeeze is worked out from the way the rows stack and the way the eye
       // looks, both smooth over the water: the rows' own size on the screen is a derivative, and the octave's derivative
       // taken from it was blocky from one square of pixels to the next and frayed the strokes' ends.
-      vec3 f3 = Uf * fl.x + cross(up, Uf) * fl.y, k3 = cross(up, pcPhysWaterDir(sdir));
+      vec3 f3 = Uf * fl.x + cross(up, Uf) * fl.y, k3 = kc3;
       vec3 d3 = mix(dot(f3, f3) > 1e-6 ? normalize(f3) : k3, dot(k3, f3) < 0.0 ? -k3 : k3, still);
       float rowF = length(cross(cross(up, dot(d3, d3) > 1e-6 ? normalize(d3) : k3), Vd));
       float graze = 1.0 / max(rowF, 0.333);

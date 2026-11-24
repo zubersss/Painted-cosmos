@@ -18,6 +18,7 @@
 // slope toward land (every ring counts the same, so a rock on the near ring cannot swing it); the coastline runs across it.
 // A node over deep water (DEEP m and more) is far from any shore: it is not measured at all.
 import { NOLQ, makeSample } from './surface.js';
+import { smoothstep } from './noise.js';
 
 export const SHORE_DEF = {
   lattice: 160,              // metres between the field's nodes
@@ -26,6 +27,7 @@ export const SHORE_DEF = {
   na: 8,                     // points a ring
   deep: 30,                  // metres of water at the node: no shore near (not measured)
   clampH: [-20, 12],         // metres about the sea: a cliff's top cannot outweigh the shore's line
+  share: [0.15, 0.45],       // the share of a ring on land over which it counts from nothing to fully near
 };
 
 const FACE = (x, y, z) => { const ax = Math.abs(x), ay = Math.abs(y), az = Math.abs(z); return ax >= ay && ax >= az ? (x > 0 ? 0 : 1) : ay >= az ? (y > 0 ? 2 : 3) : (z > 0 ? 4 : 5); };
@@ -73,7 +75,10 @@ export class ShoreField {
         const hh = Math.max(o.clampH[0], Math.min(o.clampH[1], st.h - this.sea));
         gx += c * hh; gy += s * hh;
       }
-      if (land > 0 && w === 0) w = o.near[r];
+      // (how near: by the SHARE of the ring that is land, so a rock or a sea stack, one point of eight, turns nothing,
+      //  and a coastline, three or four of eight, turns the waves fully: the first stills curled the strokes into rings
+      //  round every stack)
+      w = Math.max(w, o.near[r] * smoothstep(o.share[0], o.share[1], land / o.na));
     }
     const gl = Math.hypot(gx, gy);
     if (!(gl > 1e-6) || w <= 0) return ZERO;
