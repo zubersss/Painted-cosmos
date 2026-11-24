@@ -81,3 +81,55 @@ export function getDabTextures(aspect, agree) {
   _dab = { par, id, aspect, agree };
   return _dab;
 }
+
+// A SPRAY OF LEAVES ON A CARD (the trees to 30 a second, ?trees2=cards, 2026-11-24; docs/lead/TREES-DESIGN.md on r2,
+// package T2). The same baked layer, read over a card of leaves' own chart (kitbuild.js clusterCard: the chart in DAB
+// CELLS, so nothing about a kind's leaf size has to be handed to the shader). One text, included by the card's paint
+// (materials.js CARD_FRAG) and by the shadow map (shadow.js), so the leaves a card throws a shadow with are exactly the
+// leaves it is painted with. The includer declares uDabP and uDabId.
+//   SPRAY.pres: the share of the layer's dabs laid on a card (the rest is the sky between leaves); SPRAY.rag: how far
+//   in from a card's edge a leaf may be made to stop, by its own number (the outline is ragged leaf by leaf).
+export const SPRAY = { pres: 0.8, rag: 0.25 };
+export const SPRAY_GLSL = /* glsl */`
+#define PC_SPRAY_N ${DAB_N.toFixed(1)}
+#define PC_SPRAY_T ${DAB_T.toFixed(1)}
+vec3 pcSprayHash(vec2 p) {
+  vec3 q = fract(vec3(p.xyx) * vec3(0.1031, 0.1030, 0.0973));
+  q += dot(q, q.yzx + 33.33);
+  return fract((q.xxy + q.yzz) * q.zyx);
+}
+// p: the card's chart (cells, its own number already added); off: that number; ipx: pixels to a cell along the chart's
+// two axes; R: the radius of the card's corners (cells); asp: a dab's length over its width. Returns how far inside the
+// topmost laid leaf's edge the pixel lies (pixels; below 0 no leaf), and that leaf's numbers and its centre (cells from
+// the card's middle). A leaf is laid only if the whole of it lies inside the card: none is cut by the card's edge.
+float pcSpray(vec2 p, vec2 off, vec2 ipx, float R, float asp, out vec3 rnd, out vec2 ctr) {
+  vec2 cell = floor(p);
+  vec2 tf = min(floor((p - cell) * PC_SPRAY_T), PC_SPRAY_T - 1.0);
+  vec4 ids = floor(texelFetch(uDabId, ivec2(mod(cell, PC_SPRAY_N) * PC_SPRAY_T + tf + 0.5), 0) * 255.0 + 0.5);
+  float gone = 1.0 - ${SPRAY.pres.toFixed(3)}, inR = 0.866 * R;
+  rnd = vec3(0.5); ctr = vec2(0.0);
+  for (int s = 0; s < 4; s++) {
+    float code = ids[s];
+    if (code > 17.5) break;
+    float k = mod(code, 2.0), ij = floor(code * 0.5 + 0.01);
+    vec2 c = cell + vec2(mod(ij, 3.0), floor(ij / 3.0 + 0.01)) - 1.0;
+    vec2 cw = mod(c, PC_SPRAY_N);
+    vec4 P = texelFetch(uDabP, ivec2(int(cw.x + 0.5) * 2 + int(k + 0.5), int(cw.y + 0.5)), 0);
+    if (P.a <= gone) continue;
+    vec2 o = c + P.xy, d = p - o;
+    float cs = cos(P.z), sn = sin(P.z);
+    vec2 q = vec2(cs * d.x + sn * d.y, cs * d.y - sn * d.x);
+    float a = 0.62 + 0.36 * fract(P.a * 16.0), b = a / asp * (0.8 + 0.4 * fract(P.a * 256.0));
+    float t = q.x / a;
+    if (abs(t) >= 1.0) continue;
+    float inside = b * (1.0 - t * t) - abs(q.y);
+    if (inside <= 0.0) continue;
+    vec3 r = pcSprayHash(c + k * 31.7);
+    vec2 oc = o - off;
+    if (length(oc) + a > inR * (1.0 - ${SPRAY.rag.toFixed(3)} * r.z)) continue;
+    rnd = r; ctr = oc;
+    return min(inside * length(vec2(-sn, cs) * ipx), (a - abs(q.x)) * length(vec2(cs, sn) * ipx));
+  }
+  return -1.0;
+}
+`;

@@ -7,7 +7,7 @@ import * as THREE from 'three';
 import { Post } from './post.js';
 import { G, SHEET, WX, QUALITY, FRAME_HOOKS, GLAZES, MOTION, PREV, LOOK, OIL, SHADOW, ensureGlobals, SCREEN, MATERIALS } from './shared.js';
 const _lv = new THREE.Vector3();
-import { makeWashMaterial, makePaintUniforms, standInFor, bindBodyUniforms, defaultBodyUniforms } from './materials.js';
+import { makeWashMaterial, makePaintUniforms, standInFor, bindBodyUniforms, defaultBodyUniforms, TREE_DEPTH } from './materials.js';
 import { VERT_PARS, VERT_END, FRAG_PARS } from './chunks.js';
 import { ShadowMap } from './shadow.js';
 
@@ -197,6 +197,20 @@ export function createPainter(renderer) {
     swapped.length = 0;
   }
 
+  // (package T5) each card mesh that is shown, drawn into the scene's depth with its depth-only materials, its wood
+  // left out; then put back as it was. The scene's own pass draws the cards' colour where the depth is equal.
+  function treeDepthFirst(camera) {
+    for (const mesh of TREE_DEPTH.meshes) {
+      if (!mesh.count || !mesh.userData.pcDepthMats) continue;
+      let shown = true;
+      for (let o = mesh; o && shown; o = o.parent) if (!o.visible) shown = false;
+      if (!shown) continue;
+      const src = mesh.material;
+      mesh.material = mesh.userData.pcDepthMats;
+      try { renderer.render(mesh, camera); } finally { mesh.material = src; }
+    }
+  }
+
   function render(scene, camera, dt) {
     if (dt > 0) G.uTime.value += Math.min(dt, 0.1);
     for (const hook of FRAME_HOOKS) hook(camera, info);
@@ -249,6 +263,9 @@ export function createPainter(renderer) {
     glazed.length = 0;
     for (const o of GLAZES) if (o.visible && o.parent) { o.visible = false; glazed.push(o); }
     if (placed) scene.matrixWorldAutoUpdate = false;
+    // (?treedepth=1, the trees to 30 a second, package T5: the trees' cards of leaves are laid in DEPTH ONLY before
+    //  the scene, so that in the scene each pixel of a tree is painted once, by the leaf on top: materials.js CARD_FRAG)
+    if (TREE_DEPTH.on && TREE_DEPTH.meshes.size) treeDepthFirst(camera);
     try {
       renderer.render(scene, camera);
     } finally {

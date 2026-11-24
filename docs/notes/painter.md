@@ -4,6 +4,54 @@ Branch: `cosmos` (shared with PILOT and PHYSICS, one working tree). Commits: `to
 This file was rewritten by the second PAINTER agent (the first ran out of working context). The
 first agent's record of M1 is kept at the end ("Earlier answers").
 
+## Hand-over of THE TREES NEAR lane (group A2, branch `trees-near`; kept current; 2026-11-24)
+
+The brief (from the coordinator): the owner wants 30 a second on the S23 Ultra (v37: about 89 ms a frame, the NEAR trees
+about 52 ms of it) without losing the look; the near trees at 5-15 m are approved as they look now. This lane builds
+packages T2, T3 and T5 of `docs/lead/TREES-DESIGN.md` (on `r2`), each behind a switch and a speed-test row, and does not
+touch the far trees, the hand-over distances or the shadows' cost (session A1, branch `trees-far`), nor chunks.js,
+post.js, shared.js or world/index.js (the look director's).
+
+**A FINDING THAT SHAPES THE LANE (measured in Node, not on a device).** A scratch rasteriser over the real grove kit
+(roundmaple seed 11, the phone's 372 lines, fov 58, today's leaf thinning applied to both): leaf CARDS carrying a dab
+spray RASTERISE 5 TO 9 TIMES THE FRAGMENTS of today's leaf polygons for the same leaves on screen (6 m: 153k-179k
+against 24.8k; 12 m: 78k-82k against 15.8k), because a spray card is mostly sky round its leaves and every one of those
+fragments runs the lookup before it is discarded, while a leaf polygon covers exactly its leaf and its paint is already
+done in the vertex shader. Cards save 3,000-5,000 triangles a tree. Told to the coordinator; so BOTH forms are built and
+the phone prices both in one run.
+
+**What is built (all behind `?trees2=`; without it every tree is what it was):**
+- `?trees2=1` (or `split`): the near AND middle trees drawn by TWO SHORT PROGRAMS (`materials.js` `WOOD_FRAG`,
+  `LEAF_FRAG`, chosen by `makePropMaterial(..., { tree: 'wood' | 'leaf' })`), over two groups of one index (wood, then
+  leaves; `flora.js` `splitGroups`), with the near tree's haze of HAIR TWIGS NOT BUILT and a side fewer on every tube
+  (`kits/grove.js`, `trees2`; the hairs were 1,072 to 2,500 triangles a tree). THE SAME TREE: every random number is
+  still drawn, so the skeleton and every leaf are where they were (`src/world/trees2.test.mjs` holds it).
+  The leaf program has NO DISCARD and no alpha to coverage: the lens window, the explorer's window, the wash and the fire
+  drop WHOLE LEAVES in the vertex shader (`PROP_VERT`, `PC_TREE_LEAF`), so the card can test depth before painting. The
+  wood program paints a pixel from TWO streaks (its own and the one at its edge) with ONE light at the streak's centre
+  and two tones, where the old program toned every streak of two layers and a wash under them; it pinches a branch in
+  round the lens (`PC_TREE_WOOD`, with `Builder.axis`: a tube's ring carries its centre in `aCard`) instead of
+  discarding, and lays the branches of a wash one by one.
+- `?trees2=cards`: the same wood, and the near tree's leaves as CLUSTERS ON CARDS (`kitbuild.js clusterCard`, part 7;
+  one six-cornered card where a clump of leaves hung; its chart in DAB CELLS so the shader needs no number of the
+  kind's own). The leaves on a card are the ground's own baked dab layer (`dabtex.js SPRAY_GLSL`, shared by the card's
+  paint `CARD_FRAG` and the shadow map, so a card throws exactly the leaves it is painted with); a leaf is laid only if
+  it lies whole inside the card (the outline is leaves); painted at its own centre with one tone. Cards thin and grow by
+  distance as leaves do (`sortLeafCards`, `uLeafLod`: part 7 counts as a leaf).
+- `?treedepth=1` (with `?trees2=cards`): package T5. The cards are drawn in DEPTH ONLY before the scene
+  (`render/index.js treeDepthFirst`, `materials.js TREE_DEPTH`), then in colour where the depth is EQUAL, with no discard
+  and no alpha to coverage; `invariant gl_Position` keeps the two passes' corners identical.
+- Speed-test rows (`core/bench.js`): 'trees: two short programs', 'near trees as clusters', 'clusters with a depth pass
+  first', each swapped in while the test runs (`flora.js setTrees2(mode, depth)`).
+- Hunks in files of other lanes, each small and said in the commit: `shadow.js` (a card's shadow through its spray;
+  cards thinned as leaves), `core/bench.js` (the rows, and its helpers now see a mesh with two materials).
+
+**Seen / measured / not:** see the newest entry below this list as it lands. Nothing here has been timed on a device.
+
+**Next:** A/B stills (5/10/18/30/45 m, autumn and green wood, phone and desktop) -> commit T2 split -> stills of cards
+and T5 (pixel-identical check) -> commit -> T3 (the middle tree) -> report each step to the coordinator and the look
+director (session_01R5Brhzz2JPPF6Ecz6XRQHx).
+
 ## Hand-over of THE OIL LOOK, prototype on branch `look-proto` (READ THIS FIRST; kept current)
 
 Branch: `look-proto`, cut from `main` at `5e85754`. Nothing here is live. The plan, the owner's instructions, the sort of
