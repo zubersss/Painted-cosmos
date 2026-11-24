@@ -19,6 +19,7 @@ import { makeNearMaterial } from '../render/materials.js';
 import { QUALITY, LOOK } from '../render/shared.js';
 import { getLook } from '../data/looks.js';
 import { bloomAt, bloomSwitches, hasBlooms, SHAPES } from './bloom.js';
+import { SEASON } from '../data/season.js';
 
 // cell (m); range (m) at quality 0, 1, 2 (0: the ring is not laid); marks per cell; the ring
 // fades in between `inner` distances (so a broad touch is never held up to the eye); how soft
@@ -118,7 +119,17 @@ const dens = (c, d) => Math.max(0, Math.min(1, c - (c - c * c) * (d - 1)));   //
 // three to five pixels and sinks into the sward (SEEN, the level meadow, 24 Nov). The data keeps real sizes; this is the
 // painter's licence, one number for all of them.
 const BLOOM_HEAD = 2.5;   // (2.0 until the coordinator's note, 24 Nov: "a poppy at 2 m should read as a poppy")
-const packTone = (c) => 1 + Math.round(Math.max(0, Math.min(1, c[0])) * 63) * 4096 + Math.round(Math.max(0, Math.min(1, c[1])) * 63) * 64 + Math.round(Math.max(0, Math.min(1, c[2])) * 63);
+// (the colour takes the low 18 bits; pure white would carry into the year's bits above them, so it stops one short)
+const packTone = (c) => Math.min(262143, 1 + Math.round(Math.max(0, Math.min(1, c[0])) * 63) * 4096 + Math.round(Math.max(0, Math.min(1, c[1])) * 63) * 64 + Math.round(Math.max(0, Math.min(1, c[2])) * 63));
+// (the year, ?bloomyear=0 off) a kind's flowering window, `season: [from, to]` on SEASON.t (0 high summer, 1 deep autumn),
+// in sevenths, in the six bits above the colour: when it comes into flower times 8, plus how far before the end of the
+// year it is over. [0, 1], or no window, is 0: in flower all the year, the mark as it was. Read by materials.js NEAR_VERT.
+const packYear = (b) => {
+  const w = b && b.season;
+  if (!w || !bloomSwitches().year) return 0;
+  const a = Math.round(Math.max(0, Math.min(1, w[0])) * 7), e = Math.round(Math.max(0, Math.min(1, w[1])) * 7);
+  return (a * 8 + (7 - e)) * 262144;
+};
 // smooth value noise on the cell grid (drifts of flowers, where the grass stands tall)
 function vnoise(x, y, seed) {
   const xi = Math.floor(x), yi = Math.floor(y), fx = x - xi, fy = y - yi, sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy);
@@ -263,6 +274,7 @@ class Ring {
     // touches painted each pixel they covered 3.8 times at the autumn landing. The shader grows a touch as the band thins.)
     u.uNear.value.set(RANGE * (FLORA.grass2 && cfg.name === 'mid' ? 0.40 : 0.66), RANGE, this.now, pixel || 0.002);
     if (u.uNearK) u.uNearK.value.w = cfg.name === 'mid' ? 0.85 : (cfg.name === 'far' ? 0.6 : 1);   // (a flower head's least size on screen, a share)
+    if (u.uNearK) u.uNearK.value.y = FLORA.bloom ? SEASON.t : 0;    // (the flowers' year: packYear above)
     // (the fade-in band is a tier's own where a ring says so: the vista ring is laid at two tiers whose reaches
     // differ by more than twice, and one band of metres cannot serve both -- at the middle tier it would fade in
     // where it is already fading out. The three rings above have one band each, as they had.)
@@ -561,7 +573,7 @@ class Ring {
     // (a cell's plants stand together in one tuft, a third of the cell across, and not spread evenly over it: a clump of
     // ox-eyes, a poppy with its buds round it)
     const cu = (H(520) - 0.5) * C * 0.5, cv = (H(521) - 0.5) * C * 0.5;
-    const tone = b.eye ? packTone(b.eye) : 0;
+    const yr = packYear(b), tone = (b.eye ? packTone(b.eye) : 0) + yr;
     let used = 0;
     for (let p = 0; p < nP && used < room - 1; p++) {
       const q1 = H(510 + p), q2 = H(530 + p), q3 = H(550 + p), q4 = H(570 + p), q5 = H(590 + p);
@@ -570,7 +582,7 @@ class Ring {
       if (sh === SHAPES.cushion) {
         // a low dome of leaves with its flowers on top: one mark (its leaves the mark's colour, its flowers its second)
         const r0 = (b.head[0] + (b.head[1] - b.head[0]) * q3) * 1.3, bc = b.body || lc;
-        this.put(ou, ov, 0, 0.05 * q5, la, r0 * 1.4, r0, SHAPES.cushion, q1 * 0.61 + q2 * 0.39, born, bc[0], bc[1], bc[2], 0, 0.3, packTone(b.c));
+        this.put(ou, ov, 0, 0.05 * q5, la, r0 * 1.4, r0, SHAPES.cushion, q1 * 0.61 + q2 * 0.39, born, bc[0], bc[1], bc[2], 0, 0.3, packTone(b.c) + yr);
         used++; continue;
       }
       const L = (b.stalk[0] + (b.stalk[1] - b.stalk[0]) * q3) * (1.15 + 0.25 * tall);
@@ -649,14 +661,14 @@ class Ring {
     if (blooming) {
       const o = bloomAt(this.S, this.x, this.y, this.z, s, this.bi, this.bo || (this.bo = { kind: -1, bloom: null, dens: 0, heart: 0 }));
       if (o.kind >= 0 && o.dens > 0.03 && left > 1) {
-        const b = o.bloom, sh = SHAPES[b.shape] || 0, v = o.dens * (far ? 10 : 9), tone = b.eye ? packTone(b.eye) : 0;
+        const b = o.bloom, sh = SHAPES[b.shape] || 0, v = o.dens * (far ? 10 : 9), yr = packYear(b), tone = (b.eye ? packTone(b.eye) : 0) + yr;
         const nf = Math.min(left - 1, Math.floor(v) + (H(100) < v - Math.floor(v) ? 1 : 0));
         for (let q = 0; q < nf; q++, k++) {
           const q1 = H(102 + q), q2 = H(106 + q), q3 = H(110 + q), p = at(q1, q2), jit = 0.94 + 0.12 * q2;
           const st0 = b.stalk ? b.stalk[0] + (b.stalk[1] - b.stalk[0]) * q3 : 0.2;
           if (sh === SHAPES.cushion) {
             const r0 = (b.head[0] + (b.head[1] - b.head[0]) * q1) * 1.3 * kw, bc = b.body || b.c;
-            this.put(p[0], p[1], 0, 0, 0, r0 * 1.4, r0, SHAPES.cushion, q3, born, bc[0], bc[1], bc[2], 0, 0, packTone(b.c));
+            this.put(p[0], p[1], 0, 0, 0, r0 * 1.4, r0, SHAPES.cushion, q3, born, bc[0], bc[1], bc[2], 0, 0, packTone(b.c) + yr);
           } else if (sh === SHAPES.spike) {
             const hh = (b.head[0] + (b.head[1] - b.head[0]) * q1) * kh;
             this.put(p[0], p[1], 0, 0, 0, hh, 0.035 * kw, sh, q3, born, b.c[0] * jit, b.c[1] * jit, b.c[2] * jit, Math.max(0, st0 - hh * 0.8) * kh, flex, tone);

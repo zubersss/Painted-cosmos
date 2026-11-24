@@ -3154,7 +3154,7 @@ uniform vec4 uWx;
 #ifdef PC_OIL
 // (the flora lane, docs/lead/FLORA-DESIGN.md) x 1: a mark the eye cannot see is dropped at once (G1); z 1: the flowers'
 // heads are not drawn (the speed test's row; 0 in play); y, w: spare
-uniform vec4 uNearK;    // x 1: marks out of view are dropped (G1); z 1: no flower heads; w a flower head's least size on screen, a share (0: 1)
+uniform vec4 uNearK;    // x 1: marks out of view are dropped (G1); y the year now (SEASON.t, the flowers' windows); z 1: no flower heads; w a flower head's least size on screen, a share (0: 1)
 uniform vec4 uNearL;    // x 1: the grass package's paint (G4), y how strong the gusts' sheen is, z w the bend (rad) it grows over
 varying float vSheen;   // (G4) how far the gust bends this blade away from the eye, as a step of light: 0 none
 varying float vTeeth;   // (G3) how many blades a fan-brush touch is cut into, from its size on the screen: 0 as it was
@@ -3201,6 +3201,23 @@ void main() {
   // for the floor on a far mark's size, and the lean of a bend). A mark with no size (vis 0) drew nothing before either.
   // uNearK.x 0 (the speed test's row, ?nearcull=0, ?grass2=0) is the ring as it was.
   if (uNearK.z > 0.5 && kind > 6.5) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); return; }   // (the speed test's 'no flower heads')
+  // THE YEAR (the flora lane, docs/lead/FLORA-DESIGN.md 5.1, ?bloomyear=0 off): a flower's window on the year rides in
+  // iTone's top six bits (world/nearground.js packYear: when it comes into flower and when it is over, in sevenths of
+  // SEASON.t, 0 high summer to 1 deep autumn), and uNearK.y is the year now. Out of its window a kind's heads thin out one
+  // by one (each head by its own hash) and shrink before they go, over a seventh of the year, so nothing pops; a cushion
+  // keeps its leaves and its flowers go back into them. A mark with no window (every blade, stalk and leaf) is untouched.
+  float tn = iTone, yrF = 1.0, yrS = 1.0;
+  if (iTone > 262143.5) {
+    float yw = floor(iTone / 262144.0);
+    tn = iTone - yw * 262144.0;
+    float ya = floor(yw / 8.0) / 7.0, yb = 1.0 - mod(yw, 8.0) / 7.0;
+    yrF = smoothstep(ya - 0.143, ya, uNearK.y) * (1.0 - smoothstep(yb, yb + 0.143, uNearK.y));
+    if (kind < 11.5) {
+      float yq = fract(h * 5.37);
+      if (yq >= yrF) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); return; }
+      yrS = mix(0.45, 1.0, smoothstep(0.0, 0.18, yrF - yq));
+    }
+  }
   if (uNearK.x > 0.5) {
     vec4 rv = modelViewMatrix * vec4(root, 1.0);
     float ext = iAxis.w * 1.2 + 2.0 * iPar.x + (dab ? iCol.a : 0.0) + 0.3 + uNear.w * di * 4.0;
@@ -3229,8 +3246,9 @@ void main() {
   } else vFlat = 0.0;
   #ifdef PC_OIL
   vTeeth = 0.0;
-  if (iTone > 0.5) { float pk = iTone - 1.0; vTone = vec3(floor(pk / 4096.0), mod(floor(pk / 64.0), 64.0), mod(pk, 64.0)) / 63.0; }
+  if (tn > 0.5) { float pk = tn - 1.0; vTone = vec3(floor(pk / 4096.0), mod(floor(pk / 64.0), 64.0), mod(pk, 64.0)) / 63.0; }
   else vTone = vec3(-1.0);
+  if (kind > 11.5 && yrF < 1.0 && vTone.x >= 0.0) vTone = mix(iCol.rgb, vTone, yrF);
   // (G4, THE GUSTS' SHEEN, 2026-11-24) PHYSICS' bend carries the wind's travelling waves (physics/flora.glsl.js: the gust
   // and the wave train in pcPhysBend), so where a gust presses the sward the blades lean over together and, leaning away
   // from the eye, show their lit backs: bands of paler grass sweep across a meadow as the gusts pass. Asked at the root,
@@ -3267,7 +3285,7 @@ void main() {
       if (kind > 6.5) {
         float hf = (kind > 9.5 && kind < 11.5 ? 1.4 : (kind > 8.5 && kind < 9.5 ? 2.0 : 2.6)) * (uNearK.w > 0.0 ? uNearK.w : 1.0);
         float fk = max(1.0, wPx * hf * grow / max(dw, 1e-5));
-        dl *= fk; dw *= fk;
+        dl *= fk * yrS; dw *= fk * yrS;     // (yrS: a head about to go out of flower shrinks first, the year above)
       }
       #endif
       rel = ax * (iCol.a * (len / max(iAxis.w, 1e-4)) + max(dl, wPx * 1.3 * grow) * t) + sd * (side * max(dw, wPx * 1.3) * grow);

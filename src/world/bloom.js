@@ -25,26 +25,35 @@
 //     wet     how near water: 1 at the bank, 0 from 22 m off (from the sample's distance to water, s.s)
 //     meadow  the place's own undergrowth share (s.under)
 //     height  metres above the sea; lip: on the lip of a cliff (s.lip); rock: rocky ground (s.rock)
+//   season  [from, to]: when it is in flower on the year (SEASON.t, 0 high summer to 1 deep autumn; in sevenths); none:
+//           all the year. The near rings thin and shrink its heads out of it as the year turns (materials.js NEAR_VERT);
+//           the map itself (and so the ground's colour and the far marks) follows it only when the year is held still
+//           (?season=), since a colour laid into the ground at one moment and its neighbour at another would seam
+//   bold    1: one of the place's bold kinds near the eye (the coordinator, 24 Nov: every place keeps one in flower in
+//           every season; src/data/looks/flora.test.mjs holds it)
 //   sward: { gm, carpet, floor }: the grass package's dials (nearground.js reads gm and carpet; `floor` here: how much
 //     darker the ground's near paint is under a dense sward, the sward's own shade at its roots)
 import { MODE } from '../data/mode.js';
+import { SEASON } from '../data/season.js';
 
 // THE SWITCHES (the oil look only; 1 by default, 0 gives the picture back as it was, to the bit):
 //   ?bloom=0     no flowers from this map at all (the near rings lay their flowers as before, the ground is not tinted)
 //   ?bloomair=0  the flowers, but not their colour in the ground (A1)
+//   ?bloomyear=0 the flowers, but not following the year (every kind in flower all the year, as before the year came)
 //   ?grass2=0    (read here too for the floor under the sward; nearground.js FLORA reads it for everything else)
 // Read once, at the first call (MODE.oil is set by render/shared.js when it loads, which may be after this module is).
 let SW = null;
 export function bloomSwitches() {
   if (SW) return SW;
-  const f = { bloom: 1, air: 1, grass2: 1 };
+  const f = { bloom: 1, air: 1, grass2: 1, year: 1 };
   try {
     const q = new URLSearchParams(location.search), on = (k) => !q.has(k) || (q.get(k) !== '0' && q.get(k) !== 'false');
     f.grass2 = on('grass2') ? 1 : 0;
     f.bloom = on('bloom') ? 1 : 0;
     f.air = f.bloom && on('bloomair') ? 1 : 0;
+    f.year = f.bloom && on('bloomyear') ? 1 : 0;
   } catch { /* no address to read (Node): everything on, if the look is */ }
-  if (!MODE.oil) { f.bloom = 0; f.air = 0; f.grass2 = 0; }
+  if (!MODE.oil) { f.bloom = 0; f.air = 0; f.grass2 = 0; f.year = 0; }
   SW = f;
   return f;
 }
@@ -54,6 +63,15 @@ export const SHAPES = { rayed: 7, cup: 8, bell: 9, spike: 10, froth: 11, cushion
 
 const ss = (a, b, x) => { if (a === b) return x >= b ? 1 : 0; const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 const ramp = (r, x) => (r ? ss(r[0], r[1], x) : 1);
+
+// how much a kind is in flower now (0..1), the shader's own sums (materials.js NEAR_VERT: sevenths, a seventh to come and
+// go), and the share the map gives it: 1 unless the year is held still (?season=) and followed (?bloomyear=)
+export function inFlower(w, t) {
+  if (!w) return 1;
+  const a = Math.round(Math.max(0, Math.min(1, w[0])) * 7) / 7, e = Math.round(Math.max(0, Math.min(1, w[1])) * 7) / 7;
+  return (a > 0 ? ss(a - 0.143, a, t) : 1) * (e < 1 ? 1 - ss(e, e + 0.143, t) : 1);
+}
+export function bloomNow(b) { return b && b.season && SEASON.held && bloomSwitches().year ? inFlower(b.season, SEASON.t) : 1; }
 
 // a biome's blooms, laid out once (null: none)
 const CACHE = new WeakMap();
@@ -105,7 +123,9 @@ export function bloomAt(S, x, y, z, s, bi, out) {
   if (sp) { const dl = Math.hypot(x - sp.x, y - sp.y, z - sp.z) * R; if (dl < 45) patch = Math.max(patch, 1.25 * (1 - ss(18, 45, dl))); }
   let best = -1, bd = 0, bh = 0;
   for (let k = 0; k < B.length; k++) {
-    const b = B[k], hab = habitat(b.hab, s);
+    // (the year held still, ?season=: a kind out of flower gives its ground to the kinds in flower, so an autumn meadow is
+    // as full as a summer one; while the year turns the choice stays as it is and the near rings fade the heads instead)
+    const b = B[k], hab = habitat(b.hab, s) * bloomNow(b);
     if (hab <= 0.001) continue;
     const o = 17.3 * (k + 1), d = b.drift || 9;
     // a drift: one kind's clonal patch, dense at the heart and ragged at its edge (two octaves: the second roughens
