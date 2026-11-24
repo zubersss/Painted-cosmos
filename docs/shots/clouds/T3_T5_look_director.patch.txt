@@ -1,0 +1,88 @@
+diff --git a/src/render/index.js b/src/render/index.js
+index d5ae1cd..92a9426 100644
+--- a/src/render/index.js
++++ b/src/render/index.js
+@@ -5,7 +5,7 @@
+ // Additive: setTime(seconds), setDebugView(n), setLook({...}), info, dispose().
+ import * as THREE from 'three';
+ import { Post } from './post.js';
+-import { G, SHEET, WX, QUALITY, FRAME_HOOKS, GLAZES, MOTION, PREV, LOOK, OIL, SHADOW, ensureGlobals, SCREEN, MATERIALS } from './shared.js';
++import { G, SHEET, WX, QUALITY, FRAME_HOOKS, GLAZES, MOTION, PREV, LOOK, OIL, SHADOW, ensureGlobals, SCREEN, MATERIALS, PREPASSES } from './shared.js';
+ const _lv = new THREE.Vector3();
+ import { makeWashMaterial, makePaintUniforms, standInFor, bindBodyUniforms, defaultBodyUniforms } from './materials.js';
+ import { VERT_PARS, VERT_END, FRAG_PARS } from './chunks.js';
+@@ -234,6 +234,7 @@ export function createPainter(renderer) {
+     // (the shadow pass walks the whole scene and places every object in it; the scene pass that follows would walk and
+     // place them all again, though nothing has moved in between: when the shadow pass has drawn this frame, the scene
+     // pass takes the places as they are. Counted at a phone's size: 872 objects were placed 2.8 times a frame, now once.)
++    for (const p of PREPASSES) p(renderer, scene, camera);      // (group D, T5: the cloud shadow map, world/clouds.js)
+     const sf0 = shadow ? shadow.frames : 0;
+     if (shadow) shadow.render(renderer, scene, camera);
+     const placed = !!shadow && shadow.frames !== sf0 && scene.matrixWorldAutoUpdate === true;
+diff --git a/src/render/post.js b/src/render/post.js
+index 29d5f90..3210646 100644
+--- a/src/render/post.js
++++ b/src/render/post.js
+@@ -13,6 +13,7 @@
+ // the painting (wash variation, strokes, light) is anchored in the world by the materials.
+ import * as THREE from 'three';
+ import { getTextures, G, PREV, LOOK, OIL } from './shared.js';
++import { WX as WXF } from '../world/wxfield.js';      // (group D's cloud shadow map, T3)
+ 
+ // (2026-11-22, the owner's ten-step upgrade: the last pass's own switches, read once, so that the owner can be shown
+ // A and B of the same still and can turn any one of them off. Each is described where it is used, in OIL_FRAG.)
+@@ -650,6 +651,9 @@ uniform vec2 uInTexel;   // 1 / the size the scene is drawn at
+ uniform float uUpK;      // (the sharp read where the picture is enlarged: 0 off, else the bilinear ramp's gain; setSize)
+ uniform vec2 uShaftN;    // (the light in the air: x the most taps a line of sight gets, y metres of air to a tap; x 0 off)
+ uniform vec4 uFarC;      // (the far land: x its local contrast, y the reference's reach in scene pixels, z its colour push, w free)
++uniform sampler2D uCloudShadow;   // (group D, T3: the cloud shadow map, world/clouds.js A6; 1 under a cloud, smooth)
++uniform mat4 uCloudShadowV;       // (view space -> its uv)
++uniform float uCloudShadowK;      // (0: none, the speed test's row)
+ varying vec2 vUv;
+ ${AUX_DEC}
+ const vec3 W = vec3(0.3, 0.5, 0.2);
+@@ -676,6 +680,23 @@ void main() {
+   // contrast and the night's lamp test each used to fetch it for itself)
+   vec4 aux = pcAuxDec(texture(tAux, vUv));
+   float vz = exp2(aux.z) - 1.0;
++  // THE CLOUDS' SHADOWS ON THE LAND (group D, WEATHER-DESIGN A6 and T3): the shapes of the clouds overhead lying on the
++  // ground and on everything standing on it, from the map world/clouds.js draws along the sun. A COOL GLAZE that draws the
++  // lit values toward the shaded ones -- the light parts down by up to a quarter and a third of the way to a cool grey,
++  // the darks barely moved -- never a plain dimming; crisp at the map's half-way line (the map is smooth across a texel);
++  // weaker as the air thickens past two kilometres; never on the sky or on the clouds themselves (region 0).
++  if (uCloudShadowK > 0.0 && aux.w > 0.5) {
++    vec3 cvp = vec3((vUv * 2.0 - 1.0) * uTanHalf, -1.0) * vz;
++    vec2 cuv = (uCloudShadowV * vec4(cvp, 1.0)).xy;
++    if (cuv.x > 0.0 && cuv.y > 0.0 && cuv.x < 1.0 && cuv.y < 1.0) {
++      float cs = texture(uCloudShadow, cuv).r;
++      float cw = clamp(fwidth(cs), 0.02, 0.2);
++      cs = smoothstep(0.5 - cw, 0.5 + cw, cs) * uCloudShadowK * (1.0 - smoothstep(1800.0, 4200.0, vz));
++      float cL = dot(col, vec3(0.3, 0.5, 0.2));
++      vec3 csh = mix(col, vec3(cL) * vec3(0.86, 0.90, 1.08), 0.32) * mix(1.0, 0.74, smoothstep(0.22, 0.72, cL));
++      col = mix(col, csh, cs * 0.85);
++    }
++  }
+   // THE FAR LAND KEEPS ITS LOCAL CONTRAST (the owner, 22 Nov: "fully rendered even from 300 yards away"). Past about
+   // 60 m the air's veil flattens the land's own value steps toward one tone, so a wood at 275 m reads as a smudge that
+   // sharpens as the player walks in. The pixel is set against a few-pixel reference of its neighbourhood and nudged
+@@ -951,7 +972,8 @@ export class Post {
+       // (2026-11-22, the ten-step upgrade; the switches are at the top of this file and the reasons in OIL_FRAG)
+       uInTexel: this.sheetUniforms.uInTexel, uUpK: { value: 0 },
+       uShaftN: { value: new THREE.Vector2(16, 7) },
+-      uFarC: { value: new THREE.Vector4(FARCON, FARPX, FARSAT, 0) } });
++      uFarC: { value: new THREE.Vector4(FARCON, FARPX, FARSAT, 0) },
++      uCloudShadow: WXF.uCloudShadow, uCloudShadowV: WXF.uCloudShadowV, uCloudShadowK: WXF.uCloudShadowK });
+     this.mOil.name = 'oil-finish';
+     this.debugView = 0;
+     this.mCopy = fsMaterial(/* glsl */`
+diff --git a/src/render/shared.js b/src/render/shared.js
+index 089d6e8..981cf76 100644
+--- a/src/render/shared.js
++++ b/src/render/shared.js
+@@ -556,3 +556,6 @@ export function syncPhysWater(W) {
+ // (PHYSICS' draw kits face the picture plane and size themselves in internal pixels):
+ // each hook is called as hook(camera, painter.info) at the start of painter.render.
+ export const FRAME_HOOKS = [];
++// (group D's touch T5, WEATHER-DESIGN 8.4: passes drawn before the shadow pass and the scene, each (renderer, scene,
++// camera): world/clouds.js puts its cloud shadow map here. Empty, nothing runs.)
++export const PREPASSES = [];

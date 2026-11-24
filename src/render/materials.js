@@ -6,7 +6,7 @@ import * as THREE from 'three';
 // THE GROUND SEEN FROM THE AIR (group C, the far view): the canopy painted into the ground. Its shader text, its uniforms
 // and its switch (?canopy=) live in render/farground.js; the hooks in the ground's shaders are all inside #ifdef PC_CANOPY, which is set
 // only in the oil look with the switch on.
-import { CANOPY, CANOPY_DEBUG, CANOPY_DAB, CANOPY_VERT_DECL, CANOPY_VERT_MAIN, CANOPY_FRAG, canopyUniforms, GROUND_SEASON, SEASON_VERT, SEASON_VERT_MAIN, SEASON_FRAG, seasonUniforms, ROCKFIELD, ROCK_FRAG, rockUniforms } from './farground.js';
+import { CANOPY, CANOPY_DEBUG, CANOPY_DAB, CANOPY_FLOOR, CANOPY_VERT_DECL, CANOPY_VERT_MAIN, CANOPY_FRAG, canopyUniforms, GROUND_SEASON, SEASON_VERT, SEASON_VERT_MAIN, SEASON_FRAG, seasonUniforms, ROCKFIELD, ROCK_FRAG, rockUniforms, ROCK_DEBUG, BLOOM_FAR, BLOOM_VERT_DECL, BLOOM_VERT_MAIN, BLOOM_FRAG, bloomUniforms } from './farground.js';
 import { G, PHYS, PHYSW, PREV, OIL, LOOK, BURNPAINT, register, ensureGlobals, makeBodyUniforms } from './shared.js';
 import { MODE } from '../data/mode.js';
 import { FLORA_GLSL } from '../physics/flora.glsl.js';
@@ -31,6 +31,8 @@ const _gf = (v) => (+v).toFixed(4);      // a number as GLSL must read it: a bar
 const SKYFACE = _d22('skyface', 1), FLOORVAR = _gf(_d22('floorvar', 1)), FARCROWN = _gf(_d22('farcrown', 1));
 // (?farfix=0: the far trees' tables at eight kinds, as before 2026-11-24; see makePropMaterial)
 const FARFIX = (() => { try { return new URLSearchParams(location.search).get('farfix') !== '0'; } catch { return true; } })();
+// (?pines: how many times a needle card is grown at 30 m and beyond, PROP_VERT; ?needlefill= to judge another)
+const NEEDLE_FILL = (() => { try { const v = +new URLSearchParams(location.search).get('needlefill'); return v > 0 ? Math.min(4, v) : 2.2; } catch { return 2.2; } })();
 // THE WATER'S PAINT KNOWS THE FALL, AND WHITE WATER WHERE IT CHURNS (the owner, 2026-11-23: the water should be
 // "constantly moving the way water would be naturally", with "airration"). Until now every dash on every river ran
 // at one fixed rate whatever the slope, and the only foam in the game was the sea's, raised by the wind. The mesher
@@ -267,6 +269,7 @@ varying vec3 vRel;        // the place measured from the eye, in the body's axes
 #endif
 ${CANOPY_VERT_DECL}
 ${SEASON_VERT}
+${BLOOM_VERT_DECL}
 void main() {
   float d = distance(position, uCamLocal);
   float m = max(clamp((d - uMorph.x) / (uMorph.y - uMorph.x), 0.0, 1.0), uMorph.z);
@@ -285,6 +288,7 @@ void main() {
   vCol = mix(aColor, aColorP, m); vCol2 = mix(aColor2.rgb, aColor2P.rgb, m); vPar = mix(aParams, aParamsP, m);
 ${CANOPY_VERT_MAIN}
 ${SEASON_VERT_MAIN}
+${BLOOM_VERT_MAIN}
   gl_Position = projectionMatrix * mv;
   ${VERT_END}
 }
@@ -421,6 +425,7 @@ ${FIRE_GLOW}
 ${CANOPY_FRAG}
 ${SEASON_FRAG}
 ${ROCK_FRAG}
+${BLOOM_FRAG}
 // The ground where a stroke lies (ds: the pixels from here to its centre; w: its width, m): its wash, the light's
 // level, the snow's cover, the canopy's colour and its cover there.
 void pcGroundAt(vec2 ds, float w, vec3 rnd, out vec3 c, out float lvl, out float snowC, out vec3 leaf, out float canopy) {
@@ -430,10 +435,16 @@ void pcGroundAt(vec2 ds, float w, vec3 rnd, out vec3 c, out float lvl, out float
   // facet, what was carried that far was nonsense: strokes of cyan, black and white on Pluto's lilac mountains, the
   // survey of the worlds)
   vec2 dsA = ds * min(1.0, 24.0 / max(length(ds), 1e-3));
+  #ifdef PC_ROCKF
+    if (gFaceD > 0.5) dsA = vec2(0.0);      // (a dab of an upright chart takes the pixel's own washes and facing: carried, they jumped at every facet of a staircase wall, render/farground.js gFaceK)
+  #endif
   vec4 colC = clamp(vCol + gCdx * dsA.x + gCdy * dsA.y, 0.0, 1.0);
   vec3 col2C = clamp(vCol2 + gC2dx * dsA.x + gC2dy * dsA.y, 0.0, 1.0);
   vec4 parC = vPar + gPdx * dsA.x + gPdy * dsA.y;
   vec3 nVc = normalize(vNV + gNvdx * dsA.x + gNvdy * dsA.y), nLc = normalize(vNL + gNldx * dsA.x + gNldy * dsA.y);
+  #ifdef PC_ROCKF
+    if (gFaceD > 0.5) nVc = gFaceNV;        // (a dab of an upright chart is lit as a plane along the strike, render/farground.js pcFaceLight)
+  #endif
   c = mix(col2C, colC.rgb, gMid);                  // (far away the forest floor is its canopy)
   // (the lighter paint looks up no noise for a dab: its hue and weight vary by the dab's own numbers alone, pcGroundPaint)
   vec4 n1 = vec4(0.5), n2 = vec4(0.5);
@@ -451,7 +462,9 @@ void pcGroundAt(vec2 ds, float w, vec3 rnd, out vec3 c, out float lvl, out float
   // as everything else here is.
   float upN = dot(nLc, normalize(Bc));
   #ifdef PC_ROCKF
-    c = pcRockWash(c, upN, Bc, 1.0 - colC.a, length(vView));      // (the far view, FV4: a rock face in its own value and beds, render/farground.js)
+    if (gFaceD > 0.5) upN = gFaceP.x;
+    c = pcRockWash(c, upN, Bc, 1.0 - colC.a, length(vView), rnd, w);      // (the far view, FV4: a rock face in its own value and beds, a cliff in the world's rock, render/farground.js)
+    parC.z *= 1.0 - gRock;      // (no leaf shadow on a rock face: its pattern is laid flat and ran down a cliff in dark blocks, SEEN)
   #endif
   ${SKYUP('upN')}
   snowC = pcSnowCover(upN, rnd.z * 0.5 + n2.b * 0.3 + n1.a * 0.2, parC.z);
@@ -480,6 +493,9 @@ void pcGroundAt(vec2 ds, float w, vec3 rnd, out vec3 c, out float lvl, out float
   float x = dot(nVc, gSunV) * 0.5 + 0.5;
   float sunny = min(pcSunAtSoft(Bc, parC.z * mix(0.82, 1.0, gMid), 8.0, w, fract(rnd.y * 5.7)), 1.0 - pcCast(Bc, (rnd.x - 0.5) * 0.3));
   lvl = pcLevel(mix(min(x, 0.44) - 0.10 * parC.z, x + (rnd.z - 0.5) * 0.10, sunny), 0.03);
+  #ifdef PC_ROCKF
+    lvl = pcRockPlanes(lvl, nVc, sunny);        // (a rock face lit in three planes by its slope's own facing, a gully in shade deeper: render/farground.js)
+  #endif
   #ifdef PC_FIRE
     // AND A HOLE IS IN ITS OWN SHADOW. Nothing else in the picture tells the eye that a dark patch on flat ground
     // is a hole and not a stain; the light going out of it, as it does down a well, is what makes it one.
@@ -493,6 +509,16 @@ void pcGroundAt(vec2 ds, float w, vec3 rnd, out vec3 c, out float lvl, out float
       if (gMark.x > 0.3) gCan = 0.0;      // (no crown stands where the fire has been)
     #endif
   #endif
+  #ifdef PC_BLOOMF
+    pcBloomAt(dsA, rnd);                     // (the far view, FV6(b): is this dab a flower of a drift, render/farground.js)
+    #ifdef PC_CANOPY
+      if (gCan > 0.5) gBloom = 0.0;
+    #endif
+    #ifdef PC_ROCKF
+      if (gRock > 0.0) gBloom = 0.0;
+    #endif
+    if (snowC > 0.5) gBloom = 0.0;
+  #endif
   leaf = pcDensity(col2C, 1.15);
   #ifdef PC_SEASONG
     leaf = pcSeasonLeaf(leaf, colC.rgb);     // (in summer a fallen leaf is last year's, brown)
@@ -502,9 +528,19 @@ void pcGroundAt(vec2 ds, float w, vec3 rnd, out vec3 c, out float lvl, out float
 }
 // One stroke's paint from that: its own colour (a fallen leaf's, for the share fk of the strokes), the snow, the light.
 vec3 pcGroundPaint(vec3 c, vec3 leaf, float fk, vec3 rnd, float snowC, float lvl) {
+  #ifdef PC_ROCKDEBUG
+    // (?rockdebug=1, for looking only: a dab of an upright chart red (a cliff's rock) or orange; a dab of the ground's
+    // chart on steep land blue (rock) or cyan)
+    if (uRockDbg > 3.5 && gFaceD > 0.5) { float hq = (length(gBc) - uBodyR) / 5.5; float fq = fract(hq); return fq < 0.11 ? vec3(0.0) : fq > 0.88 ? vec3(1.0) : mod(floor(hq), 2.0) < 0.5 ? vec3(1.0, 0.3, 0.2) : vec3(0.2, 0.4, 1.0); }
+    if (uRockDbg > 1.5 && uRockDbg < 3.5) { float uq = dot(normalize(vNL), normalize(vBody)); vec3 nF = normalize(cross(gBdx, gBdy)); float uf = abs(dot(nF, normalize(vBody))); float q = uRockDbg > 2.5 ? uf : uq; return q < 0.3 ? vec3(0.5, 0.0, 0.0) : q < 0.5 ? vec3(1.0, 0.1, 0.1) : q < 0.64 ? vec3(1.0, 0.6, 0.1) : q < 0.8 ? vec3(1.0, 1.0, 0.2) : q < 0.86 ? vec3(0.2, 0.9, 0.2) : vec3(0.3); }
+    if (gFaceOn > 0.5) return (gFaceD > 0.5 ? (gCliff > 0.5 ? vec3(1.0, 0.15, 0.1) : vec3(1.0, 0.7, 0.1)) : (gCliff > 0.5 ? vec3(0.1, 0.25, 1.0) : vec3(0.1, 0.9, 1.0))) * (0.55 + 0.45 * rnd.x);
+  #endif
   #ifdef PC_CANOPY
     // (a dab of the painted canopy: the crown's own wash in the crown's own light, one flat colour, render/farground.js)
     if (gCan > 0.5) return pcTone(pcDabTint(gCanC, rnd, gCanLf), gCanL);
+  #endif
+  #ifdef PC_BLOOMF
+    if (gBloom > 0.5) return pcTone(pcDabTint(gBloomC, rnd, 0.2), lvl);      // (a flower of a drift, whole, in its own light: render/farground.js)
   #endif
   float f = step(1.0 - fk, fract(rnd.z * 13.7));
   // (bare ground and grass, where no leaf has fallen: a dab is the ground's colour or one of its two neighbouring
@@ -515,7 +551,7 @@ vec3 pcGroundPaint(vec3 c, vec3 leaf, float fk, vec3 rnd, float snowC, float lvl
   #ifdef PC_ROCKF
     // (the far view, FV4: on a rock face no dab is laid a step darker by its own number, and its pigment and stray
     // are halved, so the face reads in lit and shaded planes by its own facing, render/farground.js)
-    cg = mix(cg, c, 0.5 * gRock);
+    cg = mix(cg, c, max(0.5 * gRock, gCliff));      // (a cliff's dab keeps its bed's tone: no stray pigment)
     lvl -= (1.0 - f) * step(0.58, fract(rnd.x * 11.1)) * 0.9 * step(1.5, lvl) * (1.0 - gRock);
     vec3 k = pcDabTint(mix(cg, leaf, f), mix(rnd, vec3(0.5), 0.5 * gRock), f);
   #else
@@ -669,6 +705,9 @@ void main() {
   #ifdef PC_CANOPY
     gSdx = dFdx(vFarS); gSdy = dFdy(vFarS);
   #endif
+  #ifdef PC_BLOOMF
+    gBkdx = dFdx(vBloomK); gBkdy = dFdy(vBloomK);
+  #endif
   float wpx = uOilA.x * uOilPx.y / 720.0;
   vec3 c, leaf; float lvl, snowC, canopy;
   vec3 acc;
@@ -759,6 +798,9 @@ void main() {
   float dabPx = 0.50 * uOilS.w * uOilA.x * uOilPx.y / 720.0;
   gVar = max(gMid, ${FLOORVAR} * smoothstep(2.6, 4.2, dabPx));
   float lw = max(length(gBdx), length(gBdy));
+  #ifdef PC_ROCKF
+    gRockLw = lw;
+  #endif
   // (a dab's own place: where its centre's chart lies on the sphere, at the ground's height carried there)
   float rB = length(vBody);
   vec3 upB = vBody / rB;
@@ -778,6 +820,21 @@ void main() {
       gSunCh = scCan / max(length(scCan), 1e-6);
     }
   #endif
+  #ifdef PC_ROCKF
+    // (the far view, FV4: on steep land the dabs are laid on upright charts, render/farground.js pcFaceLayer; a pixel
+    // under about 31 degrees never asks)
+    // (the facing is the STEEPER of the smoothed one and the triangle's own: on the coast's staircase wall every
+    // triangle is upright, and the smoothed facing had gentle columns every few metres, SEEN in ?rockdebug=2 and 3)
+    vec3 nP = normalize(vNL);
+    float upSm = dot(nP, upB);
+    gFaceP = vec2(min(upSm, abs(dot(normalize(cross(gBdx, gBdy)), upB))), 0.5);
+    gFaceOn = uRockK * step(gFaceP.x, 0.86);
+    if (gFaceOn > 0.5) {
+      gFaceP.y = pcStrikeWay(nP, upB, upSm);
+      gFaceK = vec2(smoothstep(0.80, 0.64, gFaceP.x), smoothstep(0.30, 0.70, fract(gFaceP.y)));
+      pcFaceFrame(nP, upB, upSm);
+    }
+  #endif
   // (the speed test's flat ground: no strokes at all, shared.js uOilL.y; the lighter paint: two layers, the coarsest
   // left to the ground's own colour)
   if (uOilL.y > 0.5 && uOilL.y < 1.5) rem = 0.0;
@@ -790,12 +847,29 @@ void main() {
     if (L == 2 && uOilL.x > 0.5) break;
     float ws = L == 0 ? 1.0 : L == 1 ? 2.0 : 4.0, w = o4.x * ws;
     vec3 rnd, rnd2; vec2 ds, ctr; float cov, has2;
+    #ifdef PC_ROCKF
+      float faceD = 0.0;
+      if (gFaceOn > 0.5) pcFaceLayer(ch, dlx, dly, rB - uBodyR, rdx, rdy, w, uOilS.z, 4.0 * wpx * uOilS.w * ws, ocl,
+                                     L == 0 ? vec2(0.35, 0.65) : L == 1 ? vec2(0.0, 0.35) : vec2(1.0, -1.0), rnd, ctr, ds, cov, rnd2, has2, faceD);
+      else
+    #endif
     pcDabLayer(ch, dlx, dly, w, uOilS.z, 4.0 * wpx * uOilS.w * ws, ocl,
                L == 0 ? vec2(0.35, 0.65) : L == 1 ? vec2(0.0, 0.35) : vec2(1.0, -1.0), rnd, ctr, ds, cov, rnd2, has2);
     if (cov <= 0.0) continue;
     gCtrB = pcGroundUnchart(vBody, ctr, uBodyR) * (rB + rdx * ds.x + rdy * ds.y);
     #ifdef PC_CANOPY
       gCtrCh = ctr;
+    #endif
+    #ifdef PC_ROCKF
+      gFaceD = faceD;
+      // (a dab of an upright chart: its centre's place from its own chart, and its place on the ground's chart)
+      if (faceD > 0.5) {
+        gCtrB = pcFaceCentre(ch, ctr, faceD);
+        pcFaceLight(ch, faceD, upB);
+        #ifdef PC_CANOPY
+          gCtrCh = ch + dlx * ds.x + dly * ds.y;
+        #endif
+      }
     #endif
     pcGroundAt(ds, w, rnd, c, lvl, snowC, leaf, canopy);
     // (under trees the floor is nearly all fallen leaves, with the earth dark between: the clip's. A world may keep
@@ -809,6 +883,9 @@ void main() {
     float fk = clamp(canopy * 1.6, 0.0, 0.88) * gVar * (uGroundK.w > 0.0 ? uGroundK.w : 1.0);
     #ifdef PC_SEASONG
       fk *= pcSeasonLeafK();                 // (a quarter of the fallen leaves in high summer, all of them in autumn)
+    #endif
+    #ifdef PC_ROCKF
+      fk *= 1.0 - gRock;                     // (no leaf lies on a rock face)
     #endif
     acc += rem * cov * pcGroundPaint(c, leaf, fk, rnd, snowC, lvl);
     rem *= 1.0 - cov;
@@ -827,7 +904,19 @@ void main() {
       vec4 canM = pcCanopyMean(vFarS, vPar.w);
       bareC = mix(bareC, canM.rgb, canM.a);
     #endif
-    vec3 bare = pcTone(bareC, pcLevel(mix(min(x0, 0.44) - 0.10 * vPar.z, x0, sun0), 0.05));
+    #ifdef PC_BLOOMF
+      bareC = mix(bareC, pcBloomPal(vBloomI), 0.45 * vBloomK * uBloomOn);      // (the ground between the dabs takes a share of the drift)
+    #endif
+    float lvl0 = pcLevel(mix(min(x0, 0.44) - 0.10 * vPar.z, x0, sun0), 0.05);
+    #ifdef PC_ROCKF
+      // (on a cliff the ground between the dabs is the cliff's rock at the pixel's own place, render/farground.js)
+      float clP = smoothstep(0.66, 0.50, gFaceP.x) * smoothstep(0.05, 0.20, 1.0 - vCol.a) * gFaceOn;
+      if (clP > 0.0) { bareC = mix(bareC, pcCliffC(vBody, rB - uBodyR, vec3(0.5), bareC, lw), clP); lvl0 = mix(lvl0, min(lvl0, 0.9), gGully * clP); }
+    #endif
+    vec3 bare = pcTone(bareC, lvl0);
+    #ifdef PC_ROCKDEBUG
+      if (gFaceOn > 0.5 && uRockDbg < 1.5) bare = vec3(0.5);
+    #endif
     #ifdef PC_FIRE
       // (the powers, fire) The ground that shows BETWEEN the strokes is charred too, or a burnt patch would show its
       // old green through the gaps between its black strokes. This one is a smooth wash and not a stroke, so it takes
@@ -1050,13 +1139,15 @@ export function makeTerrainMaterial(bodyU) {
   // (the far view's painted canopy: compiled in only with the oil look and ?canopy= on; a world without a painted canopy
   // keeps uCanK.w at 0 and returns before any of it is worked out. terrain.js writes the season's crowns each frame.)
   if (LOOK.oil && CANOPY > 0) {
-    m.defines = m.defines || {}; m.defines.PC_CANOPY = 1; m.defines.PC_CAN_DAB = _gf(CANOPY_DAB); Object.assign(m.uniforms, canopyUniforms());
+    m.defines = m.defines || {}; m.defines.PC_CANOPY = 1; m.defines.PC_CAN_DAB = _gf(CANOPY_DAB); m.defines.PC_CAN_FLOOR = _gf(CANOPY_FLOOR); Object.assign(m.uniforms, canopyUniforms());
     if (CANOPY_DEBUG) m.defines.PC_CANDEBUG = 1;
   }
   // (the far view, FV3: the floor and the far colour follow the year; compiled in only with the oil look and ?groundseason=)
   if (LOOK.oil && GROUND_SEASON) { m.defines = m.defines || {}; m.defines.PC_SEASONG = 1; Object.assign(m.uniforms, seasonUniforms()); }
   // (the far view, FV4: rock faces, strata and snow that read from afar; compiled in only with the oil look and ?rockfield=)
-  if (LOOK.oil && ROCKFIELD) { m.defines = m.defines || {}; m.defines.PC_ROCKF = 1; Object.assign(m.uniforms, rockUniforms()); }
+  // (the far view, FV6(b): the flower drifts from the air, with flora B; compiled in only with the oil look and ?bloomfar=1)
+  if (LOOK.oil && BLOOM_FAR) { m.defines = m.defines || {}; m.defines.PC_BLOOMF = 1; Object.assign(m.uniforms, bloomUniforms()); }
+  if (LOOK.oil && ROCKFIELD) { m.defines = m.defines || {}; m.defines.PC_ROCKF = 1; Object.assign(m.uniforms, rockUniforms()); if (ROCK_DEBUG) m.defines.PC_ROCKDEBUG = _gf(ROCK_DEBUG); }
   // (the powers, fire: the ground goes black where the fire passed. Only with ?powers=1 and ?look=oil; see addFire.)
   addFire(m, true);
   return register(m, 'terrain');
@@ -2023,6 +2114,8 @@ uniform vec4 uOilA;
 uniform vec4 uOilB;
 uniform vec4 uOilD;
 uniform vec4 uOilG;
+uniform float uNeedle;    // (?pines: a conifer's needles never narrower on the screen than this many pixels; 0 off, as before)
+uniform vec4 uOilPx;      // (x: the angle one pixel of the scene pass takes, radians: shared.js)
 uniform mat4 uShM;
 uniform highp sampler2D uShTex;
 uniform vec4 uShK;
@@ -2121,6 +2214,19 @@ void main() {
       float e = (1.0 - keep) * 1.06 - 0.03;
       cardG = smoothstep(e - 0.03, e + 0.03, aData.w) * min(inversesqrt(keep), 2.4);
       cardO *= cardG;
+      lp = aCard + cardO;
+    }
+    // A CONIFER'S NEEDLES STAY A MASS AT RANGE (?pines, 24 Nov: the spruces and tall pines 20 to 60 m off read as bare
+    // poles). The spruce's foliage is sprays of needle cards with the air left between its whorls -- some 11 square
+    // metres of needles on a 16 m tree, about a fifth of its outline -- which near by is the approved look, and from 20 m
+    // on is a pole with specks. So from 10 m out each needle card grows about its own centre, up to NEEDLE_FILL times at
+    // 30 m and beyond, and the sprays close into the kind's dark mass; and wherever it stands a needle is kept at least
+    // uNeedle pixels across, its two side corners (uv.y +-1) pushed out (a needle under a pixel wide is missed by the
+    // pixels' centres more often than it is hit). Within 10 m nothing changes. 0: as before.
+    if (uNeedle > 0.0 && aData.y > 4.5 && aData.y < 6.5) {
+      float dN = max(distance((im * vec4(aCard, 1.0)).xyz, uCamLocal), 0.1);
+      cardO *= mix(1.0, ${NEEDLE_FILL.toFixed(2)}, smoothstep(10.0, 30.0, dN));
+      if (abs(uv.y) > 0.5) cardO *= clamp(0.5 * uNeedle * dN * uOilPx.x / max(length(mat3(im) * cardO), 1e-4), 1.0, 5.0);
       lp = aCard + cardO;
     }
   #endif
@@ -2353,6 +2459,13 @@ void main() {
       float lvL = pcLevel(xl, 0.03);
       vec3 deepL = pcShadeLeaf(cs);      // (L2: the one foliage shade, chunks.js)
       vLeafC.rgb = mix(deepL, pcTone(cs, lvL), smoothstep(1.2, 2.0, lvL));
+      // (?pines: a conifer's needle mass from 20 m out sits at the references' deep green, about V 0.26 (#39432e), not
+      //  near-black: the look director's ruling. A needle darker than that is lifted to it, its hue kept, from 12 m to
+      //  20 m; a lighter one is left as it is; within 12 m nothing changes. Only trunks in shade go down to 0.08-0.18.)
+      if (uNeedle > 0.0 && aData.y < 5.5) {
+        float vN = max(max(vLeafC.r, vLeafC.g), vLeafC.b), tN = 0.24 * smoothstep(12.0, 20.0, length(cV));
+        if (vN < tN) vLeafC.rgb *= tN / max(vN, 0.02);
+      }
       vLeafK.rgb = cs;
       #ifdef PC_FIRE
         // (the powers, fire) A LEAF ON A CROWN THAT HAS BURNED GOES BLACK BEFORE IT GOES ALTOGETHER. Its paint is taken
@@ -3295,6 +3408,7 @@ export function makePropMaterial(bodyU, opts = {}) {
     uLeafLod: { value: new THREE.Vector4(0, 0, 0, 0) },
     uLeafFam: { value: new THREE.Vector4().fromArray(opts.oilFam || [0, 0, 0, 0]) },
     uOilDark: { value: new THREE.Vector4(opts.oilDark ? opts.oilDark[0] : 0, 0, 0, 0) },
+    uNeedle: { value: opts.needle || 0 },      // (?pines: flora.js; 0 for every plant but a conifer with the switch on)
     uOilDarkA: v3(opts.oilDark && opts.oilDark[1], [0.5, 0.4, 0.4]), uOilDarkB: v3(opts.oilDark && opts.oilDark[2], [0.2, 0.15, 0.2]),
   };
   const defines = {};
