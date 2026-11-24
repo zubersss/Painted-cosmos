@@ -1663,10 +1663,9 @@ void main() {
       // not joined into lines; they lengthen smoothly to the open sea's crests as the fetch grows: the look director.
       // wChop is 0 off the sea, so ponds and lakes keep the 10 above)
       wChop = step(0.75, vOpen) * (1.0 - smoothstep(300.0, 900.0, fetchW));
-      float aspW = still > 0.5 ? mix(10.0, mix(3.5, 5.5, smoothstep(150.0, 600.0, dist)), wChop) / max(lenF, 0.34) : 6.0;      // (the chop longer toward the horizon, 3.5 to 5.5 widths: the look director)
+      float aspW = still > 0.5 ? mix(10.0, mix(6.0, 7.5, smoothstep(150.0, 600.0, dist)), wChop) / max(lenF, 0.34) : 6.0;      // (the chop 6 widths near, 7.5 toward the horizon: thin pointed strokes in rows, not pebbles -- the look director's last round)
       // (pointed ends on the sea, the look director's note; ponds and rivers keep square ones until F asks for them there)
       gWLens = smoothstep(0.5, 0.75, vOpen) * step(0.5, still);
-      gWLens *= smoothstep(3.5, 5.0, aspW * max(lenF, 0.34));      // (no taper on a short stroke: it broke the near chop into jagged bits -- lane W2, the look director)
       pcWStrokes(wch, wdx, wdy, dS, v0 * (1.0 - still), wo4.x, aspW, woc3, wr1, wr2, wown);
       gWLens = 0.0;
       // (the lace: along the current wherever there is one, at the water's own pace, on its own octaves)
