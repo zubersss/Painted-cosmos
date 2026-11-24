@@ -52,7 +52,14 @@ not more coloured), 0.112 (N 7: the near mountain lavender, the warm/cool split 
 air rules there); 420 m at 16.8 h pixel-identical. Waiting for the look director to choose. Averaging the violet and
 the warm tone first cancelled to neutral (no change at all): multiplied now. 87b25e8: A1's far crown shadow hook in
 pcCanopyAt behind ?farshadow=1. NEXT: the glades from the air (LOOK-AUDIT-2 finding 1, C's part), and B's ask on
-?bloomfar: fewer flower dabs near the eye (a third below 60 m). FV6(b) ?bloomfar: the ground
+?bloomfar: fewer flower dabs near the eye (a third below 60 m) (DONE dba551d).
+THE GLADES (LOOK-AUDIT-2 finding 1, C's part), BEHIND ?glades=1 (OFF by default; next commit after dba551d): the wood's
+own glade field (surface.js forest recipe, oil look) opened WHOLE: no tree inside, the edge a short ragged step about the
+middle of the old soft step; the far trees and the painted roof follow it by themselves (both read s.trees). SEEN at
+the autumn woodland (the gallery's default season) from 150 m and 420 m at noon and 150 m at 16.8 h: dark stands with
+crisp yellow-green glades between. HONEST: the wood's darks fall (V<0.3 in the lower half 51.5 to 45.1 per cent at
+150 m, 20.7 to 18.7 at 420 m) because glades replace trees; and the on-foot landing view changes (an open glade on one
+bank). Next for the glades if wanted: denser stands outside them, so the wood keeps its darks. FV6(b) ?bloomfar: the ground
 between the dabs takes no drift under 150 m (1ed9553, B's ask). B's flower line landed (design-flora dd86fb3); F passed it with 6cf9c7a.
 Scratch: `wt37` = main at v37.1.
 
