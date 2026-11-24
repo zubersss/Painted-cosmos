@@ -37,6 +37,8 @@ vec2 pcPhysGrid(vec3 p) {
 #endif
 uniform vec4 uPhysWindMap;     // xy: centre of the bend/wind field (m along east/north), z: 1/size, w: texels per side
 uniform vec4 uPhysNearMap;     // the same for the push field
+uniform sampler2D uPhysFar;    // (group D, ?farwind=1) the far field: the wind map's steady load beyond the bend field (RG soft, BA stiff)
+uniform vec4 uPhysFarMap;      // xy: its centre (m along east/north), z: 1/size, w: texels per side (0: off, and it is never read)
 uniform vec4 uPhysWave;        // xy: wave direction; z, w: phases of flutter trains 0 and 1 (P11)
 uniform vec4 uPhysWavePhase;   // xyz: phases of the three wave trains; w: phase of flutter train 2 (P11)
 uniform vec4 uPhysShape;       // soft flex, soft max angle, stiff flex, stiff max angle
@@ -62,10 +64,26 @@ vec4 pcPhysTex(sampler2D t, vec2 uv, float n) {
 
 // The bend of a plant rooted at body-local point root. stiff01: 0 grass .. 1 tree.
 // Returns xy: bend (radians toward east / north), z: flatten01, w: shake01.
+// (group D) the bend field's load, or beyond its edge the far field's: the two meet over the last eighth of the bend
+// field's half-width, so nothing steps where a plant crosses it. With the far field off (uPhysFarMap.w 0) this is the
+// bend field's own lookup, exactly as it was.
+// (beyond the band only the far field is read and inside it only the bend field, so a plant pays one lookup either way;
+// only the band itself, 16 m wide, pays both)
+vec4 pcPhysLoad(vec2 g, vec2 uv) {
+  if (uPhysFarMap.w > 0.5) {
+    vec2 q = abs(uv - 0.5) * 2.0;
+    float edge = smoothstep(0.875, 1.0, max(q.x, q.y));
+    if (edge >= 1.0) return pcPhysTex(uPhysFar, (g - uPhysFarMap.xy) * uPhysFarMap.z + 0.5, uPhysFarMap.w);
+    vec4 b = pcPhysTex(uPhysBend, uv, uPhysWindMap.w);
+    if (edge > 0.0) b = mix(b, pcPhysTex(uPhysFar, (g - uPhysFarMap.xy) * uPhysFarMap.z + 0.5, uPhysFarMap.w), edge);
+    return b;
+  }
+  return pcPhysTex(uPhysBend, uv, uPhysWindMap.w);
+}
 vec4 pcPhysBend(vec3 root, float stiff01) {
   vec2 g = pcPhysGrid(root);
   vec2 uv = (g - uPhysWindMap.xy) * uPhysWindMap.z + 0.5;
-  vec4 b = pcPhysTex(uPhysBend, uv, uPhysWindMap.w);
+  vec4 b = pcPhysLoad(g, uv);
   vec2 L = mix(b.xy, b.zw, stiff01);
   vec4 wt = pcPhysTex(uPhysWind, uv, uPhysWindMap.w);
   float gust = wt.z;
@@ -106,8 +124,9 @@ vec4 pcPhysBend(vec3 root, float stiff01) {
 // PC_PHYS_LINEAR). No travelling waves, no push field, no flatten. For the mid and far tree
 // tiers and for anything beyond the 32 m near field. Returns the bend (rad, east / north).
 vec2 pcPhysBendLite(vec3 root, float stiff01) {
-  vec2 uv = (pcPhysGrid(root) - uPhysWindMap.xy) * uPhysWindMap.z + 0.5;
-  vec4 b = pcPhysTex(uPhysBend, uv, uPhysWindMap.w);
+  vec2 gl = pcPhysGrid(root);
+  vec2 uv = (gl - uPhysWindMap.xy) * uPhysWindMap.z + 0.5;
+  vec4 b = pcPhysLoad(gl, uv);
   vec2 L = mix(b.xy, b.zw, stiff01);
   float load = length(L);
   float ang = mix(uPhysShape.y, uPhysShape.w, stiff01) * (1.0 - exp(-mix(uPhysShape.x, uPhysShape.z, stiff01) * load));
@@ -149,7 +168,7 @@ vec3 pcPhysCrown(vec3 rel, vec3 up, float H, vec3 root, vec4 pb, float id, float
   float x = min(1.0, r / L), shape = x * x * (3.0 - x) * 0.5;
   vec2 g = pcPhysGrid(root);
   vec2 uv = (g - uPhysWindMap.xy) * uPhysWindMap.z + 0.5;
-  vec4 b = pcPhysTex(uPhysBend, uv, uPhysWindMap.w), wt = pcPhysTex(uPhysWind, uv, uPhysWindMap.w);
+  vec4 b = pcPhysLoad(g, uv), wt = pcPhysTex(uPhysWind, uv, uPhysWindMap.w);
   vec2 Lw = mix(b.xy, b.zw, clamp((Hs - 0.5) / 9.5, 0.0, 1.0));       // the wind load at the plant's own height
   float load = length(Lw);
   vec2 d = load > 1e-6 ? Lw / load : (r > 1e-4 ? rd / r : vec2(1.0, 0.0));
