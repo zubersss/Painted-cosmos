@@ -97,7 +97,12 @@ export function bloomAt(S, x, y, z, s, bi, out) {
   // the coordinator on the level meadow, 24 Nov: with each kind's drifts on their own noise, six kinds' drifts together
   // covered the whole meadow and the near flowers were an even confetti. A patch holds the drifts of two or three kinds
   // side by side, as the poppies beside the daisies in the old picture; between patches there is only a sprinkle.)
-  const patch = 0.15 + 1.1 * ss(PT[0], PT[1], n3(X / 26 - 5.3, Y / 26 + 8.9, Z / 26 - 2.2));
+  let patch = 0.15 + 1.1 * ss(PT[0], PT[1], n3(X / 26 - 5.3, Y / 26 + 8.9, Z / 26 - 2.2));
+  // (the landing, the first thing the owner sees, always stands in a patch: within 18 m of it the patch is full, fading out
+  // by 45 m. SEEN 24 Nov: the patch field happened to leave the autumn landing's bank bare in the first view. The kinds and
+  // their drifts are still the map's own; only the patch is held. S._spawn is set once the surface has found its landing.)
+  const sp = S._spawn;
+  if (sp) { const dl = Math.hypot(x - sp.x, y - sp.y, z - sp.z) * R; if (dl < 45) patch = Math.max(patch, 1.25 * (1 - ss(18, 45, dl))); }
   let best = -1, bd = 0, bh = 0;
   for (let k = 0; k < B.length; k++) {
     const b = B[k], hab = habitat(b.hab, s);
