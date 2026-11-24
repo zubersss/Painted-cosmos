@@ -116,7 +116,7 @@ export function stepPatch(job, deadline) {
   // the patch's normals are known, below)
   const rkf = rockfieldOn(S.id);
   // (?farwater=1: the rivers of the tree's signed distance at each vertex, for the far ground's water line; only with them)
-  const fwo = !!(MODE.oil && MODE.water && (MODE.water.farwater || MODE.water.farwaterBench) && S.rivers);
+  const fwo = !!(MODE.oil && MODE.water && (MODE.water.farwater || MODE.water.benchw) && S.rivers);
   // (and the flower drifts from the air, FV6(b), ?bloomfar=1: world/bloom.js's cover and palette index at each sample,
   // packed in a byte each into an attribute of their own, aBloom; without the switch nothing is computed or built)
   const blm = bloomFarOn(S);

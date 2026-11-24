@@ -235,6 +235,36 @@ build only where the look asks: 221040b).
   beside the explorer into the distance on the right, a riffle, the ship on the left, a meadow of yellow flowers): 8.5 %
   water-blue and 2.8 % white churn, against 6.4 % for v39.1; the three side by side `first-view-3.jpg`.
 
+### THE WATER'S CUTS, ?wcut= (24 Nov 21:40-; the coordinator: the owner's phone tables, v39.5)
+
+The owner's phone (r2 docs/lead/bench/2026-11-24-v39.5-owner-phone.md, every row at 2.25x the pixels): the brook's bank is
+the slowest view of all, 32.0 ms, and 'no water drawn' saves 5.3 ms there; from 400 m it saves at least 4.2 ms (at the
+cap). The water is the second largest cost after the far trees. The coordinator: look for a cut in the water's fragment
+work, mostly from the air; give each cut a row and a still for F. Split with W3: W3 cuts its new paint (PC_WPAINT, the +29 %
+at a bank); this session cuts v37's program, the one live today.
+
+WHAT THE v37 WATER PROGRAM DOES PER PIXEL (render/materials.js WATER_FRAG, read through): about 13 noise lookups (4 of them
+the lava's and the cloud sea's, worked out for every water and mixed in by a weight of 0); PHYSICS' sea map read in four
+places (the waves, the swash, the local sea, the waves' way: 24-36 texel reads if the compiler does not share them -- it may,
+unknown); the four wave trains (16 sines and cosines) and the swash; the reflection's march, 12 steps each a projection and
+a lookup -- from the air it meets nothing, so all 12 run on every water pixel and it ends where it started 239 m up the
+screen; the foam, surf and far-sea strokes (4 more lookups, plus loops on a running sea); the oil look's strokes (1-2 layers).
+
+THE CUTS (bits of one uniform, uWCut; compiled in with ?wcut= or ?bench=water, else v37's program to the letter):
+- 1 LAVA WORK SKIPPED: where the liquid is neither lava nor a sea of cloud (vLiqP 0, all of Earth), the block that mixes them
+  in by a weight of 0 is left out: 4 lookups and their arithmetic. 0 to the last bit there.
+- 2 CALM FOAM SKIPPED: where the local sea is under 2 cm and breaks nowhere (sea.x <= 0.02, sea.w 0), rough is 0 and every
+  white (crests, caps, white horses, surf, swash, far-sea strokes, streaks) is 0 to the last bit: left out, 3-4 lookups. The
+  far sea's two screen widths are taken before the branch, where the whole pixel square works them out.
+- 4 FAR REFLECTION MARCH HALVED: beyond 150 m only the odd steps. Its t is the same number at each step, and a ray that meets
+  nothing ends at the same last step (on the screen: step 12; off it: the step before it left, as a line leaves the screen
+  once): the same answer. Where the ray meets something (a bank's trees from far off) it is found at the next odd step.
+- ?wcut=1 all three; any other number its own sum of bits.
+THE ROWS THAT ONLY PRICE A PART (never candidates): 8 the water one flat colour (all of its paint), 16 no reflection march,
+32 no waves per pixel. They say where the water's time goes, so the next cut, if one is needed, goes at the right part.
+?bench=water: at the brook's bank and from 400 m (the air table's own place: the landing, 45 degrees down) each cut, all
+three and the three pricing rows; at the landing's first view all three and the flat colour.
+
 ### ?bench=water FOR v39.6's DECISION (24 Nov 20:45-, the coordinator: one phone run decides the water paint's default)
 
 - THREE WATER VIEWS now: the brook's BANK, the sea SHORE, and the landing's FIRST VIEW (core/bench.js WV.first: the spawn,
@@ -247,7 +277,7 @@ build only where the look asks: 221040b).
 - THE FAR WATER LINE FROM 1 KM: an "as set" 1 km up over the landing's river (800 m north of it, facing south into the lake,
   48 degrees down), the row "no far water line" (started with the line, the default) or "far water line" (started with
   ?farwater=0), by one uniform (render/farground.js FARWATER_U.uFarWaterOn: pcFarWaterLay returns at once when 0), then down
-  again. With ?bench=water the line's data is packed and its paint compiled in either way (data/mode.js farwaterBench), so a
+  again. With ?bench=water the line's data is packed and its paint compiled in either way (data/mode.js benchw), so a
   run started with ?farwater=0 can ask it too; HONEST: that run's "as set" carries the packed data and the gated code.
 - RUN HERE (headless, software drawing, `/index.html?look=oil&fresh=1&save=0&bench=water`, 21:00-21:30): all 16 rows ran,
   none failed, none drew nothing: 1 as set; 2-4 bank (as set, no water drawn, new water paint); 5-7 shore (the same);

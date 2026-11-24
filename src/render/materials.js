@@ -1192,7 +1192,7 @@ export function makeTerrainMaterial(bodyU) {
   if (LOOK.oil && BLOOM_FAR) { m.defines = m.defines || {}; m.defines.PC_BLOOMF = 1; Object.assign(m.uniforms, bloomUniforms()); }
   if (LOOK.oil && ROCKFIELD) { m.defines = m.defines || {}; m.defines.PC_ROCKF = 1; Object.assign(m.uniforms, rockUniforms()); if (ROCK_DEBUG) m.defines.PC_ROCKDEBUG = _gf(ROCK_DEBUG); }
   // (the far view's water line: compiled in only with the oil look and ?farwater=1; world/patchgen.js packs aFarW then)
-  if (LOOK.oil && MODE.water && (MODE.water.farwater || MODE.water.farwaterBench)) {
+  if (LOOK.oil && MODE.water && (MODE.water.farwater || MODE.water.benchw)) {
     m.defines = m.defines || {}; m.defines.PC_FARWATER = 1; m.uniforms.uFarWaterOn = FARWATER_U.uFarWaterOn;
     FARWATER_U.uFarWaterOn.value = MODE.water.farwater ? 1 : 0;      // (?bench=water with ?farwater=0: compiled in, laid off)
   }
@@ -1331,6 +1331,16 @@ varying float vStill;    // how still the water is here, 0 a current .. 1 a pond
 #endif
 #endif
 varying vec3 vWake;
+#ifdef PC_WCUT
+// THE WATER'S CUTS (?wcut=1 with the oil look; the speed test's rows: core/bench.js): render/materials.js WCUT. uWCut is a
+// sum of bits. The cuts: 1 the lava's and the cloud sea's work left out where the liquid is neither (0 to the last bit
+// there); 2 calm water's foam and surf left out where the sea is under 2 cm and breaks nowhere (0 there to the last bit);
+// 4 the reflection's march in half its steps beyond 150 m (the same answer where it meets nothing). Rows that only PRICE
+// a part, never a candidate: 8 the water one flat colour, 16 no reflection march, 32 no waves per pixel.
+uniform float uWCut;
+bool pcWCut(int b) { return (int(uWCut + 0.5) & b) != 0; }
+bool pcWHalf = false;
+#endif
 #define PC_PHYS_NO_WAKE
 ${WATER_GLSL}
 #if defined(PC_OIL) && defined(PC_WPAINT)
@@ -1347,6 +1357,11 @@ vec3 pcReflect(vec3 P, vec3 R) {
   vec2 uv = vec2(0.5);
   float conf = 0.0;
   for (int i = 0; i < 12; i++) {
+    #ifdef PC_WCUT
+    // (cut 4: far off, only the odd steps. The march's t is the same number at each, and a ray that meets nothing ends at
+    // the same last step, on the screen or off it, as the whole march does: a line leaves the screen once)
+    if (pcWHalf && (i & 1) == 0) { t *= 1.7; continue; }
+    #endif
     vec3 p = P + R * t;
     vec4 cp = projectionMatrix * vec4(p, 1.0);
     if (cp.w <= 0.0) break;
@@ -1371,6 +1386,10 @@ void main() {
   // mesh ends in straight cell edges a little higher, and a sheet of foam ended there as a white slab)
   float vDep = vDepth + pcPhysWaterRunup(vBody, 0.07);
   if (vDep < 0.0 || vDepth < -0.38 + (texture(uNoise3D, vBody / 2.1).g - 0.5) * 0.14) discard;
+  #ifdef PC_WCUT
+  // (the row that prices the whole of the water's paint: one flat colour, nothing else worked out)
+  if (pcWCut(8)) { pcWrite(pcDensity(vLiq.rgb, 1.9), 0.7, normalize(normalMatrix * normalize(vBody)), -vView.z, 2.0); return; }
+  #endif
   vec3 up = normalize(vBody);
   vec3 Vd = normalize(vToCam);
   float dist = length(vView);
@@ -1382,7 +1401,13 @@ void main() {
   // this distance is dropped (waves smaller than a pixel would shimmer): far water goes flat
   // and is given its whitecaps as a few anchored dabs instead.
   vec2 along;
+  #ifdef PC_WCUT
+  // (the row that prices the waves worked out per pixel: the mesh's own waves and wakes only)
+  vec3 wv = vWake; along = vec2(1.0, 0.0);
+  if (!pcWCut(32)) wv = pcPhysWaterD(vBody, along) + vWake;
+  #else
   vec3 wv = pcPhysWaterD(vBody, along) + vWake;
+  #endif
   #ifdef PC_WWAKE
   // THE PLAYER'S OWN SMALL WAVES, PER PIXEL (the water group, lane W4, ?wakes=2; physics/water.js WAKES2, physics/splash.js):
   // a footfall's ring, a swimmer's strokes and bow wave, a low flight's furrow. Worked out here and not at the mesh's
@@ -1440,7 +1465,12 @@ void main() {
   // the painting, mirrored: soft vertical reflections broken by the ripples
   vec3 nV = normalize(normalMatrix * n);
   vec3 Rv = reflect(normalize(vView), nV);
+  #ifdef PC_WCUT
+  pcWHalf = pcWCut(4) && dist > 150.0;
+  vec3 hit = pcWCut(16) ? vec3(0.5, 0.5, 0.0) : pcReflect(vView, Rv);      // (16: the row that prices the march)
+  #else
   vec3 hit = pcReflect(vView, Rv);
+  #endif
   vec3 refl = texture(uPrevTex, hit.xy).rgb;
   // (a sea that is running is no mirror: it keeps its own wash and only takes a breath of the sky)
   float rough = smoothstep(0.08, 0.9, sea.x) * (1.0 - vLiqP.y) * (1.0 - vLiqP.x);
@@ -1449,6 +1479,11 @@ void main() {
   // (lava, acid, a sea of cloud) are mostly their own colour
   float mirror = vLiq.a;
   vec3 own = pcDensity(vLiq.rgb, 1.0 + (r3.g - 0.5) * 1.3 + (r1.r - 0.5) * 0.6 - hN * 0.55);   // pigment gathers in the troughs
+  #ifdef PC_WCUT
+  // (cut 1: where the liquid is neither lava nor a sea of cloud every line down to the cloud sea's hollows mixes in by a
+  // weight of 0: left out, four lookups and their arithmetic)
+  if (!pcWCut(1) || vLiqP.x + vLiqP.y > 0.0) {
+  #endif
   // lava: paper-bright where it runs hot, dark crust drifting on it
   vec4 r4 = texture(uNoise3D, vBody / 9.0 + drift * 0.4);
   // (scarlet by the banks where it cools, cadmium orange in the stream, paper-yellow only where it
@@ -1475,6 +1510,9 @@ void main() {
   own = mix(own, vec3(1.0), vLiqP.y * smoothstep(0.42, 0.66, r5.r * 0.7 + r3.b * 0.3));
   own = mix(own, own * uGlaze, vLiqP.y * (1.0 - smoothstep(0.30, 0.52, r5.g)) * 0.6);
   own = mix(own, own * uGlaze, vLiqP.y * (1.0 - smoothstep(-0.9, 0.1, hN)) * 0.5);      // the hollows of a rolling cloud sea
+  #ifdef PC_WCUT
+  }
+  #endif
   // rain stipples the surface: it mirrors less and takes the sky's value
   mirror *= (1.0 - 0.45 * uWx.w) * (1.0 - 0.6 * rough);
   c = mix(own, pcDensity(c * mix(vec3(1.0), vLiq.rgb, 0.35), 1.12 + (r3.g - 0.5) * 0.35 - hN * 0.40), mirror);
@@ -1490,7 +1528,14 @@ void main() {
   // a sea that is running is laid in broken strokes of unequal weight: dark in the hollows
   // between the sets, thin where the backs of the waves take the sky (the strokes are
   // anchored to the planet; seen across the water they lie flat, as strokes on a sea do)
+  #ifdef PC_WCUT
+  // (cut 2: CALM WATER, the sea here under 2 cm and breaking nowhere. Then rough is 0, and every white below -- the crests,
+  // the caps, the white horses, the surf, the swash, the far sea's strokes, the streaks -- is 0 to the last bit: left out)
+  bool calm = pcWCut(2) && sea.x <= 0.02 && sea.w <= 0.0;
+  float band = calm ? 0.0 : (texture(uNoise3D, vBody / 7.3 + 0.21).g - 0.5) * 1.5 + (r3.b - 0.5) * 0.9;
+  #else
   float band = (texture(uNoise3D, vBody / 7.3 + 0.21).g - 0.5) * 1.5 + (r3.b - 0.5) * 0.9;
+  #endif
   c = pcDensity(c, 1.0 + rough * (band * 0.9 - hN * 0.25));
 
   // the bed shows through where the water is shallow or seen from above
@@ -1524,6 +1569,20 @@ void main() {
   // the way the crests lie; whitecaps where it breaks, ragged; surf where it shoals at a shore
   float liq = (1.0 - vLiqP.y) * (1.0 - vLiqP.x);
   float deep = smoothstep(0.04, 0.3, vDep);
+  #ifdef PC_WCUT
+  // (the far sea's two screen widths are taken here, before the branch, where every pixel of a square works them out)
+  vec3 wcD3 = normalize(pcPhysWaterDir(sdir));
+  float wcFq = fwidth(dot(vBody, wcD3)), wcFa = fwidth(dot(vBody, normalize(cross(up, wcD3))));
+  float white = 0.0, farSea = 0.0;
+  if (!calm) {
+  #define PC_WDECL
+  #define PC_FWQ wcFq
+  #define PC_FWA wcFa
+  #else
+  #define PC_WDECL float
+  #define PC_FWQ fwidth(qd)
+  #define PC_FWA fwidth(dot(vBody, A3))
+  #endif
   vec4 r6 = texture(uNoise3D, vBody / 0.62 + drift * 3.0);
   float torn = r6.r * 0.55 + r2.g * 0.45;
   // (beyond the first twenty metres the torn foam is sized to the distance, in octaves that give way to one
@@ -1594,9 +1653,9 @@ void main() {
   // (a sea running high: deeper hollows, paler backs and more white horses, so a gale reads from the shore)
   float gale = smoothstep(0.6, 2.6, sea.x);
   float qd = dot(vBody, D3);
-  float lk = max(0.0, log2(max(13.0 * fwidth(qd), 1.0e-3) / 8.5) / 1.3785);
+  float lk = max(0.0, log2(max(13.0 * PC_FWQ, 1.0e-3) / 8.5) / 1.3785);
   // (far: where a pixel is wider than the brush can draw a wave in, a metre or two of sea)
-  float farSea = smoothstep(0.35, 1.6, fwidth(qd) + fwidth(dot(vBody, A3))) * smoothstep(0.03, 0.22, sea.x) * liq * deep;
+  PC_WDECL farSea = smoothstep(0.35, 1.6, PC_FWQ + PC_FWA) * smoothstep(0.03, 0.22, sea.x) * liq * deep;
   if (farSea > 0.01) {
     float k0 = floor(lk), kf = lk - k0, capTh2 = 0.68 - 0.45 * sea.w - 0.13 * gale;
     float sw = 0.0, wh = 0.0, hol = 0.0;
@@ -1623,7 +1682,7 @@ void main() {
     // white drew its few dashes at a quarter strength, and none read)
     farWhite = farSea * wh * smoothstep(0.008, 0.05, sea.w) * (0.35 + 0.65 * uDayness) * (1.0 - smoothstep(900.0, 2200.0, dist));
   }
-  float white = max(max(max(crest * 0.85, foam) * deep, surf * smoothstep(0.0, 0.03, vDep)) * liq, farWhite);
+  PC_WDECL white = max(max(max(crest * 0.85, foam) * deep, surf * smoothstep(0.0, 0.03, vDep)) * liq, farWhite);
   // (PHYSICS P26: the cap on white water is lifted and the sea's white share, sea.w, runs to 1; the coordinator's ruling:
   // paint whatever share comes as broken foam, streaks and spray, never a flat white area. To 0.15 the caps above are the
   // picture, as they were. Beyond it the crests' foam is blown into streaks along the wind, drawn out twelve to one and
@@ -1643,6 +1702,9 @@ void main() {
     float form = 0.42 + 0.58 * smoothstep(-0.5, 0.6, hN);
     white = max(white, wOver * max(streak * form, closeUp * 0.46 * form * (0.75 + 0.5 * (tornW - 0.5))));
   }
+  #ifdef PC_WCUT
+  }
+  #endif
   glint = max(glint, white);
   c = mix(c, vec3(1.0), glint);
   // (a sea running high keeps its body under the murk: in a gale the air is thick enough to
@@ -1878,6 +1940,15 @@ void main() {
 }
 `;
 
+// THE WATER'S CUTS (?wcut= with the oil look; the coordinator, 24 Nov 21:36: the owner's phone found the water the second
+// largest cost, 5.3 ms at the brook's bank and at least 4.2 ms from 400 m). Bits of one uniform, uWCut; the shader's own
+// account is at WATER_FRAG's PC_WCUT. The three CUTS, candidates for the default: lava (1), calm (2), march (4); ?wcut=1
+// turns all three on, any other number is its own sum of bits (so ?wcut=2 is the calm cut alone, ?wcut=8 the flat colour).
+// The three PRICING bits (flat, noMarch, noWaves) are the speed test's, never a candidate. Compiled in with the switch, or
+// for the speed test's water table (?bench=water) at whatever the switch says; without either, v37's program to the letter.
+export const WCUT = { cuts: 7, lava: 1, calm: 2, march: 4, flat: 8, noMarch: 16, noWaves: 32 };
+export const WCUT_U = { uWCut: { value: 0 } };
+
 export function makeWaterMaterial(bodyU, skyU) {
   const m = new THREE.ShaderMaterial({
     name: 'pc-water',
@@ -1904,6 +1975,11 @@ export function makeWaterMaterial(bodyU, skyU) {
   if (wpaintOn()) { m.defines.PC_WPAINT = 1; m.uniforms.uWPaint = WPAINT.uWPaint; }
   // (the speed test's rows for the new paint, either way from how the run started: render/waterchunk.js benchWPaint)
   if (MODE.oil) { WATER_MATS.push(m); benchWPaint(); }
+  // (the water's cuts: WCUT above)
+  if (MODE.oil && MODE.water && (MODE.water.wcut || MODE.water.benchw)) {
+    m.defines.PC_WCUT = 1; m.uniforms.uWCut = WCUT_U.uWCut;
+    WCUT_U.uWCut.value = MODE.water.wcut === 1 ? WCUT.cuts : Math.max(0, MODE.water.wcut | 0);
+  }
   m.userData.pcPainted = true;
   // (R1 W2.4: water drawn in this frame wants last frame's painting kept for the next: post.js finish)
   m.onBeforeRender = () => { PREV.water = true; };

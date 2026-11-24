@@ -510,18 +510,42 @@ export function attachBench(pc) {
         // (and the place the far water line is asked from: 800 m north of the landing, facing south over its river into the lake)
         WV.air1k = { dir: [g0.x, g0.y, g0.z], e: 0, n: 800, yaw: 180, pitch: -0.12 };
       }
+      // THE WATER'S CUTS (render/materials.js WCUT, ?wcut=; the coordinator, 24 Nov 21:36: "look for a cut in the water's
+      // fragment work, mostly from the air ... Give each cut a row"): at the brook's bank and from 400 m each cut and all
+      // three, the other way from how the run started, and three rows that only price a part of the water's paint (one flat
+      // colour: all of it; no reflection march; no waves per pixel); at the landing's first view all three and the flat
+      // colour. ?bench=water compiles the cuts in at whatever ?wcut says (data/mode.js benchw)
+      let WC = null;
+      try { const mm = await import('../render/materials.js'); WC = mm.WCUT && mm.WCUT_U ? { K: mm.WCUT, U: mm.WCUT_U.uWCut } : null; } catch { WC = null; }
+      const wcRows = (pre, sfx, all) => {
+        if (!WC) return [];
+        const K = WC.K, m0 = WC.U.value | 0, out = [], put = (v) => () => { WC.U.value = v; }, back = () => { WC.U.value = m0; };
+        if (all) for (const [b, nm] of [[K.lava, 'lava work skipped'], [K.calm, 'calm foam skipped'], [K.march, 'far reflection march halved']]) out.push([pre + (m0 & b ? 'without cut: ' : 'cut: ') + nm + sfx, put(m0 ^ b), back]);
+        const full = (m0 & K.cuts) === K.cuts;
+        out.push([pre + (full ? 'no water cuts' : 'all three water cuts') + sfx, put(full ? m0 & ~K.cuts : m0 | K.cuts), back]);
+        out.push([pre + 'water one flat colour' + sfx, put(m0 | K.flat), back]);
+        if (all) for (const [b, nm] of [[K.noMarch, 'water: no reflection march'], [K.noWaves, 'water: no waves per pixel']]) out.push([pre + nm + sfx, put(m0 | b), back]);
+        return out;
+      };
       for (const view of ['bank', 'shore', ...(WV.first ? ['first'] : []), ...Object.keys(WV).filter((k) => WV[k].place)]) {
         waterRows.push([AS + ', ' + view + ' view', () => goView(view), null, { alone: true }]);
         waterRows.push([view + ' view: no water drawn', () => show(/^pc-water/, false), () => show(/^pc-water/, true)]);
         for (const r of extra) if (r && r.view === view) waterRows.push([view + ' view: ' + r.name, r.on, r.off]);
+        if (view === 'bank' || view === 'first') waterRows.push(...wcRows(view + ' view: ', '', view === 'bank'));
+      }
+      // (from 400 m, 45 degrees down, at the landing: the air table's own place, where 'no water drawn' saved at least 4.2 ms)
+      if (WC) {
+        waterRows.push([AS + ', 400 m up, 45 deg down', async () => { foot = null; await goView(); await lift(400, 45); }, null, { alone: true }]);
+        waterRows.push(['no water drawn (400 m up)', () => show(/^pc-water/, false), () => show(/^pc-water/, true)]);
+        waterRows.push(...wcRows('', ' (400 m up)', true));
       }
       // THE FAR WATER LINE FROM 1 KM (render/farground.js, the oil look's default since v39.5): its own "as set" 1 km up over
       // the landing's river, facing south down it into the lake, and the line laid the other way from how the run started
-      // (?bench=water packs its data and compiles it in either way, behind one uniform; data/mode.js farwaterBench). Then
+      // (?bench=water packs its data and compiles it in either way, behind one uniform; data/mode.js benchw). Then
       // down again, and the landing's own place kept for the end of the table.
       let FW = null, M0 = null;
       try { FW = (await import('../render/farground.js')).FARWATER_U; M0 = (await import('../data/mode.js')).MODE; } catch { FW = null; }
-      if (FW && M0 && M0.oil && M0.water && (M0.water.farwater || M0.water.farwaterBench) && WV.air1k) {
+      if (FW && M0 && M0.oil && M0.water && (M0.water.farwater || M0.water.benchw) && WV.air1k) {
         const on0 = FW.uFarWaterOn.value >= 0.5;
         waterRows.push([AS + ', 1 km up over the river', async () => { foot = null; await goView('air1k'); await lift(1000, 48); }, null, { alone: true }]);
         waterRows.push([(on0 ? 'no far water line' : 'far water line') + ' (1 km up)', () => { FW.uFarWaterOn.value = on0 ? 0 : 1; }, () => { FW.uFarWaterOn.value = on0 ? 1 : 0; }]);

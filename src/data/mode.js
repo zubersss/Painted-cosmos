@@ -39,6 +39,7 @@ export const MODE = { oil: false, powers: false, calm: false, beasts: 0, water: 
 //   ?bends=0       with ?rivers=tree: the wide rivers wander as the streams do, without their S-bends (for the A/B)
 //   ?mount=1       with ?rivers=tree: MOUNTAIN STREAMS: torrents down the mountains' flanks into their valleys and on into
 //                  the wood's rivers (world/mountain.js; the mountains' own flow, the drainage field as it is)
+//   ?wcut=1        with ?look=oil: the water program's cuts (render/materials.js WCUT; 0, the default: v37's program)
 // A NUMBER or 0 for each: 0 is off.
 // THE DEFAULT IN THE OIL LOOK (the owner, 24 Nov: "No do make it look different i give you access": what has passed review
 // becomes the default; the coordinator's order): with ?look=oil and nothing said, the rivers of the flow tree (with their
@@ -51,7 +52,7 @@ export const MODE = { oil: false, powers: false, calm: false, beasts: 0, water: 
 // (0) until the sea from the air passes the look director; the player's (`wakes`, `splash`) are the paint lane's (above).
 // (the object as it stands before waterFromSearch is asked -- a test, a module read on its own -- is the game with no water
 //  part; the game and the gallery ask waterFromSearch before anything is made, and with ?look=oil it sets the defaults)
-MODE.water = { on: false, rivers: 0, lakes: 0, ponds: 0, puddles: 0, swell: 0, falls: 0, fjord: 0, wpaint: 0, wakes: 1, splash: 0, runoff: 0, bends: 1, mount: 0, farwater: 0 };
+MODE.water = { on: false, rivers: 0, lakes: 0, ponds: 0, puddles: 0, swell: 0, falls: 0, fjord: 0, wpaint: 0, wakes: 1, splash: 0, runoff: 0, bends: 1, mount: 0, farwater: 0, wcut: 0, benchw: 0 };
 export function waterFromSearch(search) {
   const W = MODE.water;
   let q;
@@ -68,9 +69,14 @@ export function waterFromSearch(search) {
   //  that from 1 km up a river narrower than the ground's vertices lie apart still reads; a paint switch, it changes no
   //  ground. On by default in the oil look since the look director passed it, 24 Nov 18:22; ?farwater=0 the opt-out)
   W.farwater = n('farwater', d);
+  // (THE WATER'S CUTS, ?wcut=1 with the oil look (the coordinator, 24 Nov 21:36: the owner's phone found the water the second
+  //  largest cost, 5.3 ms at the brook's bank and at least 4.2 ms from 400 m): the water program's work cut where it shows
+  //  nothing or nearly nothing -- render/materials.js WCUT. 0, the default: v37's water program to the letter)
+  W.wcut = n('wcut', 0);
   // (the speed test's water table, ?bench=water: the far water line's data packed and its paint compiled in whatever the
-  //  switch says, behind one uniform, so the table can ask it either way from how the run started; core/bench.js)
-  W.farwaterBench = q.get('bench') === 'water' ? 1 : 0;
+  //  switch says, and the water's cuts compiled in, each behind one uniform, so the table can ask them either way from how
+  //  the run started; core/bench.js)
+  W.benchw = q.get('bench') === 'water' ? 1 : 0;
   W.on = !!(W.rivers || W.lakes || W.ponds || W.puddles || W.swell || W.falls || W.fjord || W.runoff || W.mount);
   return W;
 }
