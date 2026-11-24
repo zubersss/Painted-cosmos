@@ -27,6 +27,9 @@ import { burntAt } from '../data/burnt.js';
 import { skyNumbers, SKY } from './sky.js';
 import { DriftField, DRIFT, snowTransport01 } from './drift.js';
 import { clamp01, smoothstep } from './util.js';
+// (group D, the second weather: docs/lead/WEATHER-DESIGN.md. Everything of it is behind wx2.js and off by default.)
+import { WX2 } from './wx2.js';
+import { WindMap, WINDMAP, setThermal } from './windmap.js';
 import { WaterField, WATER_GLSL, WATER, windSea, seaGrown, fetchOf, wakeLength, foamCover, whiteWind, surf01, FetchGauge, FETCH_GAUGE, SEA_TEX } from './water.js';
 import { SeaMap, SEA_MAP, FetchRose } from './seamap.js';
 import { DeformField, DEFORM, MARK, MARK_STRIDE } from './deform.js';
@@ -96,6 +99,8 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
   const airGrid = new AirGrid(seed);
   const near = new TerrainGrid(17, 2, 10);      // 32 m of ground at 2 m, for particles, pushes and prints
   const flora = new FloraField();
+  // (group D) THE WIND MAP OF THE WHOLE WORLD (windmap.js): read only while WX2.windmap is on; with it off it is never touched
+  const windMap = new WindMap(seed);
   const particles = new Particles(seed, 1);
   const loose = new Loose(particles);
   const devils = []; devils.count = 0;
@@ -153,7 +158,7 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
   };
   // Small weather near the focus, refreshed by update(): dust devils (features.js).
   const features = { devils };
-  const stats = { ms: 0, msAvg: 0, msMax: 0, msGround: 0, msAir: 0, msWeather: 0, msFlora: 0, msParticles: 0, msFetch: 0, fetchSamples: 0, samples: 0, particles: 0, pushCells: 0, frames: 0, reanchors: 0 };
+  const stats = { ms: 0, msAvg: 0, msMax: 0, msGround: 0, msAir: 0, msWind: 0, msWeather: 0, msFlora: 0, msParticles: 0, msFetch: 0, fetchSamples: 0, samples: 0, particles: 0, pushCells: 0, frames: 0, reanchors: 0 };
   const _dirv = { x: 0, y: 0, z: 0 };
   const _d3 = new Float64Array(3);
   const _g = {}, _g2 = {}, _cov = {}, _menv = {}, _m2 = {}, _wenv = {};
@@ -356,8 +361,15 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
     let used = near.update(frame, fx, fz, sampleActive, Math.ceil(budget * 0.5) * bn, groundInto, clock, QUALITY.sampleMs);
     const t1 = now();
     used += airGrid.update(frame, bodyId, time, fx, fz, sampleActive, Math.ceil(budget * 0.5) * ba, clock, QUALITY.sampleMs);
-    const t2 = now();
+    let t2 = now();
     stats.samples = used; stats.msGround = t1 - t0; stats.msAir = t2 - t1;
+    // (group D) the wind map: the land read in slices until it is whole, then the wind refreshed a slice a frame
+    if (WX2.windmap) {
+      setThermal(WX2.thermal);
+      if (!windMap.land.ready || windMap.bodyId !== bodyId) windMap.readLand(bodyId, sampleActive, warming ? null : clock, WINDMAP.staticMs, warming ? 1e9 : WINDMAP.staticBatch);
+      windMap.step(dt, bodyId, time, sunDir);
+      const t2b = now(); stats.msWind = t2b - t2; t2 = t2b;
+    } else stats.msWind = 0;
 
     // where we are
     const coverKnown = airGrid.coverNear(fx, fz, cover);
@@ -785,6 +797,15 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
 
   const fields = {
     frame,                    // the LocalFrame all near fields share (anchor and axes, body-local)
+    // (group D) THE WIND MAP OF THE WHOLE WORLD, or null while wx2.js WX2.windmap is off (docs/lead/WEATHER-DESIGN.md 9.1):
+    //   N, version (+1 each full refresh), t, ready (a full refresh made since the land was read);
+    //   per texel k = (face * N + j) * N + i of the cube sphere (windmap.js FACES, the same as world/cubesphere.js), each
+    //   along the texel's own east (Y x up) and north (up x east): e10, n10 (m/s at 10 m), aloftE, aloftN (m/s at the
+    //   cloud layer: what clouds drift with), lift (m/s up at cloud base), trigger (0..1), shelter (land speed factor);
+    //   land { ready, h, H1, H2, relief, gradE, gradN, axisE, axisN, aniso, confine, saddle, water, heat, moist, W1, wgE, wgN };
+    //   sites [{ x, y, z, w, kind: 'peak' | 'ridge' | 'basin', k }]: where convection is born;
+    //   at(ux, uy, uz, out): bilinear, in the query point's own east and north; vecAt(ux, uy, uz, o): body-local vector.
+    get wind() { return WX2.windmap ? windMap : null; },
     flora: {
       // textures (RGBA float32, N x N, row j = north index, column i = east index)
       get bend() { return flora.bend; }, get wind() { return flora.wind; }, get push() { return flora.push; },
