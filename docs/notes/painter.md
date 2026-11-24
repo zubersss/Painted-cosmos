@@ -540,7 +540,9 @@ outside the view's sides runs none of the impostor vertex shader (30 / 28 / 48 p
 150 m / 420 m / 1 km); (2) ?impminpx=4, OFF, bench row impMinPx at 400 m: far trees IN LEAF under 4 px are not drawn and
 the painted canopy stands for them (conifers kept: with them the dark spikes and the slope trees went, SEEN); MEASURED
 trees in view cut 2,408 / 5,550 / 4,427 of 22,412 / 27,135 / 10,291 (0.7 / 3.3 / 18.7 percent of impostor pixels); picture
-change 0.04 / 0.23 / 0.41 of 255 (A1_impminpx4_{420m,1km}_zoom_AB). For F's eye.
+change 0.04 / 0.23 / 0.41 of 255 (A1_impminpx4_{420m,1km}_zoom_AB). F PASSED the look at 4 px; its default waits for the
+bench row like ?farshadow. F asked the two priced together too: bench row farShMinPx at 400 m (both on, only when the run
+starts with both off). The v39.5 farshadow row is a lower bound (9267b3b's kept frames skip a placing walk): re-run on v39.6.
 Before: F PASSED THE FAR SHADOWS (with the cache and C's hook) on
 one change: the hook's level 0.40 instead of 0.33, so the sunlit glades stay bright at a low sun. ASKED C to set it (C's
 line, farview); then render the 16 h pair at 150 m on a scratch merge to confirm. F recommends ?farshadow as the DEFAULT
