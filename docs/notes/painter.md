@@ -436,6 +436,24 @@ is 0.30 of 255 at 5 m and at 10 m (0.31 with `?light=old`, as before the merge);
 picture by 1.7, so the wood follows it; `?light=old&trees2=0` is pixel-identical to the still before the merge. Stills
 `A2_*-v39_*`. (The cards' own program, `CARD_FRAG`, does not take the one light: cards are dropped.)
 
+**ON FOOT TO UNDER 33 ms (the coordinator's job, 24 Nov, after the ground from the air was found to hold no 30 ms:
+the v38.2 table had the whole 400 m frame at 17.9 ms with impostors, ground included).** DERIVED from the phone's own
+rows: v39.1 (split trees + impostors) is about 22 ms on foot (40.3 split - 18.5 old far trees + 0.7 impostors; and
+'no trees' was at the 16.7 cap in v37, so all that is not a tree fits under 16.7). Never timed together: the owner's
+next table decides. Built for that table: `?bench=foot` (core/bench.js), the frame on foot without the trees'
+questions, and THE NEAR GRASS AND FLOWERS' FIRST ROWS (in the full table too): 'no near grass or flowers', 'near
+grass: half its marks' (`materials.js NEAR_VERT uNearCut`, folded away before any is rasterised, by place in
+half-metre cells so a flower plant of several marks goes whole, the flora lane's ask; at 0, the default, not worked
+out at all), 'near grass one flat colour' (`uOilL.y` 8 in `NEAR_FRAG`). Also fixed: my wood
+program honours the flat mode 7, so 'near bark one flat colour' measures the split's bark. SEEN: the default still
+pixel-identical to before; each mode acts (half: fewer blades and leaves; flat: every mark in its flat wash; bark flat).
+The speed test's panel now lists the three tests (trees, air, foot) with their addresses and how to send each.
+STANDING BY (24 Nov, 13:10) for the owner's three tables (bench=trees, bench=air, bench=foot on v39.2): no cut is
+built until they show where the on-foot frame goes. COUNTED (Node, landing, phone tier 1, 936 x 442, on foot): the near grass today 12,967 marks (fine ring 6,941, middle
+4,333, vista 1,693), 38,901 triangles, 272k fragments rasterised, 107k pixels covered, about 110k painted after the
+depth test; the flora lane's branch (design-flora e55f6cc) 26,928 marks (fine 15,608, carpet 6,460, middle 3,167),
+80,784 triangles, 357k fragments, about 172k painted after the depth test.
+
 **COUNTED AT THE LANDING after v39 (Node, the scratch copy of `tools/overdraw.mjs`, `where=spawn`, phone tier 1, the
 counter's 787 x 443 = 0.348 Mpixel at fov 55, on foot; `?trees2=0` against the default):** near wood 71,504 -> 39,920
 triangles, near leaves 47,110 both, middle trees unchanged (wood 21,310, leaves 34,356: the middle tree never had hair);
