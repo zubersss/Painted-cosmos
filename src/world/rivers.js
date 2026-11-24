@@ -69,7 +69,8 @@ export const RIVER_DEF = {
   mountSink: 0.5,  //   and how far its water stands under the mountain's large-scale height (metres), and the deepest gorge
   mountCut: 10,    //   it cuts through a rise across it (metres; past that it runs dry over it)
   edgeThin: 90,    // metres: a river that ends at the edge of the wood (a marsh, a dry biome) thins away over this
-  springs: null,   // [{ near: [x, y, z], up, acc }]: catchment added so a stream runs past a place (a look's oil.springs)
+  springs: null,   // [{ near: [x, y, z], up, acc, ramp }]: catchment added so a stream runs past a place (a look's oil.springs)
+  keep: null,      // [{ near: [x, y, z], r }]: places a river bends round, its water's edge kept r metres off (a look's oil.keep)
   near: 100,       // metres: the exact distance is asked of the segments within this; beyond, the coarse field
   grade: [55, 220], // metres from the centre line: the base level is graded toward the river's own over the first, eased to
                     // the land's own by the second
@@ -161,7 +162,10 @@ export function buildRivers(S, D, opts) {
       if (best < 0) break;
       p = best;
     }
-    for (let guard = 0; p >= 0 && guard < 5000; guard++) { accF[p] += sp.acc || 30; p = to[p]; }
+    // (`ramp`: the catchment added grows over that many nodes from where it starts, so a river fed by it widens down to the
+    //  place as a river does, instead of starting full width)
+    const ramp = sp.ramp || 0;
+    for (let guard = 0; p >= 0 && guard < 5000; guard++) { accF[p] += (sp.acc || 30) * (ramp > 0 ? Math.min(1, (guard + 1) / ramp) : 1); p = to[p]; }
   }
   // 1. the river nodes
   const isR = new Uint8Array(len);
@@ -385,6 +389,19 @@ export function buildRivers(S, D, opts) {
       const push2 = hold * swing * (RA ? 1 - (1 - o.mountWander) * RA[k] : 1) / R;
       let x = qx + ax * push2, y = qy + ay * push2, z = qz + az * push2;
       if (Ls > 1) { const f = 1 - smoothstep(0, Ls, arc - sGo); x += dx0 * f; y += dy0 * f; z += dz0 * f; }
+      // (a place the river bends round -- the landing, which the owner's first look must find dry, with the river past it --
+      //  its water's edge kept `r` off: a point nearer is carried out along the line from the place, eased so the bank is
+      //  smooth; a river that passes farther off is as it was)
+      if (o.keep) for (const kp of o.keep) {
+        const kx = kp.near[0], ky = kp.near[1], kz = kp.near[2];
+        let vx = x - kx, vy = y - ky, vz = z - kz;
+        const dd = len3(vx, vy, vz) * R, need = kp.r + w * 0.5 + 3, A = need + 40;
+        if (dd < A) {
+          if (dd < 1e-3) { vx = ax; vy = ay; vz = az; } else { vx /= dd / R; vy /= dd / R; vz /= dd / R; }
+          const fd = need + (A - need) * (dd / A) * (dd / A);
+          x = kx + vx * fd / R; y = ky + vy * fd / R; z = kz + vz * fd / R;
+        }
+      }
       const l = R / len3(x, y, z);
       const thin = thinEnd > 0 ? 0.12 + 0.88 * smoothstep(0, thinEnd, arc - sGo) : 1;
       if (thin < 1 && RR[k] >= 0) thinned.add(RR[k]);
@@ -891,11 +908,22 @@ export function attachRivers(S, drain) {
     for (const sp of look) {
       let near = sp.near;
       if (sp.at === 'landing') { const g = S.getSpawn(); near = [g.x, g.y, g.z]; }
-      if (near) springs.push({ near, up: sp.up || 0, acc: sp.acc || 30 });
+      if (near) springs.push({ near, up: sp.up || 0, acc: sp.acc || 30, ramp: sp.ramp || 0 });
     }
   }
   const opts = {};
   if (springs) opts.springs = springs;
+  // (a look's places a river bends round: { at: 'landing', r }, the world's first landing)
+  const keepL = S.look && S.look.oil && S.look.oil.keep;
+  if (keepL) {
+    const keep = [];
+    for (const kp of keepL) {
+      let near = kp.near;
+      if (kp.at === 'landing') { const g = S.getSpawn(); near = [g.x, g.y, g.z]; }
+      if (near) keep.push({ near, r: kp.r || 12 });
+    }
+    if (keep.length) opts.keep = keep;
+  }
   if (MODE.water && MODE.water.bends === 0) opts.bends = 0;
   const net = buildRivers(S, drain, opts);
   if (!net) return null;
