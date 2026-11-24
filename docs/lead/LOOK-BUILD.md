@@ -320,3 +320,20 @@ the owner first. Not started.
   build/olive/ (top without, below with).
 - The fresh-eyes audit of v39.2 and its three findings are in `docs/lead/LOOK-AUDIT-2.md`; the cloud shell's limb
   (?skylimb) fixed on the way is in its section 4.
+
+## High up a dark stroke takes less of the air (?airdark, 24 Nov): SEEN, a modest gain
+
+- My share of the fresh-eyes audit's finding 1 (from about 1 km the wood had no pixel under V 0.3). chunks.js
+  pcAtmosV: a stroke's share of the air is cut for dark strokes, to 0.6 of it at the darkest, all of it from
+  lightness 0.40 up, one flat amount per stroke; ramped by the horizon's dip, 27 to 35 degrees (Earth about 500 m to
+  900 m), in OIL.uLookG.w from world/index.js where the air's top is on. `?airdark=0` or `?light=old` off.
+- FIRST LAYING REJECTED (from every height, down to 0.35): at 1 km the darks under V 0.35 went 0.6 to 8.0 per cent,
+  but at 150 m the far wood went as dark as the near (no aerial depth) and its saturation 0.61 to 0.74
+  (build/airdark/airdark_first_laying_150m_off_over_on_REJECTED.jpg).
+- SEEN (look-director, autumn wood, noon, one page each, LOOK.airDark 1 then 0): 420 m, 150 m and on foot 0 pixels
+  change. At 1 km 7.4 per cent: the land's pixels under V 0.35 go 0.6 to 5.1 per cent, under 0.3 0.0 to 2.7; the
+  mountains' shaded faces a step deeper; V median 0.70 unchanged (build/airdark/airdark_1km_off_over_on.jpg).
+- SAID PLAINLY: the 8 per cent the audit asked for is not reached by the air, because the wood at 1 km has almost
+  nothing dark left to keep (the air is the smaller part). The darks have to come from the things: A1's crown masses
+  (passed for v39.3) and its next steps (the small crowns' gaps in their shaded tone, the far spruce by limb), and C's
+  mountains' shade plane. To be re-measured at 1 km once those are in.
