@@ -652,20 +652,23 @@ void main() {
       // overhead and away from it, where the zenith key's blue shows and the low sky goes a cool lilac. Laid in four
       // steps round the sky (by the angle to the sun, its edges a pixel wide and wandering with the sky's own noise)
       // and on the sky's own height bands (tq), so it is painted, not a glow. ?goldsky=0 is the wash as it was.
-      float gT = smoothstep(-0.45, 0.90, sd) * 5.0 + (n1.g - 0.5) * 1.1 + (n2.r - 0.5) * 0.45;
-      float gTi = floor(gT), fwg = max(fwidth(gT), 1e-4);
-      float side = clamp((gTi + smoothstep(0.5 - fwg, 0.5 + fwg, gT - gTi)) / 5.0, 0.0, 1.0);      // 0 away from the sun .. 1 toward it
-      float low = tq;                                                                                  // 0 overhead .. 1 at the horizon band
-      // (the gold is laid as a GLAZE over the bands, not a wash that replaces them: each band keeps its own value, so
-      // the steps and strokes under it still read, and only toward the sun and low down does it go to the gold itself)
+      // (rings round the sun, five steps by the angle to it, their edges a pixel wide and wandering with the sky's noise:
+      // pale gold close to the sun, gold, a warm peach, a cool lilac, and away from the sun the sky's own blue a step
+      // deeper. Each ring is laid as a glaze that keeps the value of what is under it -- the sky's height bands, the
+      // clouds -- so the steps and shapes under it still read; strongest low in the sky, lighter overhead.)
+      float gT = smoothstep(-0.55, 0.97, sd) * 5.0 + (n1.g - 0.5) * 0.9 + (n2.r - 0.5) * 0.35;
+      float gTi = clamp(floor(gT), 0.0, 4.0), fwg = max(fwidth(gT), 1e-4);
+      float ring = clamp(gTi + smoothstep(0.5 - fwg, 0.5 + fwg, gT - gTi), 0.0, 5.0);      // 0 away from the sun .. 5 by it
+      float low = tq;                                                                      // 0 overhead .. 1 at the horizon band
       float cl = dot(col, vec3(0.3, 0.5, 0.2));
-      vec3 warmG = clamp(vec3(cl) * vec3(1.20, 0.99, 0.70), 0.0, 1.0);
-      float w = gold * mix(0.40, 1.0, side) * mix(0.50, 1.0, low);
-      col = mix(col, mix(warmG, vec3(0.92, 0.80, 0.58), 0.45 * side * low), w * 0.85);
-      // (away from the sun: overhead the sky's own blue a step deeper; low down a warm rose, the light's last colour)
-      float away = gold * (1.0 - side);
-      col = mix(col, dens(col, 1.30) * vec3(0.86, 0.95, 1.14), away * (1.0 - low) * 0.55);
-      col = mix(col, clamp(vec3(cl) * vec3(1.12, 0.93, 0.92), 0.0, 1.0), away * low * 0.35);
+      vec3 rc = ring < 1.5 ? mix(vec3(0.62, 0.68, 0.90), vec3(0.76, 0.70, 0.86), ring - 0.5)
+              : ring < 2.5 ? mix(vec3(0.76, 0.70, 0.86), vec3(0.90, 0.72, 0.64), ring - 1.5)
+              : ring < 3.5 ? mix(vec3(0.90, 0.72, 0.64), vec3(0.93, 0.77, 0.52), ring - 2.5)
+              : mix(vec3(0.93, 0.77, 0.52), vec3(0.96, 0.88, 0.66), clamp(ring - 3.5, 0.0, 1.0));
+      vec3 rv = mix(rc, clamp(rc * (cl / max(dot(rc, vec3(0.3, 0.5, 0.2)), 1e-3)), 0.0, 1.0), 0.55);   // (the ring keeping the value under it)
+      float amt = gold * mix(0.30, 0.88, low) * mix(0.75, 1.0, ring / 5.0);
+      col = ring < 0.5 ? mix(col, dens(col, 1.30) * vec3(0.86, 0.95, 1.14), gold * mix(0.55, 0.30, low))      // (away: the blue deeper)
+                       : mix(col, rv, amt);
     }
     {
       // THE NIGHT SKY'S STREAKS (the owner, 2026-11-16: "make the lines on the sky at night time near the northern lights
