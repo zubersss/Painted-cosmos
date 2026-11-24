@@ -442,3 +442,17 @@ the owner first. Not started.
 - Waiting: W3's river paint with its cost cut (v39.6) and the per-stroke direction (the banding at bending reaches);
   E-W2's sea sheet; B's FV6 pools at half strength; C's glades from the air; A2's ?leafgrow for the owner.
 - My open lane: the light's design. Not started.
+
+## State at 22:50, 24 Nov
+
+- The owner's phone tables (v39.5): 60 held at the phone's own size (56 on foot). The room goes to a sharper picture
+  (about 1.25x each way, dynres guarding). Rule R3.9 added (look thresholds in pixels scale with the lines; anti-grain
+  floors stay in real pixels); A1 is converting its crown thresholds. Checked: the strokes themselves are sized as a
+  share of the picture's height, so a sharper picture or a dynres step only makes them crisper.
+- Passed tonight for v39.6: B's flower drifts (?bloomfar on), B's ?u2cells (a correctness fix), A1's ?impminpx=4 and
+  far shadows on the look (both wait for their phone rows), E's ?wcut=1 (if the phone shows a saving), C's glades at
+  1.12 (count-neutral), C's noon lit split inside ?rockfield, W3's storm river.
+- HELD: W3's river default, ONLY for the game's first view at the golden hour (the sun path so broad the near reach
+  reads as cream sand; fan wedges mid-reach): W3 narrows the path to about a third of the width. The sea (?wsea) stays
+  v37 until the overlapping rows and the white bits are fixed (E-W2 and W3).
+- My open lane: the light's design. Not started.
