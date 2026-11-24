@@ -411,7 +411,7 @@ smooth blue-violet pebbles in the warm meadow; give them the mountains' rock fam
 farview ROCK_LOOK), lit with a lit top and a cool shaded side, laid in strokes like the ground, their foot settled into the
 grass. The bush near the eye (old leaf cards) is A2's lane.
 
-**THE NEAR GROUND DENSER (`?dense=1`, OFF; eb1b68f, c175020; BUILT, counted, NOT yet seen).** The coordinator, after the
+**THE NEAR GROUND DENSER (`?dense=1`, OFF; eb1b68f, c175020; SEEN bc0a7ba, sent to the look director).** The coordinator, after the
 owner's v39.5 phone table (the near grass and flowers 0.5 ms of 24 ms at 2.25x the pixels; the small plants 2.7): "room
 for more grass and flowers near the eye ... the owner wants much denser". `world/nearground.js` `DENSE_K`, `ringsFor`: the
 carpet 22 blades a cell's worth where 16, to 8 m (7); the fine ring to 16 m at tier 1 (12; the top tier's 23 as it was),
@@ -420,7 +420,27 @@ middle ring room for 10 touches (7), the drift's heads 1.3x. `NearGround.setDens
 (no shader compiled); `?bench=foot` row 'near grass and flowers denser' (asked the other way when started with it on).
 Tests: `src/world/neardense.test.mjs`. COUNTED (scratch overdraw counter, tier 1, 1024x480, on foot): the meadow's near
 strokes 267k -> 558k pixels (the fine ring 13,920 -> 38,700 marks, self-lap 1.92 -> 3.05), the whole frame +26 per cent
-pixels, +15 per cent triangles; the autumn landing near strokes 338k -> 509k, the frame +6 per cent.
+pixels, +15 per cent triangles; the autumn landing near strokes 338k -> 509k, the frame +6 per cent. SEEN (`dense-*-asset-
+dense.jpg`, one page switched at run time): the meadow on foot fuller, its thin 8-16 m band a drift of ox-eye (18.3 per
+cent changes), the landing's loosestrife far thicker (17.1), the green wood more bluebells and blades (11.5), from 10 m
+little (1.5, 0.5); V>0.90 2.0 -> 3.2 per cent at the meadow. The coordinator: it rides OFF with its bench row; the owner's
+next phone run prices it, then the default if the price is right.
+
+**THE BOULDERS AS PAINTED STONE (`?stone=1`, OFF; 3a2b809, 4715fc0, 7caf77f; not yet seen).** F's u2cells follow-up, with
+C. `data/looks/earth.js` `STONE_EARTH` (ROCK_LOOK.mtn's pigments: the lit face Davy's grey with raw umber, the shade Davy's
+with Payne's grey and cobalt violet) as `oil.stone` of the two woods and the meadow, `STONE_COAST` (the coast cliff's two
+bed tones, C's word) at the coast; `world/flora.js` lays it over the undergrowth's rock, sets a boulder a quarter of its
+height into the ground, and sets PC_STONE on the boulders' material; `materials.js` PROP_FRAG's oil boulder branch ONLY,
+under `#ifdef PC_STONE` (the coordinator's leave, F and A2 told): C's lit top, 14 cm value-step strokes, warm-lit /
+cool-shade lean, the lowest 16 cm damp. Without ?stone=1 the compiled shader is identical. F's pair decides the default.
+
+**SPEED-TEST ROWS ADDED 24 Nov, late (4715fc0, for v39.7):** 'no far flower drifts (?bloomfar=0)' in `?bench=foot` and the
+air table: it hands three a `uBloomOn` held at 0 on the ground's materials for the row and gives the real uniform back
+(bench-only; the same picture as ?bloomfar=0). The review's note fixed: a speed test no longer places the hidden
+undergrowth (`under2On` is `?under=1` only); its row places it while it runs (`setUnder2` + `flora.rebuildUnder2()`).
+PACKAGE O REBUILT (6513f9f): the first heather and gorse were SEEN from inside the coast's densest patch (66 kits in view)
+as a few thin dark sticks and tiny pink flecks, 1.4 per cent of the picture; now heather a dome of scale-leaves with 22
+flower spikes over its top (136 triangles), gorse 40 spines and 30 larger yellow touches (140), sizes 0.9-1.5.
 
 **Done:**
 1. Speed-test rows (`core/bench.js`, after 'no small plants'): 'no near grass', 'near grass: the blades only (the fine
