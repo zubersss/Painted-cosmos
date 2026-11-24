@@ -557,16 +557,26 @@ export const FARWATER_VERT_MAIN = /* glsl */`
 export const FARWATER_FRAG = /* glsl */`
 #ifdef PC_FARWATER
 varying vec3 vFarW;
-// how much of this pixel is river: 1 inside, 0 out, over the pixel's own share of the distance; 0 near the eye
-float pcFarWater(vec3 fw, float aa, float dist) {
+// how much of this pixel is river: 1 inside, 0 out, over the pixel's own share of the distance (a crisp edge of about a
+// pixel). Its width breathes: br along it, and the pools are in the packed half width already. Near the eye it does not
+// fade out but NARROWS to nothing, from 500 m to 250 m (the look director: by whole width, never a soft cross-fade)
+float pcFarWater(vec3 fw, float aa, float dist, float br) {
   float sd = (fw.x - 0.5) * 96.0, dc = fw.y * 48.0, hw = fw.z * 24.0;
+  float hwE = hw * br * smoothstep(250.0, 500.0, dist);
   aa = max(aa, 0.05);
-  return (1.0 - smoothstep(hw - aa, hw + aa, abs(sd))) * step(0.75, hw) * (1.0 - smoothstep(41.0, 46.0, dc))
-       * smoothstep(250.0, 500.0, dist);
+  return (1.0 - smoothstep(hwE - aa, hwE + aa, abs(sd))) * step(0.75, hw) * step(0.05, hwE) * (1.0 - smoothstep(41.0, 46.0, dc));
 }
-// the ground's paint c with the river laid over it, in water's tone from above
+// the ground's paint c with the river laid over it. ITS VALUE (the look director, 24 Nov): the lake's own hue -- water seen
+// from above takes the sky's tone, as the water's paint does -- and a step DARKER than the land beside it, so it reads as
+// water and not as a road or a crack: its value set to 0.70 of the paint it lies on, in any light and in a dark wood too
 vec3 pcFarWaterLay(vec3 c, float dist) {
-  float k = pcFarWater(vFarW, fwidth(vFarW.x) * 72.0, dist);
-  return mix(c, pcDensity(mix(uHaze, vec3(1.0), 0.30) * vec3(0.86, 0.95, 1.04), 1.12), k);
+  float br = 0.82 + 0.36 * texture(uNoise3D, vBody / 85.0).r;      // (riffles narrower, reaches wider, over about 100 m)
+  float k = pcFarWater(vFarW, fwidth(vFarW.x) * 72.0, dist, br);
+  if (k <= 0.0) return c;
+  // (the hue: the sky's tone pulled halfway to the lakes' blue, for the air laid over it afterwards greys it: SEEN, the sky's
+  //  tone alone at 0.82 of the land read grey-green and was lost in the wood's texture from 1 km, 17:45)
+  vec3 w = mix(mix(uHaze, vec3(1.0), 0.30), vec3(0.45, 0.62, 0.86), 0.5);
+  float lw = dot(w, vec3(0.299, 0.587, 0.114)), lc = dot(c, vec3(0.299, 0.587, 0.114));
+  return mix(c, w * (0.70 * lc / max(lw, 1e-3)), k);
 }
 #endif`;

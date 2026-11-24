@@ -785,7 +785,7 @@ class RiverNet {
       } else if (si >= 0) Pr += (pF - Pr) * smoothstep(o.near - 25, o.near, dC);
     }
     // 2. the channel, in the terms the land's recipes read (as _riversOil's `lay`)
-    let best = 1e9, bar = 0, deep = 0, win = 0, zone = 0, bankD = 1e9;
+    let best = 1e9, bar = 0, deep = 0, win = 0, zone = 0, bankD = 1e9, rhwE = hw;
     const lay = (sI, k, gv, who) => {
       const w = k * W;
       let d = sI < w ? (k <= 1 ? sI / k : Math.max(0, sI - (w - W))) : W + (sI - w) * gv;
@@ -812,6 +812,7 @@ class RiverNet {
         if (bb > barW) { barW = bb; side = kb > 0; pb = true; }
       }
       const sI = Math.abs(sd), w = kP * W;
+      rhwE = w;      // (the far water line's half width: the river's with its pools, so the line breathes along it: F, 24 Nov)
       // (how far past this river's water's edge, metres, 1e9 off the rivers: written for the far view's water line -- from 1 km
       //  a river under about 30 m wide falls between the ground's vertices, 24 Nov; the trees standing back by it was tried
       //  and did not bring the river back from 1 km, so nothing reads it yet)
@@ -857,7 +858,7 @@ class RiverNet {
     // (the far view's water line, ?farwater=1: the signed distance to the nearest river's centre line -- its sign the side of
     //  the segment, so it passes through zero across the river and interpolates truly between vertices far apart -- and
     //  that river's half width; 1e9 and 0 where no river is near)
-    c.rsd = si >= 0 ? sd : 1e9; c.rhw = si >= 0 ? hw : 0;
+    c.rsd = si >= 0 ? sd : 1e9; c.rhw = si >= 0 ? rhwE : 0;
     // 4. the current, along the channel that won, downstream
     c.fu = 0; c.fv = 0;
     if (best < W + 3) {

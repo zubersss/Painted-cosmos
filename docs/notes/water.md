@@ -277,6 +277,13 @@ showed NO water with the water branch (`docs/shots/painter/water-air/gate-high-a
   without its strokes: the look director's call. Test: src/world/farwater.test.mjs (nothing packed without the switch; with
   it, coarse patches over the landing carry vertices inside the river, and they are wet). Switches off: 0 of 1,688,000 values
   differ, both looks; the ground's program is compiled without any of it.
+- F's REVIEW (17:33): keep it, the right fix. Changes asked and MADE: (1) the lake's own hue, a step darker than the land (its
+  value set to 0.70 of the paint it lies on; the hue the sky's tone pulled halfway to the lakes' blue, since the air greys it:
+  the sky's tone alone at 0.82 read grey-green and was lost in the wood, SEEN 17:45); (2) a crisp edge (about a pixel) and the
+  width breathing (the packed half width now the river's with its pools, and +-18 % along it over about 100 m); (3) near the
+  eye it narrows to nothing from 500 m to 250 m, no cross-fade. SEEN (`farwater-F-notes-1km-1600.jpg`, before | after): 1 km a
+  continuous darker blue-grey line into the lake; 1.6 km FAINT in the haze (value 0.59 against the land's 0.74 at 1 km, the
+  air greying it to saturation 0.07), where the pale line read more. Asked F to choose the value for the far end.
 
 ### THE SPEED TEST'S FALLS VIEW AND ?bench=water (24 Nov, this session; lane 0, the coordinator's order)
 
