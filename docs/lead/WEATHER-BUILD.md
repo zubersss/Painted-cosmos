@@ -628,6 +628,18 @@ A separate session builds W1 CLOUDS once the look director's sky ceiling (touch 
   - Reading the band per vertex would barely save anything: the far ground's mesh has about 216,000 vertices in this
     view against 518,000 pixels.
 
+- **W3.12c, the look director's review (ACCEPTED with one change, made):**
+  - The sheen is a GREYING AND COOLING, not a lightening. Half the saturation, a touch toward the sky's blue-grey, and a
+    lift of at most 0.06 that never reaches a stroke already over V 0.80. On the lemon floor the first step had pushed
+    light strokes past white (cream fog).
+  - The patch is re-based on v39.2's materials.js (aa699c1). Rendered on the release with the hooks applied locally: it
+    compiles, with no errors. Alpine meadow from 150 m (`W3.12c_*`):
+    - 9.0 % of the picture changes;
+    - on the changed pixels, V 0.421 to 0.425, S 0.306 to 0.193, V over 0.90 from 0.4 % to 0.1 %;
+    - the green strokes go sage-grey in patches.
+  - Crowns: one band value per WHOLE tree (A1's impostors and C's canopy), never per dab. Not for the near and middle
+    trees, whose leaves already move.
+
 ### W3.13: THE WEATHER RELEASE FOR v39.3 (the coordinator, 24 Nov; built on design-weather, aa699c1)
 
 - **Why on design-weather:** the coordinator asked for a branch named weather-release. This session's brief allows
@@ -667,6 +679,12 @@ A separate session builds W1 CLOUDS once the look director's sky ceiling (touch 
   - A land storm passes 70 m from the landing at game time 3,653 s:
     - at 990 m, a slate-violet ceiling with lighter seams comes over the wood;
     - overhead, a thunderstorm of 10.8 mm/h: slanting rain, a darker sky, the explorer's hood up, leaves blowing.
+  - The look director's pair, noon at the landing, `?clouds3d=0` over the default
+    (`release/v39.3_game_noon_pair_*.jpg`):
+    - Nearly the same picture: the canopy hides most of the sky. With `?clouds3d=0` the sky is the old painted flat
+      cloud and the clouds module is never loaded.
+    - The default shows a patch of blue at the top right between its clouds.
+    - A game load is not repeatable to the pixel, so this pair is for the eye. The pixel proof is the gallery's.
 
 ## NEXT
 
