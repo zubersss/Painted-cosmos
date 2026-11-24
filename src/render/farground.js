@@ -395,6 +395,8 @@ export const ROCK_FRAG = /* glsl */`
 uniform float uRockK;     // 1 on a world whose rock is painted so (CANOPY_WORLDS: Earth), 0 elsewhere
 uniform vec3 uRockC0, uRockC1, uRockC2, uRockC3;      // the world's cliff rock: pale, mid, deep, slate (ROCK_LOOK below)
 uniform vec4 uRockB;      // x a bed's mean height (m), y the gullies' spacing (m), z the sea's level (m), w unused
+uniform vec3 uRockM0, uRockM1, uRockM2, uRockM3;      // the MOUNTAINS' rock family: light, mid, deep, warm (ROCK_LOOK .mtn)
+uniform vec2 uRockMH;     // the height band (m) over which the coast's rock gives way to the mountains' family
 float gRock = 0.0;        // how much this dab is a rock face (set in pcGroundAt, read in pcGroundPaint)
 float gCliff = 0.0;       // this dab is a cliff's rock (0 or 1: whole dabs), set with gRock
 float gGully = 0.0;       // how far into a gully the cliff dab lies: its light goes down (pcGroundAt)
@@ -522,11 +524,21 @@ vec3 pcCliffC(vec3 Bc, float hB, vec3 rnd, vec3 c, float w) {
   // (the beds alternate a light one and a dark one, each its tone by its own number: four tones at random under a
   // full sun all came out one tan, the light taking every lit colour toward its gold, SEEN)
   float t = pcHash3(vec2(bi * 1.37 + 0.21, 3.7)).x;
-  vec3 tone = mod(bi, 2.0) < 0.5 ? (t < 0.72 ? uRockC0 : uRockC3) : (t < 0.6 ? uRockC1 : uRockC2);
+  // (ONE ROCK FAMILY PER MOUNTAIN: the look director's second audit, 3. Over the coast's height the beds are the
+  // sandstone's strong turns; up the range they are the mountains' grey-violet family, the beds small steps inside it,
+  // never a rainbow. The band is the world's (uRockMH): on Earth from 60 to 140 m above the sea.)
+  float kM = smoothstep(uRockMH.x, uRockMH.y, hB);
+  bool lightBed = mod(bi, 2.0) < 0.5;
+  vec3 toneC = lightBed ? (t < 0.72 ? uRockC0 : uRockC3) : (t < 0.6 ? uRockC1 : uRockC2);
+  vec3 toneM = lightBed ? (t < 0.6 ? uRockM0 : uRockM3) : (t < 0.7 ? uRockM1 : uRockM2);
+  vec3 tone = mix(toneC, toneM, kM);
+  vec3 lipC = mix(mix(uRockC0, uRockM0, kM), vec3(1.0), 0.4);
   if (f < 0.10) tone = tone * vec3(0.60, 0.60, 0.66);
-  else if (f > 0.89) tone = mix(tone, mix(uRockC0, vec3(1.0), 0.4), 0.6);      // (the lit lip: the only near-white on a face)
-  tone = mix(tone, 0.5 * (mix(uRockC0, uRockC3, 0.28) + mix(uRockC1, uRockC2, 0.4)), 0.85 * kB);
-  tone = mix(tone, pcDensity(mix(uRockC1, uRockC2, 0.4), 1.15), gGully * 0.75);
+  else if (f > 0.89) tone = mix(tone, lipC, 0.6);      // (the lit lip: the only near-white on a face)
+  vec3 meanC = 0.5 * (mix(uRockC0, uRockC3, 0.28) + mix(uRockC1, uRockC2, 0.4));
+  vec3 meanM = 0.5 * (mix(uRockM0, uRockM3, 0.4) + mix(uRockM1, uRockM2, 0.3));
+  tone = mix(tone, mix(meanC, meanM, kM), 0.85 * kB);
+  tone = mix(tone, pcDensity(mix(mix(uRockC1, uRockC2, 0.4), mix(uRockM1, uRockM2, 0.5), kM), 1.15), gGully * 0.75);
   float lc = max(dot(c, vec3(0.3, 0.5, 0.2)), 0.05);
   tone = clamp(tone * mix(vec3(1.0), clamp(c / lc, vec3(0.7), vec3(1.4)), 0.08), 0.0, 1.0);
   float wet = (1.0 - smoothstep(0.8, 3.2, hB - uRockB.z + 0.9 * (rnd.x - 0.5))) * step(uRockB.z - 1.5, hB);
@@ -542,7 +554,10 @@ vec3 pcCliffC(vec3 Bc, float hB, vec3 rnd, vec3 c, float w) {
 // rock or turf by its own number and a slow field against the share at its centre: a ragged edge, never a line.
 vec3 pcRockWash(vec3 c, float up, vec3 Bc, float strata, float dist, vec3 rnd, float w) {
   float hB = length(Bc) - uBodyR;
-  float far = smoothstep(0.82, 0.67, up) * smoothstep(80.0, 250.0, dist);
+  // (up the range, past the coast's height band, the rock begins at a gentler slope, about 30 degrees, from 80 m out:
+  // the mountains' flanks were the pastel patches of the alpine wash, rose, lime and lilac, the audit's rainbow)
+  float kMt = smoothstep(uRockMH.x, uRockMH.y, hB) * smoothstep(0.05, 0.20, strata);
+  float far = mix(smoothstep(0.82, 0.67, up), smoothstep(0.87, 0.74, up), kMt) * smoothstep(80.0, 250.0, dist);
   float cl = smoothstep(0.66, 0.50, up) * smoothstep(0.05, 0.20, strata);
   float nr = textureLod(uNoise3D, Bc / 4.3 + 0.13, 0.0).g;
   gCliff = step(fract(rnd.y * 7.7 + rnd.z * 3.1) * 0.6 + nr * 0.4, cl * 1.1 - 0.05) * uRockK;
@@ -550,6 +565,7 @@ vec3 pcRockWash(vec3 c, float up, vec3 Bc, float strata, float dist, vec3 rnd, f
   gGully = 0.0;
   if (gRock <= 0.0) return c;
   if (gCliff > 0.5) return pcCliffC(Bc, hB, rnd, c, gRockLw);
+  if (kMt > 0.0) return mix(c, pcCliffC(Bc, hB, rnd, c, gRockLw), gRock * mix(0.65, 1.0, kMt));      // (a mountain's far face: its family, not its wash)
   float l = dot(c, vec3(0.3, 0.5, 0.2));
   vec3 rk = mix(vec3(l), c, 0.5);
   if (strata > 0.004) {
@@ -557,6 +573,20 @@ vec3 pcRockWash(vec3 c, float up, vec3 Bc, float strata, float dist, vec3 rnd, f
     rk = f < 0.42 ? pcDensity(rk, 0.86) : (f < 0.58 ? pcDensity(rk, 1.38) : rk);
   }
   return mix(c, rk, gRock * (0.65 + 0.35 * min(strata * 2.0, 1.0)));
+}
+// THE ROCK'S LIGHT IN PLANES (the look director's second audit, 3: "a mountain is a few big planes, lit and shaded").
+// The oil look's light lights whatever faces the sun at all, so under a high sun every face of a range was lit and none
+// was in shade. A rock dab is lit by its slope's own facing in THREE PLANES instead: facing the sun (d, the facing's dot
+// with the sun, over 0.72) the full light, side on (0.42 to 0.72) the local colour, turned away the cool shade, and a
+// gully on the shaded side a step deeper still. The step is taken whole at the dab (its facing is the dab's), handed to
+// the shared pcLevel as a facing it understands, so night, cloud and storm still rule it. lvl: the dab's own level, kept
+// where it is darker (a cast shadow); nV the facing in the eye's axes.
+float pcRockPlanes(float lvl, vec3 nV, float sunny) {
+  float d = dot(nV, gSunV);
+  float dq = mix(mix(-0.20, 0.12, smoothstep(0.39, 0.45, d)), 0.50, smoothstep(0.69, 0.75, d));
+  float lp = pcLevel(0.5 + 0.5 * dq, 0.02) - 0.7 * gGully * (1.0 - smoothstep(0.55, 0.65, d));
+  lp = mix(min(lp, 1.0), lp, sunny);
+  return mix(lvl, lp, gRock);
 }
 #endif`;
 
@@ -618,7 +648,9 @@ export function canopyUniforms() {
 export function rockUniforms() {
   const L = ROCK_LOOK.earth;
   return { uRockK: { value: 0 }, uRockC0: { value: L.c[0].slice() }, uRockC1: { value: L.c[1].slice() }, uRockC2: { value: L.c[2].slice() },
-    uRockC3: { value: L.c[3].slice() }, uRockB: { value: [L.bed, L.gully, 0, 0] } };
+    uRockC3: { value: L.c[3].slice() }, uRockB: { value: [L.bed, L.gully, 0, 0] },
+    uRockM0: { value: L.mtn.c[0].slice() }, uRockM1: { value: L.mtn.c[1].slice() }, uRockM2: { value: L.mtn.c[2].slice() }, uRockM3: { value: L.mtn.c[3].slice() },
+    uRockMH: { value: L.mtn.band.slice() } };
 }
 // THE CLIFFS' ROCK, a world at a time (FV4, the cliffs): its four tones, pale, mid, deep and slate, laid by local value
 // (pcTone lights and shades them), a bed's mean height and the gullies' spacing in metres. Each tone is a mix of the
@@ -630,7 +662,13 @@ export function rockUniforms() {
 // turns with the dark ones (pcCliffC): under a full sun four tones at random came out one tan.
 export const ROCK_LOOK = {
   earth: { c: [mixc(pig('yellowOchre'), pig('davysGrey'), 0.15), dilute(mixc(pig('davysGrey'), pig('rawUmber'), 0.4), 0.18),
-               mixc(pig('rawUmber'), pig('burntSienna'), 0.4), dilute(pig('paynesGrey'), 0.25)], bed: 5.5, gully: 22 },
+               mixc(pig('rawUmber'), pig('burntSienna'), 0.4), dilute(pig('paynesGrey'), 0.25)], bed: 5.5, gully: 22,
+    // THE MOUNTAINS' FAMILY (the look director's second audit, 3: "one rock family per mountain, grey-violet, with the bed
+    // tones as small steps inside it"): a light grey-violet (Davy's grey, a little cobalt violet), a mid grey (Davy's with
+    // Payne's), a deep blue-violet (Payne's with cobalt violet), a warm grey (Davy's with raw umber); over the band of
+    // heights (m above the sea) where the coast's sandstone gives way to it
+    mtn: { c: [dilute(mixc(pig('davysGrey'), pig('cobaltViolet'), 0.18), 0.22), mixc(pig('davysGrey'), pig('paynesGrey'), 0.35),
+               mixc(pig('paynesGrey'), pig('cobaltViolet'), 0.25), dilute(mixc(pig('davysGrey'), pig('rawUmber'), 0.3), 0.1)], band: [60, 140] } },
 };
 export function seasonUniforms() {
   return { uSeasonG: { value: [0, 0, 0, 0] }, uCanSum: { value: [0.6, 0.8, 0.3] }, uCanAut: { value: [0.9, 0.6, 0.2] } };
