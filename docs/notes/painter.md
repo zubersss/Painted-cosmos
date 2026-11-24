@@ -46,6 +46,16 @@ splashes; 5 rain on water.
 - Tools (scratch, not committed): `tools/lab.mjs` with the design's camera helper (its appendix A) and a script that
   opens a page once and grabs each station with `uWPaint` 1 and 0 (no recompile between A and B).
 
+**Step 2, DONE (24 Nov): the night.** Merged `origin/look-director` (its night key L1: `pcNight`, `uLookF`, `uLookN`;
+its master switch is `?light=old`). At the end of `WATER_FRAG`, before the air: by the moon the water takes the same pull
+and strength as the land's lit paint (`c = mix(c, pcNight(c) * mix(1.0, uLookN.x, uMoon * uLookF.x), liq)`; lava and a
+sea of cloud keep their own colour). Not behind `?wpaint`: it is the look director's switch (`?nightkey=0`, or
+`?light=old`, is the night water as it was); by day `uMoon` is 0 and nothing moves. SEEN (E1 at 23:00, phone settings,
+`s2-E1-night-23h-phone-ab.jpg`): the stream from the brightest thing in the wood (median V 0.71 against the land's
+0.22) to V 0.43, in the night's blue; saturation unchanged (0.61). Phone cost: nil by day, a few instructions a water
+pixel by night. Waiting on the look director's word on the exact line (asked 24 Nov). Not done: the aurora's green on
+Neptune's lake (every other dash: LOOK-AUDIT) -- its share is `wau` in `WATER_FRAG`, for the look director to rule.
+
 ## Hand-over of THE FAR TREES (trees lane A1, branch `trees-far`; kept current by that session)
 
 Started 24 Nov 2026 by helper session A1 (TREES FAR) of the coordinator. Branch `trees-far`, cut from `look-proto` =

@@ -1521,6 +1521,19 @@ void main() {
     }
   }
   #endif
+  #ifdef PC_OIL
+  // THE NIGHT (the water group's paint, lane W3; the look director's night key, L1, chunks.js pcNight). By the moon the
+  // land goes part of the way to its own value in the night key's hue and is laid at the night's strength (pcTone),
+  // but the water never passes through pcTone: by night the stream stayed the day's blue, laid half of its own wash
+  // "whatever the sky gives it", and was the lightest, bluest thing in the wood. So the water takes the same pull and the
+  // same strength as the land's lit paint (pcTone: lit * mix(1.0, uLookN.x, nk)). The lava and the sea of cloud glow or
+  // are their own colour and keep it. By day uMoon is 0 and this is the colour untouched; ?nightkey=0 (uLookF.x 0) is the
+  // night water as it was.
+  {
+    float nkW = uMoon * uLookF.x;
+    if (nkW > 0.0) c = mix(c, pcNight(c) * mix(1.0, uLookN.x, nkW), liq);
+  }
+  #endif
   float f = pcFogAmount(dist) * (1.0 - 0.45 * farSea) * (1.0 - 0.6 * vLiqP.x);
   c = pcAtmosV(c, f, vView);
   pcWrite(c, mix(mix(0.7, 0.22, white), 1.0, vLiqP.y), normalize(normalMatrix * up), -vView.z, 2.0);
