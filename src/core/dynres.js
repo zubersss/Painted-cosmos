@@ -90,6 +90,14 @@ export const DYNRES = Object.freeze({
   sharpHighMs: 0,            // > 0: a rung is given back when the smoothed frame is over this for sharpDownAfter s
   sharpLowMs: 0,             // > 0: a rung is climbed only after sharpUpAfter s under this
   sharpDownAfter: 0,         // s over sharpHighMs before a rung goes (0: at once, as before)
+  // (24 Nov, an independent review of v39.6: the touch ladder could OSCILLATE. A rung that held past its trial window
+  //  and was lost later was not counted as a failure, so in a borderline view -- the brook's bank, rung 1 at about 27 ms
+  //  -- it climbed after 6 s under 20 ms, gave back over 27 ms and climbed again, a step every 6 or 7 s, each one
+  //  rebuilding the drawing targets: a hitch and a visible jump in sharpness. MEASURED in the test beside this file: 31
+  //  steps in five minutes over three runs of the worst borderline found. So a rung given back within this many seconds
+  //  of being climbed counts as a failure too: the wait doubles and the failures grow, and a borderline view settles on
+  //  the lower rung. 0: only a rung lost inside its trial window counts, as before.)
+  sharpFailWithin: 0,
 });
 
 export class DynamicResolution {
@@ -138,6 +146,7 @@ export class DynamicResolution {
     this.sharpProbing = false;           // the newest rung is still on trial
     this.sharpFails = 0;                 // rungs that did not hold; after sharpGiveUp the ladder is left alone
     this.sharpOver = 0;                  // s the smoothed frame has been over the touch device's line (sharpHighMs)
+    this.sinceClimb = this.sharp > 0 && this.T.sharpFailWithin > 0 ? 0 : Infinity;   // s since a rung was climbed (a rung started on counts as climbed now)
   }
 
   // The lines the frame time is judged against: the defaults, or stretched to a known cap.
@@ -192,7 +201,7 @@ export class DynamicResolution {
     }
     this.downCooldown = Math.max(0, this.downCooldown - dt);
     this.upCooldown = Math.max(0, this.upCooldown - dt);
-    this.sinceUp += dt; this.sinceTierUp += dt; this.sinceSharp += dt;
+    this.sinceUp += dt; this.sinceTierUp += dt; this.sinceSharp += dt; this.sinceClimb += dt;
     if (this.sharpProbing && this.sinceSharp >= T.sharpWindow) { this.sharpProbing = false; this.sharpBackoff = Math.max(1, this.sharpBackoff / 2); }   // the rung held
     if (this.probing && this.sinceUp >= T.probeWindow) { this.probing = false; this.probeBackoff = Math.max(1, this.probeBackoff / 2); }   // the last step up held
     const ms = this.ema;
@@ -227,7 +236,7 @@ export class DynamicResolution {
       // Traced, on the owner's own phone as the numbers describe it.)
       if (this.sinceSharp < T.sharpBack) { this.over = 0; this.steady = 0; this.under = 0; return { scale: this.scale, quality: this.quality, sharp: this.sharp, changed: false }; }
       this.sharp = sharpPanic ? Math.floor(this.sharp / 2) : this.sharp - 1;   // a panic gives back half the ladder
-      if (this.sharpProbing || sharpPanic) { this.sharpBackoff = Math.min(T.sharpBackoffMax, this.sharpBackoff * 2); this.sharpFails++; }
+      if (this.sharpProbing || sharpPanic || (T.sharpFailWithin > 0 && this.sinceClimb < T.sharpFailWithin)) { this.sharpBackoff = Math.min(T.sharpBackoffMax, this.sharpBackoff * 2); this.sharpFails++; }
       this.sharpProbing = false; this.sinceSharp = 0; this.sharpSteady = 0; this.sharpOver = 0;
       this.over = 0; this.steady = 0; this.under = 0;
       // (the average is NOT wound back here. It was, and that hid a real panic: each slow frame gave back one rung
@@ -257,7 +266,7 @@ export class DynamicResolution {
       this.sharpSteady += dt;
       if (this.sharpSteady >= T.sharpUpAfter * this.sharpBackoff) {
         this.sharp++; this.sharpChanges++;
-        this.sharpSteady = 0; this.sinceSharp = 0; this.sharpProbing = true;
+        this.sharpSteady = 0; this.sinceSharp = 0; this.sinceClimb = 0; this.sharpProbing = true;
         this.steady = 0; this.under = 0;
         return { scale: this.scale, quality: this.quality, sharp: this.sharp, changed: true };
       }

@@ -239,7 +239,10 @@ async function boot() {
     tuning: params.get('look') !== 'oil' ? undefined
       : PRESET.id === 'desktop' ? { minScale: 0.8 }
         : { minScale: 0.85, targetMs: 33.3, highMs: 37, lowMs: 27, panicMs: 62, tierUpMs: 22,
-          ...(SHARP_TOUCH ? { sharpHighMs: 27, sharpLowMs: 20, sharpDownAfter: 0.5 } : {}) },
+          // (sharpFailWithin and sharpGiveUp 1: a rung lost within a minute of being climbed -- or of the start -- ends
+          //  the climbing until the next rest, so a borderline view settles on the lower rung instead of stepping up
+          //  and down every few seconds, each step a hitch: the independent review of v39.6, core/dynres.js)
+          ...(SHARP_TOUCH ? { sharpHighMs: 27, sharpLowMs: 20, sharpDownAfter: 0.5, sharpFailWithin: 60, sharpGiveUp: 1 } : {}) },
     // Start at the best picture (top tier, full resolution) and give some of it up only when
     // the measured frame time asks: under 30 fps the controller sheds load within a second or
     // two, and it climbs back by careful steps (src/core/dynres.js). ?quality=0|1|2 pins the
