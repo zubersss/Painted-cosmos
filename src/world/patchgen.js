@@ -5,7 +5,7 @@ import { faceToDir } from './cubesphere.js';
 import { makeSample, NOLQ, SNOW } from './surface.js';
 import { MODE } from '../data/mode.js';
 import { BODIES } from '../data/bodies.js';
-import { canopyOn, groundSeasonOn, rockfieldOn, standAt } from './farstand.js';
+import { canopyOn, groundSeasonOn, rockfieldOn, standAt, bloomFarOn } from './farstand.js';
 
 export const PATCH_N = 32;                 // cells per patch edge (even, for geomorphing)
 const N = PATCH_N, V = N + 1, E = N + 3;   // E: sample grid with a one-vertex apron for normals
@@ -46,6 +46,7 @@ const CS = 25;   // floats kept per sample: wash, far wash, parameters, liquid l
                  // there. The water lead owns this layout for the water lanes: the runoff's cap and swell take 25 and 26.)
 const _col = new Float32Array(E * E * CS);
 const _fs = [0, 0];     // (the stand and its needle share at a sample: world/farstand.js)
+const _bl = new Float32Array(E * E * 2);      // (the flower drift at a sample, FV6(b): its cover and its palette index; kept apart from _col so it takes no sample slot)
 let _s = null;
 let _stillGrid = new Float32Array(0), _stillSamp = null;      // (scratch: the water's section, how still, on a coarse grid)
 
@@ -110,6 +111,9 @@ export function stepPatch(job, deadline) {
   // (and the rock, FV4: how much snow the surface laid over each wash, so that it can be shed off the steep faces once
   // the patch's normals are known, below)
   const rkf = rockfieldOn(S.id);
+  // (and the flower drifts from the air, FV6(b), ?bloomfar=1: world/bloom.js's cover and palette index at each sample,
+  // packed in a byte each into an attribute of their own, aBloom; without the switch nothing is computed or built)
+  const blm = bloomFarOn(S);
   // 1. sample the surface on the apron grid, a row at a time
   // (S.foot: how far apart this patch's samples lie, in metres, while they are taken: the oil look's surface draws a
   // river into the far colour as wide as that, so that a river is still a line on the land from high up, where the
@@ -139,6 +143,7 @@ export function stepPatch(job, deadline) {
         _col[c + 23] = s.still || 0;                              // (the water's: how still, where a water part says; 0 otherwise)
         if (gse) { _col[c + 6] = s.canA || 0; _col[c + 7] = s.canS || 0; }
         _col[c + 24] = rkf ? s.snowK || 0 : 0;                    // (the far view's snow: 24 since the water took 23)
+        if (blm) { _bl[k * 2] = s.fd || 0; _bl[k * 2 + 1] = s.fi || 0; }
       }
     }
   }
@@ -153,6 +158,7 @@ export function stepPatch(job, deadline) {
   // the same vertex as the parent's (half resolution) mesh paints it: its washes, its parameters and its
   // normal there, so a patch can show exactly what its parent showed and slide to its own look
   const colP = new Uint8Array(nv * 4), col2P = new Uint8Array(nv * 4), parP = new Uint8Array(nv * 4), norP = new Float32Array(nv * 3);
+  const blo = blm ? new Uint8Array(nv * 4) : null, bloP = blm ? new Uint8Array(nv * 4) : null;
   let boundR2 = 0;
   for (let j = 0; j < V; j++) {
     for (let i = 0; i < V; i++) {
@@ -206,6 +212,7 @@ export function stepPatch(job, deadline) {
       // crack's depth, which the oil look's ground never paints -- the needle share; world/farstand.js)
       col2[q] = b8(_col[c + 3]); col2[q + 1] = b8(_col[c + 4]); col2[q + 2] = b8(_col[c + 5]); col2[q + 3] = can ? b8(_col[c + 21]) : 255;
       par[q] = b8(_col[c + 6]); par[q + 1] = b8(_col[c + 7]); par[q + 2] = b8(_col[c + 8]); par[q + 3] = b8(_col[c + (can ? 22 : 9)]);
+      if (blo) { blo[q] = b8(_bl[k * 2]); blo[q + 1] = b8(_bl[k * 2 + 1] / 15); }
       if (!io && !jo) {
         // the parent's own normal here: its grid is twice as wide (at the border the apron is one cell deep)
         const il2 = i > 0 ? k - 2 : k - 1, ir2 = i < N ? k + 2 : k + 1, jl2 = j > 0 ? k - 2 * E : k - E, jr2 = j < N ? k + 2 * E : k + E;
@@ -227,6 +234,8 @@ export function stepPatch(job, deadline) {
         col2P[v * 4 + t] = (col2[v1 * 4 + t] + col2[v2 * 4 + t] + 1) >> 1;
         parP[v * 4 + t] = (par[v1 * 4 + t] + par[v2 * 4 + t] + 1) >> 1;
       }
+      // (the drift's cover halfway, its colour the stronger neighbour's: an index is a name, not a number to average)
+      if (bloP) { bloP[v * 4] = (blo[v1 * 4] + blo[v2 * 4] + 1) >> 1; bloP[v * 4 + 1] = blo[(blo[v1 * 4] >= blo[v2 * 4] ? v1 : v2) * 4 + 1]; }
       if (io || jo) for (let t = 0; t < 3; t++) norP[v * 3 + t] = (norP[v1 * 3 + t] + norP[v2 * 3 + t]) * 0.5;
     }
   }
@@ -246,6 +255,7 @@ export function stepPatch(job, deadline) {
     const a = dst * 4, b = src * 4;
     norP[o] = norP[p]; norP[o + 1] = norP[p + 1]; norP[o + 2] = norP[p + 2];
     for (let t = 0; t < 4; t++) { col[a + t] = col[b + t]; col2[a + t] = col2[b + t]; par[a + t] = par[b + t]; colP[a + t] = colP[b + t]; col2P[a + t] = col2P[b + t]; parP[a + t] = parP[b + t]; }
+    if (blo) for (let t = 0; t < 4; t++) { blo[a + t] = blo[b + t]; bloP[a + t] = bloP[b + t]; }
   };
   for (let k = 0; k < V; k++) {
     skirt(S0 + k, k); skirt(S0 + V + k, N * V + k); skirt(S0 + 2 * V + k, k * V); skirt(S0 + 3 * V + k, k * V + N);
@@ -413,7 +423,7 @@ export function stepPatch(job, deadline) {
   }
   return {
     origin: [ox, oy, oz], positions: pos, normals: nor, morph: mor, colors: col, colors2: col2, params: par,
-    colorsP: colP, colors2P: col2P, paramsP: parP, normalsP: norP,
+    colorsP: colP, colors2P: col2P, paramsP: parP, normalsP: norP, bloom: blo, bloomP: bloP,
     water, boundR: Math.sqrt(boundR2) + drop, minH, maxH, size,
   };
 }
