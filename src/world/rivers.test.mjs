@@ -81,6 +81,25 @@ test('the landing stays dry, with a brook by it', () => {
   assert.ok(o.s < 60, 'water within 60 m of the landing (s = ' + o.s.toFixed(1) + ')');
 });
 
+test('the trees stand back from the point bars: none on the bar, fewer within 6 m of it (F, 24 Nov)', () => {
+  const o = makeSample(S.nB), R = S.R;
+  let seed = 17; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  let ex = spawn.z, ez = -spawn.x; const el = Math.hypot(ex, ez); ex /= el; ez /= el;
+  const nx = spawn.y * ez, ny = spawn.z * ex - spawn.x * ez, nz = -spawn.y * ex;
+  let zone = 0, bad = 0;
+  for (let i = 0; i < 60000; i++) {
+    const e = (rnd() * 2 - 1) * 2000, n = (rnd() * 2 - 1) * 2000;
+    let x = spawn.x + (ex * e + nx * n) / R, y = spawn.y + (ny * n) / R, z = spawn.z + (ez * e + nz * n) / R; const l = Math.hypot(x, y, z);
+    S.sample(x / l, y / l, z / l, o, true);
+    // (barZone is written by the rivers' sample, which runs for a point where a wood's recipe does: only those are asked)
+    if (S.biomes[o.top].terrain !== 'forest') continue;
+    const bz = S._ctx.barZone || 0;
+    if (bz > 0.05) { zone++; if (o.trees > 1 - bz + 1e-6) bad++; }
+  }
+  assert.ok(zone > 30, 'points by a bar: ' + zone);
+  assert.equal(bad, 0, 'trees no denser than 1 - barZone by a bar');
+});
+
 test('the budget: build, memory and the cost of a sample', () => {
   assert.ok(buildMs < 600, 'the network built in ' + buildMs.toFixed(0) + ' ms (here; the design budget is 150 ms with the drainage)');
   assert.ok(net.bytes() < 2.5 * 1024 * 1024, 'memory ' + (net.bytes() / 1024).toFixed(0) + ' KB');

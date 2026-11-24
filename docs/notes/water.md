@@ -24,7 +24,7 @@ streams fall back over tens of minutes, and it now keeps the weather's clock, 60
 The coordinator (13:11): v39.1 is live, design-water 2d40220 is in v39.2's gate; merge look-proto only once v39.2 lands there.
 Order next: W3 splits rivers and ponds from the sea (strokes default there), E-W2 and W3 fix the sea, then the mountain streams.
 OPEN: F's sand-bar notes (colour, grass,
-pebbles: C's recipe, asked; the trees' line can read c.barZone). The lead's sessions: coordinator session_01R5Bri1TV3HBTyuxNZZuhNw,
+pebbles: C's recipe, queued after the cliff; the trees' line now reads c.barZone). The lead's sessions: coordinator session_01R5Bri1TV3HBTyuxNZZuhNw,
 F session_01R5Brhzz2JPPF6Ecz6XRQHx, E-W2 session_01R5Bri2xowNiwS1SnP3VG3f, E-W3/W4 session_01R5Bri2fSASVVvyrSG11UGF,
 C session_01R5Bri2AMBsFiRcxvUUZMvu, D (weather) session_01R5Bri2bBgFSfCmxpKKuURT (src/physics/index.js is now the water's).
 
@@ -164,7 +164,22 @@ DRAWING the water-paint lane's (E-W3/W4): the contract below was sent to it befo
   0.09 at 3 h, 0.003 at 4 h 20; a 20 mm soaking over 3 h still gives 0.25 m as before. In the game: runnels within seconds
   of a heavy shower and gone about twenty seconds after it; streams falling over the next minute or so. Also mended: the
   rate at the eye is fields.rain.now (it read the per-texel array). The A/B stills were taken with the state pinned, so
-  they stand. (3) The swollen river's brown is too weak to
+  they stand.
+- AFTER F'S REVIEW (13:27: keep it OFF; three things before it is shown): (a) WIDTH, done here: a runnel's bed and water are
+  `RIVER_DEF.runnel` = 2 times narrower than the twig it replaces, its banks as steep (only under ?runoff=1). MEASURED
+  (rain-only water, 8-direction transects at 120-400 runnel points within 1.5 km of the landing): wet width p10 2.0, p50
+  3.0, p90 3.5 m before; p10 1.2, p50 1.9, p90 2.2 after. The few wider (to 6.7 m) are rain-only water in a small lake
+  basin and the head of a small stream, not runnels. SEEN: `runnel-narrow-ab.jpg` (the storm and an hour after, before |
+  after; trees now stand nearer the narrower runnel). (b) THE DRY BED: C asked for a flag; written in surface.js `_forest`
+  (rivers.js cannot know the bed, the recipe makes it): `c.capOnly` 1 where ALL the water is rain-only (cap >= lq - h),
+  reset every sample; C gives such a bed the dry bed's colours after the coast cliff. Measured: 255 of 317 runnel points;
+  the rest are hollows a runnel crosses, deeper than its cap, which keep a pool in the dry (natural). Of all the cap water
+  in the wood, 429 of 557 points are also wet without runoff: the heads of small streams, which by design keep part of
+  their water in the dry. KNOWN, small, not fixed: where a runnel's mouth meets a river, the river's shallow margin within
+  the runnel's own zone loses up to 0.6 m in the dry (a notch a runnel wide). (c) COLOUR, muddy storm water: W3's paint
+  (`WATER_FRAG` PC_RUNOFF's mud line), driven by RUNOFF.mudK; F's target hue 35-40, S 0.30-0.40, V 0.45-0.55 in the storm
+  light, the churned edge a step lighter, not white. Tests: runoff.test.mjs (runnels 1-2 m, capOnly exactly where the cap
+  holds all the water). (3) The swollen river's brown is too weak to
   read from 150 m (F's call). For W3: after v39.2 C's snow takes patchgen slot 24, where water-paint packs the runoff's cap
   (24, 25): they move to 25, 26 on water-paint's merge.
 
@@ -209,7 +224,12 @@ as-set row, then each view's as-set, no-water and part rows): short, for a phone
   went back to the landing; no errors. The view itself, opened in the gallery at the place it gives:
   `docs/shots/painter/water-default/bench-falls-view.jpg` (from the sea, the widest fall's sheet in the cliff).
 - `c.barZone` (world/rivers.js, written every call): the bar and 6 m beyond, for the wood's trees to stand back from it (F's
-  bar notes); not read yet: the bar's colour, grass and pebbles are C's recipe, asked of C with the tree line.
+  bar notes). READ NOW (24 Nov, C's yes): surface.js `_forest`, the trees `(1 - max(bar, barZone))`, only when the rivers
+  of the tree are attached. MEASURED: 0.18 % of points within 2 km of the landing change their tree density, nothing else
+  (height, colour) changes; with the water switches off 0 of 1,568,000 values differ in both looks. SEEN:
+  `docs/shots/painter/water-sbends/bars-trees-ab.jpg` (40 m up: at the landing's river the small trees and shrubs that stood
+  on the bar are gone; a second bar had none). The bar's colour still reads close to the autumn floor: C's sand (ochre-cream)
+  and the bar's under are queued after the coast cliff; pebbles are nearground.js's owner's. Test: rivers.test.mjs.
 
 ### S-BENDS ON THE BIG RIVERS (built 24 Nov, this session; part of ?rivers=tree, ?bends=0 for the A side)
 

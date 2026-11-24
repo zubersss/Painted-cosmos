@@ -91,3 +91,37 @@ test('the data: runnels carry o.cap (water only when wet), rivers carry o.swell,
   S.sample(sp.x, sp.y, sp.z, o, true);
   assert.ok(!(o.lq !== NOLQ && o.lq > o.h - 0.3), 'the landing stays dry');
 });
+
+test('a runnel is narrow: 1 to 2 m of water in a storm (F, 24 Nov), wider only where a basin or a small stream fills', () => {
+  const S = getSurface('earth'), sp = S.getSpawn(), o = makeSample(S.nB), R = S.R;
+  if (!S.rivers) attachRivers(S, ensureDrainage('earth'));
+  let ex = sp.z, ez = -sp.x; const el = Math.hypot(ex, ez); ex /= el; ez /= el;
+  const nx = sp.y * ez, ny = sp.z * ex - sp.x * ez, nz = -sp.y * ex;
+  const at = (e, n) => { let x = sp.x + (ex * e + nx * n) / R, y = sp.y + (ny * n) / R, z = sp.z + (ez * e + nz * n) / R; const l = Math.hypot(x, y, z); S.sample(x / l, y / l, z / l, o, false); return o; };
+  const rain = (q) => q.lq !== NOLQ && q.lq > q.h && q.cap >= 0.3;
+  let seed = 3; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const widths = []; let capOnly = 0, capN = 0, capBad = 0;
+  for (let i = 0; i < 400000 && widths.length < 120; i++) {
+    const e = (rnd() * 2 - 1) * 1500, n = (rnd() * 2 - 1) * 1500, s0 = at(e, n);
+    if (!(s0.cap >= 0.59 && s0.lq > s0.h + 0.05 && s0.swell < 0.15)) continue;   // (a runnel: swell 0.1; a basin 0.6, a stream more)
+    // (the recipe is told where ALL the water is rain-only -- surface.js c.capOnly, for C's dry bed; where a runnel crosses a
+    //  hollow deeper than its cap, a pool stays in the dry and the flag is 0 there)
+    if (S.biomes[o.top].terrain === 'forest' && o.w[o.top] > 0.999) { capN++; if ((S._ctx.capOnly === 1) !== (s0.cap >= s0.lq - s0.h)) capBad++; else if (S._ctx.capOnly === 1) capOnly++; }
+    let best = 1e9;
+    for (let a = 0; a < 8; a++) {
+      const an = a * Math.PI / 8, de = Math.sin(an), dn = Math.cos(an);
+      let w = 0;
+      for (const sg of [1, -1]) for (let t = 0.1; t <= 8; t += 0.1) if (!rain(at(e + de * t * sg, n + dn * t * sg)) || t > 7.95) { w += t; break; }
+      best = Math.min(best, w);
+    }
+    widths.push(best);
+  }
+  widths.sort((a, b) => a - b);
+  const p = (q) => widths[Math.floor(q * (widths.length - 1))];
+  assert.ok(widths.length >= 100, 'runnels found: ' + widths.length);
+  assert.ok(p(0.5) >= 1.0 && p(0.5) <= 2.2, 'the median runnel is 1 to 2 m wide: ' + p(0.5).toFixed(2));
+  assert.ok(p(0.9) <= 3.0, 'nine in ten under 3 m: ' + p(0.9).toFixed(2));
+  assert.equal(capBad, 0, 'c.capOnly exactly where the cap holds all the water (' + capOnly + ' of ' + capN + ' runnel points)');
+  assert.ok(capOnly > capN * 0.6, 'most runnel water is all rain-only: ' + capOnly + ' of ' + capN);
+  at(0, 0); assert.equal(S._ctx.capOnly, 0, 'and not at the landing');
+});

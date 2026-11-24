@@ -68,6 +68,7 @@ export const RIVER_DEF = {
   mountA1: 6,      //   there (nodes: the mountain's own flow runs into a hundred small valleys, each draining about forty),
   mountSink: 0.5,  //   and how far its water stands under the mountain's large-scale height (metres), and the deepest gorge
   mountCut: 10,    //   it cuts through a rise across it (metres; past that it runs dry over it)
+  runnel: 2,       // ?runoff=1: a runnel's bed and water this many times narrower than the twig it replaces (F: 1-2 m in a storm)
   edgeThin: 90,    // metres: a river that ends at the edge of the wood (a marsh, a dry biome) thins away over this
   springs: null,   // [{ near: [x, y, z], up, acc, ramp }]: catchment added so a stream runs past a place (a look's oil.springs)
   keep: null,      // [{ near: [x, y, z], r }]: places a river bends round, its water's edge kept r metres off (a look's oil.keep)
@@ -841,7 +842,10 @@ class RiverNet {
         const g3 = Math.sqrt((q1 - q0) * (q1 - q0) + (q2 - q0) * (q2 - q0)) / e;
         const qt = Math.abs(qf) / Math.max(g3, 0.42 / K3);
         qs = qt + (qs - qt) * smoothstep(28, 45, qs);
-        lay(qs, 0.5 * mask * (1 - smoothstep(10, ro ? 125 : 85, parent)), 3.0, 2);
+        // (?runoff=1: a runnel is narrower than the twig it replaces -- F, 24 Nov: 1 to 2 m in a storm, a forest runnel and
+        //  not a brook -- its bed and water `runnel` times narrower, its banks as steep as before)
+        const tw = ro ? o.runnel : 1;
+        lay(qs * tw, 0.5 * mask * (1 - smoothstep(10, ro ? 125 : 85, parent)), 3.0 / tw, 2);
       }
     }
     c.pool = deep; c.bar = bar; c.barZone = zone;
