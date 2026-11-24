@@ -262,6 +262,7 @@ class Ring {
     // 0.66 to 1, so past about 25 m the band thins toward its rim instead of standing in rows behind one another: its
     // touches painted each pixel they covered 3.8 times at the autumn landing. The shader grows a touch as the band thins.)
     u.uNear.value.set(RANGE * (FLORA.grass2 && cfg.name === 'mid' ? 0.40 : 0.66), RANGE, this.now, pixel || 0.002);
+    if (u.uNearK) u.uNearK.value.w = cfg.name === 'mid' ? 0.85 : (cfg.name === 'far' ? 0.6 : 1);   // (a flower head's least size on screen, a share)
     // (the fade-in band is a tier's own where a ring says so: the vista ring is laid at two tiers whose reaches
     // differ by more than twice, and one band of metres cannot serve both -- at the middle tier it would fade in
     // where it is already fading out. The three rings above have one band each, as they had.)
@@ -648,7 +649,7 @@ class Ring {
     if (blooming) {
       const o = bloomAt(this.S, this.x, this.y, this.z, s, this.bi, this.bo || (this.bo = { kind: -1, bloom: null, dens: 0, heart: 0 }));
       if (o.kind >= 0 && o.dens > 0.03 && left > 1) {
-        const b = o.bloom, sh = SHAPES[b.shape] || 0, v = o.dens * (far ? 10 : 9);
+        const b = o.bloom, sh = SHAPES[b.shape] || 0, v = o.dens * (far ? 10 : 9), tone = b.eye ? packTone(b.eye) : 0;
         const nf = Math.min(left - 1, Math.floor(v) + (H(100) < v - Math.floor(v) ? 1 : 0));
         for (let q = 0; q < nf; q++, k++) {
           const q1 = H(102 + q), q2 = H(106 + q), q3 = H(110 + q), p = at(q1, q2), jit = 0.94 + 0.12 * q2;
@@ -658,10 +659,14 @@ class Ring {
             this.put(p[0], p[1], 0, 0, 0, r0 * 1.4, r0, SHAPES.cushion, q3, born, bc[0], bc[1], bc[2], 0, 0, packTone(b.c));
           } else if (sh === SHAPES.spike) {
             const hh = (b.head[0] + (b.head[1] - b.head[0]) * q1) * kh;
-            this.put(p[0], p[1], 0, 0, 0, hh, 0.035 * kw, DAB + CRISP, q3, born, b.c[0] * jit, b.c[1] * jit, b.c[2] * jit, Math.max(0, st0 - hh * 0.8) * kh, flex);
+            this.put(p[0], p[1], 0, 0, 0, hh, 0.035 * kw, sh, q3, born, b.c[0] * jit, b.c[1] * jit, b.c[2] * jit, Math.max(0, st0 - hh * 0.8) * kh, flex, tone);
           } else {
-            const r0 = (0.045 + 0.05 * q1) * kw;
-            this.put(p[0], p[1], 0, 0, 0, r0 * 1.6, r0, DAB + CRISP, q3, born, b.c[0] * jit, b.c[1] * jit, b.c[2] * jit, st0 * 0.85 * kh, flex);
+            // (the near ring's own head, drawn by the same shader, so a drift is the same flowers from 2 m to 60 m: SEEN 24 Nov,
+            // from 10 m up the near ring's flowers are past their 12 m and these round touches were one or two pixels, and a
+            // drift was only the ground's tint, which for a red flower on green is a rust brown; the head's floor of a few
+            // pixels, materials.js NEAR_VERT, keeps each a dot of the flower's colour)
+            const r0 = (0.035 + 0.035 * q1) * kw;
+            this.put(p[0], p[1], 0, 0, 0, r0 * 2, r0, sh || (DAB + CRISP), q3, born, b.c[0] * jit, b.c[1] * jit, b.c[2] * jit, st0 * 0.85 * kh, flex, tone);
           }
         }
         left -= nf;

@@ -2800,7 +2800,7 @@ uniform vec4 uWx;
 #ifdef PC_OIL
 // (the flora lane, docs/lead/FLORA-DESIGN.md) x 1: a mark the eye cannot see is dropped at once (G1); z 1: the flowers'
 // heads are not drawn (the speed test's row; 0 in play); y, w: spare
-uniform vec4 uNearK;
+uniform vec4 uNearK;    // x 1: marks out of view are dropped (G1); z 1: no flower heads; w a flower head's least size on screen, a share (0: 1)
 uniform vec4 uNearL;    // x 1: the grass package's paint (G4), y how strong the gusts' sheen is, z w the bend (rad) it grows over
 varying float vSheen;   // (G4) how far the gust bends this blade away from the eye, as a step of light: 0 none
 varying float vTeeth;   // (G3) how many blades a fan-brush touch is cut into, from its size on the screen: 0 as it was
@@ -2911,7 +2911,7 @@ void main() {
       // The whole head grows, its shape kept: half-width 2.6 px for a daisy, cup or poppy, 2.0 for a bell (they hang
       // several to a stalk), 1.4 for a spike or froth, which are tall already. Only the oil look's heads, kinds 7-12.)
       if (kind > 6.5) {
-        float hf = kind > 9.5 && kind < 11.5 ? 1.4 : (kind > 8.5 && kind < 9.5 ? 2.0 : 2.6);
+        float hf = (kind > 9.5 && kind < 11.5 ? 1.4 : (kind > 8.5 && kind < 9.5 ? 2.0 : 2.6)) * (uNearK.w > 0.0 ? uNearK.w : 1.0);
         float fk = max(1.0, wPx * hf * grow / max(dw, 1e-5));
         dl *= fk; dw *= fk;
       }
