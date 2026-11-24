@@ -89,7 +89,7 @@ export function getDabTextures(aspect, agree) {
 // leaves it is painted with. The includer declares uDabP and uDabId.
 //   SPRAY.pres: the share of the layer's dabs laid on a card (the rest is the sky between leaves); SPRAY.rag: how far
 //   in from a card's edge a leaf may be made to stop, by its own number (the outline is ragged leaf by leaf).
-export const SPRAY = { pres: 0.8, rag: 0.25 };
+export const SPRAY = { pres: 0.9, rag: 0.25 };     // (0.8 first: at 5-10 m the crown was sparser than the leaf cards it replaces; the share costs no extra fragments, only fewer discarded)
 export const SPRAY_GLSL = /* glsl */`
 #define PC_SPRAY_N ${DAB_N.toFixed(1)}
 #define PC_SPRAY_T ${DAB_T.toFixed(1)}

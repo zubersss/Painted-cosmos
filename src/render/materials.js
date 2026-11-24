@@ -2843,7 +2843,10 @@ export function makePropMaterial(bodyU, opts = {}) {
     defines,
     uniforms: baseUniforms(bodyU, own),
     vertexShader: PROP_VERT, fragmentShader: tree === 'wood' ? WOOD_FRAG : tree === 'leaf' ? LEAF_FRAG : tree === 'card' ? CARD_FRAG : PROP_FRAG,
-    side: opts.doubleSide ? THREE.DoubleSide : THREE.FrontSide,
+    // (the wood program draws only the faces that are seen: a tube's triangles turn their front inward, so from outside
+    //  it is their BACK that shows, and under DoubleSide the inner faces of the far side were drawn as well, only to be
+    //  hidden behind the near side. The near side is what wins the depth test either way, so the picture is the same.)
+    side: tree === 'wood' && opts.doubleSide ? THREE.BackSide : opts.doubleSide ? THREE.DoubleSide : THREE.FrontSide,
   });
   m.userData.pcPainted = true;
   // (the powers, fire: a crown that has burned is left bare and black. The plants need no list of burnt places -- each

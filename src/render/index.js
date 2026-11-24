@@ -127,7 +127,15 @@ export function createPainter(renderer) {
     // none it cannot change the picture, because with one sample alpha-to-coverage has no effect by definition.
     {
       const want = post.samples > 0;
-      for (const m of MATERIALS) if (m.userData.pcMake && m.userData.pcMake.kind === 'prop' && !!m.alphaToCoverage !== want) m.alphaToCoverage = want;
+      // (?trees2: the trees' wood and leaf programs, and the cards' colour pass after a depth pass, are drawn with no
+      //  alpha to coverage whatever the samples: they cut nothing, or the depth pass already cut it, and it would only
+      //  cost them the early depth test -- materials.js makePropMaterial, opts.tree)
+      for (const m of MATERIALS) {
+        const mk = m.userData.pcMake;
+        if (!mk || mk.kind !== 'prop') continue;
+        const t = mk.opts && mk.opts.tree, w = t === 'wood' || t === 'leaf' || (t === 'card' && mk.opts.depth) ? false : want;
+        if (!!m.alphaToCoverage !== w) m.alphaToCoverage = w;
+      }
     }
     // (the oil look on a touch device has no smoothing filter at all: the light post filter softens every stroke's edge,
     // and the phone's screen then stretches the picture three times over: blur on blur, against the look's first rule)
