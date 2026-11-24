@@ -223,7 +223,11 @@ export function stepPatch(job, deadline) {
       // flowers keep off steep ground by their own slope test. z: the slope's own kind, o.fi2, for the far dabs)
       if (blo) {
         const upn = (nor[o] * _px[k] + nor[o + 1] * _py[k] + nor[o + 2] * _pz[k]) / Math.sqrt(_px[k] * _px[k] + _py[k] * _py[k] + _pz[k] * _pz[k]);
-        blo[q] = b8(_bl[k * 3] * (1 - sstep(0.13, 0.29, 1 - upn)));      // (from 30 degrees, gone by 45: from 46 the far patches' smoothed normals left red on the peaks' faces, SEEN by flora B) blo[q + 1] = b8(_bl[k * 3 + 1] / 15); blo[q + 2] = b8(_bl[k * 3 + 2] / 15);
+        // (from 30 degrees, gone by 45: from 46 the far patches' smoothed normals left red on the peaks' faces, SEEN by flora B)
+        // (the two index writes stood after this comment on one line and never ran, so every dab took palette entry 0: violet
+        // near the eye, SEEN by flora B with ?bloomfar=1; the default picture never reads this array)
+        blo[q] = b8(_bl[k * 3] * (1 - sstep(0.13, 0.29, 1 - upn)));
+        blo[q + 1] = b8(_bl[k * 3 + 1] / 15); blo[q + 2] = b8(_bl[k * 3 + 2] / 15);
       }
       if (!io && !jo) {
         // the parent's own normal here: its grid is twice as wide (at the border the apron is one cell deep)
