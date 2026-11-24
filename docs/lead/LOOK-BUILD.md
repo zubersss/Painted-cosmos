@@ -45,7 +45,40 @@ its A).
 | step | state | commit | what was seen |
 | --- | --- | --- | --- |
 | L0 | DONE | see git log (`[painter] L0`) | 7 stills (S1-S6 + S3 at night) against v37: 6 identical to the pixel, 1 with 2 pixels off by 1 of 255 (the 275 m night still); the shader text of all 36 materials of the autumn wood (comments and spaces taken out) identical, the 9 plant shaders with `pcFogAmountV` included, so those 2 pixels are the software renderer's run-to-run noise, not the change. Suites 325 / 65 / 416 pass. |
-| T1 | not started | | |
+| T1 | DONE | see git log (`[painter] T1`) | see the T1 section below; stills in docs/shots/painter/look-director/build/T1 (A = `?skyceil=0`, B = on) |
 | L1 | not started | | |
 | L2 + L7 | not started | | |
 | L3 | not started | | |
+
+## T1, the sky ceiling: what was built and what was seen
+
+- `src/world/index.js`: `SKYCEIL` (`?skyceil=a,b` metres for every world; `?skyceil=0` the sky as it was; oil look
+  only), `skyCeiling(body, look)` (a look's `weather.ceiling` row if it has one, else 3.5 and 7.5 of the world's own
+  atmosphere: Earth 2,800 / 6,000 m, Mars 1,575 / 3,375, Neptune 3,500 / 7,500, Pluto 420 / 900), `skySpace01`
+  (the eye's height above the LAND through that ceiling). It replaces `space01` for: the sky (`uAtmo.x`), the aurora
+  (`uAurora.x`, `uAuroraK`), the moon on the land, the night key, the dusk and night grade, the far air under a
+  closed sky, the ring painted in a ringed world's sky, the ring mesh's visibility, and `lighting.skySpace01`.
+  NOT for: the weather numbers (`air`), the ground's own air (`air01`: L5, held for the far-view design), the limb,
+  the dust in the near air, the leaves in the air.
+- The weather group's hooks (WEATHER-DESIGN 8.4 T1 b-d): `CLOUDS3D` (`?clouds3d=`, default 0 until group D's first
+  commit flips it, one line, with F's leave), `askWeatherModules()` fetching `./clouds.js` (`createClouds(scene)`)
+  and `./wxfield.js` (`createWxField()` or a module with `update`) on first use; per frame
+  `wxfield.update(physics.fields)` and `clouds.update(dt, camLocal, root, sunDirL, fields, skyU)` beside the sky
+  uniforms; `G.uAirNear.x = max(dust, clouds.eyeInCloud01)`; `world.clouds` for render/index.js (T5).
+- On the ground and at 420 m nothing changes (both numbers are 0 there), so the review's standard set is the same.
+
+**SEEN (27 stills, A = `?skyceil=0`, B = the ceiling on; all opened):**
+- Earth over the autumn wood at noon from 1,020 m and 2,020 m: A is a black starfield with purple wisps over a sunlit
+  land (the old fault); B a pale day sky. At 3,520 m B is still a pale sky (looking down steeply, the planet a ball in
+  it), at 6,020 m B is space with stars, the same as A; from orbit A and B are the same. So the climb now goes: day
+  sky to 2.8 km, a gradual turn, space by 6 km.
+- The golden hour from 1,020 m: B a flat beige sky (the far air's khaki of audit F6, now seen instead of space).
+- Night from 1,020 m: B a blue night sky with streaks and stars; looking level, Neptune's aurora stands over the
+  horizon at 1,020 m and 2,020 m (A: space, no aurora). The land under it is now in the night key, so it shows the
+  night fault F1 (lemon and orange at full strength): that is L1's.
+- Mars from 1,020 m: B its pale salmon day sky (its own ceiling 1,575 / 3,375 m).
+- STILL TO WATCH, said plainly: between 920 m and 2.8 km the LAND's own air has already gone (air01, not moved: L5)
+  while the sky stays a day sky, so the far land is crisp and saturated under a pale sky; in these stills the far land
+  fades into the sky's band at the limb and does not read as a cut-out, but the far-view group and L5 should look at
+  this pair together. The ball in a pale sky at 3.5 km is the in-between of the climb; the weather group's orbit shell
+  (their A8) takes over above 2.8 km.
