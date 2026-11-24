@@ -123,6 +123,17 @@ export function bloomAt(S, x, y, z, s, bi, out) {
   return out;
 }
 
+// how near a flower's colour lies to the ground's round the colour wheel: 1 the same hue or no hue (a white or a grey
+// flower), 0.33 opposite
+function hueNear(c, r, g, b) {
+  const h = (R, G, B) => { const mx = Math.max(R, G, B), mn = Math.min(R, G, B), d = mx - mn; if (d < 1e-4) return null;
+    const x = mx === R ? ((G - B) / d) % 6 : mx === G ? (B - R) / d + 2 : (R - G) / d + 4; return [x * 60, d / Math.max(mx, 1e-4)]; };
+  const a = h(c[0], c[1], c[2]), e = h(r, g, b);
+  if (!a || !e || a[1] < 0.25) return 1;
+  let dh = Math.abs(a[0] - e[0]) % 360; if (dh > 180) dh = 360 - dh;
+  return 1 - 0.67 * ss(40, 120, dh);
+}
+
 // bloomTint(S, o, x, y, z, bi): ONE CALL at the end of Surface.sample (full samples only). Mixes the drift's colour into
 // the ground's near paint (o.r..b) and its far colour (o.r2..b2) by its cover, and lays the sward's own shade into the
 // near paint where the grass is dense (the dark between the blades: LOOK-RULES R3.1 keeps a blade one flat colour, so
@@ -151,7 +162,12 @@ export function bloomTint(S, o, x, y, z, bi) {
   // the air -- a bluebell wood, a poppy field -- so its far colour goes most of the way, held at 0.7 so the ground's own
   // value structure stays under it; at the feet the flowers themselves stand there and the ground takes less.)
   const cover = r.dens * (b.tint == null ? 0.85 : b.tint);
-  const kn = cover * 0.4, kf = Math.min(0.7, cover);
+  // (a colour far round the wheel from the ground's -- a red poppy or a violet aster on green -- mixed into it makes a rust
+  // or a grey mud, SEEN 24 Nov from 10 m: drifts of poppies were brown patches. Such a drift is carried by its heads, which
+  // the middle and far rings now lay as dots of their own colour; the ground takes a third as much of it. A white, cream or
+  // yellow flower near the grass's own hue tints as before.)
+  const near = hueNear(c, o.r, o.g, o.b);
+  const kn = cover * 0.4 * near, kf = Math.min(0.7, cover) * near;
   o.r += (c[0] - o.r) * kn; o.g += (c[1] - o.g) * kn; o.b += (c[2] - o.b) * kn;
   o.r2 += (c[0] - o.r2) * kf; o.g2 += (c[1] - o.g2) * kf; o.b2 += (c[2] - o.b2) * kf;
 }
