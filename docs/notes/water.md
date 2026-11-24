@@ -122,6 +122,26 @@ DRAWING the water-paint lane's (E-W3/W4): the contract below was sent to it befo
 - Test: `src/world/runoff.test.mjs` (the switch; the hydrograph's timings; the part reading the rain field when there is
   one, the wetness when not, not every frame; the data: runnels carry cap, rivers swell, the landing dry).
 
+### THE DEFAULT FLIP (24 Nov, this session; the owner via the coordinator: reviewed work becomes the default tonight)
+
+`src/data/mode.js` waterFromSearch: with `?look=oil` and nothing said, `rivers` (the tree, with its S-bends), `lakes`,
+`ponds`, `puddles` and `fjord` are 1; opt-outs `?rivers=old` (or `0`), `?lakes=0`, `?ponds=0`, `?puddles=0`, `?fjord=0` (all
+five: the oil look as it was). `falls` stays 0 until the water's paint lands the curtain (then `W.falls = n('falls', 1)`).
+The watercolour game (no `?look=oil`): every part 0, as it was. Merged first: `origin/water-bodies` 7c4daa6 (W2's parts
+build only where the look asks: 221040b).
+- `src/world/waterhooks.js` ensureWater builds NOTHING on a world without a wood (the drainage field alone changes a world's
+  white water and pools): `?flow=1` still builds the field anywhere, as it did.
+- `src/core/save.js` (PILOT's file, the coordinator's word: "if needed, lift or nudge to dry ground on load"): a place saved
+  on dry ground that stands in shallow water NOW comes back on the nearest dry ground within 12 m; one saved swimming still
+  swims.
+- THE FOUR CHECKS, measured: (1) the landing dry, its brook 32 m off with every default part on (rivers.test: under 60 m);
+  (2) 800 places on the old brook's banks within 400 m of the landing: 11 stand in water now (up to 0.56 m, none deep
+  enough to swim); loaded through the real Sim and restore, all 11 come back on dry ground, moved 1.5-3 m; nobody can load
+  inside a bank (restore sets the explorer on the ground as it is now: it always did); (3) the speed test's bank view finds
+  water 12.5 m from its spot with a long run of it (the old: 2 m); (4) every other world: the same samples, bit for bit,
+  under the default address (`?look=oil`), with no drainage, rivers or hydro built; Earth alone changes.
+- `src/world/waterhooks.test.mjs` test 1 now holds the defaults and their opt-outs.
+
 ### S-BENDS ON THE BIG RIVERS (built 24 Nov, this session; part of ?rivers=tree, ?bends=0 for the A side)
 
 The coordinator's order (3a): the references' long S-bends on the big rivers. All in `src/world/rivers.js` (and one switch,
