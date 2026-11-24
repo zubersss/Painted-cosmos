@@ -526,7 +526,7 @@ vec3 pcCliffC(vec3 Bc, float hB, vec3 rnd, vec3 c, float w) {
   float t = pcHash3(vec2(bi * 1.37 + 0.21, 3.7)).x;
   // (ONE ROCK FAMILY PER MOUNTAIN: the look director's second audit, 3. Over the coast's height the beds are the
   // sandstone's strong turns; up the range they are the mountains' grey-violet family, the beds small steps inside it,
-  // never a rainbow. The band is the world's (uRockMH): on Earth from 60 to 140 m above the sea.)
+  // never a rainbow. The band is the world's (uRockMH): on Earth from 35 to 90 m above the sea.)
   float kM = smoothstep(uRockMH.x, uRockMH.y, hB);
   bool lightBed = mod(bi, 2.0) < 0.5;
   vec3 toneC = lightBed ? (t < 0.72 ? uRockC0 : uRockC3) : (t < 0.6 ? uRockC1 : uRockC2);
@@ -591,7 +591,9 @@ float pcRockPlanes(float lvl, vec3 nV, float sunny) {
   float b = mix(dh, 1.0, smoothstep(0.30, 0.12, length(nh)));      // (a gentle face has no side: its bearing does not count)
   b = min(b, smoothstep(0.02, 0.16, d) * 2.0 - 1.0);               // (turned from a low sun: shade)
   float dq = mix(mix(-0.20, 0.12, smoothstep(-0.30, -0.20, b)), 0.50, smoothstep(0.30, 0.40, b));
-  float lp = pcLevel(0.5 + 0.5 * dq, 0.02) - 0.45 * (1.0 - smoothstep(-0.30, -0.20, b)) - 0.4 * gGully * (1.0 - smoothstep(0.30, 0.40, b));
+  // (the shade side the shared shade level less 0.7, a gully on it to the deepest paint: less 0.45 left the shade at V 0.37
+  // to 0.45 and none of a mountain under 0.3, MEASURED at the audit's views)
+  float lp = pcLevel(0.5 + 0.5 * dq, 0.02) - 0.7 * (1.0 - smoothstep(-0.30, -0.20, b)) - 0.5 * gGully * (1.0 - smoothstep(0.30, 0.40, b));
   lp = mix(min(lp, 1.0), lp, sunny);
   return mix(lvl, lp, gRock);
 }
@@ -675,7 +677,7 @@ export const ROCK_LOOK = {
     // Payne's), a deep blue-violet (Payne's with cobalt violet), a warm grey (Davy's with raw umber); over the band of
     // heights (m above the sea) where the coast's sandstone gives way to it
     mtn: { c: [dilute(mixc(pig('davysGrey'), pig('cobaltViolet'), 0.18), 0.22), mixc(pig('davysGrey'), pig('paynesGrey'), 0.35),
-               mixc(pig('paynesGrey'), pig('cobaltViolet'), 0.25), dilute(mixc(pig('davysGrey'), pig('rawUmber'), 0.3), 0.1)], band: [60, 140] } },
+               mixc(pig('paynesGrey'), pig('cobaltViolet'), 0.25), dilute(mixc(pig('davysGrey'), pig('rawUmber'), 0.3), 0.1)], band: [35, 90] } },      // (from 60 to 140 m a mountain's lower flanks kept the pastel wash, SEEN; the coast's cliff tops are about 25 m)
 };
 export function seasonUniforms() {
   return { uSeasonG: { value: [0, 0, 0, 0] }, uCanSum: { value: [0.6, 0.8, 0.3] }, uCanAut: { value: [0.9, 0.6, 0.2] } };
