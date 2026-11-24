@@ -1,0 +1,12 @@
+The weather field's GLSL (src/world/wxfield.js WXFIELD_GLSL) compiled and run in headless Chromium (software GL),
+24 Nov 2026, lane W1 CLOUDS. Run: node docs/shots/clouds/wxfield-glsl-check/run.mjs (from the repository root).
+
+4,096 random body-local directions, test maps of smooth functions on the 32-a-face grid, read in a FRAGMENT shader
+and compared against the CPU twin (wxfield.js sampleAtlas), and pcWxField read in a VERTEX shader once:
+
+  {"ok":true,"field":0.00196,"field2":0.00196,"rain":0.078,"wind":0.255,"shadow":0,"vertex":0.00196}
+
+field / field2: worst difference in a channel, 0..1 (half an 8-bit step: the read-back's own rounding)
+rain: mm/h (pcRainAt), wind: m/s (pcWindAt; the read-back codes each component in 60/255 m/s steps, so 0.24 of the
+0.255 is the check's own rounding), shadow: pcCloudShadow on a 2 x 2 test map (exact), vertex: pcWxField in a vertex
+shader (half an 8-bit step).

@@ -31,22 +31,40 @@ export const MODE = { oil: false, powers: false, calm: false, beasts: 0, water: 
 //   ?lakes=1       lake beds in the basins the field fills          ?ponds=1    ponds in flat glades
 //   ?puddles=1     puddles that come with rain and dry after it     ?swell=1    streams that rise after rain
 //   ?falls=1       waterfalls where rivers meet cliffs              ?fjord=1    fjords at high river mouths
-//   ?wpaint=2      the water's new paint (0: v37's)                 ?wakes=2    ring waves per pixel (1: v37's, per vertex)
+//   ?wpaint=1      the water's new strokes (0, THE DEFAULT for v39.2: v37's;  ?wakes=2    ring waves per pixel (1: v37's)
+//                  2: and its new colour, under review)
 //   ?splash=1      splashes going in, from footsteps, from a low flight
 //   ?runoff=1      the water that comes and goes with the rain: runnels that run in a storm and dry after it, streams and
 //                  ponds that rise and fall back (needs ?rivers=tree: the runnels come from the flow tree; world/waterstate.js)
-// A NUMBER or 0 for each: 0 is off, which is exactly the game as it was.
-MODE.water = { on: false, rivers: 0, lakes: 0, ponds: 0, puddles: 0, swell: 0, falls: 0, fjord: 0, wpaint: 0, wakes: 1, splash: 0, runoff: 0 };
+//   ?bends=0       with ?rivers=tree: the wide rivers wander as the streams do, without their S-bends (for the A/B)
+//   ?mount=1       with ?rivers=tree: MOUNTAIN STREAMS: torrents down the mountains' flanks into their valleys and on into
+//                  the wood's rivers (world/mountain.js; the mountains' own flow, the drainage field as it is)
+// A NUMBER or 0 for each: 0 is off.
+// THE DEFAULT IN THE OIL LOOK (the owner, 24 Nov: "No do make it look different i give you access": what has passed review
+// becomes the default; the coordinator's order): with ?look=oil and nothing said, the rivers of the flow tree (with their
+// S-bends) and the lakes, ponds, puddles and fjord are ON, with the drainage field they stand on. Each part builds only on a
+// world whose look asks for it (the rivers where there is a wood; world/hydro.js by the look's keys; world/waterhooks.js
+// builds nothing on a world without a wood), so only Earth changes. To turn them off: ?rivers=old ?lakes=0 ?ponds=0
+// ?puddles=0 ?fjord=0 ?falls=0 -- all six together are the oil look's ground water as it was. The FALLS are on too (the look
+// director passed them with the water's paint's curtain fix, 24 Nov: they ship with water-paint, never before it). The
+// watercolour game (no ?look=oil): every part of the ground off, exactly as it was. The water's paint (`wpaint`) stays v37's
+// (0) until the sea from the air passes the look director; the player's (`wakes`, `splash`) are the paint lane's (above).
+// (the object as it stands before waterFromSearch is asked -- a test, a module read on its own -- is the game with no water
+//  part; the game and the gallery ask waterFromSearch before anything is made, and with ?look=oil it sets the defaults)
+MODE.water = { on: false, rivers: 0, lakes: 0, ponds: 0, puddles: 0, swell: 0, falls: 0, fjord: 0, wpaint: 0, wakes: 1, splash: 0, runoff: 0, bends: 1, mount: 0 };
 export function waterFromSearch(search) {
   const W = MODE.water;
   let q;
   try { q = new URLSearchParams(search || ''); } catch { return W; }
   const n = (k, d) => { if (!q.has(k)) return d; const v = q.get(k); if (v === 'tree') return 1; const x = parseInt(v, 10); return isFinite(x) ? x : d; };
-  W.rivers = q.get('rivers') === 'tree' ? 1 : 0;
-  W.lakes = n('lakes', 0); W.ponds = n('ponds', 0); W.puddles = n('puddles', 0); W.swell = n('swell', 0);
-  W.falls = n('falls', 0); W.fjord = n('fjord', 0);
-  W.wpaint = n('wpaint', 0); W.wakes = n('wakes', 1); W.splash = n('splash', 0); W.runoff = n('runoff', 0);
-  W.on = !!(W.rivers || W.lakes || W.ponds || W.puddles || W.swell || W.falls || W.fjord || W.runoff);
+  const oil = q.get('look') === 'oil', d = oil ? 1 : 0, rv = q.get('rivers');      // (the oil look's defaults: above)
+  W.rivers = rv === 'tree' ? 1 : rv === 'old' || rv === '0' ? 0 : d;
+  W.lakes = n('lakes', d); W.ponds = n('ponds', d); W.puddles = n('puddles', d); W.swell = n('swell', 0);
+  W.falls = n('falls', d); W.fjord = n('fjord', d);
+  W.wpaint = n('wpaint', 0);      // (the coordinator, 24 Nov 12:40: v37's strokes stay the default for v39.2 -- the look director
+                                  //  found the sea from the air a blocky checker with ?wpaint=1 and 2; ?wpaint=1 for the new strokes)
+  W.wakes = n('wakes', 1); W.splash = n('splash', 0); W.runoff = n('runoff', 0); W.bends = n('bends', 1); W.mount = n('mount', 0);
+  W.on = !!(W.rivers || W.lakes || W.ponds || W.puddles || W.swell || W.falls || W.fjord || W.runoff || W.mount);
   return W;
 }
 

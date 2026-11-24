@@ -137,8 +137,14 @@ export function spruceGeometry(seed, lod, spec) {
     });
     cards += n;
   };
+  // (?pines, 24 Nov: shared out by LIMB, not by length, the short high boughs get as many needles as the long low ones,
+  //  so the top is the dark narrow cone the references show rather than a pole with specks over a broad skirt; the
+  //  same budget, so the same triangles. ONLY THE MIDDLE FORM (lod 1, from where the near tree hands over): the near
+  //  spruce stays exactly as the owner approved it, the look director's ruling. spec.needleTop, set by flora.js only
+  //  with the switch.)
+  const byLimb = !!(spec && spec.needleTop) && lod !== 0;
   for (const L of limbs) {
-    const share = budget * (L.len / wTot);
+    const share = byLimb ? budget / limbs.length : budget * (L.len / wTot);
     let wSum = 0;
     for (const w of SW) wSum += w;
     for (const f of L.forks) for (const w of UW) wSum += w;

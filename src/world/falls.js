@@ -29,8 +29,11 @@ export const FALLS_DEF = {
   sheetU: [4, 8, 14],     // segments across the sheet at each detail (least .. full)
   sheetV: [6, 12, 22],    // ... and down it
   poolRings: [2, 3, 5], poolSec: [12, 18, 28],
-  spray: [40, 130, 300],  // dabs a fall
-  sheetSpray: 0.22,       // the share of them peeled off the lower sheet (the rest are thrown from the foot)
+  spray: [70, 220, 520],  // dabs a fall
+  sheetSpray: 0.18,       // the share of them peeled off the lower sheet ...
+  mist: 0.34,             // ... and of them hanging over the pool as its pale spray cloud (the rest are thrown from the foot)
+  spread: [0.22, 0.04],   // the sheet widens as it falls: by this share of its width, and this share of the drop, each side
+  runup: 1.6,             // metres of the water's run onto the lip drawn as part of the sheet (its edge broken by strokes)
   lift: 0.12,             // metres the pool's disc lies over the sea's still level
   move: 20,               // metres the eye moves before the set and its detail are looked at again
   g: 9.81,
@@ -52,9 +55,15 @@ export function edgeAt(F, u) {
   const n = F.eU.length, f = (u - F.eU[0]) / (F.eU[n - 1] - F.eU[0]) * (n - 1), i = Math.max(0, Math.min(n - 2, Math.floor(f))), w = Math.max(0, Math.min(1, f - i));
   return F.eT[i] + (F.eT[i + 1] - F.eT[i]) * w;
 }
+// (the half width at time t: it widens as it falls; before the lip, t < 0, it is the river's own)
+export function fallHw(F, t) { const s = Math.max(0, t / F.T), D = FALLS_DEF; return F.hw * (1 + D.spread[0] * s) + D.spread[1] * F.drop * s; }
 export function fallAt(F, t, u, out) {
-  const g = FALLS_DEF.g, hw = F.hw * (1 + 0.12 * (t / F.T)) + 0.02 * F.drop * (t / F.T);
-  const a = 0.15 + F.v0 * t + edgeAt(F, u), b = -0.5 * g * t * t, c = u * hw;
+  const g = FALLS_DEF.g, hw = fallHw(F, t);
+  // (before the lip, t < 0, the water runs level on its own surface toward it: a few centimetres over the cut's water)
+  // (and it swells a little as it goes over: a brink 0.35 m high at the lip, so the strokes running over it break the edge
+  //  seen from below, where a level run made a ruled line: the review, 24 Nov)
+  const tc = Math.min(0.7, FALLS_DEF.runup / Math.max(F.v0, 0.5));
+  const a = 0.15 + F.v0 * t + edgeAt(F, u), b = t < 0 ? 0.03 + 0.32 * (1 - (t / tc) * (t / tc)) : 0.35 * Math.max(0, 1 - t / (0.25 * F.T)) - 0.5 * g * t * t, c = u * hw;
   for (let i = 0; i < 3; i++) out[i] = F.lipP[i] + F.dir[i] * a + F.up[i] * b + F.acr[i] * c;
   return out;
 }
@@ -74,10 +83,13 @@ export function sheetArrays(list, R, org, D = FALLS_DEF) {
     const F = fallFrame(f, R), U = D.sheetU[lod], V = D.sheetV[lod];
     const K = Math.sqrt(F.v0 * F.v0 + (D.g * F.T * 0.6) * (D.g * F.T * 0.6));
     const base = P.length / 3;
-    for (let j = 0; j <= V; j++) {
-      const s = j / V, t = s * F.T;
+    // (rows above the lip first: the run onto it, t from -tc to 0, then the fall)
+    const tc = Math.min(0.7, D.runup / Math.max(F.v0, 0.5)), VU = lod >= 1 ? 2 : 1;
+    for (let j = -VU; j <= V; j++) {
+      const s = j < 0 ? (j / VU) * (tc / F.T) : j / V, t = s * F.T;
       // the way the jet goes here (its tangent), and the face's normal: out from the cliff, up at the lip
-      const tx = F.dir[0] * F.v0 - F.up[0] * D.g * t, ty = F.dir[1] * F.v0 - F.up[1] * D.g * t, tz = F.dir[2] * F.v0 - F.up[2] * D.g * t;
+      const tf = Math.max(0, t);
+      const tx = F.dir[0] * F.v0 - F.up[0] * D.g * tf, ty = F.dir[1] * F.v0 - F.up[1] * D.g * tf, tz = F.dir[2] * F.v0 - F.up[2] * D.g * tf;
       let nx = ty * F.acr[2] - tz * F.acr[1], ny = tz * F.acr[0] - tx * F.acr[2], nz = tx * F.acr[1] - ty * F.acr[0];
       const nl = Math.hypot(nx, ny, nz) || 1; nx /= nl; ny /= nl; nz /= nl;
       for (let i = 0; i <= U; i++) {
@@ -86,11 +98,11 @@ export function sheetArrays(list, R, org, D = FALLS_DEF) {
         P.push(q[0] - org[0], q[1] - org[1], q[2] - org[2]);
         N.push(nx, ny, nz);
         AF.push(u, s, t, 0);
-        AG.push(F.hw * (1 + 0.12 * s) + 0.02 * F.drop * s, K, 0, id);
+        AG.push(fallHw(F, t), K, tc / F.T, id);
         AP.push(0, 0);
       }
     }
-    for (let j = 0; j < V; j++) for (let i = 0; i < U; i++) {
+    for (let j = 0; j < V + VU; j++) for (let i = 0; i < U; i++) {
       const a = base + j * (U + 1) + i, b = a + 1, c = a + U + 1, d = c + 1;
       I.push(a, c, b, b, c, d);
     }
@@ -124,7 +136,8 @@ export function sprayArrays(list, R, org, D = FALLS_DEF) {
     const F = fallFrame(f, R), n = D.spray[lod];
     fallFoot(F, 0, q);
     for (let k = 0; k < n; k++) {
-      S.push(rnd(), rnd() * 2 - 1, rnd() < D.sheetSpray ? 1 : 0, 0);
+      const r = rnd();
+      S.push(rnd(), rnd() * 2 - 1, r < D.sheetSpray ? 1 : r < D.sheetSpray + D.mist ? 2 : 0, rnd());
       C.push(q[0] - org[0], q[1] - org[1], q[2] - org[2], F.hw);
       Dd.push(F.dir[0], F.dir[1], F.dir[2], F.drop);
       A.push(F.acr[0], F.acr[1], F.acr[2], F.drop);

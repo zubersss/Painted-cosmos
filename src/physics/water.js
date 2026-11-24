@@ -263,6 +263,35 @@ const GK = 1 / WATER.groupWaves;            // group wavenumber as a fraction of
 // wavelength of a wake from its amplitude: a swimmer's ripples are a metre long, a ship's a few
 export const wakeLength = (amp) => 0.8 + 14 * amp;
 
+// THE PLAYER'S OWN SMALL WAVES, DRAWN PER PIXEL (the water group, lane W4, ?wakes=2; docs/lead/WATER-DESIGN.md 3.6). The 16
+// wakes above are worked out at the corners of the water's triangles, so a ring a metre long between vertices a metre or
+// more apart was mostly lost. These are a second set, kept apart so the 16 and every shader that reads them stay as
+// they were: up to 32 sources with a KIND, which the water's paint sums per pixel within 30 m of the eye
+// (render/materials.js WATER_FRAG, the GLSL twin WAKE2_GLSL below). Nothing is laid while WAKES2.on is false, and then
+// every function here is the field exactly as it was.
+//   bow     a body's bow wave as it wades or swims (the 16's explorer source, moved here when on)
+//   foot    a ring from each footfall in water over 3 cm deep: short (0.35 to 0.5 m) and low (1 to 2 cm)
+//   stroke  a pulse at each arm stroke of a swimmer, at the hands: laid along its path they add up to a V
+//   press   the furrow of a low fast flight: sources dropped behind at a spacing set by the speed, deeper the lower
+// A source's fourth number carries its kind: amp (m) for a bow or a stroke, -amp for a footfall, 1 + amp for a press.
+export const WAKE_KIND = Object.freeze({ bow: 0, foot: 1, stroke: 2, press: 3 });
+export const WAKES2 = {
+  on: false,                       // the paint turns it on with ?wakes=2 (render/waterchunk.js); physics never does
+  n: 32,
+  buf: new Float32Array(32 * 4),   // x, z (frame axes, m), age (s), the kind and amplitude (above)
+  head: 0,
+  live: 0,                         // sources alive (the paint skips its loop at 0)
+};
+// A source's kind, amplitude (m) and wavelength (m) from its fourth number.
+export function wake2Shape(w, o) {
+  if (w < 0) { o.kind = WAKE_KIND.foot; o.amp = -w; o.L = 0.35 + 7 * o.amp; }
+  else if (w >= 1) { o.kind = WAKE_KIND.press; o.amp = w - 1; o.L = wakeLength(o.amp); }
+  else { o.kind = WAKE_KIND.bow; o.amp = w; o.L = wakeLength(w); }
+  return o;
+}
+const _ws = { kind: 0, amp: 0, L: 1 }, _w2o = [0, 0, 0];
+function wake2Encode(amp, kind) { amp = Math.min(Math.max(amp, 0), 0.3); return kind === WAKE_KIND.foot ? -amp : kind === WAKE_KIND.press ? 1 + amp : amp; }
+
 // How high (in units of Hs) the surface must stand for only a share W of it to stand higher.
 // The elevation of four trains in sets is not Gaussian (its tails are shorter), so the
 // distribution is measured once, on first use: every phase of every train and of its groups
@@ -502,6 +531,7 @@ export class WaterField {
     this.frameVersion = frame.version;
     for (let i = 0; i < NT; i++) { this.phase[i] -= this.kx[i] * X + this.kz[i] * Z; this.gphase[i] -= this.gx[i] * X + this.gz[i] * Z; }
     for (let w = 0; w < this.wake.length; w += 4) { this.wake[w] -= X; this.wake[w + 1] -= Z; }
+    if (WAKES2.on) { const B = WAKES2.buf; for (let w = 0; w < B.length; w += 4) { B[w] -= X; B[w + 1] -= Z; } }
     // (P18) the map's levels stay on their ground (the warp's phase offset k . warp is carried with it)
     const g = this._mg; g[0] -= X; g[1] -= Z; g[4] -= X; g[5] -= Z;
     const u = this.uniforms; u.uPhysSeaGrid[0] = g[0]; u.uPhysSeaGrid[1] = g[1]; u.uPhysSeaGrid2[0] = g[4]; u.uPhysSeaGrid2[1] = g[5];
@@ -653,6 +683,14 @@ export class WaterField {
 
   // Something disturbed the liquid at grid position (x, z): a ring of waves of amplitude `amp`
   // (m) spreads from there. Called by the facade for swimmers, waders and thruster wash.
+  // (W4, ?wakes=2) A source of the player's own small waves (WAKES2 above); kind: WAKE_KIND. Nothing while WAKES2 is off.
+  addRing(x, z, amp, kind = WAKE_KIND.bow) {
+    if (!WAKES2.on || !(amp > 0.002) || !this.present) return;
+    const B = WAKES2.buf, o = WAKES2.head * 4;
+    B[o] = x; B[o + 1] = z; B[o + 2] = 0; B[o + 3] = wake2Encode(amp, kind);
+    WAKES2.head = (WAKES2.head + 1) % WAKES2.n;
+  }
+
   addWake(x, z, amp) {
     if (!(amp > 0.002)) return;
     const o = this.wakeHead * 4;
@@ -747,6 +785,16 @@ export class WaterField {
       W[w + 2] += h;
       if (!this.present || W[w + 2] > WATER.wakeLife * Math.sqrt(wakeLength(W[w + 3])) * 1.6) W[w + 3] = 0;
     }
+    if (WAKES2.on) {
+      const B = WAKES2.buf; let live = 0;
+      for (let w = 0; w < B.length; w += 4) {
+        if (B[w + 3] === 0) continue;
+        B[w + 2] += h;
+        wake2Shape(B[w + 3], _ws);
+        if (!this.present || B[w + 2] > WATER.wakeLife * Math.sqrt(_ws.L) * 1.6) B[w + 3] = 0; else live++;
+      }
+      WAKES2.live = live;
+    }
   }
 
   // The wake part of the surface at (x, z): elevation (m).
@@ -762,7 +810,29 @@ export class WaterField {
       if (q > 3 || q < -3) continue;
       s += amp * Math.exp(-q * q - age / (WATER.wakeLife * Math.sqrt(L))) * Math.sqrt(L / (r + L)) * Math.cos(k * (r - c * age));
     }
+    if (WAKES2.on && WAKES2.live) { this.wake2Into(x, z, _w2o); s += _w2o[0]; }
     return s;
+  }
+
+  // (W4) The player's own small waves at (x, z): o[0] elevation, o[1], o[2] the slope along east and north. The twin of
+  // WAKE2_GLSL pcWake2. The same packet as the 16's, each with its kind's wavelength.
+  wake2Into(x, z, o) {
+    const B = WAKES2.buf, g = this.g;
+    let s = 0, se = 0, sn = 0;
+    for (let w = 0; w < B.length; w += 4) {
+      if (B[w + 3] === 0) continue;
+      wake2Shape(B[w + 3], _ws);
+      const amp = _ws.amp, L = _ws.L, k = TAU / L, c = Math.sqrt(g / k), age = B[w + 2];
+      const dx = x - B[w], dz = z - B[w + 1], r = Math.sqrt(dx * dx + dz * dz);
+      const q = (r - 0.5 * c * age) / (WATER.wakeWidth * L);
+      if (q > 3 || q < -3) continue;
+      const A = amp * Math.exp(-q * q - age / (WATER.wakeLife * Math.sqrt(L))) * Math.sqrt(L / (r + L)), ph = k * (r - c * age);
+      const cp = Math.cos(ph);
+      s += A * cp;
+      if (r > 1e-4) { const m = (-A * k * Math.sin(ph) - A * cp * (2 * q / (WATER.wakeWidth * L) + 0.5 / (r + L))) / r; se += m * dx; sn += m * dz; }
+    }
+    o[0] = s; o[1] = se; o[2] = sn;
+    return o;
   }
 
   // The wakes with their slope: o[0] = elevation (m), o[1] = d/deast, o[2] = d/dnorth. The twin of pcPhysWake.
@@ -782,6 +852,7 @@ export class WaterField {
       // d/dr of the carrier and of the packet's own shape (its Gaussian edge and its spreading)
       if (r > 1e-4) { const m = (-A * k * Math.sin(ph) - A * cp * (2 * q / (WATER.wakeWidth * L) + 0.5 / (r + L))) / r; se += m * dx; sn += m * dz; }
     }
+    if (WAKES2.on && WAKES2.live) { this.wake2Into(x, z, _w2o); s += _w2o[0]; se += _w2o[1]; sn += _w2o[2]; }
     o[0] = s; o[1] = se; o[2] = sn;
     return o;
   }
@@ -1019,6 +1090,33 @@ vec2 pcPhysSeaDir(vec3 p) {
   return normalize(Jt * uPhysWaterDir);
 }
 #endif
+`;
+
+// (W4, ?wakes=2) The GLSL twin of wake2Into: the player's own small waves, per pixel. Include it AFTER WATER_GLSL (it uses
+// uPhysWakeG). uWWake: WAKES2.buf; uWWakeN: WAKES2.live (0: no source alive, and the loop is skipped). xyz as pcPhysWake.
+export const WAKE2_GLSL = /* glsl */`
+uniform vec4 uWWake[${WAKES2.n}];   // the player's own small waves: x, z (frame axes, m), age (s), kind and amplitude (water.js)
+uniform float uWWakeN;              // how many are alive (0: none, nothing to do)
+vec3 pcWake2(vec2 g) {
+  vec3 o = vec3(0.0);
+  if (uWWakeN < 0.5) return o;
+  for (int i = 0; i < ${WAKES2.n}; i++) {
+    vec4 w = uWWake[i];
+    if (w.w == 0.0) continue;
+    float amp = w.w < 0.0 ? -w.w : (w.w >= 1.0 ? w.w - 1.0 : w.w);
+    float L = w.w < 0.0 ? 0.35 + 7.0 * amp : 0.8 + 14.0 * amp;
+    float k = 6.2831853 / L, c = sqrt(uPhysWakeG / k);
+    vec2 dl = g - w.xy; float r = length(dl);
+    float q = (r - 0.5 * c * w.z) / (${f(WATER.wakeWidth)} * L);
+    if (abs(q) > 3.0) continue;
+    float A = amp * exp(-q * q - w.z / (${f(WATER.wakeLife)} * sqrt(L))) * sqrt(L / (r + L));
+    float ph = k * (r - c * w.z);
+    float cp = cos(ph);
+    o.x += A * cp;
+    o.yz += (-A * k * sin(ph) - A * cp * (2.0 * q / (${f(WATER.wakeWidth)} * L) + 0.5 / (r + L))) * (r > 1e-4 ? dl / r : vec2(0.0));
+  }
+  return o;
+}
 `;
 
 // GLSL twin. Shares the frame uniforms with FLORA_GLSL (guarded, so both may be included).
