@@ -532,7 +532,16 @@ FV7 of `docs/lead/FARVIEW-DESIGN.md`. A second session (A2, branch `trees-near`)
 the same time: this lane touches only the far parts of `flora.js`, `florakit.js`, the plant material's far branch,
 `render/impostor.js`, `render/shadow.js` and new rows in `core/bench.js`.
 
-**State (update this line every step):** (24 Nov, about 21:00) F PASSED THE FAR SHADOWS (with the cache and C's hook) on
+**State (update this line every step):** (24 Nov, about 21:45) v39.5 LIVE (look-proto 1cb697c) with the far spruce, the storm
+crowns and ?farshadow (09e929d, 9267b3b: WITHOUT the fixes of ee22d1f -- told the coordinator: in flight with ?farshadow=1
+the world would stand still between whole draws; the bench row's number is a little too good). THE AIR VIEW'S COST (the
+coordinator's next job; C does the glades): (1) caadb47, ON, no picture change: a far tree out of range, behind the eye or
+outside the view's sides runs none of the impostor vertex shader (30 / 28 / 48 percent of the trees in drawn far meshes at
+150 m / 420 m / 1 km); (2) ?impminpx=4, OFF, bench row impMinPx at 400 m: far trees IN LEAF under 4 px are not drawn and
+the painted canopy stands for them (conifers kept: with them the dark spikes and the slope trees went, SEEN); MEASURED
+trees in view cut 2,408 / 5,550 / 4,427 of 22,412 / 27,135 / 10,291 (0.7 / 3.3 / 18.7 percent of impostor pixels); picture
+change 0.04 / 0.23 / 0.41 of 255 (A1_impminpx4_{420m,1km}_zoom_AB). For F's eye.
+Before: F PASSED THE FAR SHADOWS (with the cache and C's hook) on
 one change: the hook's level 0.40 instead of 0.33, so the sunlit glades stay bright at a low sun. ASKED C to set it (C's
 line, farview); then render the 16 h pair at 150 m on a scratch merge to confirm. F recommends ?farshadow as the DEFAULT
 once the owner's phone run has the bench row (the 16 MB target and the +130-call redraws are the phone's to judge).

@@ -394,7 +394,7 @@ export class Flora {
   // frame the bake is done they hand over (_impReady).
   _impostors(on) {
     if (on && !this.imp) {
-      const geos = [], floors = [], leafK = [];
+      const geos = [], floors = [], leafK = [], small = [];
       this.species.forEach((sp, i) => {
         if (!sp.canCard) { sp.impLayer = -1; return; }
         sp.impLayer = geos.length;
@@ -407,10 +407,10 @@ export class Flora {
         sp.impByBough = byBough;
         geos.push(byBough ? sp.base.geo1 : sp.geo0[0]);
         if (IMP.variants > 1) geos.push(byBough ? TALL_KITS[spec.kit](12 + i * 10, 1, spec) : sp.geo0[1]);
-        for (let v = 0; v < Math.max(1, IMP.variants); v++) { floors.push(pine ? FAR_SPRUCE_V : 0); leafK.push(byBough ? FAR_SPRUCE_K : 0); }
+        for (let v = 0; v < Math.max(1, IMP.variants); v++) { floors.push(pine ? FAR_SPRUCE_V : 0); leafK.push(byBough ? FAR_SPRUCE_K : 0); small.push(sp.far[2] < 0.5); }      // (small: a tree in leaf, not a tapering kind, may be left to the painted canopy when tiny: IMP_MINPX)
       });
       if (!geos.length) return false;
-      this.imp = new ImpostorAtlas(geos, { floors, leafK });
+      this.imp = new ImpostorAtlas(geos, { floors, leafK, small });
       this.mats.imp = makeImpostorMaterial(this.bodyUniforms, this.imp, this.mats.far);
       // (the guard: if this device cannot draw them, today's far tree, and the hand-over as it was)
       this.imp.onFail = (why) => { this.impFailed = why; this.setFarForm(FAR_BLOB ? 'blob' : 'cards'); this.setHandover(HAND.near, HAND.mid); };
@@ -1096,6 +1096,10 @@ export class Flora {
   // row: on or off while the game runs (the shadow square, the casters' list at the next update, the twin's whole crown).
   setFarShadow(on) { const was = FAR_SHADOW.on; FAR_SHADOW.on = !!on; return was; }
   get farShadow() { return FAR_SHADOW.on; }
+  // The smallest far crown drawn, in pixels across (render/impostor.js IMP_MINPX, ?impminpx=): under it the canopy painted
+  // into the ground stands for the tree. 0 every tree. For the speed test and for judging, while the game runs.
+  setImpMinPx(px) { const u = this.mats && this.mats.imp && this.mats.imp.uniforms.uImpMinPx; if (!u) return null; const was = u.value; u.value = Math.max(0, +px || 0); return was; }
+  get impMinPx() { const u = this.mats && this.mats.imp && this.mats.imp.uniforms.uImpMinPx; return u ? u.value : 0; }
   // The far impostors in the weather group's gust bands (render/impostor.js GUST, ?gustbands=1), for the speed test's row:
   // false keeps the bands off the crowns (the ground keeps them). Returns null where the impostors do not take them.
   setImpGust(on) { const u = this.mats && this.mats.imp && this.mats.imp.uniforms.uImpGust; if (!u) return null; const was = u.value > 0.5; u.value = on ? 1 : 0; return was; }
