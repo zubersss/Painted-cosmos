@@ -12,7 +12,14 @@ FV7 of `docs/lead/FARVIEW-DESIGN.md`. A second session (A2, branch `trees-near`)
 the same time: this lane touches only the far parts of `flora.js`, `florakit.js`, the plant material's far branch,
 `render/impostor.js`, `render/shadow.js` and new rows in `core/bench.js`.
 
-**State (update this line every step):** (24 Nov, about 12:00) SMALL CROWNS IN TWO STEPS built behind `?impsmall=1`
+**State (update this line every step):** (24 Nov, about 12:45) URGENT FIX DONE for v39.1 (the coordinator): during
+the bake over frames the far wood was gone; now today's far trees stand in until the bake is done and hand over in that
+frame (flora.js impWant / impOn, _impReady; impostor.js step(), onReady, bakeTick), the bake counts as busy from the
+frame it is asked for. SEEN, gallery autumn wood 16.8 h on foot, phone settings: mid-bake (step 5 of 78, not ready,
+busy 1) today's far trees across the river, 5,915 drawn, 0 impostors; after (78 frames, 10.7 s of bake in software) the
+swap in one frame, 20.4 ms here, then 4,920 impostors and only the 1,068 conifers in today's form on foot (no tree
+drawn twice, no impostor kind left in today's form), page ready only then; 400 m up 83,520 impostors
+(`A1_bake_foot_mid_vs_after.jpg`, `A1_bake_after_air400.jpg`). Before that: SMALL CROWNS IN TWO STEPS built behind `?impsmall=1`
 (OFF by default), as F ruled (11:07): at a view of 12 texels or fewer the strokes facing the sun take the cap's level and
 the rest exactly one level under it, no stroke jitter, no inner shade; 24+ texels and the conifer core untouched. SEEN
 at phone settings with C's roof (`A1_small_*`): 150 m the far crowns a lit mass and a mid shade instead of lit/black
