@@ -334,8 +334,12 @@ the same time: this lane touches only the far parts of `flora.js`, `florakit.js`
 shadow saving live) merged into trees-far (e85dabd), rendered, pushed. THE GUST ON THE FAR CROWNS ACCEPTED BY F at
 150 m and 600 m (11738e6: a small turned crown's one tone at its cap, two-thirds step); dormant until F's binding
 (look-director 43540c5) reaches look-proto, with D's physics (design-weather d2f4277). READY, NOT BUILT: F's audit finding
-1 (the wood as confetti from the air; one tone for every crown under 4-6 px) waits for the coordinator's lane and F's
-?canopy=0 test (impostors or C's canopy). Scratch worktrees removed, lab closed. Before that: THE GUST BANDS ON THE FAR CROWNS: F accepted 150 m;
+1 (the wood as confetti from the air). THE COORDINATOR'S PLAN, on F's ?canopy=0 verdict: if it names the impostors,
+build behind ONE switch (a) crowns under 4-6 px as one tone lit on the sunward side (the gust block without the band;
+vGust.z's lit share is there for it), (b) crowns of 15-30 px at 150 m with fewer, bigger strokes so each tree is one
+mass with a lit and a shaded side (first idea: read a coarser atlas level there, which doubles a stroke on the screen,
+with the two light steps; the silhouette stays smooth by its cover), (c) a glade or two where the stand thins; if it
+names C's canopy dabs, give C the one-tone rule. Scratch worktrees removed, lab closed. Before that: THE GUST BANDS ON THE FAR CROWNS: F accepted 150 m;
 for 600 m F picked (a): under a band a crown under about 4-6 px is ONE tone (the tree's colour stepped paler, at the
 crown's mean light), fading in over 4-10 px of crown width. BUILT and pushed (dormant until F's binding PHYS.uPhysGust,
 look-director 43540c5, is merged here). SEEN in the scratch merge `gw` (trees-far + design-weather d2f4277 + D's two
