@@ -25,8 +25,14 @@ export default {
   // (and in the oil look the explorer lands in the autumn wood: the first site and the first autumn site change places)
   // (rivers: the oil look's river system, src/world/surface.js _riversOil: channels that split and rejoin, pools, side streams)
   oil: { gold: 1, sites: { 0: 'autumn_woodland', 4: 'temperate_forest' }, rivers: 1, riverAt: [53.82, -8.34, -2.78], leaves: 0.5,
-    // (?rivers=tree, world/rivers.js: the landing keeps a brook -- catchment added four nodes up the drainage tree from it)
-    springs: [{ at: 'landing', up: 4, acc: 30 }],
+    // (the rivers of the tree, world/rivers.js, the default in the oil look: the landing keeps its RIVER -- the coordinator,
+    //  24 Nov: the owner's first view is a wide stream under the maples, and the first thing they see must not have less
+    //  water. Catchment added sixteen nodes up the drainage tree from the landing, growing over ten of them, so the river
+    //  widens down to it as a river does: 18.8 m wide by the landing, in its S-bends. And `keep`: it bends round the landing,
+    //  its water's edge at least 12 m off, so the landing stays dry with the river past it -- measured: centre line 22 m, the
+    //  water's edge 16 m from the landing)
+    springs: [{ at: 'landing', up: 16, acc: 1100, ramp: 10 }],
+    keep: [{ at: 'landing', r: 12 }],
     // (the bodies of water, world/hydro.js; each read only behind its own switch, ?lakes= ?ponds= ?puddles= ?fjord=:
     //  lakeK: the share of a filled basin's hills drowned where it is deepest (the tallest stand as islands);
     //  ponds: the chance a 120 m cell of low wood holds a small still pond (0.25: about 80 on Earth, 4 within 800 m of the

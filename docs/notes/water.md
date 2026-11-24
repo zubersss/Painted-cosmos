@@ -13,6 +13,19 @@ review before a step is called done, a short message to the coordinator (session
 The weather group lands the rain field (its section 9.3: `fields.rain` at 32 a face, mm/h, 2 Hz, `rainAt`,
 `rainBetween`, a GPU channel `pcRainAt`): use theirs for rain (the design's `uRainCells[8]` and `rainAt` are replaced).
 
+**STATE (24 Nov, about noon), the short of it.** Pushed on design-water: W1 rivers with S-bends (aeca809), the index fix,
+mountain streams behind ?mount=1 (1eed43a; F: keep behind the switch, the white water is the paint's), THE DEFAULT FLIP in the
+oil look (4873c6a: rivers of the tree, lakes, ponds, puddles, fjord on; falls held), the speed test's falls view and
+?bench=water (597ab63), the stills of the landing's river (1ec1984, ACCEPTED by the coordinator). COMMITTED, NOT YET PUSHED:
+c229268 the landing's river (Earth's oil.springs / oil.keep, the save's nudge to 24 m) and dfbe555 (mountain floors wander):
+held only for E-W2's puddle fix (its hydro.test puddle share near the landing reads 7.73 % against 4 % with the wide river;
+E-W2 is fixing its rule; my measured suggestion: no puddle within 30 m of a stream). When water-bodies has it: merge, run the
+three suites, push, tell the coordinator (who ships the flip into the next release). OPEN: F's sand-bar notes (colour, grass,
+pebbles: C's recipe, asked; the trees' line can read c.barZone); the runoff paint (E-W3/W4) and its A/B in a storm; the
+falls flip (one line in mode.js when E-W2 sends it). The lead's sessions: coordinator session_01R5Bri1TV3HBTyuxNZZuhNw,
+F session_01R5Brhzz2JPPF6Ecz6XRQHx, E-W2 session_01R5Bri2xowNiwS1SnP3VG3f, E-W3/W4 session_01R5Bri2fSASVVvyrSG11UGF,
+C session_01R5Bri2AMBsFiRcxvUUZMvu, D (weather) session_01R5Bri2bBgFSfCmxpKKuURT (src/physics/index.js is now the water's).
+
 ### LANE 0 (built and pushed 24 Nov, commit b5924da): the hooks, the switches, the speed test's water views
 
 - `src/data/mode.js`: `MODE.water` and `waterFromSearch(search)`: `?rivers=tree ?lakes= ?ponds= ?puddles= ?swell= ?falls=
@@ -132,7 +145,7 @@ build only where the look asks: 221040b).
 - `src/world/waterhooks.js` ensureWater builds NOTHING on a world without a wood (the drainage field alone changes a world's
   white water and pools): `?flow=1` still builds the field anywhere, as it did.
 - `src/core/save.js` (PILOT's file, the coordinator's word: "if needed, lift or nudge to dry ground on load"): a place saved
-  on dry ground that stands in shallow water NOW comes back on the nearest dry ground within 12 m; one saved swimming still
+  on dry ground that stands in shallow water NOW comes back on the nearest dry ground within 24 m; one saved swimming still
   swims.
 - THE FOUR CHECKS, measured: (1) the landing dry, its brook 32 m off with every default part on (rivers.test: under 60 m);
   (2) 800 places on the old brook's banks within 400 m of the landing: 11 stand in water now (up to 0.56 m, none deep
@@ -141,6 +154,15 @@ build only where the look asks: 221040b).
   water 12.5 m from its spot with a long run of it (the old: 2 m); (4) every other world: the same samples, bit for bit,
   under the default address (`?look=oil`), with no drainage, rivers or hydro built; Earth alone changes.
 - `src/world/waterhooks.test.mjs` test 1 now holds the defaults and their opt-outs.
+- HELD BY THE COORDINATOR (11:26): THE LANDING LOST ITS RIVER (the owner's approved first view is a wide stream under the
+  maples; on the default it was a 5.5 m brook, and from 150 m no river by the landing). Cure, in Earth's look
+  (`data/looks/earth.js` oil): `springs: [{ at: 'landing', up: 16, acc: 1100, ramp: 10 }]` -- catchment added sixteen nodes up
+  the tree from the landing, growing over ten (`ramp`, new in rivers.js), so the river widens down to the landing -- and
+  `keep: [{ at: 'landing', r: 12 }]` (new in rivers.js): the river bends round the landing, its water's edge at least 12 m
+  off (a nearer point of the curve carried out along the line from the landing, eased). MEASURED: the river by the landing
+  18.8 m wide, its centre line 22 m and its water's edge 16 m from the landing, the landing dry; the bank view finds water
+  12.5 m off; 28 of the 800 old bank places stand in water now (up to 1.24 m) and the save's nudge, widened to 24 m, brings
+  all 28 back on dry ground (moved up to 13.5 m).
 
 ### THE SPEED TEST'S FALLS VIEW AND ?bench=water (24 Nov, this session; lane 0, the coordinator's order)
 
