@@ -532,7 +532,11 @@ FV7 of `docs/lead/FARVIEW-DESIGN.md`. A second session (A2, branch `trees-near`)
 the same time: this lane touches only the far parts of `flora.js`, `florakit.js`, the plant material's far branch,
 `render/impostor.js`, `render/shadow.js` and new rows in `core/bench.js`.
 
-**State (update this line every step):** (24 Nov, about 20:50) C PUT THE CANOPY HOOK IN (farview 87b25e8, under
+**State (update this line every step):** (24 Nov, about 21:00) F PASSED THE FAR SHADOWS (with the cache and C's hook) on
+one change: the hook's level 0.40 instead of 0.33, so the sunlit glades stay bright at a low sun. ASKED C to set it (C's
+line, farview); then render the 16 h pair at 150 m on a scratch merge to confirm. F recommends ?farshadow as the DEFAULT
+once the owner's phone run has the bench row (the 16 MB target and the +130-call redraws are the phone's to judge).
+Before: C PUT THE CANOPY HOOK IN (farview 87b25e8, under
 PC_FAR_SHADOW, set only with ?farshadow=1). RENDERED on a scratch merge of trees-far + 87b25e8 (never pushed), F's views,
 autumn noon: land under V 0.3 150 m 9.7 -> 14.6 percent, 420 m 0.90 -> 1.25, 1 km 0.61 -> 0.72 -- the same as my
 working-copy rows (14.64, 1.25). FOUND AND FIXED on the way (the first merge render showed nothing): the kept far map drawn
