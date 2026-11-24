@@ -142,6 +142,20 @@ build only where the look asks: 221040b).
   under the default address (`?look=oil`), with no drainage, rivers or hydro built; Earth alone changes.
 - `src/world/waterhooks.test.mjs` test 1 now holds the defaults and their opt-outs.
 
+### THE SPEED TEST'S FALLS VIEW AND ?bench=water (24 Nov, this session; lane 0, the coordinator's order)
+
+`src/core/bench.js`: a water part may PLACE its own view: a WATER_BENCH row with `place(S)` returning { dir, yaw (degrees),
+pitch (radians) } or null (E-W2's `fallsView`, in the sea 60 m before the widest fall). The view is asked once, of Earth's
+surface as built; a part that is not loaded adds no row, and a place that finds nothing (null: no falls on the world) adds
+no view. The views loop as bank, shore, then every placed view. `?bench=water` runs the water's views only (the landing's
+as-set row, then each view's as-set, no-water and part rows): short, for a phone and for a headless check.
+- CHECKED HEADLESS (the game, `?look=oil&falls=1&bench=water`): all 8 rows ran -- the landing, the bank (as set, no water),
+  the shore (as set, no water), the FALLS view (as set 431k triangles, no water 352k, no falls 429k) -- and the explorer
+  went back to the landing; no errors. The view itself, opened in the gallery at the place it gives:
+  `docs/shots/painter/water-default/bench-falls-view.jpg` (from the sea, the widest fall's sheet in the cliff).
+- `c.barZone` (world/rivers.js, written every call): the bar and 6 m beyond, for the wood's trees to stand back from it (F's
+  bar notes); not read yet: the bar's colour, grass and pebbles are C's recipe, asked of C with the tree line.
+
 ### S-BENDS ON THE BIG RIVERS (built 24 Nov, this session; part of ?rivers=tree, ?bends=0 for the A side)
 
 The coordinator's order (3a): the references' long S-bends on the big rivers. All in `src/world/rivers.js` (and one switch,

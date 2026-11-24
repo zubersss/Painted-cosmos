@@ -72,7 +72,9 @@ export function prepareMountain(S) {
   if (!idx.length || !S.biomes.some((b) => b.terrain === 'forest')) return null;
   S._lqGroup0 = S.lqGroup.slice();
   for (const i of idx) S.lqGroup[i] = 0;
-  S.mount = { idx, alpine: alpineStream, baseAt: mountBaseAt };
+  // (the alpine recipe's one hook: the stream, then lane W2's mountain tarns where it builds them -- world/hydro.js
+  //  hydro.alpine only ever raises c.lqA and writes nothing else outside a tarn, so the stream's contract holds)
+  S.mount = { idx, baseAt: mountBaseAt, alpine: (S2, c, h, T) => { h = alpineStream(S2, c, h, T); return S2.hydro && S2.hydro.alpine ? S2.hydro.alpine(S2, c, h, T) : h; } };
   return S.mount;
 }
 
