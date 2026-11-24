@@ -1959,10 +1959,14 @@ void main() {
     // (the lighter paint: no noise for a plant's wash; and the speed test's flat plants, shared.js uOilL.y)
     vec4 n1 = uOilL.x > 0.5 ? vec4(0.5) : texture(uNoise3D, vBody / 9.0);
     // (uOilL.y 2: every plant one flat colour; 3: only the far trees, to tell their paint from their shapes)
+    // (2026-11-24, trees lane: the far test was 'over 1.5', so rows 5 and 6 -- a leaf in its own colour, no air on
+    //  the plants -- flattened every far tree as well and measured more than they said. Now only 2 and 3.)
     #ifdef PC_FAR
-    if (uOilL.y > 1.5) { pcWrite(vData.y > 4.5 ? uLeafA * 0.7 : uBarkB, 0.0, nV, -vView.z, 3.0); return; }
+    if (uOilL.y > 1.5 && uOilL.y < 3.5) { pcWrite(vData.y > 4.5 ? uLeafA * 0.7 : uBarkB, 0.0, nV, -vView.z, 3.0); return; }
     #else
     if (uOilL.y > 1.5 && uOilL.y < 2.5) { pcWrite(vData.y > 4.5 ? uLeafA * 0.7 : uBarkB, 0.0, nV, -vView.z, 3.0); return; }
+    // (7: the near trees' BARK one flat colour, every leaf and every discard as set -- trees lane T0 row c)
+    if (uOilL.y > 6.5 && uOilL.y < 7.5 && vData.y < 0.5) { pcWrite(uBarkB, 0.0, nV, -vView.z, 3.0); return; }
     #endif
   #else
     vec4 n1 = texture(uNoise3D, vBody / 9.0);
