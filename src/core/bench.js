@@ -97,7 +97,9 @@ export function attachBench(pc) {
   document.body.appendChild(copyBtn);
   const P = pc.painter, R = pc.renderer;
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
-  const mats = (re) => { const s = new Set(); pc.scene.traverse((o) => { const m = o.material; if (m && m.name && re.test(m.name)) s.add(m); }); return s; };
+  // (a tree drawn by two programs, ?trees2=, carries an ARRAY of materials, wood then leaves: both are counted)
+  const mats = (re) => { const s = new Set(); pc.scene.traverse((o) => { for (const m of [].concat(o.material || [])) if (m && m.name && re.test(m.name)) s.add(m); }); return s; };
+  const mname = (o) => { const m = Array.isArray(o.material) ? o.material[0] : o.material; return (m && m.name) || ''; };
   const show = (re, on) => { for (const m of mats(re)) m.visible = on; };
   // the script's own time and the frame's draw calls, taken round the game's frame while a row is measured
   const acc = { ms: 0, n: 0, calls: 0, tris: 0 };
@@ -226,12 +228,21 @@ export function attachBench(pc) {
     if (pc.settle) await Promise.race([pc.settle(12), wait(20000)]);
     const hasB = typeof P._bench === 'function', lite0 = !!P.lite;
     const B = (o) => hasB && P._bench(o);
-    const farMeshes = (fn) => pc.scene.traverse((o) => { if (o.isMesh && o.material && /^pc-prop-far/.test(o.material.name || '')) fn(o); });
-    const treeMeshes = (fn) => pc.scene.traverse((o) => { if (o.isMesh && o.material && /^pc-prop-(tall|far)/.test(o.material.name || '')) fn(o); });
+    const farMeshes = (fn) => pc.scene.traverse((o) => { if (o.isMesh && o.material && /^pc-prop-far/.test(mname(o))) fn(o); });
+    const treeMeshes = (fn) => pc.scene.traverse((o) => { if (o.isMesh && o.material && /^pc-prop-(tall|far)/.test(mname(o))) fn(o); });
     const flora = () => (pc.world && pc.world._flora) || null;
     // (the far trees' form swapped while the test runs, world/flora.js setFarCards: the two forms are then timed in the
     // same minute, on a phone as warm for the one as for the other)
     const cards0 = !!(flora() && flora().species && flora().species.some((sp) => sp.cardFar));
+    // (the trees' two short programs, and the trees of clusters, swapped in while the test runs, world/flora.js
+    // setTrees2: the trees' patches are built again, so each is timed in the same minute as the trees it replaces)
+    const t2a = (flora() && flora().trees2) || '', t2d = !!(flora() && flora().treeDepth);
+    const swapT2 = async (mode, depth) => {
+      const f = flora();
+      if (!f || !f.setTrees2 || f.setTrees2(mode, depth == null ? t2d : depth) == null) return;
+      await wait(400);
+      if (pc.settle) await Promise.race([pc.settle(12), wait(20000)]);
+    };
     const swapFar = async (on) => {
       const f = flora();
       if (!f || !f.setFarCards || f.setFarCards(on) == null) return;
@@ -266,9 +277,18 @@ export function attachBench(pc) {
       if (pc.settle) await Promise.race([pc.settle(12), wait(20000)]);
     };
     const AS = 'as set';
+    // (the trees-near lane's rows, in the full table and in ?bench=trees: the near and middle trees drawn by two short
+    //  programs, wood and leaves, with no hair twigs (T2, ?trees2=1); the leaves as clusters on cards (?trees2=cards);
+    //  the cards laid in depth first (T5). Each against the "as set" row above it, built afresh while the test runs.)
+    const T2ROWS = [
+      [t2a ? 'trees in one program as before' : 'trees: two short programs', () => swapT2(t2a ? '' : 'split'), () => swapT2(t2a)],
+      ['near trees as clusters', () => swapT2('cards-near', false), () => swapT2(t2a)],
+      ['middle trees as clusters', () => swapT2('cards-mid', false), () => swapT2(t2a)],
+      ['clusters with a depth pass first', () => swapT2('cards', true), () => swapT2(t2a)],
+    ];
     // ---- THE TENTH FORM'S HANDLES (see the top of this file) ----------------------------------------------------
     const tallMats = () => mats(/^pc-prop-tall/);
-    const tallMeshes = (fn) => pc.scene.traverse((o) => { if (o.isMesh && o.material && /^pc-prop-tall/.test(o.material.name || '')) fn(o); });
+    const tallMeshes = (fn) => pc.scene.traverse((o) => { if (o.isMesh && o.material && /^pc-prop-tall/.test(mname(o))) fn(o); });
     const nearPart = (v) => () => { const f = flora(); if (f) f.benchNear = v; };
     // (no wind in the near trees' vertex shader: their own uPhysOn is 0 while the rest of the world's stays as it is.
     //  The uniform is shared by every plant, so the near trees are given one of their own for the row and handed the
@@ -458,6 +478,10 @@ export function attachBench(pc) {
         () => { const f = flora(); if (f) { f.benchTreeK = null; f.lastScale = -1; } }],
       ['near trees at a third of the distance', () => { const f = flora(); if (f) { f.benchTreeK = 0.33; f.lastScale = -1; } },
         () => { const f = flora(); if (f) { f.benchTreeK = null; f.lastScale = -1; } }],
+      // (2026-11-24, the trees to 30 a second, docs/lead/TREES-DESIGN.md on r2: the near and middle trees drawn by
+      //  two short programs, wood and leaves, with no hair twigs (T2, ?trees2=1); the near tree's leaves as clusters
+      //  on cards (?trees2=cards). Each against the "as set" row above, built afresh while the test runs.)
+      ...T2ROWS,
       ['no trees', () => show(/^pc-prop-(tall|far)/, false), () => show(/^pc-prop-(tall|far)/, true)],
       ['no small plants', () => show(/^pc-prop-(?!tall|far)/, false), () => show(/^pc-prop-(?!tall|far)/, true)],
       // (2026-11-20) WHERE THE DRAW CALLS ARE. The table's header says 350 of them and 9.6 ms of script, and a draw
@@ -502,6 +526,8 @@ export function attachBench(pc) {
       [AS, null, null],
       T0.side, T0.order, T0.a2c, T0.noNear,
       [AS, null, null],
+      ...T2ROWS,
+      [AS, null, null],
       T0.blob, T0.noFar, T0.farFlat,
       ...airAt(150, 30, [T0.noFar, T0.blob, T0.farFlat, T0.a2c]),
       ...airAt(400, 45, [T0.noFar, T0.blob]),
@@ -540,7 +566,7 @@ export function attachBench(pc) {
       const r = stats(await sample(2400));
       r.fps = 1000 / Math.max(r.mean, 1e-3);
       if (k === 0 && P._shadow) sunOut = P._shadow.frames > f0;
-      if (off) { await off(); if (name.startsWith('far trees as') || name.startsWith('far trees of')) await calm(); }
+      if (off) { await off(); if (name.startsWith('far trees as') || name.startsWith('far trees of') || /program|clusters|depth pass/.test(name)) await calm(); }
       // (a row that left the ground is put down again if the table ends up there; see airAt)
       // (2026-11-19) The header quotes the first row THAT WAS REALLY DRAWING. It used to quote the first row
       // whatever it was, and at v22 that row drew nothing, so the header described the whole game as "script
