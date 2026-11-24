@@ -942,6 +942,27 @@ spiky shapes. Triangles +2,834 at the landing (Node). The default is the picture
 `A2_pines_*` (A off, B on) and `A2_pines-fill3_*`. If a true needle mass is wanted at 40-60 m, the spruce kit's budget
 by limb COUNT rather than length (a denser top) is the next step: it changes the near spruce too.
 
+**READING THE OWNER'S `?bench=foot` TABLE (prepared 24 Nov, late, before it arrives; v39.5 merged, 2a4d2fb).** Each
+row is set against the "as set" row before it; first check the table agrees with itself (the "as set" rows within 25
+per cent, or it says so). Rows and what each answers, with the near-tree cut each would call for:
+- 2-4 NEAR GRASS (`pc-near`): 'no near grass or flowers' its whole cost; 'half its marks' how much of it is per mark
+  (triangles and set-up: half the marks should save about half if so); 'one flat colour' how much is the paint per
+  pixel. The flora lane's (B) to act on; `?nearcut` (uNearCut) is built for it.
+- 6 'no small plants' (bushes, undergrowth: not tall, not far): B's lane.
+- 7-8 the ground (drawn at all; one flat colour = its paint per pixel): C's / the look director's.
+- 10-11 shadows ('no shadows at all'; 'trees cast no shadow' = the trees' share of the shadow pass): A1's shadow lane.
+- 12 the light in the air; 13 the lighter or full paint: the look director's.
+- 15 'NO NEAR TREES' (every `pc-prop-tall` mesh: the near and middle tiers): THIS LANE'S NUMBER. Read with 16 'near
+  bark one flat colour' (the wood program's paint per pixel) and the triangle counts: if 15 is large and 16 small, the
+  cost is the leaves (triangles and the leaf program); if 16 is a good part of 15, the bark's two-layer paint.
+  Cuts ready or near: (a) the near hand-over nearer (`?treenear=`, metres at the phone's scale; today 27 m; 18 m was
+  SEEN to make the 15-20 m trees umbrellas of big kites with today's middle tree, so it needs F's eye); (b) the leaf
+  budget of the near maple (2,560 cards, 10k triangles a tree) cut by a share, the thinning's growth keeping the crown
+  full; (c) for the bark: one streak layer instead of two beyond a few metres (`pcWoodLevel`'s fine layer is already
+  only where near); (d) `?treesway=whole` (built: the cheaper sway). Each behind a switch and a row, the look kept.
+- 17 'no far trees' (the impostors: A1's), 18 'no trees' (all of it).
+The derived figure to test: v39.1 on foot about 22 ms (40.3 split - 18.5 old far trees + 0.7 impostors); never measured.
+
 **ON FOOT TO UNDER 33 ms (the coordinator's job, 24 Nov, after the ground from the air was found to hold no 30 ms:
 the v38.2 table had the whole 400 m frame at 17.9 ms with impostors, ground included).** DERIVED from the phone's own
 rows: v39.1 (split trees + impostors) is about 22 ms on foot (40.3 split - 18.5 old far trees + 0.7 impostors; and
