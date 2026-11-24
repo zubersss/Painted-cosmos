@@ -513,6 +513,26 @@ A separate session builds W1 CLOUDS once the look director's sky ceiling (touch 
   `stormland.test.mjs` gained the gust front and the drift cap.
 - **Suites:** physics 442, world and looks 103, unit 328, 0 failing. Switches off: bit-identical, 162,000 numbers.
 
+### W3.11: THE FLIP, READY BUT NOT APPLIED, AND THE GUARD (the coordinator, 24 Nov)
+
+- **The guard (committed, ade2f6f):** `src/world/wxguard.js`, `watchPrograms(mesh, name)`.
+  - On the frames after a mesh's first draw it looks once at the program three compiled for it. A failed one
+    (`diagnostics.runnable === false`) is hidden for good, with a console warning, and the game goes on without it.
+  - `world/storms.js` uses it for the veils and the bolts; the clouds lane may use it for its clouds.
+  - SEEN: a deliberately broken material was hidden and reported, a good one beside it untouched.
+- **THE FLIP, as one commit, NOT applied:** `docs/lead/WEATHER-FLIP.patch` (`git am docs/lead/WEATHER-FLIP.patch`).
+  It applies on top of the look director's storms hook (look-director 1de2bf6), which it changes; checked to apply
+  cleanly on design-weather plus that hook. What it does:
+  - `physics/wx2.js`: in a page every switch of the new weather is on unless the address turns it off. **?weather=old**
+    turns them all off (the weather of v37 to the last digit). `rainmap` stays off. In Node (no page) every switch stays
+    off, so no test changes meaning.
+  - `render/kitmat.js` and `audio/audio.js` read the same: on unless `?weather=old`.
+  - `world/index.js`: the hook fetches wx2.js and storms.js in the oil look unless `?weather=old`.
+  - `core/bench.js`: the row 'weather: the old weather (?weather=old)': the whole new weather against the old, live.
+  - CHECKED in the game: with no switches every switch is on but `rainmap`, the storms are loaded, the maps run, there
+    are no errors and the picture draws. With `?weather=old` every switch is off and storms.js is never fetched.
+  - NOT in it: the clouds lane's own switch (`?clouds3d`, the look director's and W1's) flips with their review.
+
 ## NEXT
 
 1. **The look director's second review** of the veils (W3.6), and their decision on region (a glaze keeping the region
