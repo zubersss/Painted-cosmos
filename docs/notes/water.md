@@ -171,8 +171,15 @@ Branch `water-bodies` = lane 0 + look-proto v37.1 + `origin/design-water` (W1's 
   mesher must skip a water cell whose corners' levels differ by more than 2 m and half the cell (else a flat blue
   curtain stands behind every fall); bench.js's falls view; C: the berm's ruled, striped wall and the cut's banks in leaf
   paint (o.bank is written for whoever paints it).
-- Camera places for the falls views: `fallsView(S)` and the scratch `fallcams.mjs` (sea60, sea150, air400, bank, E7).
-- NEXT: lake stills at E4/E5 (A/B), ponds from 150 m, the fjord; then what the review asks.
+- **AFTER (24 Nov, a950282):** the plunge pool's strokes run straight out from the cliff (a polar chart drew a starburst from
+  above); the hooks share one 120 m cell lookup and mark the cells near a cut at load. MEASURED (noisy here, about 0.15 us):
+  every part on adds about 0.1-0.2 us to a wood sample, lakes alone nothing measurable. lookstats, 68 m view A | B: V>0.90
+  13.3 -> 11.7 %, satL 0.44 -> 0.32, S(V<0.3) 0.43. Lakes, ponds and the fjord SEEN (`lakes-AB-grid.jpg`, `fjord-*.jpg`):
+  basin 6 becomes one open lake reaching the mountains' foot (86 % wet): the owner should see it before it is a default.
+  The game boots with every water switch (`game-landing-allwater-B.jpg`).
+- Camera places for the falls views: `fallsView(S)` and the scratch `fallcams.mjs` (sea60, sea150, air400, bank, E7, close25,
+  pool); the lakes' in the scratch `lshots.sh` (E4, E5, lake 11, ponds); the fjord's in `fjcams.mjs`.
+- NEXT: what the look director's review asks; W3's curtain fix and bench.js's falls view when they land (then the phone's row).
 
 ## Stations and tools
 
