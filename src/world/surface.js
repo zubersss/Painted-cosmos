@@ -95,6 +95,7 @@ class Surface {
     // `hydro` lakes, ponds and puddles in _forest and a river's mouth in the coast (world/hydro.js). Both null: the game as it was.
     this.rivers = null;
     this.hydro = null;
+    this.mount = null;    // ?mount=1: the alpine recipe's mountain streams (world/mountain.js prepareMountain). Null: as it was.
     this._dw = null;      // scratch biome weights for waterBaseAt (made on first use: only drainage asks)
   }
 
@@ -640,6 +641,9 @@ class Surface {
       const sl = T.snow || 190;
       snow = smoothstep(sl, sl + 60, h + (crag - 0.5) * 90 + C.n3(X / 60, Y / 60, Z / 60) * 30);
       shade = up * (1 - snow) * 0.18;
+      // (THE WATER, ?mount=1: the mountain stream nearest the point -- its gully cut into the slope, its bed, its water's level
+      //  -- and a tarn's still water; nothing unless that part is attached. world/mountain.js.)
+      if (this.mount) { h = this.mount.alpine(this, c, h, T); if (c.lqA === c.lqA) lq = c.lqA; bed = Math.max(bed, c.bedA); grow *= c.growA; meadow *= 1 - c.bedA; wet = Math.max(wet, c.wetA); }
     } else if (k === 'coast') {
       const f = R / 780;
       const n = A.fbm(x * f - 9.0, y * f + 2.0, z * f + 14.0, 4, 2.0, 0.5);

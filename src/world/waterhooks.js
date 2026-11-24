@@ -24,13 +24,13 @@ import { MODE } from '../data/mode.js';
 export const WATER_PARTS = [];
 export const WATER_BENCH = [];
 
-let DR = null, RIV = null, HYD = null, loaded = null;
+let DR = null, RIV = null, HYD = null, MT = null, loaded = null;
 const attached = new Set();
 
 // The parts of the WORLD the address asks for (the paint's and the player's parts are read where they are used).
 function wants() {
   const W = MODE.water || {};
-  return { rivers: !!W.rivers, hydro: !!(W.lakes || W.ponds || W.puddles || W.falls || W.fjord), falls: !!W.falls, runoff: !!W.runoff };
+  return { rivers: !!W.rivers, hydro: !!(W.lakes || W.ponds || W.puddles || W.falls || W.fjord), falls: !!W.falls, runoff: !!W.runoff, mount: !!(W.mount && W.rivers) };
 }
 
 export function loadWater() {
@@ -45,7 +45,8 @@ export function loadWater() {
     w.hydro ? one('./hydro.js') : null,
     w.falls ? one('./falls.js') : null,      // (it registers itself in WATER_PARTS when it loads)
     w.runoff ? one('./waterstate.js') : null, // (so does the runoff's hydrograph)
-  ]).then(([d, r, h]) => { DR = d; RIV = r; HYD = h; return true; });
+    w.mount ? one('./mountain.js') : null,    // (the mountain streams: prepared before the rivers, below)
+  ]).then(([d, r, h, , , m]) => { DR = d; RIV = r; HYD = h; MT = m; return true; });
   return loaded;
 }
 
@@ -57,6 +58,7 @@ export function ensureWater(bodyId) {
     const drain = DR.ensureDrainage(bodyId);
     if (!drain) return;                                  // a world with no liquid: nothing of the water attaches
     const S = drain.S;
+    if (MT && MT.prepareMountain) MT.prepareMountain(S);   // (the alpine meadow joins the streams' group before they are drawn)
     if (RIV && RIV.attachRivers) RIV.attachRivers(S, drain);
     if (HYD && HYD.attachHydro) HYD.attachHydro(S, drain, S.rivers);
   } catch (e) { console.warn('water: the parts did not attach to ' + bodyId, e); }
