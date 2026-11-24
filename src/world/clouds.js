@@ -118,6 +118,7 @@ varying vec4 vK;           // x lobe radius, y height in the cloud 0..1, z storm
 varying vec3 vUp;
 varying vec2 vAirSun;      // x the cloud's air, y how much of the sun reaches this point (the planet's shadow)
 varying vec3 vNV;          // the painted normal in view space (for the scene's second target)
+varying float vAxis;       // how far from the cloud's own upright axis, in units of its thickness (the core of its base is 0)
 void main() {
   vec3 dir = normalize(position);
   vec3 up = normalize(uAnchorD + iB.xyz);
@@ -139,6 +140,7 @@ void main() {
   vec3 np = normalize(mix(nl, normalize(p - cen), uCloudBend));
   vNP = normalize(mix(np, -up, base));
   vNV = normalMatrix * vNP;
+  { vec3 h = p - iB.xyz; h -= up * dot(h, up); vAxis = length(h) / max(iD.y * 0.9, 1.0); }
   // the stroke frame: the pole, and two axes round it
   vec3 pz = iC.xyz, px = normalize(cross(abs(pz.y) < 0.9 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0), pz)), py = cross(pz, px);
   vQ = vec3(dot(dir, px), dot(dir, py), dot(dir, pz));
@@ -175,6 +177,7 @@ varying vec4 vK;
 varying vec3 vUp;
 varying vec2 vAirSun;
 varying vec3 vNV;
+varying float vAxis;
 vec3 pcCloudDens(vec3 c, float d) { return clamp(c - (c - c * c) * (d - 1.0), 0.0, 1.0); }
 // (the sky's ceiling on value, sky.js pcSkyCap, copied: nothing in a cloud goes paper-white)
 vec3 pcCloudCap(vec3 c, float k) {
@@ -215,7 +218,11 @@ void main() {
   // (the light across the form, as far as the sun reaches; the lower sides a little deeper; the flat base never deeper
   // than the belly, which is lit by the sky and the land below it: the deepest paint is for the sides turned away)
   float x = (lam * 0.5 + 0.5) * mix(0.42, 1.0, sunK) - (1.0 - smoothstep(0.0, 0.40, hS)) * 0.10 * (1.0 - down);
-  x = mix(x, max(x, 0.25), down);
+  // (the base seen from below in three values, as a painter lays a cloud's underside: the core, where the cloud is
+  // thickest, the deep belly; a ring of the belly round it; the thin edge a half-tone (the outline rule below). Laid as one
+  // tone, a cloud from below counted a single value step, criterion 2 of the design's 4.4)
+  float core = 1.0 - smoothstep(0.35, 0.75, PC_AT(vAxis, ds));
+  x = mix(x, mix(0.25, 0.06, core), down);
   // (and a painter's cloud is lit from above whatever the hour: what faces up takes a share of the light, sky.js does
   // the same; with the sun behind the clouds, as most of the stations look, the first stills were all belly)
   x += 0.14 * max(dot(nS, normalize(vUp)), 0.0) * uAtmo.y;
@@ -774,7 +781,7 @@ export function createClouds(scene) {
       if (handK > 0 && hash(k, 77, 1) < handK * 1.15) continue;
       // where the slot is now, on the world
       _w.set(sx, sy, sz).applyQuaternion(Q);
-      let cover, base, thick, storm = 0, conv = 1;
+      let cover, base, thick, storm = 0, conv = 1, deckK = 0;
       if (C) {
         C.at(_w.x, _w.y, _w.z, _cOut);
         conv = _cOut.conv;
@@ -786,7 +793,8 @@ export function createClouds(scene) {
         if (_cOut.low < 0.05 || thick === 0) { thick = 0; }
         thick = Math.min(thick, 900);      // (the storm's own column is the cell's, below: round it, towering cumulus)
         // (under a closed deck, seen from below it, a cumulus is hidden in it: not drawn. From above it is the deck's heaps.)
-        if (CLOUDS.deck && camR < R + base && Math.min(1, smooth(0.50, 0.92, _cOut.low) * (1 - 0.45 * _cOut.conv) + 0.6 * _cOut.storm) > 0.85) continue;
+        deckK = CLOUDS.deck ? Math.min(1, smooth(0.50, 0.92, _cOut.low) * (1 - 0.45 * _cOut.conv) + 0.6 * _cOut.storm) : 0;
+        if (camR < R + base && deckK > 0.85) continue;
       } else {
         const sk = skyU.uCloud.value.y;
         cover = Math.min(0.95, Math.max(fair, sk));
@@ -808,9 +816,16 @@ export function createClouds(scene) {
       // its size: a fair cumulus 70 to 150 m across the base's radius, more under a fuller sky; its thickness the map's
       // (towers in a storm's cell) or a fair one's
       // (fair cumulus are wider than they are tall: humilis; a thicker map makes them towers)
-      const Rc = (70 + 80 * hash(k, gen, 13)) * (0.75 + 0.5 * cover) * (0.55 + 0.45 * s) * CLOUDS.size;
+      let Rc = (70 + 80 * hash(k, gen, 13)) * (0.75 + 0.5 * cover) * (0.55 + 0.45 * s) * CLOUDS.size;
       const fairT = Rc * (0.75 + 0.75 * hash(k, gen, 17));
-      const T = Math.max(60, (thick > 0 ? Math.max(fairT, thick * (0.55 + 0.45 * hash(k, gen, 19)) * (0.4 + 0.6 * conv)) : fairT) * (0.5 + 0.5 * s));
+      let T = Math.max(60, (thick > 0 ? Math.max(fairT, thick * (0.55 + 0.45 * hash(k, gen, 19)) * (0.4 + 0.6 * conv)) : fairT) * (0.5 + 0.5 * s));
+      // THE SEA OF CLOUD (the owner's Aloft reference): seen from above a closed deck, a cumulus is one of the deck's own
+      // HEAPS -- wide, low, its lower third sunk in the sheet -- so the deck reads as one rolling floor with the peaks out of
+      // it. Drawn as whole cumulus they stood on it as a field of cotton balls, the first stills from 1.6 km.
+      if (deckK > 0.6 && camR > R + base + 40) {
+        const hk = smooth(0.6, 0.9, deckK);
+        Rc *= 1 + 0.5 * hk; T = T + (Rc * (0.30 + 0.22 * hash(k, gen, 21)) - T) * hk; base -= T * 0.32 * hk;
+      }
       const rb = R + base;
       // the cloud's base centre in the drifting frame, and the eye's distance to its middle
       const bx = sx * rb, by = sy * rb, bz = sz * rb;
