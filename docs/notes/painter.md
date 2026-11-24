@@ -942,6 +942,33 @@ spiky shapes. Triangles +2,834 at the landing (Node). The default is the picture
 `A2_pines_*` (A off, B on) and `A2_pines-fill3_*`. If a true needle mass is wanted at 40-60 m, the spruce kit's budget
 by limb COUNT rather than length (a denser top) is the next step: it changes the near spruce too.
 
+**THE OWNER'S PHONE TABLES v39.5 ARE IN (r2 docs/lead/bench/2026-11-24-v39.5-owner-phone.md): THIS LANE'S COST IS
+SOLVED.** The split saves 7.7 ms; bark flat 0.2-0.7, wind 0.2, one-sided +0.5; 'no near trees' is SLOWER (+2.9, +4.0:
+the far trees behind them, A1's). Clusters CLOSED (near +1.7, middle -0.6 noise, with a depth pass +0.8): their bench
+rows are gone, the code stays off behind ?trees2=cards until a clean-up. 'Near trees after the ground' -0.8 ms: THE
+DEFAULT now (flora.js TREES_AFTER_GROUND, renderOrder 6 after the ground's 5; ?treeorder=0 as before; the bench row asks
+the other way round); the 0-pixel proof on a settled page is in the next entry when done.
+
+**THE SHARPER PICTURE ON A TOUCH DEVICE (the coordinator's job for this lane, 24 Nov late; 0c0a198, PILOT files:
+main.js, core/dynres.js, core/bench.js, tests/dynres.test.mjs).** A phone or a tablet in the oil look starts on RUNG 1 of
+dynres's sharpening ladder: 1.2x each way (1.5 picture pixels to the point for 1.25; the owner's 823x384 box draws
+1234x576 for 1028x480), may climb to rung 2 (1.4x) after 6 s under 20 ms, gives the rungs back FIRST (before scale or
+tier) when the smoothed frame is over 27 ms for half a second, and nothing else is shed during that half second. The
+device keeps its preset's tier as its top (sharpness before a higher tier). `?sharp=0`: exactly as before. WHY THE OLD
+LADDER NEVER HELPED: it climbed only from tier 2 (the phone is tier 1) and only with room above 60 a second (a phone held
+at 60 by its display never shows any). The coordinator's answers: 1.2x with room to 1.4x; the 27 / 20 ms lines; phones
+and tablets (a big tablet gets no rung: its preset's 1.6 MP limit); this reverses the 19 Nov 'sharpening never trades
+smoothness' on touch devices, under the owner's word. F's rule R3.9 (look-director 56bbf00): look thresholds in pixels
+are written at 480 lines and scaled by lines / 480; anti-grain floors stay in real pixels (this lane's NEEDLE_PX 3 px is
+a floor: stays). THIS LANE'S TREES FOLLOW THE LINES: at 576 lines the near trees thin from 6.9 m (6.5 at 480) and hand
+over at 28.8 m (27), at 672 lines (rung 2) from 8.1 m and at 33.6 m: a little leafier with sky, and a few more full trees.
+MODELLED, not measured (tests/dynres.test.mjs, a 60 Hz phone fitted to the v39.5 foot and bank rows; the table does not
+pin the frame-to-frame wobble, so two machines): on foot rung 1 about 16.7 ms and 0 per cent of frames held twice at a
+15 per cent wobble, 20.2 ms and 21 per cent at 20; the bank about 18.7 ms (keeps the rung) or 29 ms (gives it back).
+Frames held twice on a 60 Hz display read as judder: the owner judges sharpness against feel with ?sharp=0 as the A/B.
+Bench: a row 'the picture as before (?sharp=0 size)' after the first row of every table; each row remembers the size it
+was asked at and the header lists the runs (the stale 'Rows 24 on are back at that size' is gone).
+
 **READING THE OWNER'S `?bench=foot` TABLE (prepared 24 Nov, late, before it arrives; v39.5 merged, 2a4d2fb).** Each
 row is set against the "as set" row before it; first check the table agrees with itself (the "as set" rows within 25
 per cent, or it says so). Rows and what each answers, with the near-tree cut each would call for:
