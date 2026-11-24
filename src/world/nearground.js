@@ -563,8 +563,12 @@ class Ring {
     const st = this.st, s = this.s, seed = this.seed, H = (k) => hash3i(i, j, k, seed);
     const o = bloomAt(this.S, this.x, this.y, this.z, s, this.bi, this.bo || (this.bo = { kind: -1, bloom: null, dens: 0, heart: 0 }));
     if (o.kind < 0 || o.dens < 0.01) return 0;
-    const b = o.bloom, sh = SHAPES[b.shape] || (DAB + CRISP), C = this.cfg.cell;
-    const want = o.dens * (b.peak || 8) * area;
+    // (the look director, 24 Nov: "mix kinds, leave gaps of grass between clumps". A cell is a clump of ONE kind, the
+    // runner-up's where the map says two drifts run together; and one cell in three in a drift is grass, the clumps in
+    // the others a third fuller, so the drift's plants a square metre are what they were)
+    if (H(523) < 0.33) return 0;
+    const b = (o.bloom2 && H(524) < o.mix) ? o.bloom2 : o.bloom, sh = SHAPES[b.shape] || (DAB + CRISP), C = this.cfg.cell;
+    const want = o.dens * (b.peak || 8) * area * 1.5;
     let nP = Math.floor(want) + (H(500) < want - Math.floor(want) ? 1 : 0);
     if (nP <= 0) return 0;
     const gr = s.r, gg = s.g, gb = s.b, tall = sstep(0.52, 0.74, this.rough);
@@ -663,12 +667,16 @@ class Ring {
       if (o.kind >= 0 && o.dens > 0.03 && left > 1) {
         const b = o.bloom, sh = SHAPES[b.shape] || 0, v = o.dens * (far ? 10 : 9), yr = packYear(b), tone = (b.eye ? packTone(b.eye) : 0) + yr;
         const nf = Math.min(left - 1, Math.floor(v) + (H(100) < v - Math.floor(v) ? 1 : 0));
+        const b1 = b, sh1 = sh, tone1 = tone, B2 = o.bloom2, mx2 = o.mix;
         for (let q = 0; q < nf; q++, k++) {
           const q1 = H(102 + q), q2 = H(106 + q), q3 = H(110 + q), p = at(q1, q2), jit = 0.94 + 0.12 * q2;
+          // (some touches are the runner-up drift's, as in the near ring)
+          const two = B2 && H(114 + q) < mx2, b = two ? B2 : b1, sh = two ? (SHAPES[B2.shape] || 0) : sh1;
+          const tone = two ? (B2.eye ? packTone(B2.eye) : 0) + packYear(B2) : tone1;
           const st0 = b.stalk ? b.stalk[0] + (b.stalk[1] - b.stalk[0]) * q3 : 0.2;
           if (sh === SHAPES.cushion) {
             const r0 = (b.head[0] + (b.head[1] - b.head[0]) * q1) * 1.3 * kw, bc = b.body || b.c;
-            this.put(p[0], p[1], 0, 0, 0, r0 * 1.4, r0, SHAPES.cushion, q3, born, bc[0], bc[1], bc[2], 0, 0, packTone(b.c) + yr);
+            this.put(p[0], p[1], 0, 0, 0, r0 * 1.4, r0, SHAPES.cushion, q3, born, bc[0], bc[1], bc[2], 0, 0, packTone(b.c) + packYear(b));
           } else if (sh === SHAPES.spike) {
             const hh = (b.head[0] + (b.head[1] - b.head[0]) * q1) * kh;
             this.put(p[0], p[1], 0, 0, 0, hh, 0.035 * kw, sh, q3, born, b.c[0] * jit, b.c[1] * jit, b.c[2] * jit, Math.max(0, st0 - hh * 0.8) * kh, flex, tone);

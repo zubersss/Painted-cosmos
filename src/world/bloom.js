@@ -101,7 +101,7 @@ function habitat(h, s) {
 // Writes out.kind (index into the biome's blooms, -1 none), out.bloom (that entry or null), out.dens (0..1, of its peak),
 // out.heart (0..1, how deep into a drift). Returns out.
 export function bloomAt(S, x, y, z, s, bi, out) {
-  out.kind = -1; out.bloom = null; out.dens = 0; out.heart = 0;
+  out.kind = -1; out.bloom = null; out.dens = 0; out.heart = 0; out.bloom2 = null; out.mix = 0;
   if (!bloomSwitches().bloom) return out;
   const B = bloomsOf(S, bi);
   if (!B) return out;
@@ -121,7 +121,7 @@ export function bloomAt(S, x, y, z, s, bi, out) {
   // their drifts are still the map's own; only the patch is held. S._spawn is set once the surface has found its landing.)
   const sp = S._spawn;
   if (sp) { const dl = Math.hypot(x - sp.x, y - sp.y, z - sp.z) * R; if (dl < 45) patch = Math.max(patch, 1.25 * (1 - ss(18, 45, dl))); }
-  let best = -1, bd = 0, bh = 0;
+  let best = -1, bd = 0, bh = 0, b2 = -1, v2 = 0;
   for (let k = 0; k < B.length; k++) {
     // (the year held still, ?season=: a kind out of flower gives its ground to the kinds in flower, so an autumn meadow is
     // as full as a summer one; while the year turns the choice stays as it is and the near rings fade the heads instead)
@@ -138,13 +138,17 @@ export function bloomAt(S, x, y, z, s, bi, out) {
     // (a drift's heart is solid, its edge a short ragged step: 0.30 of the noise where it was 0.45 and read as an even wash)
     const heart = ss(e, e + 0.30, n) * (0.30 + 0.90 * colony);
     const v = Math.max(heart, b.sprinkle == null ? 0.03 : b.sprinkle) * hab * (b.share == null ? 1 : b.share);
-    if (v > bd) { bd = v; best = k; bh = heart; }
+    if (v > bd) { b2 = best; v2 = bd; bd = v; best = k; bh = heart; } else if (v > v2) { b2 = k; v2 = v; }
   }
   if (best < 0) return out;
   // (bimodal: a drift is solid inside and stops in a short ragged step, and between drifts there is almost nothing; a
   // value that was the product of four soft fields lay at a middling density everywhere, which is the even confetti)
   const D = bd * rich * patch;
   out.kind = best; out.bloom = B[best]; out.dens = Math.max(ss(DT[0], DT[1], D), Math.min(D, 0.04)); out.heart = bh * Math.min(1, patch);
+  // (the runner-up: where a second kind's drift is nearly as strong, the near rings lay some of its plants among the
+  // first's, so two drifts run into each other and a drift's heart is never one flower alone -- the look director on the
+  // 1.8 m meadow, 24 Nov: "the buttercup drift ... reads as one orange carpet: mix kinds". out.mix is the share it takes.)
+  if (b2 >= 0 && v2 > 0.25 * bd) { out.bloom2 = B[b2]; out.mix = 0.5 * ss(0.25, 1.0, v2 / bd); }
   return out;
 }
 
