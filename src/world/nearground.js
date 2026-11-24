@@ -117,7 +117,7 @@ const dens = (c, d) => Math.max(0, Math.min(1, c - (c - c * c) * (d - 1)));   //
 // (F2) a painted flower is drawn larger than life: at the game's distances a real head of two or three centimetres is
 // three to five pixels and sinks into the sward (SEEN, the level meadow, 24 Nov). The data keeps real sizes; this is the
 // painter's licence, one number for all of them.
-const BLOOM_HEAD = 2.0;
+const BLOOM_HEAD = 2.5;   // (2.0 until the coordinator's note, 24 Nov: "a poppy at 2 m should read as a poppy")
 const packTone = (c) => 1 + Math.round(Math.max(0, Math.min(1, c[0])) * 63) * 4096 + Math.round(Math.max(0, Math.min(1, c[1])) * 63) * 64 + Math.round(Math.max(0, Math.min(1, c[2])) * 63);
 // smooth value noise on the cell grid (drifts of flowers, where the grass stands tall)
 function vnoise(x, y, seed) {
@@ -557,11 +557,14 @@ class Ring {
     const gr = s.r, gg = s.g, gb = s.b, tall = sstep(0.52, 0.74, this.rough);
     const lc = st.leafB ? st.leafB[1] : (st.leaf ? st.leaf[1] : [gr, gg, gb]);
     const sc0 = lerp(lc[0], gr, 0.35), sc1 = lerp(lc[1], gg, 0.35), sc2 = lerp(lc[2], gb, 0.35);
+    // (a cell's plants stand together in one tuft, a third of the cell across, and not spread evenly over it: a clump of
+    // ox-eyes, a poppy with its buds round it)
+    const cu = (H(520) - 0.5) * C * 0.5, cv = (H(521) - 0.5) * C * 0.5;
     const tone = b.eye ? packTone(b.eye) : 0;
     let used = 0;
     for (let p = 0; p < nP && used < room - 1; p++) {
       const q1 = H(510 + p), q2 = H(530 + p), q3 = H(550 + p), q4 = H(570 + p), q5 = H(590 + p);
-      const ou = (q1 - 0.5) * C * 0.9, ov = (q2 - 0.5) * C * 0.9, la = q4 * 6.2832, tilt = 0.04 + 0.16 * q5;
+      const ou = cu + (q1 - 0.5) * C * 0.42, ov = cv + (q2 - 0.5) * C * 0.42, la = q4 * 6.2832, tilt = 0.04 + 0.16 * q5;
       const jit = 0.93 + 0.14 * q3, cr = b.c[0] * jit, cg = b.c[1] * jit, cb = b.c[2] * jit;
       if (sh === SHAPES.cushion) {
         // a low dome of leaves with its flowers on top: one mark (its leaves the mark's colour, its flowers its second)

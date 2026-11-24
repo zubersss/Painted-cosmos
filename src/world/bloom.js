@@ -92,6 +92,11 @@ export function bloomAt(S, x, y, z, s, bi, out) {
   // evenly everywhere and from 150 m nothing gathered into a patch; a poor slope now has a sprinkle, a rich one more than
   // its drifts' own peak)
   const rich = 0.15 + 1.15 * ss(-0.35, 0.45, n3(X / 430 + 11.3, Y / 430 - 4.1, Z / 430 + 7.7));
+  // ... and inside a slope the flowers stand in PATCHES of 15 to 40 m with grass between, the same for every kind (SEEN,
+  // the coordinator on the level meadow, 24 Nov: with each kind's drifts on their own noise, six kinds' drifts together
+  // covered the whole meadow and the near flowers were an even confetti. A patch holds the drifts of two or three kinds
+  // side by side, as the poppies beside the daisies in the old picture; between patches there is only a sprinkle.)
+  const patch = 0.06 + 1.24 * ss(-0.12, 0.32, n3(X / 26 - 5.3, Y / 26 + 8.9, Z / 26 - 2.2));
   let best = -1, bd = 0, bh = 0;
   for (let k = 0; k < B.length; k++) {
     const b = B[k], hab = habitat(b.hab, s);
@@ -100,16 +105,17 @@ export function bloomAt(S, x, y, z, s, bi, out) {
     // a drift: one kind's clonal patch, dense at the heart and ragged at its edge (two octaves: the second roughens
     // the outline so it is never a blob)
     const n = n3(X / d + o, Y / d - o * 0.7, Z / d + o * 1.3) + 0.35 * n3(X / (d * 0.37) - o, Y / (d * 0.37) + o, Z / (d * 0.37) - 0.5 * o);
-    const e = b.edge == null ? 0.0 : b.edge;
+    const e = b.edge == null ? 0.05 : b.edge;
     // ... and drifts of one kind gather in colonies four times their own size, so from the air they are patches of 30 to
     // 50 m and not an even speckle
     const colony = ss(-0.25, 0.45, n3(X / (d * 4) - o * 1.9, Y / (d * 4) + o * 0.3, Z / (d * 4) + o));
-    const heart = ss(e, e + 0.45, n) * (0.35 + 0.85 * colony);
-    const v = Math.max(heart, b.sprinkle == null ? 0.04 : b.sprinkle) * hab * (b.share == null ? 1 : b.share);
+    // (a drift's heart is solid, its edge a short ragged step: 0.30 of the noise where it was 0.45 and read as an even wash)
+    const heart = ss(e, e + 0.30, n) * (0.30 + 0.90 * colony);
+    const v = Math.max(heart, b.sprinkle == null ? 0.03 : b.sprinkle) * hab * (b.share == null ? 1 : b.share);
     if (v > bd) { bd = v; best = k; bh = heart; }
   }
   if (best < 0) return out;
-  out.kind = best; out.bloom = B[best]; out.dens = Math.min(1, bd * rich); out.heart = bh;
+  out.kind = best; out.bloom = B[best]; out.dens = Math.min(1, bd * rich * patch); out.heart = bh * Math.min(1, patch);
   return out;
 }
 
