@@ -12,7 +12,13 @@ FV7 of `docs/lead/FARVIEW-DESIGN.md`. A second session (A2, branch `trees-near`)
 the same time: this lane touches only the far parts of `flora.js`, `florakit.js`, the plant material's far branch,
 `render/impostor.js`, `render/shadow.js` and new rows in `core/bench.js`.
 
-**State (update this line every step):** THE IMPOSTORS ARE THE DEFAULT FAR TREES of the oil look (after F passed the
+**State (update this line every step):** OPEN, waiting for answers (24 Nov, about 11:00): F on the crown-size note
+(my proposal: at views of 12 texels or fewer, pull a crown's strokes toward one lit cap and one shade instead of a bigger
+stroke, since a crown there is already 2-3 strokes across; nothing changed before F says yes); C (far view,
+session_01R5Bri2AMBsFiRcxvUUZMvu) on the seam between its FV2 canopy roof and the impostors' reach (questions sent:
+where its roof starts, whether to thin the impostors from steep views under its ?canopy, who shoots 150 m / 400 m /
+1 km with both); the coordinator on the merge of trees-far into look-proto. 1080-line desktop stills sent to F
+(`A1_impostor_*_desktop1080*`). THE IMPOSTORS ARE THE DEFAULT FAR TREES of the oil look (after F passed the
 grain fix on foot and from the air, and the owner's phone timed them: 150 m up 151 ms -> 16.7, the screen's cap);
 `?fartree=old` (or cards, lump, blob) is today's far tree. THE GUARD (`render/impostor.js` probe / fail): before the first
 bake step the impostor program is compiled on a one-tree mesh and three's own diagnostics read; a compile failure, a
