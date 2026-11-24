@@ -524,7 +524,7 @@ vec3 pcCliffC(vec3 Bc, float hB, vec3 rnd, vec3 c, float w) {
   float t = pcHash3(vec2(bi * 1.37 + 0.21, 3.7)).x;
   vec3 tone = mod(bi, 2.0) < 0.5 ? (t < 0.72 ? uRockC0 : uRockC3) : (t < 0.6 ? uRockC1 : uRockC2);
   if (f < 0.10) tone = tone * vec3(0.60, 0.60, 0.66);
-  else if (f > 0.89) tone = mix(tone, uRockC0, 0.55);
+  else if (f > 0.89) tone = mix(tone, mix(uRockC0, vec3(1.0), 0.4), 0.6);      // (the lit lip: the only near-white on a face)
   tone = mix(tone, 0.5 * (mix(uRockC0, uRockC3, 0.28) + mix(uRockC1, uRockC2, 0.4)), 0.85 * kB);
   tone = mix(tone, pcDensity(mix(uRockC1, uRockC2, 0.4), 1.15), gGully * 0.75);
   float lc = max(dot(c, vec3(0.3, 0.5, 0.2)), 0.05);
@@ -580,11 +580,12 @@ export function rockUniforms() {
 // (pcTone lights and shades them), a bed's mean height and the gullies' spacing in metres. Each tone is a mix of the
 // shared pigments (data/looks/common.js), so no hue is invented here (the look rules, R2.1); it belongs in the world's
 // look data (an oil.rock of earth.js), which is not this lane's file: asked of its owner. Earth: the coast's sandstone,
-// a pale yellow ochre and a warm grey (Davy's grey with raw umber), a red umber bed (raw umber with burnt sienna) and a
+// a yellow ochre with a little Davy's grey (diluted, the lit bed had 22.8 per cent of its pixels over V 0.90 at noon:
+// the look director, 24 Nov; the references' rock is mid-value) and a warm grey (Davy's grey with raw umber), a red umber bed (raw umber with burnt sienna) and a
 // cool slate (Payne's grey); beds a few metres thick on a cliff of 25 m over the sea. The pale and the grey beds take
 // turns with the dark ones (pcCliffC): under a full sun four tones at random came out one tan.
 export const ROCK_LOOK = {
-  earth: { c: [dilute(pig('yellowOchre'), 0.35), dilute(mixc(pig('davysGrey'), pig('rawUmber'), 0.4), 0.18),
+  earth: { c: [mixc(pig('yellowOchre'), pig('davysGrey'), 0.15), dilute(mixc(pig('davysGrey'), pig('rawUmber'), 0.4), 0.18),
                mixc(pig('rawUmber'), pig('burntSienna'), 0.4), dilute(pig('paynesGrey'), 0.25)], bed: 5.5, gully: 22 },
 };
 export function seasonUniforms() {
