@@ -9,6 +9,7 @@
 //   ?thermal=0    ... without the thermal winds (up the sunny slopes by day, down them at night, the lake and sea breeze)
 //   ?nearmap=1    the near wind grid (air.js) takes its large-scale wind from the map instead of windLarge
 //   ?farwind=1    the plants beyond the near field read the map (flora.js FloraField.far, flora.glsl.js)
+//   ?cloudmap=1   the cloud and rain map of the whole world, and the rain field for the water group (cloudfield.js)
 const Q = (typeof location !== 'undefined' && location && location.search) ? new URLSearchParams(location.search) : null;
 const flag = (k, d) => (Q && Q.has(k) ? Q.get(k) !== '0' && Q.get(k) !== 'false' : d);
 const ALL = flag('wx2', false);
@@ -18,6 +19,7 @@ export const WX2 = {
   thermal: flag('thermal', true),
   nearmap: flag('nearmap', ALL),
   farwind: flag('farwind', ALL),
+  cloudmap: flag('cloudmap', ALL),
   // (the speed test's row 'weather: wind map frozen': the map stops refreshing, so the script's change is its cost)
   freeze: false,
 };

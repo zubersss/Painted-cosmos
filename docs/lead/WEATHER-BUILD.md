@@ -33,6 +33,7 @@ A separate session builds W1 CLOUDS once the look director's sky ceiling (touch 
 | `?thermal=0` | the map without its thermal winds |
 | `?nearmap=1` | the near grid takes its base from the map |
 | `?farwind=1` | the far plants read the map |
+| `?cloudmap=1` | the cloud and rain map, the rain field for the water group, and the storm-held bench rows |
 
 ## Done
 
@@ -106,7 +107,62 @@ A separate session builds W1 CLOUDS once the look director's sky ceiling (touch 
     before it is turned on.
 - **Suites:** physics 427, world 65, unit 325, 0 failing.
 
+### W3.1: THE CLOUD AND RAIN MAP, THE RAIN FIELD, A STORM HELD OVERHEAD (`src/physics/cloudfield.js`, `weather.js`, `index.js`, `core/bench.js`)
+
+- **`weather.js` restructured, today's numbers unchanged.** `gather`'s loop body is now `accumulate(a, cell, ...)`.
+  The new exports are:
+  - `liveCells(body, t, seed, out)`: every live cell once, with `dotMin`, its reach as a dot product;
+  - `gatherFrom(cells, body, ux, uy, uz)`: gather over that list;
+  - `gather1`: gather itself;
+  - `setForcedCell` and `forcedCell`;
+  - `CLOUD_FORM`: each kind's cumuliform share, base and thickness.
+
+  `accumulate` also sums the cover-weighted form (`conv`, `baseW`, `topH`, `coverSum`), which nothing old reads.
+  MEASURED **bit-identical** against the committed `weather.js`: 162,000 numbers (`weatherAt`, `weatherWind`) on six
+  worlds, 0 differ.
+- **`cloudfield.js` (new).** Per texel of the wind map's grid it holds `low`, `conv`, `base`, `top` (above the
+  datum: the wind map's H2 plus each kind's form), `mid`, `high`, `valley` (zero until W3.2), and `rain` and `snow`
+  (mm/h at the ground, split as `weatherAt` splits them, with the land's moisture and the air's temperature at the
+  land's height). Plus `storm`.
+  - Refreshed every 0.5 s in slices. MEASURED: 0.67 ms for a full refresh here, best of 50, so 0.045 ms a frame at
+    30 a second. It was 3.9 ms until `gatherFrom`'s accumulator object was made a literal: `Object.assign` had made
+    it a slow dictionary.
+- **THE RAIN FIELD (reconciled with `docs/lead/WATER-DESIGN.md` 5.6 on `origin/design-water`).** Their ask was
+  `uRainCells[8]` as `vec4(east, north, radius, rate)` from the focus, `uRainNow`, and `rainAt()`. Delivered:
+  - `fields.rain.cells`, a Float32Array(32): `uRainCells[8]` = (east, north, radius m, PEAK mm/h) about
+    **uPhysAnchor** along uPhysEast / uPhysNorth (the coordinates `pcPhysGrid` gives, not about the focus, so the
+    water's shader needs no new frame);
+  - `fields.rain.cellsX`, a Float32Array(8): `uRainCellsX[2]`, each cell's core edge x0. **This is the one addition
+    to their ask**: without it `pcRainCells` cannot reproduce the weather's own profile;
+  - `RAIN_GLSL` with `float pcRainCells(vec2 en)`;
+  - `fields.rain.now` (mm/h liquid at the focus) = their `uRainNow`;
+  - `rainAt` (exact, any place and time), `rainBetween` (mm, the weather's clock) and `throughfall(canopy, wet)`;
+  - the per-texel `rate` and `snow`.
+
+  The cells leave out the place's moisture and snow share; the CPU functions include them. Test: the eight cells give
+  `rainAt`'s rate at the focus within 5 %.
+- **`physics.forceWeather({ kind, radius, strength } | null)`:** a system held over the focus, gathered everywhere
+  like a real one. For the speed test and stills.
+- **Bench rows** (only with `?cloudmap=1`): `weather: a storm held overhead`, and `storm: no rain drawn`.
+- **Tests:** `cloudfield.test.mjs`, 6 new.
+- **Suites:** physics 433, world 65, unit 325, 0 failing.
+- **Seen:** `docs/shots/physics/weather-build/W3.1_cloudmap_earth_t1760.jpg`, a diagnostic of the data. Today's
+  weather is round systems scattered at random, two storm cores, one at the spawn. **Nothing in the game's picture
+  changes yet**: the clouds lane reads the map later.
+
 ## NEXT
 
-1. **W3.1:** `cloudfield.js` and the rain field (the design's 9.2 and 9.3, plus the water group's
-   `uRainCells[8]` / `rainNow`).
+1. **W3.2:** storms born from the land (`weather.js`), behind `?stormland=1`. Convective cells at `fields.wind.sites`
+   (`stormDays`: the range on 2 days in 3, the wood on 1 in 3) with four stages, drifting with the wind aloft. Then:
+   - the ceiling `below` from the map's cloud top;
+   - orographic rain;
+   - frozen at height;
+   - the lightning list for every mature cell within 4 km;
+   - the map's `mid`, `high` and `valley`;
+   - fair cumulus from lift and trigger.
+
+   Tests: the design's 6.4, items 1 to 8.
+2. **W3.3:** rain marks longer (`particles.js`, `three/kits.js`, the kitmat `rain` and `snow` strings), and the box's
+   rain from the map's four corners.
+3. **W3.4:** `world/storms.js`: rain shafts and bolts. Needs a hook in `world/index.js` (touch T2, the look
+   director's).

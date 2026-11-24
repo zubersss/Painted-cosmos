@@ -30,6 +30,8 @@ import { clamp01, smoothstep } from './util.js';
 // (group D, the second weather: docs/lead/WEATHER-DESIGN.md. Everything of it is behind wx2.js and off by default.)
 import { WX2 } from './wx2.js';
 import { WindMap, WINDMAP, setThermal } from './windmap.js';
+import { CloudField, CLOUDMAP, rainAt, rainBetween, throughfall, RAIN_GLSL } from './cloudfield.js';
+import { setForcedCell, forcedCell } from './weather.js';
 import { WaterField, WATER_GLSL, WATER, windSea, seaGrown, fetchOf, wakeLength, foamCover, whiteWind, surf01, FetchGauge, FETCH_GAUGE, SEA_TEX } from './water.js';
 import { SeaMap, SEA_MAP, FetchRose } from './seamap.js';
 import { DeformField, DEFORM, MARK, MARK_STRIDE } from './deform.js';
@@ -101,6 +103,9 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
   const flora = new FloraField();
   // (group D) THE WIND MAP OF THE WHOLE WORLD (windmap.js): read only while WX2.windmap is on; with it off it is never touched
   const windMap = new WindMap(seed);
+  // (group D) THE CLOUD AND RAIN MAP OF THE WHOLE WORLD (cloudfield.js): only while WX2.cloudmap is on
+  const cloudMap = new CloudField(seed);
+  let forceSpec = null;            // physics.forceWeather: a weather system held over the focus (the speed test, stills)
   const particles = new Particles(seed, 1);
   const loose = new Loose(particles);
   const devils = []; devils.count = 0;
@@ -158,7 +163,7 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
   };
   // Small weather near the focus, refreshed by update(): dust devils (features.js).
   const features = { devils };
-  const stats = { ms: 0, msAvg: 0, msMax: 0, msGround: 0, msAir: 0, msWind: 0, msWeather: 0, msFlora: 0, msParticles: 0, msFetch: 0, fetchSamples: 0, samples: 0, particles: 0, pushCells: 0, frames: 0, reanchors: 0 };
+  const stats = { ms: 0, msAvg: 0, msMax: 0, msGround: 0, msAir: 0, msWind: 0, msCloud: 0, msWeather: 0, msFlora: 0, msParticles: 0, msFetch: 0, fetchSamples: 0, samples: 0, particles: 0, pushCells: 0, frames: 0, reanchors: 0 };
   const _dirv = { x: 0, y: 0, z: 0 };
   const _d3 = new Float64Array(3);
   const _g = {}, _g2 = {}, _cov = {}, _menv = {}, _m2 = {}, _wenv = {};
@@ -410,7 +415,17 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
     // (the weather answers the large-scale wind here, not the gusty wind at the focus: fog does not come and go
     // with a three-second gust, and physics.weather() anywhere, any time, then says what physics.here says: P7)
     _wenv.sun01 = sun01; _wenv.sunEast = sunEastAt(bodyId, ux, uy, uz); _wenv.wind = windLarge(bodyId, ux, uy, uz, time, seed, _wl4)[3]; _wenv.fetch = cover.fetch || 0;
+    // (group D) a system forced over the focus follows it (physics.forceWeather)
+    if (forceSpec) setForcedCell({ kind: forceSpec.kind || 'storm', r: forceSpec.radius || 900, w: forceSpec.strength == null ? 1 : forceSpec.strength, x: ux, y: uy, z: uz });
     weatherAt(bodyId, ux, uy, uz, r - body.radius, time, seed, _wenv, here.weather);
+    // (group D) the cloud and rain map: a slice a frame; and the rain cells nearest the focus for the water's shaders
+    if (WX2.cloudmap) {
+      const tc0 = now();
+      cloudMap.step(dt, bodyId, time, sunDir, WX2.windmap ? windMap : null);
+      cloudMap.rainCellsFor(bodyId, frame, fp.x, fp.y, fp.z);
+      cloudMap.rainNow = here.weather.precipitation.type === 'none' ? 0 : here.weather.precipitation.rate * (1 - (here.weather.precipitation.frozen01 || 0));
+      stats.msCloud = now() - tc0;
+    } else stats.msCloud = 0;
     if (time - lastMoist > QUALITY.moistureEvery || time < lastMoist || Math.hypot(fx - moistX, fz - moistZ) > 15) {
       lastMoist = time; moistX = fx; moistZ = fz;
       _menv.moist = cover.moist; _menv.snowBase = cover.snowBase; _menv.T = here.weather.temperature;
@@ -808,6 +823,21 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
     //   sites [{ x, y, z, w, kind: 'peak' | 'ridge' | 'basin', k }]: where convection is born;
     //   at(ux, uy, uz, out): bilinear, in the query point's own east and north; vecAt(ux, uy, uz, o): body-local vector.
     get wind() { return WX2.windmap ? windMap : null; },
+    // (group D) THE CLOUD AND RAIN MAP, or null while WX2.cloudmap is off (docs/lead/WEATHER-DESIGN.md 9.2): N, version, t,
+    // ready; per texel (the wind map's grid) low, conv, base, top (m above the datum), mid, high, valley, rain, snow (mm/h at
+    // the ground), storm; cells (weather.js liveCells, .n live); at(ux, uy, uz, out).
+    get cloud() { return WX2.cloudmap ? cloudMap : null; },
+    // (group D) THE RAIN FIELD for the water group, or null while WX2.cloudmap is off (9.3, reconciled with their 5.6):
+    //   rate, snow: Float32Array per texel (mm/h); at(ux, uy, uz, out) -> out.rain, out.snow ...; now: mm/h liquid at the focus;
+    //   cells: Float32Array(32) = uRainCells[8] (east, north, radius m, peak mm/h) about uPhysAnchor along uPhysEast/North;
+    //   cellsX: Float32Array(8) = uRainCellsX[2]; GLSL: RAIN_GLSL (pcRainCells(en)); CPU: rainAt, rainBetween, throughfall.
+    get rain() {
+      if (!WX2.cloudmap) return null;
+      return { N: cloudMap.N, get version() { return cloudMap.version; }, get t() { return cloudMap.t; }, get ready() { return cloudMap.ready; },
+        rate: cloudMap.rain, snow: cloudMap.snow, at: (x, y, z, o) => cloudMap.at(x, y, z, o), get now() { return cloudMap.rainNow; },
+        cells: cloudMap.rainCells, cellsX: cloudMap.rainCellsX, GLSL: RAIN_GLSL,
+        rainAt: (b, x, y, z, t, env, o) => rainAt(b, x, y, z, t, seed, env, o), rainBetween: (b, x, y, z, t0, t1, env, o) => rainBetween(b, x, y, z, t0, t1, seed, env, o), throughfall };
+    },
     flora: {
       // textures (RGBA float32, N x N, row j = north index, column i = east index)
       get bend() { return flora.bend; }, get wind() { return flora.wind; }, get push() { return flora.push; },
@@ -884,6 +914,11 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
     get quality() { return quality; },
     // How far a body's real prevailing wind is scaled down for play (data.WINDS[body].scale).
     setWindScale,
+    // (group D) HOLD A WEATHER SYSTEM OVER THE FOCUS: { kind: 'storm' | 'shower' | 'rain' | ..., radius (m, 900), strength
+    // (0..1, 1) } or null. While held it follows the focus and is gathered everywhere like a real system: the sky numbers,
+    // the rain, the lightning, the cloud map. For the speed test's storm rows and for stills of a storm. null: as it was.
+    forceWeather(spec) { forceSpec = spec && spec.kind ? spec : null; if (!forceSpec) setForcedCell(null); },
+    get forcedWeather() { return forcedCell(); },
     get time() { return time; },
     // THE ABILITY LIGHTS A FIRE (core/powers.js, behind ?powers=1). The list belongs to the game (fire.js makeFires)
     // and comes in on the frame; lighting one is here because only the physics can say what is underfoot there.

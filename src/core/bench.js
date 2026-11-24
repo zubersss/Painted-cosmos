@@ -255,6 +255,7 @@ export function attachBench(pc) {
       }
     }
     const WX0 = { ...WX2 };      // (group D: its switches as the address set them, put back after each of its rows)
+    const holdStorm = (on) => { const P = pc.sim && pc.sim.physics; if (P && P.forceWeather) P.forceWeather(on ? { kind: 'storm' } : null); };
     const steps = [
       [AS, null, null],
       // the far trees: their paint, their shapes, which pass, which place in the order of drawing, which form
@@ -313,6 +314,14 @@ export function attachBench(pc) {
         ['weather: no far wind on plants', () => { WX2.farwind = false; }, () => { WX2.farwind = WX0.farwind; }],
         // the whole wind map's refresh stopped: read the script time against the row before (about 0.14 ms derived)
         ['weather: wind map frozen', () => { WX2.freeze = true; }, () => { WX2.freeze = false; }],
+      ] : []),
+      // (group D: a STORM HELD OVERHEAD, physics.forceWeather, so the worst case is timed whatever the weather of the
+      //  moment: the sky, the rain, the wind of a thunderstorm. "storm: no rain drawn" is the same storm with the rain's
+      //  marks hidden: the gap between the two rows is what the falling rain costs.)
+      ...(WX2.cloudmap ? [
+        [AS, null, null],
+        ['weather: a storm held overhead', () => holdStorm(true), () => holdStorm(false)],
+        ['storm: no rain drawn', () => { holdStorm(true); show(/^pc-kit-rain/, false); }, () => { show(/^pc-kit-rain/, true); holdStorm(false); }],
       ] : []),
       // (back to the size the device really draws, so the four rows below are measured from IT and not from
       //  whatever sharper size the questions above had to be asked at: see MK at the top of this file)

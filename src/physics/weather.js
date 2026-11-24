@@ -232,83 +232,161 @@ export function cellsAt(bodyId, t, seed = DEFAULT_SEED) {
 }
 
 const _c = {};
-const _acc = { blow: 0, rate: 0, rateIce: 0, rateFrost: 0, cloud: 0, windMul: 1, calm: 0, flash: 0, fog: 0, haze: 0, dust: 0, ox: 0, oy: 0, oz: 0, storm: 0, top: null, topW: 0, topCell: -1, topGen: 0, front: 0 };
+const _acc = { blow: 0, rate: 0, rateIce: 0, rateFrost: 0, cloud: 0, windMul: 1, calm: 0, flash: 0, fog: 0, haze: 0, dust: 0, ox: 0, oy: 0, oz: 0, storm: 0, top: null, topW: 0, topCell: -1, topGen: 0, front: 0, clear: 1, conv: 0, baseW: 0, topH: 0, coverSum: 0 };
+
+// (group D) A CELL FORCED OVER A PLACE (physics.forceWeather: the speed test's storm row and the stills of a storm). While
+// one is set it is gathered after the body's own cells everywhere, so the sky numbers, the rain, the lightning and the
+// cloud map all follow it as they would a real one. null (the default, always, in the game) is the weather as it was.
+let _forced = null;
+export function setForcedCell(c) { _forced = c && c.kind && KINDS[c.kind] ? c : null; }
+export function forcedCell() { return _forced; }
+function forcedInto(c) {
+  const f = _forced, K = KINDS[f.kind];
+  c.x = f.x; c.y = f.y; c.z = f.z; c.r = f.r || 900; c.w = f.w == null ? 1 : f.w; c.s = c.w; c.env = 1;
+  c.kind = K; c.kindId = f.kind; c.age = 0; c.life = Infinity; c.gen = 0; c.i = FORCED_CELL;
+  c.swirl = 0; c.spin = 0; c.ve = 0; c.vn = 0;
+  return c;
+}
+const FORCED_CELL = 9002;
+const _fown = { x: 0, y: 1, z: 0, r: 900 };
+function forcedCentre() { _fown.x = _forced.x; _fown.y = _forced.y; _fown.z = _forced.z; _fown.r = _forced.r || 900; return _fown; }
+
+function resetAcc(a) {
+  a.blow = 0; a.rate = 0; a.rateIce = 0; a.rateFrost = 0; a.cloud = 0; a.windMul = 1; a.calm = 0; a.flash = 0; a.fog = 0; a.haze = 0; a.dust = 0;
+  a.ox = a.oy = a.oz = 0; a.storm = 0; a.top = null; a.topW = 0; a.topCell = -1; a.topGen = 0; a.front = 0;
+  a.clear = 1; a.conv = 0; a.baseW = 0; a.topH = 0; a.coverSum = 0;
+}
+
+// (group D) what a cell of each kind looks like to the cloud map: the share of its cover that is cumuliform, its base above
+// the land (m) and how thick it is (m). The numbers are the design's vertical scale (docs/lead/WEATHER-DESIGN.md 3).
+export const CLOUD_FORM = {
+  cloud: { conv: 0.6, base: 320, thick: 260 }, drizzle: { conv: 0.1, base: 180, thick: 320 }, rain: { conv: 0.15, base: 200, thick: 520 },
+  shower: { conv: 0.9, base: 260, thick: 750 }, storm: { conv: 1, base: 220, thick: 1800 }, fog: { conv: 0, base: 0, thick: 60 },
+  dust: { conv: 0, base: 0, thick: 400 }, haze: { conv: 0, base: 150, thick: 500 }, acid: { conv: 0.1, base: 200, thick: 600 },
+  ice: { conv: 0.3, base: 250, thick: 600 }, frost: { conv: 0, base: 300, thick: 200 }, veil: { conv: 0, base: 400, thick: 200 },
+};
+
+// The influence of ONE cell c (cellAt's or spotAt's fields) on unit direction (ux,uy,uz), added into a. (gather's body,
+// taken out so that a planet-wide map can derive every cell once and then call this per texel: the arithmetic is gather's
+// own, in its own order, so gather is what it was to the last digit.)
+function accumulate(a, c, ux, uy, uz, R) {
+  const dot = ux * c.x + uy * c.y + uz * c.z;
+  const reach = c.r * WEATHER.frontReach;
+  const d = R * Math.sqrt(Math.max(0, 2 - 2 * dot));
+  if (d >= reach) return;
+  const K = c.kind;
+  const x = d / c.r;
+  // The edges are smeared by turbulent mixing as the system travels: the faster it drifts,
+  // the wider they are (an edge takes about WEATHER.edgeTime to pass).
+  const x0 = clamp(1 - Math.hypot(c.ve, c.vn) * WEATHER.edgeTime / c.r, 0.2, 0.45);
+  const core = (1 - smoothstep(x0, 1, x)) * c.w;                // precipitation footprint
+  const cover = (1 - smoothstep(x0 + 0.25, 1.15, x)) * c.w;     // cloud shield is wider
+  if (core > 0) {
+    const rr = K.rate * core * core;
+    a.rate += rr;
+    if (K === KINDS.ice) a.rateIce += rr; else if (K === KINDS.frost) a.rateFrost += rr;
+    a.flash += K.flash * core;
+  }
+  if (K.vis > 0) {
+    // A bank of fog, dust or haze. The extinction (in clear-air units) is shaped so that the
+    // visual range closes in steadily on the way in: visibility01 = 1 / sqrt(1 + ext) falls
+    // in proportion to the depth into the bank, and the edge is a gradual veil, never a wall.
+    // (At the middle of a full-grown bank of strength s the extinction is s^2 E, as thick as
+    // its kind and strength say.)
+    const veil = c.w > 0 ? core / c.w * c.env : 0;
+    if (veil > 0) {
+      const E = c.s * c.s * WEATHER.clearVisibility / K.vis, q = 1 - (1 - 1 / Math.sqrt(1 + E)) * veil;
+      const ext = 1 / (q * q) - 1;
+      if (K === KINDS.fog) a.fog += ext; else if (K === KINDS.dust) a.dust += ext; else a.haze += ext;
+    }
+  }
+  if (core > 0) {
+    if (K === KINDS.storm) a.storm = Math.max(a.storm, core);
+    if (core > a.topW) { a.topW = core; a.top = c.kindId; a.topCell = c.i; a.topGen = c.gen; }
+  }
+  if (cover > 0) {
+    a.clear *= 1 - K.cloud * cover;
+    // (group D: the cloud map's form, cover-weighted; nothing of the old weather reads these)
+    const F = CLOUD_FORM[c.kindId], wc = K.cloud * cover;
+    if (F) { a.coverSum += wc; a.conv += F.conv * wc; a.baseW += F.base * wc; a.topH += (F.base + F.thick * (0.55 + 0.45 * c.w)) * wc; }
+  }
+  // mean wind: stronger under active systems, calmer inside fog
+  if (K.wind >= 1) a.windMul += (K.wind - 1) * cover; else a.calm = Math.max(a.calm, (1 - K.wind) * cover);
+  if (K.blow > 0) a.blow = Math.max(a.blow, K.blow * cover);     // (the cloud shield is wider than the rain: the wind rises first)
+  // gust front: cold outflow spreading from the core, strongest just ahead of the rain
+  if (K.outflow > 0 && d > 1) {
+    const ring = smoothstep(0.15, 0.8, x) * (1 - smoothstep(0.95, WEATHER.frontReach, x));
+    const v = K.outflow * c.w * ring;
+    if (v > 0) {
+      // direction: from the cell centre to the point, in the tangent plane at the point
+      let dx = ux - c.x, dy = uy - c.y, dz = uz - c.z;
+      const dn = dx * ux + dy * uy + dz * uz;
+      dx -= dn * ux; dy -= dn * uy; dz -= dn * uz;
+      const l = Math.hypot(dx, dy, dz);
+      if (l > 1e-9) { a.ox += dx / l * v; a.oy += dy / l * v; a.oz += dz / l * v; a.front = Math.max(a.front, ring * c.w); }
+    }
+  }
+  // a great spot turns: wind circling the centre, fastest at 70 % of its radius
+  if (c.swirl > 0 && d > 1) {
+    const v = c.swirl * c.w * smoothstep(0, 0.7, x) * (1 - smoothstep(0.75, WEATHER.frontReach, x)) * c.spin;
+    let dx = ux - c.x, dy = uy - c.y, dz = uz - c.z;
+    const dn = dx * ux + dy * uy + dz * uz;
+    dx -= dn * ux; dy -= dn * uy; dz -= dn * uz;
+    const l = Math.hypot(dx, dy, dz);
+    // tangent = up x radial
+    if (l > 1e-9) { a.ox += (uy * dz - uz * dy) / l * v; a.oy += (uz * dx - ux * dz) / l * v; a.oz += (ux * dy - uy * dx) / l * v; }
+  }
+}
 
 // Sum the influence of every cell on unit direction (ux,uy,uz) at time t into _acc.
 function gather(bodyId, ux, uy, uz, t, seed) {
   const a = _acc;
-  a.blow = 0; a.rate = 0; a.rateIce = 0; a.rateFrost = 0; a.cloud = 0; a.windMul = 1; a.calm = 0; a.flash = 0; a.fog = 0; a.haze = 0; a.dust = 0;
-  a.ox = a.oy = a.oz = 0; a.storm = 0; a.top = null; a.topW = 0; a.topCell = -1; a.topGen = 0; a.front = 0;
+  resetAcc(a);
   const regime = REGIMES[bodyId];
   if (!regime || !regime.cells) return a;
   const R = BODIES[bodyId].radius, s = seedFor(bodyId, seed);
-  let clear = 1;
   const nCells = regime.cells + (regime.spots ? regime.spots.length : 0);
   for (let i = 0; i < nCells; i++) {
     if (!cellAt(bodyId, R, regime, s, i, t, _c)) continue;
-    const dot = ux * _c.x + uy * _c.y + uz * _c.z;
-    const reach = _c.r * WEATHER.frontReach;
-    const d = R * Math.sqrt(Math.max(0, 2 - 2 * dot));
-    if (d >= reach) continue;
-    const K = _c.kind;
-    const x = d / _c.r;
-    // The edges are smeared by turbulent mixing as the system travels: the faster it drifts,
-    // the wider they are (an edge takes about WEATHER.edgeTime to pass).
-    const x0 = clamp(1 - Math.hypot(_c.ve, _c.vn) * WEATHER.edgeTime / _c.r, 0.2, 0.45);
-    const core = (1 - smoothstep(x0, 1, x)) * _c.w;                // precipitation footprint
-    const cover = (1 - smoothstep(x0 + 0.25, 1.15, x)) * _c.w;     // cloud shield is wider
-    if (core > 0) {
-      const rr = K.rate * core * core;
-      a.rate += rr;
-      if (K === KINDS.ice) a.rateIce += rr; else if (K === KINDS.frost) a.rateFrost += rr;
-      a.flash += K.flash * core;
-    }
-    if (K.vis > 0) {
-      // A bank of fog, dust or haze. The extinction (in clear-air units) is shaped so that the
-      // visual range closes in steadily on the way in: visibility01 = 1 / sqrt(1 + ext) falls
-      // in proportion to the depth into the bank, and the edge is a gradual veil, never a wall.
-      // (At the middle of a full-grown bank of strength s the extinction is s^2 E, as thick as
-      // its kind and strength say.)
-      const veil = _c.w > 0 ? core / _c.w * _c.env : 0;
-      if (veil > 0) {
-        const E = _c.s * _c.s * WEATHER.clearVisibility / K.vis, q = 1 - (1 - 1 / Math.sqrt(1 + E)) * veil;
-        const ext = 1 / (q * q) - 1;
-        if (K === KINDS.fog) a.fog += ext; else if (K === KINDS.dust) a.dust += ext; else a.haze += ext;
-      }
-    }
-    if (core > 0) {
-      if (K === KINDS.storm) a.storm = Math.max(a.storm, core);
-      if (core > a.topW) { a.topW = core; a.top = _c.kindId; a.topCell = i; a.topGen = _c.gen; }
-    }
-    if (cover > 0) clear *= 1 - K.cloud * cover;
-    // mean wind: stronger under active systems, calmer inside fog
-    if (K.wind >= 1) a.windMul += (K.wind - 1) * cover; else a.calm = Math.max(a.calm, (1 - K.wind) * cover);
-    if (K.blow > 0) a.blow = Math.max(a.blow, K.blow * cover);     // (the cloud shield is wider than the rain: the wind rises first)
-    // gust front: cold outflow spreading from the core, strongest just ahead of the rain
-    if (K.outflow > 0 && d > 1) {
-      const ring = smoothstep(0.15, 0.8, x) * (1 - smoothstep(0.95, WEATHER.frontReach, x));
-      const v = K.outflow * _c.w * ring;
-      if (v > 0) {
-        // direction: from the cell centre to the point, in the tangent plane at the point
-        let dx = ux - _c.x, dy = uy - _c.y, dz = uz - _c.z;
-        const dn = dx * ux + dy * uy + dz * uz;
-        dx -= dn * ux; dy -= dn * uy; dz -= dn * uz;
-        const l = Math.hypot(dx, dy, dz);
-        if (l > 1e-9) { a.ox += dx / l * v; a.oy += dy / l * v; a.oz += dz / l * v; a.front = Math.max(a.front, ring * _c.w); }
-      }
-    }
-    // a great spot turns: wind circling the centre, fastest at 70 % of its radius
-    if (_c.swirl > 0 && d > 1) {
-      const v = _c.swirl * _c.w * smoothstep(0, 0.7, x) * (1 - smoothstep(0.75, WEATHER.frontReach, x)) * _c.spin;
-      let dx = ux - _c.x, dy = uy - _c.y, dz = uz - _c.z;
-      const dn = dx * ux + dy * uy + dz * uz;
-      dx -= dn * ux; dy -= dn * uy; dz -= dn * uz;
-      const l = Math.hypot(dx, dy, dz);
-      // tangent = up x radial
-      if (l > 1e-9) { a.ox += (uy * dz - uz * dy) / l * v; a.oy += (uz * dx - ux * dz) / l * v; a.oz += (ux * dy - uy * dx) / l * v; }
-    }
+    accumulate(a, _c, ux, uy, uz, R);
   }
-  a.cloud = 1 - clear;
+  if (_forced) accumulate(a, forcedInto(_c), ux, uy, uz, R);
+  a.cloud = 1 - a.clear;
+  return a;
+}
+
+// (group D) gather itself, for the rain field's pure functions (cloudfield.js rainAt): its accumulator, overwritten by
+// the next call to any of the weather's functions, so read what you need from it at once.
+export function gather1(bodyId, ux, uy, uz, t, seed = DEFAULT_SEED) { return gather(bodyId, ux, uy, uz, t, seed); }
+
+// (group D) Every live cell of a body at time t, each a plain object with cellAt's fields, into `out` (reused: its objects
+// are kept and refilled). For a map that asks about thousands of places at one time: derive the cells once, then
+// gatherFrom per place (MEASURED on the build machine for Earth's 6,144 texels: 0.35 ms against 20.4 ms by gather).
+export function liveCells(bodyId, t, seed = DEFAULT_SEED, out = []) {
+  out.n = 0;
+  const regime = REGIMES[bodyId];
+  if (!regime || !regime.cells) return out;
+  const R = BODIES[bodyId].radius, s = seedFor(bodyId, seed);
+  const nCells = regime.cells + (regime.spots ? regime.spots.length : 0);
+  for (let i = 0; i < nCells; i++) {
+    const c = out[out.n] || (out[out.n] = {});
+    if (cellAt(bodyId, R, regime, s, i, t, c)) out.n++;
+  }
+  if (_forced) { const c = out[out.n] || (out[out.n] = {}); forcedInto(c); out.n++; }
+  // (how far each reaches, as the least dot product of a place's direction with its centre that it still touches: a
+  //  place below it is skipped by gatherFrom without the square root, exactly where accumulate would return at once)
+  for (let i = 0; i < out.n; i++) { const c = out[i], q = c.r * WEATHER.frontReach / R; c.dotMin = 1 - 0.5 * q * q; }
+  return out;
+}
+// gather over a list made by liveCells (the same numbers gather gives at the same time and place). Returns its accumulator,
+// which the next call overwrites: read what you need from it first.
+const _acc2 = { blow: 0, rate: 0, rateIce: 0, rateFrost: 0, cloud: 0, windMul: 1, calm: 0, flash: 0, fog: 0, haze: 0, dust: 0, ox: 0, oy: 0, oz: 0, storm: 0, top: null, topW: 0, topCell: -1, topGen: 0, front: 0, clear: 1, conv: 0, baseW: 0, topH: 0, coverSum: 0 };
+export function gatherFrom(cells, bodyId, ux, uy, uz) {
+  const a = _acc2;
+  resetAcc(a);
+  const R = BODIES[bodyId].radius;
+  for (let i = 0; i < cells.n; i++) { const c = cells[i]; if (ux * c.x + uy * c.y + uz * c.z > c.dotMin) accumulate(a, c, ux, uy, uz, R); }
+  a.cloud = 1 - a.clear;
   return a;
 }
 
@@ -582,7 +660,7 @@ export function weatherAt(bodyId, ux, uy, uz, altitude, t, seed, env, o = {}) {
   li.flash01 = 0; li.nextIn = Infinity; li.thunderIn = Infinity; li.thunder01 = 0;
   li.last.t = -1e9; li.last.distance = 1e9;
   if (regime && regime.cells && a.topCell >= 0 && a.flash > 0.05) {
-    lightningFor(bodyId, regime, seed, a.topCell, a.topGen, a.flash, ux, uy, uz, t, atm.c, li, a.topCell === OWN_CELL ? _own : null);
+    lightningFor(bodyId, regime, seed, a.topCell, a.topGen, a.flash, ux, uy, uz, t, atm.c, li, a.topCell === OWN_CELL ? _own : a.topCell === FORCED_CELL && _forced ? forcedCentre() : null);
   }
 
   // ---- kind: one word for what a person would call it --------------------------------------------
