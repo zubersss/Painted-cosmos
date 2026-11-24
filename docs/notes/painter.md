@@ -783,6 +783,18 @@ goes default without the owner; the coordinator can put C to the owner on a phon
 B no visible gain, keep it off and stop there; C a clear gain ("small separate dabs with the sky between them"), F
 recommends it to the coordinator, who sends it to the owner for a side-by-side phone check; OFF until the owner says.
 
+**THE CROWNS UNDER A STORM ARE THE DEFAULT in the oil look (v39.5; 350b709 on the v39.4 merge de728ce).** With no
+address switch a tall tree's crown takes HALF the land's storm paint at a full storm (STORMLEAF 0.5, F's pass); it
+follows F's one storm-light switch (`?stormlight=0` turns it off with the land's, uLookS.x) and `?stormleaf=0` turns
+off the crowns' part alone; the ramp is A1's far crowns' (kSt = smoothstep(0.15, 0.6, uStorm) x uLookS.x x
+uStormLeaf). SEEN under `wx=storm` (a maple from 9 m, one page with no switch, the switches flipped live: uStormLeaf 0
+for `?stormleaf=0`, LOOK.stormLight 0 through the page's own shared.js for `?stormlight=0`, the path the address
+takes; 54 tall materials at 0.5, uLookS.x 1, uStorm 0.9, no program failed): on the crown pixels free of the storm's
+own motion (17 per cent of the frame moves between two grabs on this build, low in the frame), the default V 0.318 S
+0.551, and both switches V 0.349 S 0.70, the crowns as they were; the default grabbed again matches it. Still
+`A2_stormleaf_default_maple9m_storm_default_stormlight0_stormleaf0.jpg` (default, ?stormlight=0, ?stormleaf=0).
+The history of it follows.
+
 **THE CROWNS UNDER A STORM (`?stormleaf=1`, OFF; the coordinator after F's storm light, look-director e2b9c14, which
 steps the land a level down under a storm and leaves the crowns glowing).** MEASURED in the gallery under `wx=storm`
 (autumn stream, 1024 x 480): uStorm 0.9, overcast (uWx.x) 1.0, the light curve (uOilAir.z) 1. A FIRST TRY (the
