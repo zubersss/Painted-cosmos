@@ -597,6 +597,8 @@ void main() {
     //  one level under its cap, raised by the share of its seen face that its own side toward the sun lights. Shaped so
     //  that the band is one input of it: the look director's audit, finding 1, may ask the same of every small crown.)
     vec3 gSun = transpose(mat3(normalize(ir[0]), normalize(ir[1]), normalize(ir[2]))) * uSunDirL;
+    // (z, the lit share, is not read by the gust's one tone, which sits at the cap; it is kept for the one tone of every
+    //  small crown that the look director's audit, finding 1, may ask for: "lit by its own side toward the sun")
     vGust = vec3(gT * 0.85 * mix(0.67, 1.0, gK), gT * (1.0 - gK), clamp(0.5 + 0.5 * dot(gSun, dc), 0.0, 1.0));
   #endif
   // the sun, up and the line of sight in the kit's own space (the crown's mass normals are measured there)
@@ -756,8 +758,7 @@ void main() {
     }
     #ifdef PC_GUST
       // (ONE TONE for a small crown a gust band has turned, the look director's (a): its colour the tree's own, with no
-      //  stroke's hue, inner shade or tint, stepped paler as above; its light halfway from the crown's mean to its cap.
-      //  vGust.y fades it in.)
+      //  stroke's hue, inner shade or tint, stepped paler as above; its light the crown's cap. vGust.y fades it in.)
       if (vGust.y > 0.0 && cls < 2.5) {
         vec3 rc1 = vec3(fract(vInst.z * 3.1), fract(vInst.z * 7.3), fract(vInst.z * 11.7));
         vec3 c1 = mix(vLA, vLB, clamp(0.5 + vInst.x * 0.5, 0.0, 1.0));
@@ -768,9 +769,12 @@ void main() {
         float xc1 = max(0.80, vKB.y * 0.8 * (1.0 - twig));
         if (snow) xc1 = max(xc1, 0.68);
         float lc1 = floor(pcLevel(xc1, 0.002) + 0.5);
-        // (halfway from the crown's mean, one level under its cap raised by its lit share, to the cap itself: at the mean
-        //  the turned patch read duller than the busy wood round it, not paler -- the look director, 24 Nov, mix 0.5)
-        float lv1 = mix(max(lc1 - 1.0, 0.0) + vGust.z, lc1, 0.5);
+        // (at the cap itself: at the crown's mean, one level under its cap raised by its lit share, the turned patch read
+        //  duller than the busy wood round it, not paler; MEASURED at 600 m on the changed pixels V -0.003 at the mean,
+        //  +0.011 halfway, +0.025 at the cap (the greyer step lowers a strong yellow's brightest channel, so the tone
+        //  alone goes no further). The look director took the cap, 24 Nov: the patches read as lighter, pale grey-green
+        //  zones that hold together.)
+        float lv1 = lc1;
         cs = mix(cs, c1, vGust.y); lv = mix(lv, lv1, vGust.y);
       }
     #endif
