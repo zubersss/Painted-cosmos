@@ -397,7 +397,17 @@ Branch `water-bodies` = lane 0 + look-proto v37.1 + `origin/design-water` (W1's 
   (milk 0.75 0.80 0.83) tried: the body went grey, median 0.83; both in `falls-ownmilk-ABC.jpg`; F to choose (three numbers).
 - **F: the fall's own water PASS** (the committed, lighter set; F's literal numbers read grey). Nothing more on the falls until
   W3's sea fix lands.
-- NEXT: after the branches meet (the coordinator's call): the pool's pcThinLayer to W3's
+- **THE SEA'S CHECKER FROM THE AIR (F's note 3, given to W2 by the coordinator; branch `water-sea`, 9525b16, cut from
+  water-paint 46b7657; W3 told the lines; W3 owns waterchunk.js, untouched):** cause: at ?wpaint=1 still water kept v37's
+  three steps in near equal shares (one very deep) on short square-ended strokes; off Earth's coast the crests run toward the
+  coast, so from offshore the strokes foreshorten into squares, and two cells' and two octaves' overlaps read as a checker.
+  Fix in render/materials.js only (two places in PC_WPAINT): still water's strokes 10 long, kept long on the screen (up to 3x
+  against the foreshortening); far still water at wpaint 1 fewer light and deep strokes in closer steps. SEEN 150 m, 400 m,
+  1 km at phone settings (`sea-air-150m-400m-1km-wpaint0-wpaint1-fix.jpg` on water-sea): no checker, spread 0.26 at 150 m
+  (0.40 before). ?wpaint=0 unchanged (0 to 2 pixels of 518400 by at most 2 of 255). NOT GOOD YET: where the crests run
+  toward the eye the near sea reads as long streaks, not v37's swell; option rendered (far still water across the view; turns
+  with the camera, a seam between near and far): F to choose.
+- NEXT: F's word on the sea; after the branches meet (the coordinator's call): the pool's pcThinLayer to W3's
   pcWStrokes, pcFallMilk and the FALL_ colours into waterchunk.js.
 
 ## Stations and tools
