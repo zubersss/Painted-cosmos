@@ -188,12 +188,15 @@ export function unpackRGB565(v, out) {
 // count, index: Map(kind -> 0..15) }.
 // (a white or near-white flower's far colour takes a fifth of its eyes' colour, so a daisy drift laid in whole dabs reads
 // CREAM at its own value, not a grey-white: the look director on the pools, 24 Nov, "mixing white into green makes grey")
+// (and every far colour's top channel is held to 0.82, a white's to 0.80: SEEN 24 Nov, with the far view's dabs laying
+// whole strokes in these colours near the eye, sunlit lemon and cream strokes took the meadow's V over 0.90 from 0.5 to
+// 8.2 per cent at 10 m, where LOOK-RULES C6 allows 4; the near heads are held the same way, V 0.88 lit)
 function farColour(c, out, eye) {
   let r = c[0], g = c[1], b = c[2];
   const mx0 = Math.max(r, g, b), mn0 = Math.min(r, g, b);
   if (eye && mx0 - mn0 < 0.25 * mx0) { r += (eye[0] - r) * 0.2; g += (eye[1] - g) * 0.2; b += (eye[2] - b) * 0.2; }
-  const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
-  const f = (mx - mn < 0.25 * mx && mx > 0.80) ? 0.80 / mx : 1;
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b), top = mx - mn < 0.25 * mx ? 0.80 : 0.82;
+  const f = mx > top ? top / mx : 1;
   out[0] = r * f; out[1] = g * f; out[2] = b * f; return out;
 }
 const PAL = new WeakMap();
