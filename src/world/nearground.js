@@ -138,14 +138,18 @@ const CARPET = { name: 'carpet', cell: 0.45, range: [0, 7, 8], per: 20, inner: [
 // thin from 8 to 25 m, where the fine ring's blades thin out (their own ranges 0.66 to 1 of its 12 m at the phone's tier)
 // and the middle ring's touches are few. What changes (the oil look with the lane on; every number here, nothing else):
 //   the fine ring reaches 16 m at the phone's tier where it reached 12 (the top tier's 23 as it was) and its blades keep
-//     their own ranges between 0.75 and 1 of it; a cell has room for 15 marks where 12 (its stones, litter, reeds as
+//     their own ranges between 0.6 and 1 of it (0.75 at first: the look director saw the ring's end as an edge, the top
+//     of a white band; now it thins over its last 6 m); a cell has room for 15 marks where 12 (its stones, litter, reeds as
 //     before: `per0`), so 14 blades a tuft's worth where 11; its flowers 1.4 times what the map asks (room 14 where 10);
 //   the carpet lays 22 blades a cell's worth where 16 (room 28), to 8 m at the phone's tier (7; 9 at the top, 8);
 //   the middle ring has room for 10 touches a cell where 7 (its grass touches with it), the drift's heads 1.3 times.
 // The hashes a mark draws on are spread wider where a cell now lays more (no two marks of a cell share one).
+// WHITE DRIFTS WITH GAPS (the look director, 24 Nov, on the first pair: the ox-eye at 8-16 m made ONE continuous white
+// stripe across the meadow): with the switch a white kind's clumps and heads stand only where a 9 m noise field is over
+// its middle, so about half of a white drift's ground carries it, in drifts with grass between (gapWhite below).
 const DENSE_K = {
   carpet: { range: [0, 8, 9], per: 28, bk: 22 / 16 },
-  fine: { range: [11, 16, 23], per: 15, per0: 12, lo: 0.75, fk: 1.4, room: 14 },
+  fine: { range: [11, 16, 23], per: 15, per0: 12, lo: 0.6, fk: 1.4, room: 14 },
   mid: { per: 10, fk: 1.3 },
 };
 function ringsFor(dense) {
@@ -155,6 +159,9 @@ function ringsFor(dense) {
 }
 const RINGS = ringsFor(FLORA.dense);
 export { ringsFor, DENSE_K };
+// (?dense: a white kind -- its colour's spread under a quarter of its top, as the drift patch tells a white -- is laid only
+// where a 9 m noise field over the ground is above its middle: drifts with gaps of grass. Off: never a gap.)
+const isPale = (c) => Math.max(c[0], c[1], c[2]) - Math.min(c[0], c[1], c[2]) < 0.25 * Math.max(c[0], c[1], c[2]);
 const GROW_T = 0.7;      // seconds a clump laid inside the range takes to grow in (the shader's measure)
 const HOLD_T = 6;        // seconds the strokes wait at most for their ground
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -690,6 +697,7 @@ class Ring {
     if (room < 2) return 0;
     const st = this.st, s = this.s;
     const b = (o.bloom2 && H(524) < o.mix) ? o.bloom2 : o.bloom, sh = SHAPES[b.shape] || (DAB + CRISP), C = this.cfg.cell;
+    if (this.gapWhite(b.c)) return 0;          // (?dense: a white drift's gap: the cell's room goes to its grass)
     const want = o.dens * (b.peak || 8) * area * 1.5;
     let nP = Math.floor(want) + (H(500) < want - Math.floor(want) ? 1 : 0);
     if (nP <= 0) return 0;
@@ -807,7 +815,7 @@ class Ring {
       const o = groups[gi].o, win = groups[gi].win, ho = gi * 41;
       if (two2 && (gi === 0 ? ty >= 0.667 : ty < 0.333)) continue;
       const cap = two2 && ty >= 0.333 && ty < 0.667 ? cap0 >> 1 : left - 1;
-      if (o.kind >= 0 && o.dens > 0.03 && left > 1) {
+      if (o.kind >= 0 && o.dens > 0.03 && left > 1 && !this.gapWhite(o.bloom.c)) {
         const b = o.bloom, sh = SHAPES[b.shape] || 0, v = o.dens * (far ? 10 : 9) * (two2 ? 1.5 : 1) * (cfg.fk || 1), yr = win ? packWin(win) : packYear(b), tone = (b.eye ? packTone(b.eye) : 0) + yr;
         const nf = Math.min(cap, left - 1, Math.floor(v) + (H(100 + ho) < v - Math.floor(v) ? 1 : 0));
         // (the look director on the final set: past the near ring "the heads are many tiny dots of every colour side by
@@ -980,6 +988,13 @@ class Ring {
           dens(cr, dk), dens(cg, dk), dens(cb, dk), cb0 ? (q2 - 0.5) * 0.2 : (q2 - 0.5) * 0.5, flex);
       }
     }
+  }
+
+  // (?dense: is this cell in a gap of a white drift? see isPale above)
+  gapWhite(c) {
+    if (!this.cfg.fk || !isPale(c)) return false;
+    const R = this.S.R;
+    return this.S.nC.n3(this.x * R / 9 + 11.3, this.y * R / 9 - 4.1, this.z * R / 9 + 7.7) < 0;
   }
 
   // The turn (iCol.a) that lays a flat touch's long axis ALONG the land's contour here, jittered by `q`: a far
