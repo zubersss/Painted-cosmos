@@ -27,42 +27,49 @@ function touch(B, c, up, w, h, out, hash) {
   B.tri(a, b, t); B.tri(a, t, d);
 }
 
-// HEATHER: a low cushion, about 0.6 m across and 0.3 m high, of short wiry shoots fanning from the middle, each tipped
-// with a spike of small flowers (the accent, upright lozenges). About 60 triangles.
+// HEATHER: a low cushion about 0.6 m across and 0.35 m high: a dome of small dark scale-leaves (the leaf-shaped pieces,
+// small) with a few wiry shoots standing out of it, and its top strewn with upright spikes of flower (the accent, upright
+// lozenges), so that in bloom it reads as a pink-violet cushion. About 140 triangles. (The first form, ten bare shoots
+// each with one small touch, SEEN 24 Nov from inside the coast's densest patch: a few thin dark sticks and tiny pink
+// flecks lost in the grass; 1.4 per cent of the picture changed with 66 kits in view.)
 export function heatherGeometry(seed) {
   const rnd = mulberry32(seed), B = new Builder();
-  const n = 10;
-  for (let i = 0; i < n; i++) {
-    const a = (i / n) * 6.2832 + rnd() * 0.6, rr = rnd() * 0.08;
-    const dir = V(Math.cos(a), 0, Math.sin(a)), len = 0.22 + rnd() * 0.12, arch = 0.30 + rnd() * 0.25;
-    stroke(B, V(dir.x * rr, 0, dir.z * rr), dir, len, 0.035, arch, rnd, { segs: 2, sway: 0.4 });
-    // (the stroke's tip, as kitbuild.js stroke lays it: out len*(arch + 0.15), up len*(1 - 0.55 arch))
-    const ox = len * (arch + 0.15), oy = len * (1 - arch * 0.55);
-    const tip = V(dir.x * (rr + ox * 0.85), oy * 0.92, dir.z * (rr + ox * 0.85));
-    touch(B, tip, 0.06, 0.022, 0.07 + rnd() * 0.03, V(dir.x, 0.4, dir.z), rnd());
+  const c = V(0, 0.15, 0), rx = 0.30, ry = 0.17, rz = 0.28;
+  leafCards(B, c, rx, ry, rz, rnd, { n: 26, len: 0.10, wid: 0.04, massC: c, massK: 0.75, sway: 0.2, shade0: 0.15, shadeK: 0.6, droop: 0.1 });
+  for (let i = 0; i < 10; i++) {
+    const a = (i / 10) * 6.2832 + rnd() * 0.6, rr = rnd() * 0.10;
+    const dir = V(Math.cos(a), 0, Math.sin(a)), len = 0.24 + rnd() * 0.12, arch = 0.25 + rnd() * 0.25;
+    stroke(B, V(dir.x * rr, 0, dir.z * rr), dir, len, 0.03, arch, rnd, { segs: 2, sway: 0.4 });
+  }
+  // the flowering tops: spikes over the upper half of the dome, more of them toward its crown
+  for (let i = 0; i < 22; i++) {
+    const a = rnd() * 6.2832, r = Math.sqrt(rnd()) * 0.92, x = Math.cos(a) * r, z = Math.sin(a) * r;
+    const y = Math.sqrt(Math.max(0, 1 - r * r));
+    const p = V(c.x + x * rx, c.y + y * ry + 0.035, c.z + z * rz);
+    touch(B, p, 0.04, 0.026 + rnd() * 0.01, 0.09 + rnd() * 0.04, V(x, 0.5 + y, z), rnd());
   }
   return B.build();
 }
 
-// GORSE: a dense, spiny mound, about 1 m across and 0.7 m high: dark narrow spines lying every way on its skin (the
-// leaf-shaped pieces, narrow), strewn with small lemon-yellow flowers on the outside. About 100 triangles.
+// GORSE: a dense, spiny mound about 1 m across and 0.7 m high: dark narrow spines lying every way on its skin (the
+// leaf-shaped pieces, narrow), thick with lemon-yellow flowers on the outside, as gorse in bloom is. About 140 triangles.
 export function gorseGeometry(seed) {
   const rnd = mulberry32(seed), B = new Builder();
   const c = V(0, 0.36, 0), rx = 0.50, ry = 0.36, rz = 0.48;
-  leafCards(B, c, rx, ry, rz, rnd, { n: 34, len: 0.17, wid: 0.035, massC: c, massK: 0.7, sway: 0.15, shade0: 0.1, shadeK: 0.6, droop: 0.15 });
-  for (let i = 0; i < 16; i++) {
+  leafCards(B, c, rx, ry, rz, rnd, { n: 40, len: 0.17, wid: 0.035, massC: c, massK: 0.7, sway: 0.15, shade0: 0.1, shadeK: 0.6, droop: 0.15 });
+  for (let i = 0; i < 30; i++) {
     let x, y, z, l2;
     do { x = rnd() * 2 - 1; y = rnd() * 1.6 - 0.4; z = rnd() * 2 - 1; l2 = x * x + y * y + z * z; } while (l2 > 1 || l2 < 0.3);
     const l = Math.sqrt(l2);
     x /= l; y /= l; z /= l;
     const p = V(c.x + x * rx * 1.02, c.y + y * ry * 1.02, c.z + z * rz * 1.02);
-    touch(B, p, 0.0, 0.03, 0.05, V(x, y, z), rnd());
+    touch(B, p, 0.0, 0.038 + rnd() * 0.012, 0.06 + rnd() * 0.02, V(x, y, z), rnd());
   }
   return B.build();
 }
 
 const GEO = { heather: heatherGeometry, gorse: gorseGeometry };
-const HEIGHT = { heather: 0.35, gorse: 0.75 };
+const HEIGHT = { heather: 0.38, gorse: 0.75 };
 const REACH = 40;
 // (shown unless a speed test placed them without ?under=1, for its row to ask the other way: world/floraplace.js under2On)
 const SHOWN = (() => { try { return new URLSearchParams(location.search).get('under') === '1'; } catch (e) { return true; } })();        // (metres: no far form; past it the near ring's touches and the ground's colour carry the plant)

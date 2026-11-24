@@ -73,7 +73,7 @@ test('on: the coast carries heather and gorse in patches, only those kinds, the 
 
 test('each kit within its triangle budget, with the parts its paint expects', async () => {
   const { heatherGeometry, gorseGeometry } = await import('./underkit.js');
-  for (const [name, gen, maxT, parts] of [['heather', heatherGeometry, 80, [2, 3]], ['gorse', gorseGeometry, 130, [5, 3]]]) {
+  for (const [name, gen, maxT, parts] of [['heather', heatherGeometry, 160, [2, 3, 5]], ['gorse', gorseGeometry, 160, [5, 3]]]) {
     for (const seed of [211, 228, 999]) {
       const g = gen(seed), tris = g.index.count / 3, d = g.getAttribute('aData').array;
       assert.ok(tris <= maxT, name + ' ' + tris + ' triangles');
