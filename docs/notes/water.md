@@ -13,7 +13,7 @@ review before a step is called done, a short message to the coordinator (session
 The weather group lands the rain field (its section 9.3: `fields.rain` at 32 a face, mm/h, 2 Hz, `rainAt`,
 `rainBetween`, a GPU channel `pcRainAt`): use theirs for rain (the design's `uRainCells[8]` and `rainAt` are replaced).
 
-**STATE (24 Nov, 16:20), the short of it.** v39.2 shipped WITHOUT the water (the coordinator pulled it at its gate for two
+**STATE (24 Nov, 17:35), the short of it.** v39.2 shipped WITHOUT the water (the coordinator pulled it at its gate for two
 faults, both now answered); the water goes into v39.3 with the weather. design-water HEAD 792d1f1 = v39.2 (look-proto c7d8d9e)
 merged in (df7c3ba: the ground sample 25 floats, the water's still at 23, the far view's snow at 24; W3's runoff cap and swell
 to take 25, 26; THE LAYOUT FOR THE WATER LANES IS THIS SESSION'S, the coordinator's word) plus:
@@ -22,8 +22,9 @@ to take 25, 26; THE LAYOUT FOR THE WATER LANES IS THIS SESSION'S, the coordinato
   plus 2.8 % churn against v39.1's 6.4 % (first-view-3.jpg).
 - FROM THE AIR (792d1f1, "THE WATER FROM THE AIR" below): the old high frame has little water because the rivers run
   elsewhere; the added gate frame at the landing's river (cam=high&yaw=145.6&pitch=-13.4) shows it and a lake; 150 m and
-  400 m read; at 1 km the 19 m river is lost in the far ground itself. ASKED the coordinator: a far water line (a distance
-  byte per vertex + C's far paint) now, or after v39.3.
+  400 m read; at 1 km the 19 m river is lost in the far ground itself. v39.3 TOOK 792d1f1 (the water ships with the weather).
+- THE FAR WATER LINE (a1f12fd, ?farwater=1, off by default; C agreed): from 1 km and 1.6 km the rivers read as continuous
+  lines; A/B sent to F, awaiting F's word on its value and edge. The ground-sample layout is now CS 30 (27-29 the line's).
 - Earlier today, all on this branch: W1 rivers with S-bends and point bars (the trees stand back from the bars, F passed);
   mountain streams behind ?mount=1 (F: the white water is W3's paint, queued); THE DEFAULT FLIP in the oil look (rivers of the
   tree, lakes, ponds, puddles, fjord, falls on; ?wpaint 0); the speed test's falls view, ?bench=water; the landing's river
