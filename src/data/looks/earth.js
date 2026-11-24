@@ -19,7 +19,7 @@ const K = (a, b) => glazec(pig(a), pig(b));         // two washes laid one over 
 // sees it). Every colour is mixed from the named pigments (M, D above), never a loose number. The fields are described
 // at the head of world/bloom.js. A flower is a step below the explorer's cloak in strength; the cloak leads.
 const FLORA_TF = {      // the green wood: carpets under the open canopy, campion and foxglove at the edges, buttercup in damp glades
-  sward: { floor: 0.10 },
+  sward: { floor: 0.10, gm: 0.18, leaf: [M('sapGreen', 'quinGold', 0.4), M('sapGreen', 'oliveGreen', 0.5), M('oliveGreen', 'hookersGreen', 0.5)] },   // (the blades' own greens, olive-gold in the light: F10)
   blooms: [
     { kind: 'bluebell', shape: 'bell', c: M('ultramarine', 'cobaltViolet', 0.45), head: [0.010, 0.015], stalk: [0.16, 0.30], heads: [3, 6], drift: 8, peak: 22, share: 0.8, hab: { canopy: [0.05, 0.35] }, season: [0, 0.45], bold: 1 },
     { kind: 'wood anemone', shape: 'rayed', c: D('cobaltViolet', 0.86), eye: M('quinGold', 'lemonYellow', 0.4), head: [0.012, 0.018], stalk: [0.08, 0.16], heads: [1, 1], drift: 6, peak: 26, share: 0.7, hab: { canopy: [0.05, 0.30] }, season: [0, 0.35] },
@@ -29,7 +29,7 @@ const FLORA_TF = {      // the green wood: carpets under the open canopy, campio
     // (the year, the coordinator's ruling of 24 Nov: every place keeps a bold kind in flower near the eye in every season;
     // in the green wood's autumn the cyclamen under the crowns and the hawkbit in the glades)
     { kind: 'ivy-leaved cyclamen', shape: 'cup', c: M('roseMadder', 'cobaltViolet', 0.3), head: [0.012, 0.018], stalk: [0.06, 0.12], heads: [1, 3], drift: 7, peak: 16, share: 0.55, hab: { canopy: [0.05, 0.4] }, season: [0.45, 1], bold: 1 },
-    { kind: 'autumn hawkbit', shape: 'rayed', c: mixc(K('lemonYellow', 'lemonYellow'), pig('quinGold'), 0.25), eye: M('quinGold', 'cadOrange', 0.35), head: [0.014, 0.021], stalk: [0.14, 0.34], heads: [1, 2], drift: 11, peak: 14, share: 0.8, hab: { canopy: [0.45, 0.05] }, season: [0.4, 1], bold: 1 },
+    { kind: 'autumn hawkbit', shape: 'rayed', c: mixc(K('lemonYellow', 'lemonYellow'), pig('lemonYellow'), 0.3), eye: pig('quinGold'), head: [0.014, 0.021], stalk: [0.14, 0.34], heads: [1, 2], drift: 11, peak: 14, share: 0.8, hab: { canopy: [0.45, 0.05] }, season: [0.4, 1], bold: 1 },
     // (the coordinator, 24 Nov: the bold kinds near the eye in every place; in the green wood's open glades, the ox-eye)
     { kind: 'ox-eye daisy', shape: 'rayed', c: D('neutralTint', 0.75), eye: M('quinGold', 'lemonYellow', 0.3), head: [0.020, 0.030], stalk: [0.25, 0.50], heads: [1, 2], drift: 10, peak: 14, share: 0.9, hab: { canopy: [0.45, 0.05] }, season: [0, 0.65], bold: 1 },
   ],
@@ -37,11 +37,11 @@ const FLORA_TF = {      // the green wood: carpets under the open canopy, campio
 const FLORA_AW = {      // the autumn wood: violet against the gold and yellow-green is the floor's own complement
   // (its trees stand apart over grass, so its flowers grow well under the crowns: the landing's canopy share is 0.66 and at
   // the old ramps, which ended at 0.5, the first place the owner sees had no flower in view, COUNTED 24 Nov)
-  sward: { floor: 0.10 },
+  sward: { floor: 0.10, gm: 0.18, leaf: [M('oliveGreen', 'quinGold', 0.45), M('sapGreen', 'quinGold', 0.3), M('oliveGreen', 'hookersGreen', 0.4)] },   // (the blades' own greens, olive-gold in the light: F10)
   blooms: [
     { kind: 'Michaelmas aster', shape: 'rayed', c: M('cobaltViolet', 'roseMadder', 0.15), eye: M('quinGold', 'cadOrange', 0.2), head: [0.012, 0.019], stalk: [0.28, 0.55], heads: [2, 4], drift: 9, peak: 11, share: 0.9, hab: { canopy: [0.88, 0.35] }, edge: -0.2, season: [0.3, 1], bold: 1 },
     { kind: 'harebell', shape: 'bell', c: pig('cobaltViolet'), head: [0.010, 0.015], stalk: [0.20, 0.36], heads: [1, 3], drift: 7, peak: 12, share: 0.6, hab: { canopy: [0.92, 0.4] }, edge: -0.2 },
-    { kind: 'late hawkbit', shape: 'rayed', c: mixc(K('lemonYellow', 'lemonYellow'), pig('quinGold'), 0.25), eye: M('quinGold', 'cadOrange', 0.35), head: [0.014, 0.021], stalk: [0.14, 0.34], heads: [1, 2], drift: 11, peak: 14, share: 0.9, hab: { canopy: [0.8, 0.25] }, edge: -0.2, bold: 1 },
+    { kind: 'late hawkbit', shape: 'rayed', c: mixc(K('lemonYellow', 'lemonYellow'), pig('lemonYellow'), 0.3), eye: pig('quinGold'), head: [0.014, 0.021], stalk: [0.14, 0.34], heads: [1, 2], drift: 11, peak: 14, share: 0.9, hab: { canopy: [0.8, 0.25] }, edge: -0.2, bold: 1 },
     { kind: 'goldenrod', shape: 'spike', c: M('quinGold', 'yellowOchre', 0.25), head: [0.12, 0.22], stalk: [0.45, 0.85], heads: [1, 1], drift: 13, peak: 4, share: 0.4, hab: { canopy: [0.8, 0.25] }, edge: -0.2, season: [0.3, 1], bold: 1 },
     // (the year: in summer the autumn wood's asters and goldenrod are not out, and the hawkbit alone made one yellow carpet,
     // SEEN 24 Nov at ?season=0.15; knapweed's pink-purple runs with it from summer into early autumn)
@@ -67,7 +67,7 @@ const FLORA_AM = {      // the alpine meadow: gentian and pinks on the high turf
     { kind: 'meadow buttercup', shape: 'cup', c: mixc(K('lemonYellow', 'lemonYellow'), pig('lemonYellow'), 0.3), eye: K('lemonYellow', 'lemonYellow'), head: [0.011, 0.017], stalk: [0.25, 0.50], heads: [1, 3], drift: 10, peak: 16, share: 0.85, season: [0, 0.7], bold: 1 },
     // (the year: the high meadow's autumn, pale violet crocus cups out of the turf, and the hawkbit's yellow)
     { kind: 'autumn crocus', shape: 'cup', c: M('cobaltViolet', 'roseMadder', 0.3), eye: D('cobaltViolet', 0.45), head: [0.014, 0.022], stalk: [0.05, 0.12], heads: [1, 1], drift: 9, peak: 14, share: 0.8, season: [0.55, 1], bold: 1 },
-    { kind: 'autumn hawkbit', shape: 'rayed', c: mixc(K('lemonYellow', 'lemonYellow'), pig('quinGold'), 0.25), eye: M('quinGold', 'cadOrange', 0.35), head: [0.014, 0.021], stalk: [0.14, 0.34], heads: [1, 2], drift: 11, peak: 14, share: 0.8, season: [0.4, 1], bold: 1 },
+    { kind: 'autumn hawkbit', shape: 'rayed', c: mixc(K('lemonYellow', 'lemonYellow'), pig('lemonYellow'), 0.3), eye: pig('quinGold'), head: [0.014, 0.021], stalk: [0.14, 0.34], heads: [1, 2], drift: 11, peak: 14, share: 0.8, season: [0.4, 1], bold: 1 },
   ],
 };
 const FLORA_SC = {      // the sea cliffs: thrift along the edge, campion on the stony ground, trefoil in the short turf

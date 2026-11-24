@@ -65,13 +65,12 @@ const ss = (a, b, x) => { if (a === b) return x >= b ? 1 : 0; const t = Math.max
 const ramp = (r, x) => (r ? ss(r[0], r[1], x) : 1);
 
 // how much a kind is in flower now (0..1), the shader's own sums (materials.js NEAR_VERT: sevenths, a seventh to come and
-// go), and the share the map gives it: 1 unless the year is held still (?season=) and followed (?bloomyear=)
+// go)
 export function inFlower(w, t) {
   if (!w) return 1;
   const a = Math.round(Math.max(0, Math.min(1, w[0])) * 7) / 7, e = Math.round(Math.max(0, Math.min(1, w[1])) * 7) / 7;
   return (a > 0 ? ss(a - 0.143, a, t) : 1) * (e < 1 ? 1 - ss(e, e + 0.143, t) : 1);
 }
-export function bloomNow(b) { return b && b.season && SEASON.held && bloomSwitches().year ? inFlower(b.season, SEASON.t) : 1; }
 
 // a biome's blooms, laid out once (null: none)
 const CACHE = new WeakMap();
@@ -97,16 +96,24 @@ function habitat(h, s) {
     * ramp(h.height, s.h || 0) * ramp(h.lip, s.lip || 0) * ramp(h.rock, Math.min(1, s.rock || 0));
 }
 
-// bloomAt(S, x, y, z, s, bi, out): x y z a unit direction on the body, s its FULL surface sample, bi a biome index.
+// bloomAt(S, x, y, z, s, bi, out[, tEval]): tEval a point of the year to choose for (the near rings ask for summer and
+// autumn while the year turns); none: the year held still if it is (?season=), else every kind as if in flower.
+// x y z a unit direction on the body, s its FULL surface sample, bi a biome index.
 // Writes out.kind (index into the biome's blooms, -1 none), out.bloom (that entry or null), out.dens (0..1, of its peak),
 // out.heart (0..1, how deep into a drift). Returns out.
-export function bloomAt(S, x, y, z, s, bi, out) {
+export function bloomAt(S, x, y, z, s, bi, out, tEval) {
   out.kind = -1; out.bloom = null; out.dens = 0; out.heart = 0; out.bloom2 = null; out.mix = 0;
   if (!bloomSwitches().bloom) return out;
   const B = bloomsOf(S, bi);
   if (!B) return out;
   if (s.lq !== undefined && s.h !== undefined && s.lq > s.h - 0.02) return out;      // (nothing blooms under water)
   const R = S.R, n3 = S.nC.n3, X = x * R, Y = y * R, Z = z * R;
+  const sw = bloomSwitches();
+  const te = !sw.year ? null : (tEval != null ? tEval : (SEASON.held ? SEASON.t : null));
+  // (how much of the place is in flower at that point of the year, by share: where few kinds are, their drifts spread
+  // over the ground the others left -- the coordinator's ruling: an autumn place as full as a summer one, never bare)
+  let fill = 1;
+  if (te != null) { let a = 0, w = 0; for (const b of B) { const sh = b.share == null ? 1 : b.share; w += sh; a += sh * inFlower(b.season, te); } fill = w > 0 ? a / w : 1; }
   // whole slopes rich or poor in flower, at 150-600 m: what reads from a mile (SEEN, 24 Nov: at 0.35 to 1 the drifts lay
   // evenly everywhere and from 150 m nothing gathered into a patch; a poor slope now has a sprinkle, a rich one more than
   // its drifts' own peak)
@@ -123,15 +130,15 @@ export function bloomAt(S, x, y, z, s, bi, out) {
   if (sp) { const dl = Math.hypot(x - sp.x, y - sp.y, z - sp.z) * R; if (dl < 45) patch = Math.max(patch, 1.25 * (1 - ss(18, 45, dl))); }
   let best = -1, bd = 0, bh = 0, b2 = -1, v2 = 0;
   for (let k = 0; k < B.length; k++) {
-    // (the year held still, ?season=: a kind out of flower gives its ground to the kinds in flower, so an autumn meadow is
-    // as full as a summer one; while the year turns the choice stays as it is and the near rings fade the heads instead)
-    const b = B[k], hab = habitat(b.hab, s) * bloomNow(b);
+    // (a kind out of flower at that point of the year gives its ground to the kinds in flower, so an autumn meadow is as
+    // full as a summer one)
+    const b = B[k], yf = te == null ? 1 : inFlower(b.season, te), hab = yf > 0.001 ? habitat(b.hab, s) * yf : 0;
     if (hab <= 0.001) continue;
     const o = 17.3 * (k + 1), d = b.drift || 9;
     // a drift: one kind's clonal patch, dense at the heart and ragged at its edge (two octaves: the second roughens
     // the outline so it is never a blob)
     const n = n3(X / d + o, Y / d - o * 0.7, Z / d + o * 1.3) + 0.35 * n3(X / (d * 0.37) - o, Y / (d * 0.37) + o, Z / (d * 0.37) - 0.5 * o);
-    const e = b.edge == null ? 0.05 : b.edge;
+    const e = (b.edge == null ? 0.05 : b.edge) - 0.45 * (1 - fill);
     // ... and drifts of one kind gather in colonies four times their own size, so from the air they are patches of 30 to
     // 50 m and not an even speckle
     const colony = ss(-0.25, 0.45, n3(X / (d * 4) - o * 1.9, Y / (d * 4) + o * 0.3, Z / (d * 4) + o));

@@ -77,16 +77,18 @@ const VISTA = (() => {
 // Each is 1 by default in the oil look and 0 gives that package back exactly as it was.
 //   `?grass2=`   0 takes the whole grass package away (G1-G4): the oil look's near grass as it was on 24 Nov.
 //   `?nearcull=` 0 keeps the grass but shades every mark again, in view or not (G1; the speed test's row does the same).
+//   `?bladegreen=` 0 gives the blades the undergrowth's greens again instead of their own (`oil.flora.sward.leaf`, F10)
 //   `?sheen=`    0 takes away the gusts' sheen on the blades (G4: needs PHYSICS' bend, so the game, or the gallery's &physics=1).
 const FLORA = (() => {
-  const f = { grass2: 1, cull: 1, sheen: 1, bloom: 0 };
+  const f = { grass2: 1, cull: 1, sheen: 1, bloom: 0, blade: 1 };
   try {
     const q = new URLSearchParams(location.search), on = (k) => !q.has(k) || (q.get(k) !== '0' && q.get(k) !== 'false');
     f.grass2 = on('grass2') ? 1 : 0;
     f.cull = f.grass2 && on('nearcull') ? 1 : 0;
     f.sheen = f.grass2 && on('sheen') ? 1 : 0;
+    f.blade = f.grass2 && on('bladegreen') ? 1 : 0;
   } catch { /* no address to read */ }
-  if (!LOOK.oil) { f.grass2 = 0; f.cull = 0; f.sheen = 0; }
+  if (!LOOK.oil) { f.grass2 = 0; f.cull = 0; f.sheen = 0; f.blade = 0; }
   // (F1-F3: the flowers from world/bloom.js's map, ?bloom=0 off; read there, where the ground's colour reads it too)
   f.bloom = LOOK.oil ? bloomSwitches().bloom : 0;
   return f;
@@ -124,6 +126,11 @@ const packTone = (c) => Math.min(262143, 1 + Math.round(Math.max(0, Math.min(1, 
 // (the year, ?bloomyear=0 off) a kind's flowering window, `season: [from, to]` on SEASON.t (0 high summer, 1 deep autumn),
 // in sevenths, in the six bits above the colour: when it comes into flower times 8, plus how far before the end of the
 // year it is over. [0, 1], or no window, is 0: in flower all the year, the mark as it was. Read by materials.js NEAR_VERT.
+const packWin = (w) => {
+  if (!w || !bloomSwitches().year) return 0;
+  const a = Math.round(Math.max(0, Math.min(1, w[0])) * 7), e = Math.round(Math.max(0, Math.min(1, w[1])) * 7);
+  return (a * 8 + (7 - e)) * 262144;
+};
 const packYear = (b) => {
   const w = b && b.season;
   if (!w || !bloomSwitches().year) return 0;
@@ -173,8 +180,11 @@ function styleOf(look, b) {
   // A biome may set its own: `oil.flora.sward` = { gm, carpet } (carpet: the carpet ring's blades, 1 = three times the
   // fine ring's a square metre).)
   const sw = (FLORA.grass2 && b.oil && b.oil.flora && b.oil.flora.sward) || {};
-  st.leafB = FLORA.grass2 ? ((b.oil && b.oil.under && b.oil.under.leaf) || st.leaf) : st.leaf;
-  st.gmB = FLORA.grass2 ? (sw.gm != null ? sw.gm : 0.25) : st.gm;
+  // (the lime, LOOK-AUDIT F10 / LOOK-RULES R2.4, agreed with the look director 24 Nov: the blades may have greens of their
+  // own, `oil.flora.sward.leaf`, so the lit blades come out olive-gold on screen -- hue 55-75, S at most 0.72, V 0.50-0.72
+  // -- while the PROP undergrowth and the ground's palette, which are others' to set, stay as they are)
+  st.leafB = FLORA.grass2 ? ((FLORA.blade && sw.leaf) || (b.oil && b.oil.under && b.oil.under.leaf) || st.leaf) : st.leaf;
+  st.gmB = FLORA.grass2 ? (FLORA.blade && sw.gm != null ? sw.gm : 0.25) : st.gm;
   st.carpet = sw.carpet != null ? sw.carpet : 1;
   let left = 8;
   for (const k of ['blade', 'reed', 'needle', 'ripple', 'dab']) { st[k] = Math.max(0, Math.min(left, st[k])); left -= st[k]; }
@@ -560,13 +570,44 @@ class Ring {
   // `area` the cell's ground (m2), `room` how many marks it may take. Returns how many it took.
   layBlooms(i, j, born, area, room) {
     if (room < 2) return 0;
-    const st = this.st, s = this.s, seed = this.seed, H = (k) => hash3i(i, j, k, seed);
-    const o = bloomAt(this.S, this.x, this.y, this.z, s, this.bi, this.bo || (this.bo = { kind: -1, bloom: null, dens: 0, heart: 0 }));
-    if (o.kind < 0 || o.dens < 0.01) return 0;
+    const seed = this.seed, H = (k) => hash3i(i, j, k, seed);
     // (the look director, 24 Nov: "mix kinds, leave gaps of grass between clumps". A cell is a clump of ONE kind, the
     // runner-up's where the map says two drifts run together; and one cell in three in a drift is grass, the clumps in
     // the others a third fuller, so the drift's plants a square metre are what they were)
     if (H(523) < 0.33) return 0;
+    // THE YEAR TURNING (the coordinator's ruling, 24 Nov: no place flowerless near the eye in any season): a cell holds the
+    // clump the map gives it in summer AND the one it gives in autumn, each with its half of the year as its window, so
+    // the vertex shader fades one out as the other comes in (materials.js NEAR_VERT; stalks and leaves too) and nothing is
+    // ever laid again or seams. Held still (?season=) or not followed (?bloomyear=0), one clump as the map says now.
+    const groups = this.bloomGroups(this.bg || (this.bg = []));
+    let used = 0;
+    for (const g of groups) used += this.layBloomClump(i, j, born, area, room - used, g.o, g.win, H);
+    return used;
+  }
+  // the clumps a cell holds: [{ o: bloomAt's answer, win: [from, to] or null (the kind's own) }]
+  bloomGroups(out) {
+    out.length = 0;
+    const s = this.s, mk = (k) => this[k] || (this[k] = { kind: -1, bloom: null, dens: 0, heart: 0 });
+    const sw = bloomSwitches();
+    if (!sw.year || SEASON.held) {
+      const o = bloomAt(this.S, this.x, this.y, this.z, s, this.bi, mk('bo'));
+      if (o.kind >= 0 && o.dens >= 0.01) out.push({ o, win: null });
+      return out;
+    }
+    const oS = bloomAt(this.S, this.x, this.y, this.z, s, this.bi, mk('boS'), 0.15);
+    const oA = bloomAt(this.S, this.x, this.y, this.z, s, this.bi, mk('boA'), 0.85);
+    const okS = oS.kind >= 0 && oS.dens >= 0.01, okA = oA.kind >= 0 && oA.dens >= 0.01;
+    if (okS && okA && oS.bloom === oA.bloom && oS.bloom2 === oA.bloom2) { out.push({ o: oS, win: null }); return out; }
+    // the hand-over between the two: half way from where the autumn kind comes in to where the summer kind is over
+    const se = okS && oS.bloom.season ? oS.bloom.season[1] : 1, as = okA && oA.bloom.season ? oA.bloom.season[0] : 0;
+    const m = Math.max(2 / 7, Math.min(5 / 7, (se + as) / 2));
+    if (okS) out.push({ o: oS, win: [oS.bloom.season ? oS.bloom.season[0] : 0, m] });
+    if (okA) out.push({ o: oA, win: [m, oA.bloom.season ? oA.bloom.season[1] : 1] });
+    return out;
+  }
+  layBloomClump(i, j, born, area, room, o, win, H) {
+    if (room < 2) return 0;
+    const st = this.st, s = this.s;
     const b = (o.bloom2 && H(524) < o.mix) ? o.bloom2 : o.bloom, sh = SHAPES[b.shape] || (DAB + CRISP), C = this.cfg.cell;
     const want = o.dens * (b.peak || 8) * area * 1.5;
     let nP = Math.floor(want) + (H(500) < want - Math.floor(want) ? 1 : 0);
@@ -577,7 +618,7 @@ class Ring {
     // (a cell's plants stand together in one tuft, a third of the cell across, and not spread evenly over it: a clump of
     // ox-eyes, a poppy with its buds round it)
     const cu = (H(520) - 0.5) * C * 0.5, cv = (H(521) - 0.5) * C * 0.5;
-    const yr = packYear(b), tone = (b.eye ? packTone(b.eye) : 0) + yr;
+    const yr = win ? packWin(win) : packYear(b), tone = (b.eye ? packTone(b.eye) : 0) + yr;
     let used = 0;
     for (let p = 0; p < nP && used < room - 1; p++) {
       const q1 = H(510 + p), q2 = H(530 + p), q3 = H(550 + p), q4 = H(570 + p), q5 = H(590 + p);
@@ -591,8 +632,8 @@ class Ring {
       }
       const L = (b.stalk[0] + (b.stalk[1] - b.stalk[0]) * q3) * (1.15 + 0.25 * tall);
       // the stalk, and one short leaf at its foot when there is room
-      this.put(ou, ov, 0, tilt, la, L, 0.010 + 0.004 * q5, FLICK, q3, born, sc0, sc1, sc2, (q5 - 0.5) * 0.3, 1); used++;
-      if (used < room - 2 && q4 > 0.35) { this.put(ou, ov, 0, 0.55 + 0.3 * q1, la + 2.1, 0.06 + 0.07 * q2, 0.014, FLICK, q2, born, sc0 * 0.92, sc1 * 0.92, sc2 * 0.92, 0.3, 1); used++; }
+      this.put(ou, ov, 0, tilt, la, L, 0.010 + 0.004 * q5, FLICK, q3, born, sc0, sc1, sc2, (q5 - 0.5) * 0.3, 1, win ? yr : 0); used++;
+      if (used < room - 2 && q4 > 0.35) { this.put(ou, ov, 0, 0.55 + 0.3 * q1, la + 2.1, 0.06 + 0.07 * q2, 0.014, FLICK, q2, born, sc0 * 0.92, sc1 * 0.92, sc2 * 0.92, 0.3, 1, win ? yr : 0); used++; }
       const nh = Math.max(1, Math.round(b.heads[0] + (b.heads[1] - b.heads[0]) * q2));
       for (let h = 0; h < nh && used < room; h++) {
         const qh = H(610 + p * 7 + h), r0 = (b.head[0] + (b.head[1] - b.head[0]) * qh) * (h > 0 && sh !== SHAPES.bell ? 0.85 : 1) * (sh === SHAPES.spike ? 1.3 : BLOOM_HEAD);
@@ -663,20 +704,23 @@ class Ring {
     // colour, as many as its heart says, and a spike as a taller one; the horizontal dashes read as white and red lines)
     const blooming = FLORA.bloom && !cfg.vista && hasBlooms(this.S, this.bi);
     if (blooming) {
-      const o = bloomAt(this.S, this.x, this.y, this.z, s, this.bi, this.bo || (this.bo = { kind: -1, bloom: null, dens: 0, heart: 0 }));
+      // (the year turning: the summer drift's touches and the autumn drift's, each in its half of the year, as the near ring)
+      const groups = this.bloomGroups(this.bg || (this.bg = []));
+      for (let gi = 0; gi < groups.length; gi++) {
+      const o = groups[gi].o, win = groups[gi].win, ho = gi * 41;
       if (o.kind >= 0 && o.dens > 0.03 && left > 1) {
-        const b = o.bloom, sh = SHAPES[b.shape] || 0, v = o.dens * (far ? 10 : 9), yr = packYear(b), tone = (b.eye ? packTone(b.eye) : 0) + yr;
-        const nf = Math.min(left - 1, Math.floor(v) + (H(100) < v - Math.floor(v) ? 1 : 0));
+        const b = o.bloom, sh = SHAPES[b.shape] || 0, v = o.dens * (far ? 10 : 9), yr = win ? packWin(win) : packYear(b), tone = (b.eye ? packTone(b.eye) : 0) + yr;
+        const nf = Math.min(left - 1, Math.floor(v) + (H(100 + ho) < v - Math.floor(v) ? 1 : 0));
         const b1 = b, sh1 = sh, tone1 = tone, B2 = o.bloom2, mx2 = o.mix;
         for (let q = 0; q < nf; q++, k++) {
-          const q1 = H(102 + q), q2 = H(106 + q), q3 = H(110 + q), p = at(q1, q2), jit = 0.94 + 0.12 * q2;
+          const q1 = H(102 + q + ho), q2 = H(106 + q + ho), q3 = H(110 + q + ho), p = at(q1, q2), jit = 0.94 + 0.12 * q2;
           // (some touches are the runner-up drift's, as in the near ring)
-          const two = B2 && H(114 + q) < mx2, b = two ? B2 : b1, sh = two ? (SHAPES[B2.shape] || 0) : sh1;
-          const tone = two ? (B2.eye ? packTone(B2.eye) : 0) + packYear(B2) : tone1;
+          const two = B2 && H(114 + q + ho) < mx2, b = two ? B2 : b1, sh = two ? (SHAPES[B2.shape] || 0) : sh1;
+          const tone = two ? (B2.eye ? packTone(B2.eye) : 0) + (win ? yr : packYear(B2)) : tone1;
           const st0 = b.stalk ? b.stalk[0] + (b.stalk[1] - b.stalk[0]) * q3 : 0.2;
           if (sh === SHAPES.cushion) {
             const r0 = (b.head[0] + (b.head[1] - b.head[0]) * q1) * 1.3 * kw, bc = b.body || b.c;
-            this.put(p[0], p[1], 0, 0, 0, r0 * 1.4, r0, SHAPES.cushion, q3, born, bc[0], bc[1], bc[2], 0, 0, packTone(b.c) + packYear(b));
+            this.put(p[0], p[1], 0, 0, 0, r0 * 1.4, r0, SHAPES.cushion, q3, born, bc[0], bc[1], bc[2], 0, 0, packTone(b.c) + (win ? yr : packYear(b)));
           } else if (sh === SHAPES.spike) {
             const hh = (b.head[0] + (b.head[1] - b.head[0]) * q1) * kh;
             this.put(p[0], p[1], 0, 0, 0, hh, 0.035 * kw, sh, q3, born, b.c[0] * jit, b.c[1] * jit, b.c[2] * jit, Math.max(0, st0 - hh * 0.8) * kh, flex, tone);
@@ -690,6 +734,7 @@ class Ring {
           }
         }
         left -= nf;
+      }
       }
     }
     const fl = !blooming && st.flower > 0 && st.flowers ? st.flower * sstep(0.50, 0.70, this.drift) * this.meadow * (1 - 0.6 * canopy) : 0;
