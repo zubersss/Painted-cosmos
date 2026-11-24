@@ -30,7 +30,8 @@
 import * as THREE from 'three';
 import { VERT_PARS, VERT_END, FRAG_PARS } from './chunks.js';
 import { FOG_VERT, SKYUP, PC_UP_F, FARCROWN, makePaintUniforms } from './materials.js';
-import { FRAME_HOOKS, register, OIL } from './shared.js';
+import { FRAME_HOOKS, register, OIL, PHYS } from './shared.js';
+import { FLORA_GLSL } from '../physics/flora.glsl.js';
 
 const _q = (() => { try { return new URLSearchParams(location.search); } catch { return null; } })();
 const _qn = (k, d, lo, hi) => { const v = _q && _q.has(k) ? +_q.get(k) : NaN; return isFinite(v) ? Math.max(lo, Math.min(hi, v)) : d; };
@@ -393,6 +394,13 @@ uniform vec4 uFarFam[PC_NFAR];
 uniform float uFarKind[PC_NFAR];
 uniform vec3 uFarBarkA[PC_NFAR];
 uniform vec3 uFarBarkB[PC_NFAR];
+#ifdef PC_PHYS
+// THE FAR WOOD LEANS WITH THE WIND (?farwind=1, the weather group's far wind field; the coordinator, 24 Nov). The same
+// bend every plant reads (physics flora.glsl.js pcPhysBendLite: the bend field near, the far field beyond it once it is
+// bound), taken once at the tree's foot, leans the quad over it as a stiff stem leans: the top moves, the foot does not.
+${FLORA_GLSL}
+uniform float uPhysOn;
+#endif
 varying vec3 vBody;
 varying vec3 vView;
 varying vec2 vQuad;
@@ -443,6 +451,13 @@ void main() {
   vec2 hwv = vec2(CR.w, HR.x * sqrt(1.0 - sinE * sinE) + CR.w * sinE);
   vec3 lp = CR.xyz + rt * (position.x * hwv.x) + up * (position.y * hwv.y) + dc * (HR.y * uImpAtlas.w);
   vec3 wp = (im * vec4(lp * vis, 1.0)).xyz;
+  #ifdef PC_PHYS
+    if (uPhysOn > 0.5) {
+      vec3 rootB = io + uOrigin, upP = normalize(rootB);
+      float Hp = 2.0 * HR.x * length(ir[1]);
+      wp = io + pcPhysDisplace(wp - io, upP, Hp, pcPhysBendLite(rootB, 1.0));
+    }
+  #endif
   vBody = wp + uOrigin;
   vec4 mv = modelViewMatrix * vec4(wp + pcRound(io + uOrigin), 1.0);
   vView = mv.xyz;
@@ -622,9 +637,12 @@ export function makeImpostorMaterial(bodyU, atlas, farMat, farcrown = FARCROWN) 
     uFarA: fu.uFarA, uFarB: fu.uFarB, uFarC: fu.uFarC, uFarFam: fu.uFarFam, uFarKind: fu.uFarKind, uFarBarkA: fu.uFarBarkA, uFarBarkB: fu.uFarBarkB,
   }, atlas.uniforms);
   const fc = (+farcrown).toFixed(4);
+  // (the far wind: the plants' own physics uniforms, shared by reference; ?farwind=1)
+  const wind = !!(_q && _q.get('farwind') === '1');
+  if (wind) Object.assign(own, PHYS, { uStiff: { value: 1 }, uPlantHeight: { value: 12 } });
   const m = new THREE.ShaderMaterial({
     name: 'pc-prop-far-impostor',
-    defines: Object.assign({ PC_IMPOSTOR: 1, PC_IMP_NV: Math.max(1, atlas.n), PC_NFAR: fu.uFarA.value.length }, _q && _q.get('impdebug') === '1' ? { PC_IMP_DEBUG: 1 } : null),
+    defines: Object.assign({ PC_IMPOSTOR: 1, PC_IMP_NV: Math.max(1, atlas.n), PC_NFAR: fu.uFarA.value.length }, _q && _q.get('impdebug') === '1' ? { PC_IMP_DEBUG: 1 } : null, wind ? { PC_PHYS: 1 } : null),
     uniforms: makePaintUniforms(bodyU, own),
     vertexShader: IMP_VERT,
     fragmentShader: IMP_FRAG.split('${FARCROWN}').join(fc).split('${IMPJIT}').join((+IMP.jit).toFixed(4))

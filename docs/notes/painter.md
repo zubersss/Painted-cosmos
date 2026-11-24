@@ -12,7 +12,9 @@ FV7 of `docs/lead/FARVIEW-DESIGN.md`. A second session (A2, branch `trees-near`)
 the same time: this lane touches only the far parts of `flora.js`, `florakit.js`, the plant material's far branch,
 `render/impostor.js`, `render/shadow.js` and new rows in `core/bench.js`.
 
-**State (update this line every step):** T0 committed (rows built and run in software: they work; their timings mean
+**State (update this line every step):** after the look director's review: the grain fix (cb5666f), the bake in steps
+(7a48921) and the far wind (`?farwind=1`) committed; impostors still behind `?fartree=impostor`, waiting for the owner's
+`&bench=trees` table and F's verdict on the grain crops. Before that: T0 committed (rows built and run in software: they work; their timings mean
 nothing here, only the owner's phone can time them). T1 (impostors) committed behind `?fartree=impostor`, SEEN in A/B
 stills at the phone's and the desktop's settings (`docs/shots/painter/trees-far/`); not yet the default (waits for the
 owner's phone: `&bench=trees` has the row). T4 committed: with the impostors on, the middle tree hands to the impostor
@@ -97,6 +99,14 @@ the phone prices both in one run.
 **Next:** A/B stills (5/10/18/30/45 m, autumn and green wood, phone and desktop) -> commit T2 split -> stills of cards
 and T5 (pixel-identical check) -> commit -> T3 (the middle tree) -> report each step to the coordinator and the look
 director (session_01R5Brhzz2JPPF6Ecz6XRQHx).
+**THE FAR WOOD IN THE WIND (`?farwind=1`, the weather group's far wind field).** With it the impostor material takes the
+plants' physics uniforms (`PHYS`, shared) and its vertex shader leans the quad over the tree's foot by `pcPhysBendLite`
+(one bend a tree, read at its foot; stiff 1), so the top moves and the foot does not. Today that function reads the bend
+field near the eye; once the look director binds `uPhysFar` (look-director shared.js) and the weather group's
+flora.glsl.js lands, the same call reads the far field beyond 128 m with no change here. SEEN only as a still (with
+`physics=1`): the impostors draw whole and lean a little; motion is for the phone. Row: 'far trees still in the wind'
+(on foot and 150 m up), which sets the impostors' own `uPhysOn` to 0.
+
 **THE BAKE IN STEPS (`ImpostorAtlas.bake(renderer, budgetMs)`).** One step is one tree at one level: its 64 views drawn
 into its own square of the target and that square read back (at most 2.4 MB) into the level's array. The frame hook runs
 as many steps as fit in 4 ms of a frame (`?impbake=<ms>`, 0 = all at once, which the stills here use), always at least
