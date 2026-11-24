@@ -176,6 +176,49 @@ export function unpackRGB565(v, out) {
   o[0] = ((n >> 11) & 31) / 31; o[1] = ((n >> 5) & 63) / 63; o[2] = (n & 31) / 31; return o;
 }
 
+// THE FAR DABS' PALETTE (FV6, C's request: the ground's attributes are 8-bit, so a drift's colour goes as an index into
+// a 16-colour palette the ground holds as a uniform vec3[16]). Built once a world from its biomes' flower kinds: each
+// kind's far colour (a white held to a top channel of 0.80), the same colours shared, and the two nearest merged (by
+// their number of kinds) until there are 16 or fewer. bloomPalette(S) = { colours: [16 x [r, g, b]] (padded with 0),
+// count, index: Map(kind -> 0..15) }.
+function farColour(c, out) {
+  const mx = Math.max(c[0], c[1], c[2]), mn = Math.min(c[0], c[1], c[2]);
+  const f = (mx - mn < 0.25 * mx && mx > 0.80) ? 0.80 / mx : 1;
+  out[0] = c[0] * f; out[1] = c[1] * f; out[2] = c[2] * f; return out;
+}
+const PAL = new WeakMap();
+export function bloomPalette(S) {
+  let P = PAL.get(S);
+  if (P) return P;
+  const groups = [];
+  for (const b of S.biomes) {
+    const f = b.oil && b.oil.flora;
+    if (!f || !f.blooms) continue;
+    for (const k of f.blooms) {
+      const c = farColour(k.c, [0, 0, 0]);
+      let g = groups.find((q) => Math.abs(q.c[0] - c[0]) + Math.abs(q.c[1] - c[1]) + Math.abs(q.c[2] - c[2]) < 1e-6);
+      if (!g) groups.push(g = { c, n: 0, kinds: [] });
+      g.n++; g.kinds.push(k);
+    }
+  }
+  while (groups.length > 16) {
+    let bi = 0, bj = 1, bd = 1e9;
+    for (let i = 0; i < groups.length; i++) for (let j = i + 1; j < groups.length; j++) {
+      const a = groups[i].c, b = groups[j].c, d = (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2;
+      if (d < bd) { bd = d; bi = i; bj = j; }
+    }
+    const A = groups[bi], B = groups[bj], n = A.n + B.n;
+    A.c = [0, 1, 2].map((e) => (A.c[e] * A.n + B.c[e] * B.n) / n); A.n = n; A.kinds.push(...B.kinds);
+    groups.splice(bj, 1);
+  }
+  const index = new Map(), colours = [];
+  groups.forEach((g, i) => { colours.push(g.c); for (const k of g.kinds) index.set(k, i); });
+  while (colours.length < 16) colours.push([0, 0, 0]);
+  P = { colours, count: groups.length, index };
+  PAL.set(S, P);
+  return P;
+}
+
 // how near a flower's colour lies to the ground's round the colour wheel: 1 the same hue or no hue (a white or a grey
 // flower), 0.33 opposite
 function hueNear(c, r, g, b) {
@@ -193,14 +236,15 @@ function hueNear(c, r, g, b) {
 // the dark roots are the ground's). Writes nothing else; with the look off or no data it returns at once.
 const _bo = { kind: -1, bloom: null, dens: 0, heart: 0 };
 const _fc = [0, 0, 0];
-// It also writes the DRIFT CHANNEL for the ground's far dabs (FV6, the far view's patchgen.js packs it into aFar.z/w):
-//   o.fd  0..1  the drift's cover (its density times its kind's tint; 0 where none)
-//   o.fc  0..1  its flower's colour packed RGB565, (r5 << 11 | g6 << 5 | b5) / 65535 (0 where none)
+// It also writes the DRIFT CHANNEL for the ground's far dabs (FV6, the far view's patchgen.js packs it into aFar):
+//   o.fd  0..1   the drift's cover (its density times its kind's tint; 0 where none)
+//   o.fi  0..15  its flower's colour as an index into bloomPalette(S).colours (C packs it as index / 15 in a byte)
+//   o.fc  0..1   the same colour packed RGB565, (r5 << 11 | g6 << 5 | b5) / 65535, for a reader with 16 bits
 // Both are 0 on a sample that is not full (bloomTint is not called) only if the reader resets them: patchgen reads them
 // from FULL samples, where this always runs first.
 export function bloomTint(S, o, x, y, z, bi) {
   const sw = bloomSwitches();
-  o.fd = 0; o.fc = 0;
+  o.fd = 0; o.fc = 0; o.fi = 0;
   if (!sw.air && !sw.grass2) return;
   if (sw.grass2) {
     const g = swardOf(S, bi);
@@ -235,6 +279,7 @@ export function bloomTint(S, o, x, y, z, bi) {
   const cmx = Math.max(c[0], c[1], c[2]), cmn = Math.min(c[0], c[1], c[2]);
   if (cmx - cmn < 0.25 * cmx && cmx > 0.80) { const f = 0.80 / cmx; _fc[0] = c[0] * f; _fc[1] = c[1] * f; _fc[2] = c[2] * f; o.fc = packRGB565(_fc); }
   else o.fc = packRGB565(c);
+  o.fi = bloomPalette(S).index.get(b) || 0;
   // (with the channel on, the far dabs carry the drift in its own colour, so the far colour does not carry it as well)
   if (!sw.far) { o.r2 += (c[0] - o.r2) * kf; o.g2 += (c[1] - o.g2) * kf; o.b2 += (c[2] - o.b2) * kf; }
 }

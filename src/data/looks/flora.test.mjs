@@ -68,6 +68,26 @@ test('the drift channel for the far dabs (FV6): a colour packs into 16 bits and 
   }
 });
 
+test('the far dabs\' palette (FV6): 16 colours or fewer, every kind indexed, each near its own far colour', async () => {
+  const { getSurface } = await import('../../world/surface.js');
+  const { bloomPalette } = await import('../../world/bloom.js');
+  const S = getSurface('earth'), P = bloomPalette(S);
+  assert.strictEqual(P.colours.length, 16);
+  assert.ok(P.count >= 6 && P.count <= 16, 'count ' + P.count);
+  let worst = 0, worstKind = '';
+  for (const { f, where } of floras) {
+    if (!where.startsWith('earth/')) continue;
+    for (const b of f.blooms) {
+      const i = P.index.get(b);
+      assert.ok(Number.isInteger(i) && i >= 0 && i < P.count, b.kind + ' has no index');
+      const mx = Math.max(...b.c), mn = Math.min(...b.c), k = (mx - mn < 0.25 * mx && mx > 0.80) ? 0.80 / mx : 1;
+      const d = Math.hypot(...b.c.map((v, e) => v * k - P.colours[i][e]));
+      if (d > worst) { worst = d; worstKind = b.kind; }
+    }
+  }
+  assert.ok(worst < 0.16, 'the worst kind, ' + worstKind + ', lies ' + worst.toFixed(3) + ' from its palette colour');
+});
+
 test('the year: a kind with no window is always in flower, and a window opens and closes', () => {
   for (let t = 0; t <= 1.0001; t += 0.05) assert.strictEqual(inFlower(null, t), 1);
   assert.strictEqual(inFlower([0, 1], 0.5), 1);
