@@ -319,8 +319,13 @@ C packs them (aBloom) and takes fi2 from 250-400 m, fades the cover on steep gro
 gives the bare ground none of the drift under 150 m, 0.45 by 250 m, 0.2 by 400 m. SEEN: with C's 21cb6fe the cliffs were
 clear and the drifts lay in regions of one or two colours (`fv6b-*`); a whole hillside in one red at 1 km and red on a
 peak were fixed by C in d4cab64, BUT d4cab64 also put patchgen.js's two index writes after a `//` comment (every dab
-palette 0: violet near the eye, `fv6c-am02-off-on-index-bug.jpg`); sent to C twice; the pair to re-render when C fixes it.
-`?bloomfar` stays 0 until the look director judges that pair.
+palette 0: violet near the eye, `fv6c-am02-off-on-index-bug.jpg`); C fixed it in 5221c6e. SEEN on 5221c6e (`fv6d-*`): near
+the eye the ground's strokes take each drift's colour, whole, no veil: from 10 m POOLS (lightness pattern 5.4 -> 8.2 px),
+but too strong (flower colour 25 -> 40 per cent of the frame, V>0.90 0.5 -> 8.2: C6 broken); the palette's top channel is
+now 0.82 for every kind (e9bdf57), and C was asked for fewer strokes in flower colour near the eye (about half below
+~60 m). From the air at the alpine view the channel adds little now (steep ground is C's rock; drifts on gentle strips).
+A merge of farview into this branch (with look-proto v39.3) conflicts in patchgen.js: the snow at `_col[c + 24]`
+("the water took 23") with farview's 3-wide drift line. `?bloomfar` stays 0 until the look director passes a pair.
 
 **Done:**
 1. Speed-test rows (`core/bench.js`, after 'no small plants'): 'no near grass', 'near grass: the blades only (the fine
