@@ -13,12 +13,20 @@ sky to a mile: look director), FV2-T and FV7 (the far trees and the air speed te
 `src/render/materials.js`, `src/world/terrain.js`, `src/world/patchgen.js`, `src/world/surface.js` (recipes and far
 colour only). NOT chunks.js, post.js, shared.js, world/index.js (look director), NOT flora.js, florakit.js (trees groups).
 
-**STATE (24 Nov, second session, mid-step):** FV2 and FV3 ON by default (the coordinator merged FV2 into look-proto,
-v39). FV4 step 2, THE COAST CLIFF, built and SEEN from the sea at E-W2's widest fall, behind `?rockfield=1` (still off
-by default): see FV4 below. In progress: its 150 m / 400 m / 1 km / straight-down A/B sheets, the mountain faces it also
-changes, then the canopy's 3 px floor (look director) and the ground's air cost (a lead: terrain.js sets
-`material.uniformsNeedUpdate` for every patch, so three.js re-sends the whole uniform list per patch per frame;
-being measured). Scratch: a worktree of farview + water-bodies (not pushed) for the falls stills.
+**STATE (24 Nov, second session):** FV2 and FV3 ON by default (FV2 merged into look-proto as v39). FV4 step 2, THE
+COAST CLIFF, built and SEEN at E-W2's widest fall, behind `?rockfield=1` (still off by default; the look director
+called step 1 fine to turn on once FV3's summer re-measure on look-proto is in). The canopy's 3 px floor (look director)
+built: `?canfloor=` (2.6 px; 0 none), its stills being taken. The ground's "30 ms from the air" is CLOSED (A2 measured
+about 50 patches and 60k vertices at 400 m: no such cost); my side note: terrain.js sets `material.uniformsNeedUpdate` for
+every patch, so three.js re-sends 59 uniforms per patch (4.7 us a patch here, 0.6 ms a frame at 150 m up: a small saving
+for later, e.g. a short uniform list after the first patch of a frame, textures always). SLOTS: in v39.2 the water keeps
+sample slot 23 (`still`), my snowK moves to 24 (the coordinator did it); W3's runoff cap/swell go to 25/26. QUEUED (in
+order): the mountain faces; merge v39.2 and check a ?rockfield=1 still, re-measure FV3 summer on foot for the look
+director; FV6(b) bloom from the air with flora B (a new 4-byte ground attribute: cover and a palette index, o.fd / o.fi
+from world/bloom.js on design-flora, palette bloomPalette(S).colours as a uniform vec3[16], behind ?bloomfar=1); E's
+runoff bed in dry colours where c.capOnly (behind ?runoff=1), the sand colour and the bar's under. Scratch: a worktree of
+farview + water-bodies (not pushed) for the falls stills; `fallcam.sh` places the camera relative to the widest fall
+(window.__pcGallery.state, S.hydro.falls).
 
 **STATE (24 Nov, end of the first session):** FV2 and FV3 built, seen, pushed, ON by default; FV4 a first step, pushed,
 OFF by default (`?rockfield=1`). Reviews asked of the look director and the coordinator for all three (stills in
