@@ -845,7 +845,7 @@ export function createWorld(scene) {
         }
       }
       // ---- THE WATER'S OWN FRAME (falls, puddles, the water's uniforms: world/waterhooks.js; nothing without a switch) ----
-      if (WATERH) WATERH.frame(st, dt, _camL, lighting);
+      if (WATERH) WATERH.frame(st, dt, _camL, lighting, physics);
     } else {
       // deep space: no atmosphere anywhere
       skyU.uAtmo.value.set(1, 1, 0.03, 1);

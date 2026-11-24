@@ -33,8 +33,15 @@ The weather group lands the rain field (its section 9.3: `fields.rain` at 32 a f
   5. the coast branch of `_generic`, right before `h = hh + C.n3(x * R / 9 ...`: `let lqC = NaN; if (this.hydro) { hh =
      this.hydro.coast(this, c, hh, T); lqC = c.lqC; }`, and right after `lq = this.sea == null ? 0 : this.sea;`:
      `if (lqC === lqC) lq = lqC;`;
-  6. `sample`: `c.still = c.bank = c.cap = c.swell = 0` beside `c.fu = 0; c.fv = 0;`, and `o.still = c.still; ...` beside
-     `o.fu = c.fu; o.fv = c.fv;` (written EVERY time: the v37 rule).
+  6. `sample`: `c.still = c.bank = c.cap = c.swell = 0; c.lvR = NaN; c.turbW = NaN; c.fspdW = 0` beside `c.fu = 0; c.fv = 0;`,
+     and `o.still = c.still; ...` beside `o.fu = c.fu; o.fv = c.fv;` (written EVERY time: the v37 rule);
+  7. (added 24 Nov for E-W2) right after the drainage block that sets `o.turb` and `o.fspd`: `if (c.turbW === c.turbW)
+     { o.turb = c.turbW; o.fspd = c.fspdW; }` -- a water part that owns the water there (a mouth cut, a pond, a fall) MAY set
+     c.turbW (0..1) and c.fspdW (m/s); without it E-W2's 380 m cut through the coast's berm painted white end to end;
+  8. (W1) in `_forest` right after the water level: `if (c.lvR === c.lvR) b.lq = c.lvR;` (the rivers' own level).
+- FOUND BY E-W2 (24 Nov): the flat 26 m shelf and sheer wall at Earth's coast (stills w10, w11 of the design) are sample()'s
+  BERM (a water group's ground lifted where its weight falls under 0.55-0.78), not the coast recipe; W2 cuts through it with
+  lane 0's hooks only.
 - `src/world/index.js`: a `let WATERH` beside `DRAIN`; two lines after `DRAIN.ensureDrainage` (fetch the hooks on first
   use when `MODE.water.on`; `WATERH.ensureWater(active.id)`), one line after the animals' block (`WATERH.frame(...)`).
 - `src/core/bench.js`: THE WATER VIEWS. The speed test's own view (the landing) has 0.0 % water, so two places on Earth
@@ -48,7 +55,14 @@ The weather group lands the rain field (its section 9.3: `fields.rain` at 32 a f
   Test: `src/world/waterhooks.test.mjs` (switches, nothing attached without a switch, the hooks asked only when attached,
   the fields written every time, the frame).
 
-### W1 RIVERS (built 24 Nov, this session; behind ?rivers=tree)
+### W1 RIVERS (built 24 Nov, this session; behind ?rivers=tree) -- REVIEWED BY F: PASS
+
+F (look director), 24 Nov, on ab-150m, ab-1km, ab-bank, ab-main150, ab-coast150, B-game-landing: "B is one river system
+where A was scraps; the brook at the landing sits right." Its one open point (the far water near V 0.8 against the rules'
+0.45-0.70; hue from the sky's zenith, not grey) is the paint's: forwarded to E-W3/W4 (session_01R5Bri2fSASVVvyrSG11UGF).
+The other water sessions: E-W2 bodies (lakes, ponds, puddles, falls, fjords), session_01R5Bri2xowNiwS1SnP3VG3f, branch
+water-bodies; E-W3/W4 paint and player (with FV5 and the night key), session_01R5Bri2fSASVVvyrSG11UGF, branch water-paint.
+This session is the water group's lead: it answers their questions on the design and their seams.
 
 - `src/world/drainage.js`: `keepTree` keeps `to`, a float `accF`, the routing order `ordR`; `rough` (2.5 m at 450 m) is laid on
   the base field for a SECOND flood used only for the routing (`lvlR`), so the levels (`lvl`, the lakes, the staircase) stay
@@ -61,7 +75,9 @@ The weather group lands the rain field (its section 9.3: `fields.rain` at 32 a f
   tributaries.
 - Earth's look: `oil.springs: [{ at: 'landing', up: 4, acc: 30 }]` keeps a brook by the landing.
 - MEASURED: 267 reaches (246 joins, 9 sea, 12 edge), 21 mouths, 13 lakes, 10,383 segments, 1.6 MB; sample 1.49 us against
-  2.29 us (today's rivers, same run), the river part 0.55 us; build 100 ms cold (63 warm) + drainage 57-75 ms. Game: landing
+  2.29 us (today's rivers, same run), the river part 0.55 us; BUILD, COLD, ON A QUIET MACHINE (three fresh processes, the
+  first build as the game makes it): drainage 54-55 ms (two floods 25) + rivers 90-92 ms (the index 62-66) = 143-147 ms,
+  inside the design's 150 ms (the 160-175 ms first reported were measured while test suites ran alongside). Game: landing
   view water 6.8 % (was 0.0), bank view 20.9 % (the search finds the new brook at 8 m).
 - PHONE COST, DERIVED (14 ns a water pixel, 32 ns a ground pixel, design section 2): landing view +0.33 ms of water (23,540 px;
   range 0.19-0.66), which replaces 0.75 ms of ground if the phone skips hidden ground; bank view 1.0 ms (today's 0.9). Script:
@@ -70,11 +86,41 @@ The weather group lands the rain field (its section 9.3: `fields.rain` at 32 a f
   as-set rows and the bank and shore views' no-water rows.
 - Stills: `docs/shots/painter/water-w1/` (A today | B tree, at the bank, 150 m over the landing, 150 m over the new main river,
   1 km, the coast; the tree maps; the game's landing and bank views).
+- AFTER THE PUSH (polish): the index packed flat (no per-node arrays: the same network to the pixel); the seam at the
+  exact/coarse switch (100 m) closed -- the coarse field undercut 100 m at 0.97 % of samples past it, by up to 37 m, which
+  would dip the hills along a line; now the two meet at 100 m and the river's level eases across the last 25 m. Test 7
+  walks out from the rivers and holds the ground's steps over 1 m to today's along the same lines (9,455 steps over 0.25 m
+  against today's 17,411; at the switch line no more than today's).
 - NOT DONE (said plainly): the drop to the sea at each mouth (W2's mouth cut and fall: the wood stands at least 12 m over the
-  sea everywhere on Earth); grey from the air (W3); basins flood only along channels (W2's lake beds); the build is 10-25 ms
-  over the design's 150 ms here.
+  sea everywhere on Earth); grey from the air (W3); basins flood only along channels (W2's lake beds).
+- TRIED AND REFUSED: the index built from a full window of the grid round each chunk (face arithmetic, no walk): 200 ms
+  against the walk's 65; the walk stays.
 - NEXT for W1, if the review asks: stronger meanders on the big rivers (references: long S-bends); the main river by the
   landing is now a brook (a spring with a larger catchment would bring a wider one past it: one number in Earth's look).
+
+### RUNOFF (data side built 24 Nov, this session; ?runoff=1 with ?rivers=tree): the owner's own ask
+
+"how the water collects and drifts into ponds or into runways into the rivers and oceans". The DATA is this session's, the
+DRAWING the water-paint lane's (E-W3/W4): the contract below was sent to it before building.
+- `src/data/mode.js`: `?runoff=1` (`MODE.water.runoff`; counts as a part that changes the world).
+- `src/world/rivers.js` (under runoff): the twigs are RUNNELS: about four in five of them run (half without runoff), and
+  they reach 160 m from a stream (110 without); `c.cap = 0.6` m on a runnel, and on the heads of the tree's smallest streams
+  (catchment under 40 nodes, eased from 24); the water level there is the FULL one. `c.swell` (how much water rises after
+  rain) is now also 0.6 of a lake's basin.
+- `src/world/waterstate.js` (new): `WATERSTATE = { wet, rise, mud, rain, from }`, a hydrograph at the eye stepped once a
+  frame (a WATER_PART): from the weather's rain field when the physics has it (`physics.fields.rain.rainBetween` over the
+  last 30 min and 3 h, asked twice a second), else from the ground's wetness (the world's `uWx.y`). `RUNOFF` holds the
+  numbers: runnels full at 2 mm in half an hour, up in 60 s, down in 600 s; streams up to 0.4 m for 20 mm in three hours,
+  up in 300 s, down in 1,800 s; mud 0.7 of the rise.
+- `src/world/waterhooks.js`: loads waterstate.js when `?runoff=1`; the frame's ctx now carries `physics` (world/index.js
+  passes it).
+- THE PAINT'S SIDE (E-W3/W4): `depthNow = vDepth - (1 - WATERSTATE.wet) * cap`, discard where none is left; the water lifted
+  by `WATERSTATE.rise * swell`; a swollen river browner by `mud`. Until that lands ?runoff=1 shows only the longer, denser
+  twigs, all the time.
+- SEEN (a Node map of the surface, not the renderer): `docs/shots/painter/water-runoff/map-runoff-storm-dry-3km.jpg`, the
+  runnels (cyan) running at full wet and gone in the dry.
+- Test: `src/world/runoff.test.mjs` (the switch; the hydrograph's timings; the part reading the rain field when there is
+  one, the wetness when not, not every frame; the data: runnels carry cap, rivers swell, the landing dry).
 
 ### W2 THE BODIES OF WATER (branch `water-bodies`, session_01R5Bri2xowNiwS1SnP3VG3f; READ THIS to pick W2 up)
 
@@ -103,9 +149,9 @@ Branch `water-bodies` = lane 0 + look-proto v37.1 + `origin/design-water` (W1's 
   - PUDDLES (`?puddles=1`, `oil.puddles`): `c.cap` (m at full wetness, at most 0.12) in the 15 m relief's hollows on slopes
     under 3 %. MEASURED near the landing: 2.6 % of dry ground, mean 3 cm. Drawn by W3's mesher and `uWet` (not built here).
   - LOAD (here): cuts 45 ms, ponds 25-30 ms (both at load, once a world).
-- **ASKED OF LANE 0 (24 Nov, waiting):** two lines in surface.js sample() so a water part can set its own churn and speed
-  (`c.turbW`, `c.fspdW`): without them the cut and a pond take the drainage field's slope across the coast blend and paint
-  WHITE all along (turb 0.26-0.47 measured in the cut). hydro.js already sets both.
+- **LANDED (lane 0 on design-water, merged into water-bodies 24 Nov):** `c.turbW` / `c.fspdW` in surface.js sample(): a
+  water part sets its own churn and speed. MEASURED in the main cut after the merge: turb 0 all along, 0.41 at the lip
+  (was 0.26-0.47 all along from the drainage field's slope across the coast blend).
 - Maps (Node, data drawn top down, not the renderer): `docs/shots/painter/water-w2/` (A today | B with the parts).
 - Scratch tools (not committed, in the session's scratchpad): `map.mjs` (top-down PNG of sample()), `cutprof.mjs` (a cut's
   long profile and cross sections against the bare surface), `lakes2.mjs`, `ponds.mjs`, `puddles.mjs`, `mouths.mjs`.
@@ -121,7 +167,7 @@ Branch `water-bodies` = lane 0 + look-proto v37.1 + `origin/design-water` (W1's 
 - **STEP 4 (commit f832ff2):** Earth's look keys `oil.lakeK 0.78`, `oil.ponds 0.25` (82 ponds), `oil.puddles 1`,
   `oil.fjords { every: 2, len, width, depth, minW: 8 }` (mouth 8 drowned, the main mouth stays a fall). `fallsView(S)` on
   the WATER_BENCH row as `place` for a falls view in core/bench.js (asked of its owner, exact lines sent).
-- **OPEN ASKS (sent to the coordinator):** lane 0's `c.turbW`/`c.fspdW` in sample() (else the cut paints white); W3's
+- **OPEN ASKS (sent to the coordinator):** W3's
   mesher must skip a water cell whose corners' levels differ by more than 2 m and half the cell (else a flat blue
   curtain stands behind every fall); bench.js's falls view; C: the berm's ruled, striped wall and the cut's banks in leaf
   paint (o.bank is written for whoever paints it).
