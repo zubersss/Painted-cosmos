@@ -18,9 +18,12 @@ with S-bends (aeca809), the index fix, mountain streams behind ?mount=1 (1eed43a
 white water is the paint's), THE DEFAULT FLIP in the oil look (4873c6a: rivers of the tree, lakes, ponds, puddles, fjord on;
 falls held), the speed test's falls view and ?bench=water (597ab63), the landing's river (c229268: Earth's oil.springs and
 oil.keep, the save's nudge to 24 m; ACCEPTED by the coordinator from the stills 1ec1984), E-W2's puddle fix merged (110b43e:
-round the landing 1.39 % of the dry ground). THEN (a877068): water-paint merged (f05eee3) with THE FALLS FLIP (W.falls = n('falls', d), E-W2's line, F passed the falls with the paint's curtain fix; they ship with water-paint, never before). THEN (2d40220, THE v39.2 WATER, the coordinator's ruling): ?wpaint defaults to 0 (v37's strokes: the look director found the sea from the air a blocky checker with ?wpaint=1 and 2); the falls stay on; stills v392-*.jpg. NEXT: merge look-proto when the coordinator says v39.1 has landed; W3 will later make its strokes the default for rivers and ponds only. OPEN: F's sand-bar notes (colour, grass,
-pebbles: C's recipe, asked; the trees' line can read c.barZone); the runoff paint (E-W3/W4) and its A/B in a storm; the
-falls flip (one line in mode.js when E-W2 sends it). The lead's sessions: coordinator session_01R5Bri1TV3HBTyuxNZZuhNw,
+round the landing 1.39 % of the dry ground). THEN (a877068): water-paint merged (f05eee3) with THE FALLS FLIP (W.falls = n('falls', d), E-W2's line, F passed the falls with the paint's curtain fix; they ship with water-paint, never before). THEN (2d40220, THE v39.2 WATER, the coordinator's ruling): ?wpaint defaults to 0 (v37's strokes: the look director found the sea from the air a blocky checker with ?wpaint=1 and 2); the falls stay on; stills v392-*.jpg. NEXT: merge look-proto when the coordinator says v39.1 has landed; W3 will later make its strokes the default for rivers and ponds only. THEN (24 Nov 13:25): the runoff A/B in a storm and after
+(RUNOFF below): it works; the dry gully keeps a bed's blue (C), the streams stay up three hours (a fix offered), the brown is weak.
+The coordinator (13:11): v39.1 is live, design-water 2d40220 is in v39.2's gate; merge look-proto only once v39.2 lands there.
+Order next: W3 splits rivers and ponds from the sea (strokes default there), E-W2 and W3 fix the sea, then the mountain streams.
+OPEN: F's sand-bar notes (colour, grass,
+pebbles: C's recipe, asked; the trees' line can read c.barZone). The lead's sessions: coordinator session_01R5Bri1TV3HBTyuxNZZuhNw,
 F session_01R5Brhzz2JPPF6Ecz6XRQHx, E-W2 session_01R5Bri2xowNiwS1SnP3VG3f, E-W3/W4 session_01R5Bri2fSASVVvyrSG11UGF,
 C session_01R5Bri2AMBsFiRcxvUUZMvu, D (weather) session_01R5Bri2bBgFSfCmxpKKuURT (src/physics/index.js is now the water's).
 
@@ -132,6 +135,26 @@ DRAWING the water-paint lane's (E-W3/W4): the contract below was sent to it befo
   runnels (cyan) running at full wet and gone in the dry.
 - Test: `src/world/runoff.test.mjs` (the switch; the hydrograph's timings; the part reading the rain field when there is
   one, the wetness when not, not every frame; the data: runnels carry cap, rivers swell, the landing dry).
+- THE A/B IN A STORM AND AFTER (24 Nov, 13:10-13:25, this session; W3's paint d18ca49 merged onto 7f3ad70 in a SCRATCH
+  worktree only, nothing of it pushed here). Gallery, oil, quality 1, 936x372, `?rivers=tree`, A `runoff=0`, B `runoff=1`.
+  WATERSTATE was PINNED to the hydrograph's own output (stepRunoff, 1 s steps, a storm of 30 mm/h for 20 min, then dry),
+  not timed live: STORM = minute 15 (wet 0.97, rise 0.089 m, mud 0.155) under `&wx=rain`; AFTER = minute 60 (wet 0.26,
+  rise 0.157 m, mud 0.275) under `&wx=after`. Stills `docs/shots/painter/water-runoff/`: `ab-near.jpg` (eye 2.5 m, 9 m from
+  the runnel 40 m north of the landing), `ab-150m.jpg`, `after-150m-crop-ab.jpg`, `near-dry-vs-storm.jpg` (the same frame,
+  state pinned dry vs storm). SEEN: in the storm the runnel runs full (a stream about 4 m wide in its gully); an hour after,
+  a thin ribbon down its middle; pinned dry, the gully bare. Without the switch that runnel is not there at all (the ground
+  is not carved). Within 300 m of the landing: 1,064 wet cells (3 m) without, 1,163 with, 139 of them water only in the wet
+  (and 40 heads of small streams become wet-only). From 150 m the runnels are under the trees; the river: same water area
+  in the storm (17,087 vs 16,881 water-blue pixels), a hint warmer; an hour after it reads GREYER, not brown (mud 0.28).
+  PROBLEMS FOUND: (1) THE DRY GULLY KEEPS A RIVER BED'S BLUE: its sample's second colour is (0.45, 0.63, 0.84), the bed's
+  colour under water, so the dry runnel reads as a ghost of painted water (`near-dry-vs-storm.jpg`, top). Where all the
+  water is cap water (cap >= depth) the bed wants the dry bed's colours: C's recipe, asked. (2) THE STREAMS STAY UP FOR
+  THREE HOURS: the rise's target comes from the rain of the last 3 h, so after a 20 min storm it holds 0.157 m until the
+  rain leaves that window (3 h 20 min), then falls over 30 min -- the header says it falls over tens of minutes. A fix
+  offered (waterstate.js is this session's): target from mm30 + 0.4 (mm180 - mm30) with riseMm 10 -- a peak of about
+  0.25 m at the storm's end, about 0.13 m within the hour, gone after three. (3) The swollen river's brown is too weak to
+  read from 150 m (F's call). For W3: after v39.2 C's snow takes patchgen slot 24, where water-paint packs the runoff's cap
+  (24, 25): they move to 25, 26 on water-paint's merge.
 
 ### THE DEFAULT FLIP (24 Nov, this session; the owner via the coordinator: reviewed work becomes the default tonight)
 
