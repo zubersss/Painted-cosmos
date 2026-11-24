@@ -22,9 +22,9 @@ export const UNDER_KITS = ['heather', 'gorse'];
 const KIT_GRID = 9;      // candidates a side in an undergrowth cell (about 2.7 m apart on Earth)
 let _u2 = null;
 export function under2On() {
-  // (also in a speed test, ?bench=, where the kits are placed whatever the address says and shown only with ?under=1,
-  //  so its row can ask the other way: core/bench.js; world/underkit.js starts their materials hidden without it)
-  if (_u2 == null) { try { const q = new URLSearchParams(location.search); _u2 = q.get('under') === '1' || q.has('bench'); } catch (e) { _u2 = false; } }
+  // (?under=1 only: a speed test without it places none, so its 'as set' is the game; its row places them while it runs,
+  //  setUnder2 and flora.rebuildUnder2, core/bench.js)
+  if (_u2 == null) { try { const q = new URLSearchParams(location.search); _u2 = q.get('under') === '1'; } catch (e) { _u2 = false; } }
   return _u2 && MODE.oil;
 }
 export function setUnder2(on) { _u2 = !!on; }      // (tests and the speed test: the address is read once)

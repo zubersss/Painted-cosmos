@@ -70,9 +70,7 @@ export function gorseGeometry(seed) {
 
 const GEO = { heather: heatherGeometry, gorse: gorseGeometry };
 const HEIGHT = { heather: 0.38, gorse: 0.75 };
-const REACH = 40;
-// (shown unless a speed test placed them without ?under=1, for its row to ask the other way: world/floraplace.js under2On)
-const SHOWN = (() => { try { return new URLSearchParams(location.search).get('under') === '1'; } catch (e) { return true; } })();        // (metres: no far form; past it the near ring's touches and the ground's colour carry the plant)
+const REACH = 40;        // (metres: no far form; past it the near ring's touches and the ground's colour carry the plant)
 
 // The kit for an undergrowth kind (U_KIT0 + k) in a biome: { geo, mat, lod }, made once and kept on the flora layer.
 // null for a kind that is not a kit, or a biome without that plant's data.
@@ -91,7 +89,6 @@ export function underKit(flora, kind, bi) {
     const L = pl.c.leaf;
     mat = makePropMaterial(flora.bodyUniforms, { name: 'under2-' + key, leafA: L[0], leafB: L[1], leafC: L[2], accent: pl.c.accent,
       wind: 0.05, doubleSide: true, phys: 'lite', stiff: 0.35, plantHeight: HEIGHT[name] });
-    mat.visible = SHOWN;
     C.mat.set(key, mat);
   }
   return { geo, mat, lod: [0, REACH, 0.3, 0.8] };

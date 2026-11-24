@@ -1135,6 +1135,11 @@ export class Flora {
     const span = on && LOOK.oil ? 1 << UNDER2_SHIFT : 2;
     if (span === U2SPAN) return;
     U2SPAN = span;
+    this.rebuildUnder2();
+  }
+  // (the speed test: every outer undergrowth cell let go and asked for again, as setU2Cells does; also after the flora
+  //  lane's undergrowth with a body is placed or taken away for its row, world/floraplace.js setUnder2)
+  rebuildUnder2() {
     for (const ch of this.under2Chunks.values()) {
       if (ch.queued) { const qi = this.queue.indexOf(ch); if (qi >= 0) this.queue.splice(qi, 1); ch.queued = false; }
       this._disposeChunk(ch);

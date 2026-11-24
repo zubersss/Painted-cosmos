@@ -29,6 +29,9 @@ const K = (a, b) => glazec(pig(a), pig(b));         // two washes laid one over 
 // with a touch of cobalt violet (Davy's with Payne's grey): the same pigments as ROCK_LOOK.mtn, so a boulder in the meadow
 // is a piece of the mountain above it. (The boulder's faces, light and steps are the shared prop paint's: unchanged.)
 const STONE_EARTH = [dilute(M('davysGrey', 'rawUmber', 0.3), 0.15), mixc(M('davysGrey', 'paynesGrey', 0.35), pig('cobaltViolet'), 0.1)];
+// (the sea coast's boulders take the coast cliff's own two bed tones instead, so a boulder on the cliff top matches the
+// cliff: the far view's ROCK_LOOK.earth c[0] and c[1], at C's word, 24 Nov)
+const STONE_COAST = [M('yellowOchre', 'davysGrey', 0.15), dilute(M('davysGrey', 'rawUmber', 0.4), 0.18)];
 const FLORA_TF = {      // the green wood: carpets under the open canopy, campion and foxglove at the edges, buttercup in damp glades
   // (the blades' own greens, F10 / LOOK-RULES R2.4, olive-gold in the light. MEASURED 24 Nov, the lit grass of the 1.8 m
   // stills, ?bladegreen=0 -> on: hue 70 -> 66 here and 72 -> 64 at the autumn landing, V 0.71 -> 0.69 and 0.72 -> 0.66, S
@@ -1034,7 +1037,7 @@ export default {
       // motionless in the lift off the 52 m cliff above -- that lift is the real wind field and not an
       // animation, and it is the cheapest spectacular thing in the whole list. Sixty gulls on a stack is one
       // field read and sixty bodies solved in the shader, not sixty solves.
-      oil: { flora: FLORA_SC, stone: STONE_EARTH, over: { life: { gull: 0.02, seal: 0.015, cormorant: 0.03, crab: 0.06, sheep: 0.08, fox: 0.03,
+      oil: { flora: FLORA_SC, stone: STONE_COAST, over: { life: { gull: 0.02, seal: 0.015, cormorant: 0.03, crab: 0.06, sheep: 0.08, fox: 0.03,
         raven: 0.05, hare: 0.25, heron: 0.04, teal: 0.02, otter: 0.015, eagle: 0.004, vulture: 0.004,
         swallow: 0.03, herring: 0.006 } } } }),
     B('desert_canyon', 'Desert Canyon', 'canyon',

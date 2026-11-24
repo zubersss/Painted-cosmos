@@ -713,6 +713,20 @@ export function attachBench(pc) {
       onFoot,
       [AS + ', last', null, null],
     ];
+    // (FV6, the far view's flower drifts in the ground's dabs, ON by default since v39.6: render/farground.js uBloomOn,
+    //  which the ground's frame sync (syncCanopy) sets every frame. The row hands three a uniform held at 0 for the row's
+    //  length and gives the real one back after: the same picture as ?bloomfar=0, the same program and meshes (the drifts'
+    //  attribute is still built and sent; only their paint, the dabs' and the bare ground's share, is taken away). A run
+    //  started with ?bloomfar=0 has nothing to take away: the row is then the same as 'as set'.)
+    const driftHold = (off) => {
+      for (const m of mats(/^pc-terrain/)) {
+        const u = m.uniforms;
+        if (!u || !u.uBloomOn) continue;
+        if (off && !u.__bloomOn) { u.__bloomOn = u.uBloomOn; u.uBloomOn = { get value() { return 0; }, set value(v) { /* held for the row */ } }; m.uniformsNeedUpdate = true; }
+        else if (!off && u.__bloomOn) { u.uBloomOn = u.__bloomOn; delete u.__bloomOn; m.uniformsNeedUpdate = true; }
+      }
+    };
+    const driftRow = ['no far flower drifts (?bloomfar=0)', () => driftHold(true), () => driftHold(false)];
     // ?bench=air[,h]: the air table (FV7, docs/lead/FARVIEW-DESIGN.md on r2), held h metres up (400 if not said),
     // 45 degrees down. The other air lanes' switches (canopy, the far water, the meadow, the rock, the air's top)
     // join here as rows when they exist.
@@ -733,6 +747,7 @@ export function attachBench(pc) {
           async () => { try { (await import('../world/terrain.js')).UPLIST.on = true; } catch { /* none */ } }],
         T0.a2c,
         ['no shadows at all', () => B({ shadow: false }), () => B({ shadow: true })],
+        driftRow,
       ]),
       ...(airH < 1000 ? airAt(1000, 45, [T0.noFar, T0.imp]) : []),
       onFoot,
@@ -756,11 +771,16 @@ export function attachBench(pc) {
       [AS, null, null],
       ...GRASS,
       denseRow,
+      driftRow,
       [AS, null, null],
       ['no small plants', () => show(/^pc-prop-(?!tall|far|under2)/, false), () => show(/^pc-prop-(?!tall|far|under2)/, true)],
       // (the flora lane's undergrowth with a body, package O, world/underkit.js: in a speed test the kits are always placed,
       //  shown only if the run started with ?under=1, and this row asks the other way; 'no small plants' leaves them alone)
-      [UNDER0 ? 'no undergrowth' : 'with the undergrowth', () => show(/^pc-prop-under2/, !UNDER0), () => show(/^pc-prop-under2/, UNDER0)],
+      //  (a run without ?under=1 places none, so 'as set' is the game: the row places them while it runs and takes them away
+      //  after, each time waiting for the outer cells to stand again; with ?under=1 the row hides them)
+      [UNDER0 ? 'no undergrowth' : 'with the undergrowth',
+        async () => { if (UNDER0) show(/^pc-prop-under2/, false); else { (await import('../world/floraplace.js')).setUnder2(true); const f = flora(); if (f && f.rebuildUnder2) { f.rebuildUnder2(); await standing(); } } },
+        async () => { if (UNDER0) show(/^pc-prop-under2/, true); else { (await import('../world/floraplace.js')).setUnder2(false); const f = flora(); if (f && f.rebuildUnder2) { f.rebuildUnder2(); await standing(); } } }],
       // (the outer undergrowth cells from their own placement cells, the flora lane's ?u2cells: the row asks the other way
       //  from how the run started; flora.setU2Cells lets every outer cell go and asks for it again, so each switch waits
       //  for the plants to be standing before the row is timed)
