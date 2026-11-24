@@ -188,25 +188,19 @@ void main() {
 `;
 
 const PENDING = new Set();
-let hooked = false;
+let hooked = false, TICK = 0;
+// (how many frames the painter has drawn since the first bake was asked for: flora.js steps the bake from its own
+//  update only when no frame came between two updates -- the gallery's settling loop, which waits for nothing to be
+//  busy without drawing -- so a game frame never pays for two steps)
+export function bakeTick() { return TICK; }
 function hook() {
   if (hooked) return;
   hooked = true;
   // (the bake needs the renderer and must run OUTSIDE a render: the painter's frame hooks run before the frame's
-  //  passes, render/index.js. The renderer is handed over by the first impostor mesh that is drawn, flora.js.)
+  //  passes, render/index.js. The renderer is handed over by the first far tree that is drawn, flora.js.)
   FRAME_HOOKS.push(() => {
-    for (const a of PENDING) {
-      if (a.ready || a.failed || !a.renderer) { PENDING.delete(a); continue; }
-      try {
-        // (THE GUARD, before the first step: the impostor program must compile on this device)
-        if (!a._probed) { a._probed = true; const why = a.probe(a.renderer); if (why) { a.fail(why); PENDING.delete(a); continue; } }
-        if (_q && _q.get('impfail') === 'bake') throw new Error('forced by ?impfail=bake');
-        if (a.bake(a.renderer, IMP.bakeMs > 0 ? IMP.bakeMs : Infinity)) {
-          PENDING.delete(a);
-          if (!a.texture || !a.hasTree()) a.fail('the atlas came out empty');
-        }
-      } catch (e) { a.fail('the bake threw: ' + ((e && e.message) || e)); PENDING.delete(a); }
-    }
+    TICK++;
+    for (const a of PENDING) a.step();
   });
 }
 
@@ -312,7 +306,26 @@ export class ImpostorAtlas {
     for (let i = 3; i < d.length; i += 4 * 97) if (d[i]) return true;
     return false;
   }
-  // asked by every impostor mesh while it is drawn and the atlas is not yet made
+  // ONE SLICE OF THE BAKE (IMP.bakeMs of it; all of it with ?impbake=0), the guard before the first: run by the frame
+  // hook, and by flora.js from its update when no frame came between (it is outside a render either way). When the
+  // last step is done and the atlas holds a tree, onReady is called, in that same call: flora swaps today's far trees
+  // for the impostors there and then. Returns true once the atlas is made or has failed.
+  step() {
+    if (this.ready || this.failed || !this.renderer) { PENDING.delete(this); return true; }
+    try {
+      // (THE GUARD, before the first step: the impostor program must compile on this device)
+      if (!this._probed) { this._probed = true; const why = this.probe(this.renderer); if (why) { this.fail(why); PENDING.delete(this); return true; } }
+      if (_q && _q.get('impfail') === 'bake') throw new Error('forced by ?impfail=bake');
+      if (this.bake(this.renderer, IMP.bakeMs > 0 ? IMP.bakeMs : Infinity)) {
+        PENDING.delete(this);
+        if (!this.texture || !this.hasTree()) this.fail('the atlas came out empty');
+        else if (typeof this.onReady === 'function') this.onReady();
+        return true;
+      }
+    } catch (e) { this.fail('the bake threw: ' + ((e && e.message) || e)); PENDING.delete(this); return true; }
+    return false;
+  }
+  // asked by every far tree's mesh while it is drawn and the atlas is not yet made (flora.js)
   request(renderer) {
     if (this.ready || this.failed || !renderer) return;
     this.renderer = renderer;
@@ -322,8 +335,10 @@ export class ImpostorAtlas {
   // THE BAKE IN STEPS (the coordinator, 24 Nov: 48 MB baked in one go was about ten seconds in software and an unknown
   // hitch on the phone at the first far draw). A step is one tree at one level: its 64 views drawn into its own square
   // of the target, and that square read back into the level's array. The frame hook runs as many steps as fit in
-  // IMP.bakeMs of a frame (always one), and the atlas is made when the last is done; till then the impostors draw
-  // nothing (uImpK.x 0). ?impbake=0: all at once (for stills). Returns true when done.
+  // IMP.bakeMs of a frame (always one), and the atlas is made when the last is done; till then flora draws today's far
+  // trees (the coordinator, 24 Nov: with the impostors drawing nothing until the last step, the far wood was gone for
+  // up to 8 s on the phone after every world load) and counts the bake as busy, so a still waits for it.
+  // ?impbake=0: all at once. Returns true when done.
   bake(renderer, budgetMs = 0) {
     const t0 = performance.now();
     const W = this.width, H = this.height, N = IMP.views;

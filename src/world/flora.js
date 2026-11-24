@@ -19,7 +19,7 @@ import { INST_STRIDE, U_GRASS, U_FERN, U_BUSH, U_ROCK, U_FLOWER, U_STONE, U_REED
 import { SEASON, leafNow } from '../data/season.js';
 import { FLORA_PHYS, TALL_KITS, farCardGeometry, farBlobGeometry, sortLeafCards, leafDrawCount, farTreeGeometry, grassGeometry, grassPatchGeometry, reedGeometry, fernGeometry, bushGeometry, rockGeometry, flowerGeometry, shardGeometry } from './florakit.js';
 import { makePropMaterial, TREE_DEPTH } from '../render/materials.js';
-import { ImpostorAtlas, makeImpostorMaterial, impostorQuadGeometry, IMP, IMP_SHADOW, makeImpostorShadowMaterial } from '../render/impostor.js';
+import { ImpostorAtlas, makeImpostorMaterial, impostorQuadGeometry, IMP, IMP_SHADOW, makeImpostorShadowMaterial, bakeTick } from '../render/impostor.js';
 import { treeCell, underCell, hasCell, TREE_LEVEL, UNDER_LEVEL } from './obstacles.js';
 import { QUALITY, G, LOOK, SCREEN, SHADOW, SHADOW_CROWD } from '../render/shared.js';
 import { SHADOW_LAYER, SHADOW_TIERS } from '../render/shadow.js';
@@ -325,7 +325,7 @@ export class Flora {
       grass: grassGeometry(31, { oil: LOOK.oil }), patch: grassPatchGeometry(37, { oil: LOOK.oil }), fern: fernGeometry(41, { oil: LOOK.oil }), reed: reedGeometry(81), bush: bushGeometry(51, { oil: LOOK.oil }),
       rock: rockGeometry(61), flower: flowerGeometry(71, { oil: LOOK.oil }), shard: shardGeometry(91),
     };
-    this.impOn = false;
+    this.impOn = false; this.impWant = false;
     if (LOOK.oil && FAR_IMP && this.mats.far) this._impostors(true);
     this.setHandover(HAND.near, HAND.mid);
   }
@@ -346,7 +346,10 @@ export class Flora {
   }
 
   // The far impostors made (once) and switched on or off. Every kind drawn far off as leaves gets two layers of the
-  // atlas, its two lod-0 trees; the atlas itself is baked the first time an impostor is drawn (render/impostor.js).
+  // atlas, its two lod-0 trees; the atlas itself is baked the first time a far tree is drawn (render/impostor.js).
+  // impWant: the impostors are wanted (made, not failed); impOn: and their atlas is baked, so they are drawn. Between
+  // the two (THE BAKE, over frames: up to 8 s on the phone after a world loads) today's far trees are drawn, and the
+  // frame the bake is done they hand over (_impReady).
   _impostors(on) {
     if (on && !this.imp) {
       const geos = [];
@@ -365,10 +368,25 @@ export class Flora {
       this.mats.imp = makeImpostorMaterial(this.bodyUniforms, this.imp, this.mats.far);
       // (the guard: if this device cannot draw them, today's far tree, and the hand-over as it was)
       this.imp.onFail = (why) => { this.impFailed = why; this.setFarForm(FAR_BLOB ? 'blob' : 'cards'); this.setHandover(HAND.near, HAND.mid); };
+      this.imp.onReady = () => this._impReady();
       this.kit.impQuad = impostorQuadGeometry();
     }
-    this.impOn = !!on && !!this.imp;
-    return this.impOn;
+    this.impWant = !!on && !!this.imp && !this.impFailed;
+    this.impOn = this.impWant && this.imp.ready;
+    return this.impWant;
+  }
+  // THE BAKE IS DONE: today's far trees hand over to the impostors in this very frame (render/impostor.js step(), run
+  // by the frame hook before the frame's passes, or by update()). Every far cell built while the bake ran holds both
+  // forms (_buildTrees), so nothing is dropped or built again: each cell is sorted into its tiers again at once, and
+  // so is each near cell, for the hand-over moves from 57 m to 45 m with the impostors.
+  _impReady() {
+    if (!this.impWant || this.impFailed || this.impOn) return;
+    const t0 = performance.now();
+    this.impOn = true;
+    this.setHandover(HAND.near, HAND.mid);
+    for (const ch of this.farChunks.values()) if (ch.built && ch.n && !ch.held && !ch.dead) this._retier(ch, true);
+    for (const ch of this.treeChunks.values()) if (ch.built && ch.n && !ch.held && !ch.dead) this._retier(ch, true);
+    this.impSwapMs = performance.now() - t0;
   }
 
   // Every wash this world's flora can be drawn with, each with a kit geometry it is drawn on (kits and
@@ -380,7 +398,7 @@ export class Flora {
     if (!this.ready) this._init();
     const K = this.kit, M = this.mats, out = this.species.flatMap((s) => (s.mat1 && s.mat1 !== s.mat ? [[s.mat, s.geo0[0]], [s.mat1, s.geo1]] : [[s.mat, s.geo1]]));      // (?trees2: each tier its own programs)
     if (M.far) out.push([M.far, K.far]);
-    if (this.impOn && M.imp) out.push([M.imp, K.impQuad]);
+    if (this.impWant && M.imp) out.push([M.imp, K.impQuad]);
     out.push([M.under, K.grass], [M.patch, K.patch], [M.bush, K.bush], [M.rock, K.rock], [M.shard, K.shard]);
     return out;
   }
@@ -443,7 +461,11 @@ export class Flora {
   }
 
   // (still busy while a wash is being laid: a frame taken when this reaches 0 shows nothing half arrived)
-  get busy() { return this.queue.length + (this.group.visible ? this.held.length + (this.washNow - this.lastLaid < WASH_T + 0.1 ? 1 : 0) : 0); }
+  get busy() { return this.queue.length + (this.group.visible ? this.held.length + (this.washNow - this.lastLaid < WASH_T + 0.1 ? 1 : 0) + this._baking() : 0); }
+  // (the far impostors' bake counts as busy from the frame it is asked for until the swap, so a still taken when the
+  //  world says it is ready shows the impostors and not the trees standing in for them; before the first far tree is
+  //  drawn it is not asked for, and a world that draws none never waits for it)
+  _baking() { return this.impWant && !this.impOn && this.imp && this.imp.renderer && !this.imp.failed ? 1 : 0; }
 
   // HOW MUCH OF THE WOOD IS STANDING: cells built and not thrown away, and the meshes of them being drawn. For
   // measuring whether the plants keep up with a player who is moving (the owner, 2026-11-22: "I want things far
@@ -539,8 +561,9 @@ export class Flora {
         }
       }
       if (u.uWashIn) u.uWashIn.value.set(flora.washNow, mesh.userData.laid, WASH_T);
-      // (a far impostor: its atlas is baked once, outside a render, by the next frame's hook: render/impostor.js)
-      if (far && material.userData.impAtlas && !material.userData.impAtlas.ready) material.userData.impAtlas.request(renderer);
+      // (the far impostors' atlas: baked once, outside a render, from the first frame a far tree of any form is drawn
+      //  in -- today's far trees stand in till it is done: render/impostor.js)
+      if (far && flora.impWant && !flora.impOn) flora.imp.request(renderer);
       if (u.uFocus) u.uFocus.value.copy(flora._focus(renderer, camera));
       if (u.uPlantHeight && mesh.userData.plantH) u.uPlantHeight.value = mesh.userData.plantH;
       material.uniformsNeedUpdate = true;
@@ -665,9 +688,11 @@ export class Flora {
         const spf = this.species[d[o + 5]], cf = spf && spf.cardFar;
         // (an impostor kind is in the impostor mesh; a kind that keeps today's far form on foot is in that mesh too,
         //  and _retier says which of the two draws it: see IMP_FOOT)
-        const im4 = this.impOn && spf && spf.impLayer >= 0;
+        // (and while the atlas is still being baked every kind is in today's far mesh as well, which _retier draws till
+        //  the bake is done: _impReady)
+        const im4 = this.impWant && spf && spf.impLayer >= 0;
         if (im4) add('4i', i, this.kit.impQuad, this.mats.imp, true);
-        if (!im4 || spf.footCards) add(cf ? '2c' : '2', i, cf ? this.kit.farCards : this.kit.far, this.mats.far, true);
+        if (!im4 || spf.footCards || !this.impOn) add(cf ? '2c' : '2', i, cf ? this.kit.farCards : this.kit.far, this.mats.far, true);
       }
       else {
         const kind = d[o + 5], v = d[o + 6] % 2, sp = this.species[kind];
@@ -970,7 +995,7 @@ export class Flora {
   // nothing to swap (not the oil look, or not yet made).
   setFarForm(form) {
     if (!LOOK.oil || !this.ready) return null;
-    const now = this.farForm || (this.impOn ? 'impostor' : this.species.some((sp) => sp.cardFar) ? (FAR_BLOB ? 'blob' : 'cards') : 'lump');
+    const now = this.farForm || (this.impWant ? 'impostor' : this.species.some((sp) => sp.cardFar) ? (FAR_BLOB ? 'blob' : 'cards') : 'lump');
     if (form === now) return now;
     // (the impostors stand in front of whatever far form the cards would be: the cards stay the tree of flat pieces)
     if (form === 'impostor') { if (this.impFailed || !this._impostors(true)) return now; this.farForm = form; this._dropFar(); return form; }
@@ -1204,6 +1229,9 @@ export class Flora {
       return;
     }
     if (!this.ready) this._init();
+    // (the impostors' bake, stepped from here only when no frame was drawn since the last update -- the gallery's
+    //  settling loop, which waits for nothing to be busy without drawing: render/impostor.js bakeTick)
+    if (this._baking()) { const tk = bakeTick(); if (tk === this._impTick) this.imp.step(); this._impTick = tk; }
     const k = this.rangeScale, kt = this.treeScale, kq = k + kt * 8 + this.farScale * 64;
     const t0 = performance.now();
     const prof = this.prof;
