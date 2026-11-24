@@ -48,7 +48,7 @@ import { SEASON } from '../data/season.js';
 let SW = null;
 export function bloomSwitches() {
   if (SW) return SW;
-  const f = { bloom: 1, air: 1, grass2: 1, year: 1, far: 0, pool: 1 };
+  const f = { bloom: 1, air: 1, grass2: 1, year: 1, far: 0 };
   try {
     const q = new URLSearchParams(location.search), on = (k) => !q.has(k) || (q.get(k) !== '0' && q.get(k) !== 'false');
     const isOld = q.get('flora') === 'old' || q.get('flora') === '0' || q.get('flora') === 'false';   // (the opt-out: nearground.js FLORA)
@@ -59,10 +59,8 @@ export function bloomSwitches() {
     // (FV6 with the far view, C: the drift's cover and colour go to the ground's far dabs as their own channel, aFar.z/w in
     // patchgen.js; 0 by default until C's half lands, then on together after stills at 150 m, 400 m and 1 km)
     f.far = f.air && q.get('bloomfar') === '1' ? 1 : 0;
-    // (audit 2, with the drift patch, nearground.js ?driftpatch: the ground under a drift's heart takes more of its colour)
-    f.pool = f.air && on('driftpatch') ? 1 : 0;
   } catch { /* no address to read (Node, the tests): everything on, if the look is */ }
-  if (!MODE.oil) { f.bloom = 0; f.air = 0; f.grass2 = 0; f.year = 0; f.far = 0; f.pool = 0; }
+  if (!MODE.oil) { f.bloom = 0; f.air = 0; f.grass2 = 0; f.year = 0; f.far = 0; }
   SW = f;
   return f;
 }
@@ -183,10 +181,15 @@ export function unpackRGB565(v, out) {
 // kind's far colour (a white held to a top channel of 0.80), the same colours shared, and the two nearest merged (by
 // their number of kinds) until there are 16 or fewer. bloomPalette(S) = { colours: [16 x [r, g, b]] (padded with 0),
 // count, index: Map(kind -> 0..15) }.
-function farColour(c, out) {
-  const mx = Math.max(c[0], c[1], c[2]), mn = Math.min(c[0], c[1], c[2]);
+// (a white or near-white flower's far colour takes a fifth of its eyes' colour, so a daisy drift laid in whole dabs reads
+// CREAM at its own value, not a grey-white: the look director on the pools, 24 Nov, "mixing white into green makes grey")
+function farColour(c, out, eye) {
+  let r = c[0], g = c[1], b = c[2];
+  const mx0 = Math.max(r, g, b), mn0 = Math.min(r, g, b);
+  if (eye && mx0 - mn0 < 0.25 * mx0) { r += (eye[0] - r) * 0.2; g += (eye[1] - g) * 0.2; b += (eye[2] - b) * 0.2; }
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
   const f = (mx - mn < 0.25 * mx && mx > 0.80) ? 0.80 / mx : 1;
-  out[0] = c[0] * f; out[1] = c[1] * f; out[2] = c[2] * f; return out;
+  out[0] = r * f; out[1] = g * f; out[2] = b * f; return out;
 }
 const PAL = new WeakMap();
 export function bloomPalette(S) {
@@ -197,7 +200,7 @@ export function bloomPalette(S) {
     const f = b.oil && b.oil.flora;
     if (!f || !f.blooms) continue;
     for (const k of f.blooms) {
-      const c = farColour(k.c, [0, 0, 0]);
+      const c = farColour(k.c, [0, 0, 0], k.eye);
       let g = groups.find((q) => Math.abs(q.c[0] - c[0]) + Math.abs(q.c[1] - c[1]) + Math.abs(q.c[2] - c[2]) < 1e-6);
       if (!g) groups.push(g = { c, n: 0, kinds: [] });
       g.n++; g.kinds.push(k);
@@ -292,18 +295,16 @@ export function bloomTint(S, o, x, y, z, bi) {
   // the middle and far rings now lay as dots of their own colour; the ground takes a third as much of it. A white, cream or
   // yellow flower near the grass's own hue tints as before.)
   const near = hueNear(c, o.r, o.g, o.b);
-  // (audit 2, ?driftpatch: THE POOL. SEEN 24 Nov: with the paint of the heads they replace, a drift's patches cover about 3
-  // per cent of its cells, and from 10 m they were scattered dots, not pools; the ground, painted anyway, is what can carry
-  // a pool at no cost: in a drift's heart it takes up to 0.7 of the flower's colour instead of 0.4, a white, cream or yellow
-  // flower only, as before: `near` keeps a red or a violet off the green, which mixed is mud)
-  const kn = cover * (sw.pool ? 0.4 + 0.3 * r.heart : 0.4) * near, kf = Math.min(0.7, cover) * near;
+  // (audit 2: a stronger tint in a drift's heart was tried, 24 Nov, and SEEN at the top tier to make pools from 10 m, but
+  // the wash is read per pixel by the bare ground between the ground's strokes, and the daisy pool lay as a milky veil with
+  // a soft rim, "like frost or fog" (the look director): the blur. The pool is to be carried by the ground's strokes alone,
+  // each whole in the flower's colour or not: the far view's drift channel, o.fd / o.fi below. Taken back to 0.4.)
+  const kn = cover * 0.4 * near, kf = Math.min(0.7, cover) * near;
   o.r += (c[0] - o.r) * kn; o.g += (c[1] - o.g) * kn; o.b += (c[2] - o.b) * kn;
   o.fd = Math.min(1, cover);
   // (the far dabs: a white or a near-white flower is held a step under the meadow's lightest grass -- the look director at
-  // 150 m: "pale near-white flecks on the slopes read as paper" -- its top channel no more than 0.80)
-  const cmx = Math.max(c[0], c[1], c[2]), cmn = Math.min(c[0], c[1], c[2]);
-  if (cmx - cmn < 0.25 * cmx && cmx > 0.80) { const f = 0.80 / cmx; _fc[0] = c[0] * f; _fc[1] = c[1] * f; _fc[2] = c[2] * f; o.fc = packRGB565(_fc); }
-  else o.fc = packRGB565(c);
+  // 150 m: "pale near-white flecks on the slopes read as paper" -- its top channel no more than 0.80; and cream, farColour)
+  o.fc = packRGB565(farColour(c, _fc, b.eye));
   o.fi = bloomPalette(S).index.get(b) || 0;
   // (o.fi2: the slope's kind, for the far dabs to take beyond a distance of the ground's choosing, so that near the eye the
   // ground under the flowers keeps their own colour; only with the channel on)
