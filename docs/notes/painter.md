@@ -143,7 +143,17 @@ Counts: a copy of `tools/overdraw.mjs` with `QUALITY.level` from the environment
 arrays counted group by group, part 7 thinned as a leaf, `where=spawn` (the spawn is the autumn wood of grove trees;
 its `where=autumn` stand is the green wood's broadleaves, where `?trees2` changes no geometry).
 
-**Next:** a cheaper sway for the near trees behind its own switch (the coordinator's ask); when the look director's
+**`?treesway=whole` (the coordinator's ask for a cheaper sway, 24 Nov):** the NEAR trees bend whole, as the middle trees
+already do (T3), without PHYSICS' per-branch crown (`pcPhysCrown`: two field lookups, 24 sines, 4 powers, 3 arctangents
+a vertex). Built as the near tier being given the middle tier's own programs (`-mid`, branch off; each mesh sets its
+tier's ranges before it is drawn, so one program serves both). With the two short programs only. Speed-test row 'near
+trees bend whole (no branch sway)' (`flora.js setTreeSway`, `core/bench.js`). SEEN: compiles and draws; the near
+programs are the `-mid` ones and swap back; the still at rest is PIXEL-IDENTICAL to the default (the gallery's held clock
+has no wind, so no still can show the sway): HOW IT LOOKS IN MOTION IS NOT KNOWN, only the owner's phone can show it.
+Note for the bench: the 9.5 ms 'near trees: no wind in shader' row cuts the wind of every tall material, the middle tier
+too, and the middle tier lost its crown sway with the split already; that row wants running again on the split default.
+
+**Next:** when the look director's
 L2 is final, merge `origin/look-director` and have the split's leaf paint call the same `pcShadeLeaf` (`LEAF_SUN`'s
 `pcLeafDeep` sits on those lines). Keep `PC_WOOD_FLIP` on (today's inside-out bark facing) until the look director
 settles it. NOT KNOWN: the guard on a real phone's driver (it rests on three's own link check, which is on by default
