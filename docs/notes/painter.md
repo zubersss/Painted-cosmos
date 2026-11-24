@@ -453,7 +453,14 @@ is 0.30 of 255 at 5 m and at 10 m (0.31 with `?light=old`, as before the merge);
 picture by 1.7, so the wood follows it; `?light=old&trees2=0` is pixel-identical to the still before the merge. Stills
 `A2_*-v39_*`. (The cards' own program, `CARD_FRAG`, does not take the one light: cards are dropped.)
 
-**THE PINES AS POLES (24 Nov, the coordinator's urgent check and the cure, `?pines=1`, OFF by default until F passes).**
+**THE PINES: PASSED BY THE LOOK DIRECTOR ('pines2', 24 Nov) AND NOW THE DEFAULT; `?pines=0` is the old way.** After the
+ruling: the spruce budgeted by bough ONLY in its middle form (the near spruce as approved), the 2.2 growth from 10 m and
+the 3 px floor, the needle mass held at V >= 0.24 from 20 m (median 0.231 against 0.169 at 20 m, seen); 3.0 refused.
+Stills `A2_pines2_*`. +2,934 triangles at the landing. A denser far spruce (baked from a by-bough tree) is for A1, after
+A1's crown masses; F raises it. Both needle blocks of PROP_VERT sit inside `#ifdef PC_OIL`: the watercolour game is
+untouched.
+
+**THE PINES AS POLES (24 Nov, the coordinator's urgent check and the first cure, `?pines=1`).**
 Not the split: on v39.1 the poles are the same with the one program (0.2 of 255; stills `A2_pines-v391_*`), and every
 leaf of every kit is identical with and without trees2 (Node). In the autumn wood the 'tall pines' near the camera are
 SPRUCES (no tall pine within the loaded patches): the spruce kit shares its needle budget out by limb length, so 685 of
