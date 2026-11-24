@@ -579,15 +579,27 @@ void main() {
   // edge, and a weaker wind (lower band values) turns fewer of them. The colour step is the ground's own (materials.js
   // pcGroundPaint, PC_GUST): paler, a little cooler, so a band crosses meadow and wood as one thing.
   // (the look director, 24 Nov, from 600 m: "the turned crowns are 2 to 3 pixels and each tree turns at its own
-  //  threshold, so the band becomes a salt of pale specks over the whole wood ... grain". So the spread of the trees'
-  //  thresholds narrows with the crown's width on the screen: under about 4 px every tree under a band turns at the same
-  //  value and the band is one patch with only its own ragged edge; from about 8 px up the spread is as it was, which
-  //  150 m keeps. And a small crown's step is two thirds as strong, so the far bands do not outshout the near ones.)
+  //  threshold, so the band becomes a salt of pale specks over the whole wood ... grain". Two things make the specks, and
+  //  both go as the crown gets small on the screen (gK: 0 at 4 px and under, 1 at 10 px and over, by its width):
+  //  * the band's own small islands: the noise under it carries finer octaves (its edge is ragged on purpose), and from
+  //    600 m an island a few crowns wide is a speck. A small crown reads the band as the mean of five points round its
+  //    foot, up to 20 m out, so an island smaller than that is not laid and a hole smaller than that is filled: the band
+  //    is one patch with its ragged edge. (MEASURED first with only the next item: no fewer specks.)
+  //  * the trees' own thresholds: their spread narrows to nothing, so the trees under a band turn together.
+  //  And a small crown's step is two thirds as strong, so the far bands do not outshout the near ones. From 10 px up
+  //  (the near wood from 150 m) all is as it was, which the look director passed.)
   #ifdef PC_GUST
     float gPx = 2.0 * hwv.x * length(ir[0]) / max(di * uOilPx.x, 1e-4);      // (the crown's width on the screen, px)
-    float gK = smoothstep(4.0, 8.0, gPx);
-    float gTh = 0.375 + (fract(inst.z * 4.37 + 0.11) - 0.5) * 0.45 * gK;
-    vGust = step(gTh, pcGustBand(io + uOrigin)) * 0.85 * mix(0.67, 1.0, gK) * uImpGust;
+    float gK = smoothstep(4.0, 10.0, gPx);
+    vec3 gF = io + uOrigin;
+    float gB = pcGustBand(gF);
+    if (gK < 0.999) {
+      vec3 gU = normalize(gF), gE = normalize(cross(abs(gU.y) < 0.9 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0), gU)), gN = cross(gU, gE);
+      float gR = 20.0 * (1.0 - gK);
+      gB = (gB + pcGustBand(gF + gE * gR) + pcGustBand(gF - gE * gR) + pcGustBand(gF + gN * gR) + pcGustBand(gF - gN * gR)) * 0.2;
+    }
+    float gTh = mix(0.3, 0.375 + (fract(inst.z * 4.37 + 0.11) - 0.5) * 0.45, gK);
+    vGust = step(gTh, gB) * 0.85 * mix(0.67, 1.0, gK) * uImpGust;
   #endif
   // the sun, up and the line of sight in the kit's own space (the crown's mass normals are measured there)
   mat3 rot = mat3(normalize(ir[0]), normalize(ir[1]), normalize(ir[2]));
