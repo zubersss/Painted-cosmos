@@ -30,7 +30,7 @@
 import * as THREE from 'three';
 import { VERT_PARS, VERT_END, FRAG_PARS, PAINT } from './chunks.js';
 import { FOG_VERT, SKYUP, PC_UP_F, FARCROWN, makePaintUniforms } from './materials.js';
-import { FRAME_HOOKS, register, OIL, PHYS, LOOK } from './shared.js';
+import { FRAME_HOOKS, register, OIL, PHYS, LOOK, SCREEN } from './shared.js';
 import { FLORA_GLSL } from '../physics/flora.glsl.js';
 import { FAR_SHADOW } from './shadow.js';
 
@@ -524,6 +524,7 @@ uniform vec3 uCamLocal;
 uniform vec4 uLod;
 uniform vec3 uWashIn;
 uniform float uImpMinPx;  // under this many pixels across a far crown is not drawn (IMP_MINPX; 0 every one)
+uniform float uImpTop;    // the scene pass's lines with the dynamic resolution at 1 (SCREEN.outH): R3.9's anchor
 uniform vec4 uOilPx;
 uniform vec3 uSunDirL;
 uniform vec4 uImpK;       // x baked (0: nothing is drawn yet), y views to a side, z texels to a view, w the coarsest level
@@ -647,7 +648,7 @@ void main() {
     vec4 cc = projectionMatrix * modelViewMatrix * vec4(io + ir * CR.xyz + pcRound(io + uOrigin), 1.0);
     float kx = rS * sqrt(projectionMatrix[0][0] * projectionMatrix[0][0] + 1.0), ky = rS * sqrt(projectionMatrix[1][1] * projectionMatrix[1][1] + 1.0);
     // (and a crown under uImpMinPx pixels across, where the painted canopy stands for it: IMP_MINPX)
-    bool tiny = uImpMinPx > 0.0 && uImpH[ly].w > 0.5 && 2.0 * CR.w * length(ir[0]) < uImpMinPx * (max(uOilPx.y, 1.0) / 480.0) * di * uOilPx.x;
+    bool tiny = uImpMinPx > 0.0 && uImpH[ly].w > 0.5 && 2.0 * CR.w * length(ir[0]) < uImpMinPx * (max(uOilPx.y, 1.0) / max(uImpTop, 1.0)) * di * uOilPx.x;
     if (vis <= 0.0 || tiny || cc.w < -rS || cc.x - cc.w > kx || -cc.x - cc.w > kx || cc.y - cc.w > ky || -cc.y - cc.w > ky) {
       gl_Position = vec4(0.0, 0.0, 2.0, 1.0);
       return;
@@ -749,7 +750,7 @@ void main() {
   //  made fewer specks: the specks are the turned crowns' own lit strokes, a paler third colour in a wood of 2 to 5 px
   //  crowns of lit and dark strokes. What the far bands should be is with the look director.)
   #ifdef PC_GUST
-    float gPx = 2.0 * hwv.x * length(ir[0]) / max(di * uOilPx.x, 1e-4) * (480.0 / max(uOilPx.y, 1.0));      // (the crown's width on the screen, px of a 480-line picture: R3.9)
+    float gPx = 2.0 * hwv.x * length(ir[0]) / max(di * uOilPx.x, 1e-4) * (max(uImpTop, 1.0) / max(uOilPx.y, 1.0));      // (the crown's width on the screen, px of this device's full-quality picture: R3.9)
     float gK = smoothstep(4.0, 10.0, gPx);
     float gTh = 0.375 + (fract(inst.z * 4.37 + 0.11) - 0.5) * 0.45 * gK;
     float gT = step(gTh, pcGustBand(io + uOrigin)) * uImpGust;
@@ -769,11 +770,14 @@ void main() {
   vDepth = ir * (dc * HR.y);
   vKB = vec2(uFarKind[sp], pow(max(dot(normalize(io - uCamLocal), uSunDirL), 0.0), 1.5));
   #ifdef PC_MASS
-    // (THE CROWN'S WIDTH IN PIXELS OF A 480-LINE PICTURE, LOOK-RULES R3.9, the look director, 24 Nov: every threshold of the
-    //  look written in pixels -- crown mass 30, one tone 4 to 7, bark as leaves 30, the filled gaps 8, the gust's small
-    //  crowns 4 to 10, ?impminpx -- is a size at 480 lines, so the design does not change with the picture's size and a
-    //  step of the dynamic resolution never flips a crown from strokes to a patch. At 480 lines the factor is 1, exactly.)
-    vMass = vec3(2.0 * hwv.x * length(ir[0]) / max(di * uOilPx.x, 1e-4) * (480.0 / max(uOilPx.y, 1.0)), clamp(0.5 + 0.5 * dot(vSunK, dc), 0.0, 1.0), famL.a);
+    // (THE CROWN'S WIDTH IN PIXELS OF THIS DEVICE'S FULL-QUALITY PICTURE, LOOK-RULES R3.9 as amended, look-director 88eb8ce:
+    //  every threshold of the look written in pixels -- crown mass 30, one tone 4 to 7, bark as leaves 30, the filled gaps
+    //  8, the gust's small crowns 4 to 10, ?impminpx -- is a size in real pixels of the scene pass with the dynamic
+    //  resolution at 1 (uImpTop, shared.js SCREEN.outH: the oil look draws every tier at full size), so a dynres step never
+    //  flips a crown from strokes to a patch, and a taller picture keeps its finer crowns: the desktop sets the look. At
+    //  full quality the factor is 1 exactly, the thresholds of v39.5. The first wording, pixels at 480 lines, made the
+    //  desktop's far crowns flat at 1.5 to 2.25 times their size.)
+    vMass = vec3(2.0 * hwv.x * length(ir[0]) / max(di * uOilPx.x, 1e-4) * (max(uImpTop, 1.0) / max(uOilPx.y, 1.0)), clamp(0.5 + 0.5 * dot(vSunK, dc), 0.0, 1.0), famL.a);
   #endif
   #ifdef PC_MASS_V
     // (CROWN MASS'S PAINT ONCE A CROWN, MASSV: exactly the fragment's chain for a leaf stroke of a crown under crown mass)
@@ -1199,6 +1203,7 @@ export function makeImpostorMaterial(bodyU, atlas, farMat, farcrown = FARCROWN) 
   //  flora.setCrownMass)
   own.uImpStorm = { value: IMP_STORM };
   own.uImpMinPx = { value: IMP_MINPX };
+  own.uImpTop = { get value() { return SCREEN.outH > 2 ? SCREEN.outH : 480; } };      // (R3.9: the device's full-quality lines, read each frame)
   own.uMassK = { value: new THREE.Vector4(0.0, 7.0, 30.0, 4.0) }; own.uMassK2 = { value: new THREE.Vector4(1.0, 0.65, 0.35, 30.0) };
   const gust = GUSTBANDS && !!PHYS.uPhysGust;
   if (gust) Object.assign(own, PHYS, { uImpGust: { value: 1 } });      // (the whole PHYS block by reference, as with the lean: FLORA_GLSL is compiled for the bands)
@@ -1254,6 +1259,7 @@ uniform vec4 uImpC[PC_IMP_NV];
 uniform vec4 uImpH[PC_IMP_NV];
 uniform vec4 uShK;
 uniform float uImpMinPx;
+uniform float uImpTop;
 uniform vec4 uOilPx;
 uniform float uImpShLen;  // how long a far crown's shadow is against the true one (FAR_SHADOW.len: the crown's height over its foot scaled)
 varying float vS;
@@ -1272,7 +1278,7 @@ void main() {
   vec2 HR = uImpH[ly].xy;
   mat3 ir = mat3(im);
   // (a crown too small to be drawn casts nothing either: IMP_MINPX)
-  if (uImpMinPx > 0.0 && uImpH[ly].w > 0.5 && 2.0 * CR.w * length(ir[0]) < uImpMinPx * (max(uOilPx.y, 1.0) / 480.0) * di * uOilPx.x) { gl_Position = vec4(0.0, 0.0, 2.0, 1.0); return; }
+  if (uImpMinPx > 0.0 && uImpH[ly].w > 0.5 && 2.0 * CR.w * length(ir[0]) < uImpMinPx * (max(uOilPx.y, 1.0) / max(uImpTop, 1.0)) * di * uOilPx.x) { gl_Position = vec4(0.0, 0.0, 2.0, 1.0); return; }
   vec3 d = normalize(inverse(ir) * uSunDirL);
   vec3 dh = vec3(d.x, max(d.y, 0.0), d.z);
   dh /= abs(dh.x) + dh.y + abs(dh.z) + 1e-6;
@@ -1337,7 +1343,7 @@ export function makeImpostorShadowMaterial(impMat, uInv) {
       uInv, uSunDirL: u.uSunDirL, uImpK: u.uImpK, uImpAtlas: u.uImpAtlas, uImpC: u.uImpC, uImpH: u.uImpH, uImpTex: u.uImpTex,
       // (with the far crowns' shadows, ?farshadow=1, the WHOLE crown casts: the ground reads the map taken down to a patch
       //  of some metres there, and a third of the strokes made a shade too thin to cross its threshold)
-      uShK: OIL.uShK, uThinLeaf: { get value() { return FAR_SHADOW.on ? 0 : 0.66; } }, uImpMinPx: u.uImpMinPx, uOilPx: OIL.uOilPx, uImpShLen: { get value() { return FAR_SHADOW.len; } },
+      uShK: OIL.uShK, uThinLeaf: { get value() { return FAR_SHADOW.on ? 0 : 0.66; } }, uImpMinPx: u.uImpMinPx, uImpTop: u.uImpTop, uOilPx: OIL.uOilPx, uImpShLen: { get value() { return FAR_SHADOW.len; } },
     },
     vertexShader: IMP_SH_VERT, fragmentShader: IMP_SH_FRAG, side: THREE.DoubleSide,
   });
