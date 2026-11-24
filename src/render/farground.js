@@ -275,9 +275,16 @@ void pcCanopyAt(vec3 P, vec2 ch, float stand, float needle, vec3 floorC, float l
 // worked out. Adds to main's acc and takes from its rem.
 void pcCanopyLayers(vec2 ch, vec2 dlx, vec2 dly, float o4x, float wpx, vec3 ocl, float rB, float rdx, float rdy, inout vec3 acc, inout float rem) {
   if (gCanOn < 0.5 || vFarS <= 0.02 || (uOilL.y > 0.5 && uOilL.y < 1.5)) return;
+  // (A CANOPY DAB IS NEVER UNDER ABOUT 3 PIXELS: the look director, 24 Nov. The ground's finest dab is AIMED at the
+  // same width in pixels at every distance (materials.js dabPx, from the stroke size and the picture's lines only), so
+  // the canopy's is PC_CAN_DAB of it everywhere in a frame; on a phone at its smaller picture that came under three
+  // pixels, a grain. There the next octave up is taken, for the whole frame at once: no line where it changes.)
+  float canK = PC_CAN_DAB, aimPx = 0.50 * uOilS.w * uOilA.x * uOilPx.y / 720.0;
+  if (canK * aimPx < 3.0) canK *= 2.0;
+  if (canK * aimPx < 3.0) canK *= 2.0;
   for (int LC = 0; LC < 2; LC++) {
     if (rem < 0.004) break;
-    float wsC = (LC == 0 ? 1.0 : 2.0) * PC_CAN_DAB, wC = o4x * wsC;
+    float wsC = (LC == 0 ? 1.0 : 2.0) * canK, wC = o4x * wsC;
     vec3 rndC, rndC2; vec2 dsC, ctrC; float covC, has2C;
     pcDabLayer(ch, dlx, dly, wC, uOilS.z, 4.0 * wpx * uOilS.w * wsC, ocl, LC == 0 ? vec2(0.35, 0.65) : vec2(0.0, 0.35), rndC, ctrC, dsC, covC, rndC2, has2C);
     if (covC <= 0.0) continue;
@@ -492,11 +499,15 @@ vec3 pcFaceCentre(vec2 ch, vec2 ctr, float face) {
 // top; gullies down the face where a slow field across it runs high, where the beds are lost under scree and the light
 // goes (gGully); the last metres over the sea wet and dark. A touch of the place's own hue, so a coast and a range
 // differ. Nothing here varies down the face but the beds: the fields are asked at the place with its height taken out.
-vec3 pcCliffC(vec3 Bc, float hB, vec3 rnd, vec3 c) {
+vec3 pcCliffC(vec3 Bc, float hB, vec3 rnd, vec3 c, float w) {
   vec3 hp = Bc * (uBodyR / max(length(Bc), 1.0));
   vec4 nG = textureLod(uNoise3D, hp / uRockB.y + 0.31, 0.0);
   vec4 nS = textureLod(uNoise3D, hp / (uRockB.y * 4.3) + 0.67, 0.0);
-  gGully = smoothstep(0.55, 0.70, nG.r + 0.25 * (nS.g - 0.5));
+  // (a gully and a bed are told apart only while a dab is smaller than they are: a far dab bigger than a bed drew a
+  // random bed's tone, and the far slopes were a confetti of cream, umber and slate, SEEN at 400 m and 1 km. Past that
+  // they go to the rock's mean, lit and shaded by the face's own facing alone.)
+  float kB = smoothstep(0.18, 0.5, w / uRockB.x), kG = smoothstep(0.12, 0.35, w / uRockB.y);
+  gGully = smoothstep(0.55, 0.70, nG.r + 0.25 * (nS.g - 0.5)) * (1.0 - 0.7 * kG);
   float hb = hB + 9.0 * (nS.b - 0.5) + 0.8 * (nG.a - 0.5);
   float q = hb / uRockB.x + 0.38 * sin(hb / (uRockB.x * 2.7));
   float bi = floor(q), f = q - bi;
@@ -506,6 +517,7 @@ vec3 pcCliffC(vec3 Bc, float hB, vec3 rnd, vec3 c) {
   vec3 tone = mod(bi, 2.0) < 0.5 ? (t < 0.72 ? uRockC0 : uRockC3) : (t < 0.6 ? uRockC1 : uRockC2);
   if (f < 0.10) tone = tone * vec3(0.60, 0.60, 0.66);
   else if (f > 0.89) tone = mix(tone, uRockC0, 0.55);
+  tone = mix(tone, 0.5 * (mix(uRockC0, uRockC3, 0.28) + mix(uRockC1, uRockC2, 0.4)), 0.85 * kB);
   tone = mix(tone, pcDensity(mix(uRockC1, uRockC2, 0.4), 1.15), gGully * 0.75);
   float lc = max(dot(c, vec3(0.3, 0.5, 0.2)), 0.05);
   tone = clamp(tone * mix(vec3(1.0), clamp(c / lc, vec3(0.7), vec3(1.4)), 0.08), 0.0, 1.0);
@@ -520,7 +532,7 @@ vec3 pcCliffC(vec3 Bc, float hB, vec3 rnd, vec3 c) {
 // THE CLIFFS (step 2): from 49 degrees, all of it by 60, at every distance, where the land has beds (strata: the coast,
 // the range; never a wood's cut bank): the world's own rock (pcCliffC). Its top and foot are broken by WHOLE DABS, each
 // rock or turf by its own number and a slow field against the share at its centre: a ragged edge, never a line.
-vec3 pcRockWash(vec3 c, float up, vec3 Bc, float strata, float dist, vec3 rnd) {
+vec3 pcRockWash(vec3 c, float up, vec3 Bc, float strata, float dist, vec3 rnd, float w) {
   float hB = length(Bc) - uBodyR;
   float far = smoothstep(0.82, 0.67, up) * smoothstep(80.0, 250.0, dist);
   float cl = smoothstep(0.66, 0.50, up) * smoothstep(0.05, 0.20, strata);
@@ -529,7 +541,7 @@ vec3 pcRockWash(vec3 c, float up, vec3 Bc, float strata, float dist, vec3 rnd) {
   gRock = max(far * uRockK, gCliff);
   gGully = 0.0;
   if (gRock <= 0.0) return c;
-  if (gCliff > 0.5) return pcCliffC(Bc, hB, rnd, c);
+  if (gCliff > 0.5) return pcCliffC(Bc, hB, rnd, c, w);
   float l = dot(c, vec3(0.3, 0.5, 0.2));
   vec3 rk = mix(vec3(l), c, 0.5);
   if (strata > 0.004) {

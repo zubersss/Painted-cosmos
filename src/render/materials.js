@@ -478,7 +478,7 @@ void pcGroundAt(vec2 ds, float w, vec3 rnd, out vec3 c, out float lvl, out float
   float upN = dot(nLc, normalize(Bc));
   #ifdef PC_ROCKF
     if (gFaceD > 0.5) upN = gFaceP.x;
-    c = pcRockWash(c, upN, Bc, 1.0 - colC.a, length(vView), rnd);      // (the far view, FV4: a rock face in its own value and beds, a cliff in the world's rock, render/farground.js)
+    c = pcRockWash(c, upN, Bc, 1.0 - colC.a, length(vView), rnd, w);      // (the far view, FV4: a rock face in its own value and beds, a cliff in the world's rock, render/farground.js)
     parC.z *= 1.0 - gRock;      // (no leaf shadow on a rock face: its pattern is laid flat and ran down a cliff in dark blocks, SEEN)
   #endif
   ${SKYUP('upN')}
@@ -904,7 +904,7 @@ void main() {
     #ifdef PC_ROCKF
       // (on a cliff the ground between the dabs is the cliff's rock at the pixel's own place, render/farground.js)
       float clP = smoothstep(0.66, 0.50, gFaceP.x) * smoothstep(0.05, 0.20, 1.0 - vCol.a) * gFaceOn;
-      if (clP > 0.0) { bareC = mix(bareC, pcCliffC(vBody, rB - uBodyR, vec3(0.5), bareC), clP); lvl0 = mix(lvl0, min(lvl0, 0.9), gGully * clP); }
+      if (clP > 0.0) { bareC = mix(bareC, pcCliffC(vBody, rB - uBodyR, vec3(0.5), bareC, o4.x), clP); lvl0 = mix(lvl0, min(lvl0, 0.9), gGully * clP); }
     #endif
     vec3 bare = pcTone(bareC, lvl0);
     #ifdef PC_ROCKDEBUG
