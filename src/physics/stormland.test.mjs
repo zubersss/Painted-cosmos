@@ -186,3 +186,32 @@ test('land storms: the weather lives under its own top, not under half the atmos
     assert.ok(now.precipitation.rate > 10, `${now.precipitation.rate.toFixed(1)} mm/h at 700 m under its own top`);
   } finally { W.setForcedCell(null); }
 });
+
+test('land storms: under storms, every flash of a storm over the place lights it (the same flashes the bolts are drawn for)', async () => {
+  const E0 = await earth(); if (!E0) return;
+  const was = WX2.cloudmap;
+  try {
+    on(E0); WX2.cloudmap = true;
+    let t = W.STORMLAND.from;
+    for (; t < W.STORMLAND.from + 30 * 1674; t += 20) if (W.cellsAt('earth', t).some((c) => c.land && c.kindId === 'storm' && c.w > 0.7)) break;
+    const cf = new CloudField(18);
+    E0.wm.refresh('earth', t, E0.sunAt(t)); cf.refresh('earth', t, E0.sunAt(t), E0.wm);
+    const c = W.cellsAt('earth', t).find((q) => q.land && q.kindId === 'storm' && q.w > 0.7);
+    // a place 30 % of the way out from the storm's middle, where its wider cloud shield covers it more than its core
+    let ex = c.z, ez = -c.x; const el = Math.hypot(ex, ez); ex /= el; ez /= el;
+    const a = 0.3 * c.r / 4000, u = { x: c.x * Math.cos(a) + ex * Math.sin(a), y: c.y * Math.cos(a), z: c.z * Math.cos(a) + ez * Math.sin(a) };
+    const here = new Set(), listed = new Set(), out = {};
+    const near = (i, g, tt) => { const q = W.cellsAt('earth', tt).find((z) => z.i === i && z.gen === g); return q && dist(q, u) < q.r * 0.9; };
+    for (let q = 0; q < 1200; q++) {
+      const tt = t + q * 0.05;
+      const w = W.weatherAt('earth', u.x, u.y, u.z, 30, tt, 18, { moist: 1 }, out);
+      if (w.lightning.last && w.lightning.last.t > tt - 0.06 && w.lightning.last.t <= tt) here.add(w.lightning.last.t.toFixed(3));
+      cf.step(0.05, 'earth', tt, E0.sunAt(tt), E0.wm);
+      const L = cf.flashesFor('earth', tt, u.x * 4001.7, u.y * 4001.7, u.z * 4001.7);
+      // (every storm cell flashing within its own radius and a half of the place: the ones whose light reaches it)
+      for (let i = 0; i < L.n; i++) if (L[i].t > tt - 0.06 && L[i].t <= tt && near(L[i].cell, L[i].gen, tt)) listed.add(L[i].t.toFixed(3));
+    }
+    assert.ok(listed.size >= 2, `${listed.size} flashes of the storm listed in a minute`);
+    for (const f of listed) assert.ok(here.has(f), `the storm's flash at ${f} s lit the place under it (it saw ${[...here].join(', ')})`);
+  } finally { WX2.cloudmap = was; off(); }
+});
