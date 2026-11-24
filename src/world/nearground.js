@@ -95,7 +95,7 @@ const FLORA = (() => {
 })();
 export { FLORA };
 const V = VISTA.on;
-const RINGS_OIL = [RINGS_WC[0], RINGS_WC[1], Object.assign({}, RINGS_WC[2], { pool: VISTA.pool }), {
+const RINGS_OIL = [Object.assign({}, RINGS_WC[0], { pool: bloomSwitches().year ? 1.25 : 1 }), RINGS_WC[1], Object.assign({}, RINGS_WC[2], { pool: VISTA.pool }), {
   name: 'vista', cell: 13, range: [0, 190 * V, 450 * V], per: 6,
   inner: [126 * V, 206 * V], innerQ: [[0, 0], [40 * V, 72 * V], [126 * V, 206 * V]], mark: [0, 0.45 * V, V],
   soft: 0.95, alt: 220, step: 1, vista: 1, grown: 1,
@@ -574,14 +574,22 @@ class Ring {
     // (the look director, 24 Nov: "mix kinds, leave gaps of grass between clumps". A cell is a clump of ONE kind, the
     // runner-up's where the map says two drifts run together; and one cell in three in a drift is grass, the clumps in
     // the others a third fuller, so the drift's plants a square metre are what they were)
-    if (H(523) < 0.33) return 0;
     // THE YEAR TURNING (the coordinator's ruling, 24 Nov: no place flowerless near the eye in any season): a cell holds the
     // clump the map gives it in summer AND the one it gives in autumn, each with its half of the year as its window, so
     // the vertex shader fades one out as the other comes in (materials.js NEAR_VERT; stalks and leaves too) and nothing is
     // ever laid again or seams. Held still (?season=) or not followed (?bloomyear=0), one clump as the map says now.
     const groups = this.bloomGroups(this.bg || (this.bg = []));
+    if (!groups.length) return 0;
+    const t = H(523);
+    if (groups.length === 1) return t < 0.33 ? 0 : this.layBloomClump(i, j, born, area, room, groups[0].o, groups[0].win, H);
+    // (two clumps: a third of the cells hold the summer one, a third the autumn one, a third both, the room shared; so in
+    // either half of the year two cells in three flower, as with one clump and its third of gaps, and each season's gaps
+    // are the other season's cells. COUNTED 24 Nov with the year moved to 0.85 in a page: laid one after the other, the
+    // summer clump took the whole room and the autumn bank was all but bare.)
+    const useS = t < 0.667, useA = t >= 0.333, H2 = (k) => H(k + 1000);
     let used = 0;
-    for (const g of groups) used += this.layBloomClump(i, j, born, area, room - used, g.o, g.win, H);
+    if (useS) used += this.layBloomClump(i, j, born, area, useA ? room >> 1 : room, groups[0].o, groups[0].win, H);
+    if (useA) used += this.layBloomClump(i, j, born, area, room - used, groups[1].o, groups[1].win, H2);
     return used;
   }
   // the clumps a cell holds: [{ o: bloomAt's answer, win: [from, to] or null (the kind's own) }]
@@ -706,11 +714,15 @@ class Ring {
     if (blooming) {
       // (the year turning: the summer drift's touches and the autumn drift's, each in its half of the year, as the near ring)
       const groups = this.bloomGroups(this.bg || (this.bg = []));
+      // (two groups: as the near ring, a third of the cells the summer drift's, a third the autumn's, a third both)
+      const ty = H(126), two2 = groups.length === 2, cap0 = left - 1;
       for (let gi = 0; gi < groups.length; gi++) {
       const o = groups[gi].o, win = groups[gi].win, ho = gi * 41;
+      if (two2 && (gi === 0 ? ty >= 0.667 : ty < 0.333)) continue;
+      const cap = two2 && ty >= 0.333 && ty < 0.667 ? cap0 >> 1 : left - 1;
       if (o.kind >= 0 && o.dens > 0.03 && left > 1) {
-        const b = o.bloom, sh = SHAPES[b.shape] || 0, v = o.dens * (far ? 10 : 9), yr = win ? packWin(win) : packYear(b), tone = (b.eye ? packTone(b.eye) : 0) + yr;
-        const nf = Math.min(left - 1, Math.floor(v) + (H(100 + ho) < v - Math.floor(v) ? 1 : 0));
+        const b = o.bloom, sh = SHAPES[b.shape] || 0, v = o.dens * (far ? 10 : 9) * (two2 ? 1.5 : 1), yr = win ? packWin(win) : packYear(b), tone = (b.eye ? packTone(b.eye) : 0) + yr;
+        const nf = Math.min(cap, left - 1, Math.floor(v) + (H(100 + ho) < v - Math.floor(v) ? 1 : 0));
         const b1 = b, sh1 = sh, tone1 = tone, B2 = o.bloom2, mx2 = o.mix;
         for (let q = 0; q < nf; q++, k++) {
           const q1 = H(102 + q + ho), q2 = H(106 + q + ho), q3 = H(110 + q + ho), p = at(q1, q2), jit = 0.94 + 0.12 * q2;

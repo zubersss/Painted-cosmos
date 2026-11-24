@@ -18,17 +18,24 @@ const K = (a, b) => glazec(pig(a), pig(b));         // two washes laid one over 
 // world/bloom.js and world/nearground.js; each biome below takes its own as `oil.flora`, so the watercolour game never
 // sees it). Every colour is mixed from the named pigments (M, D above), never a loose number. The fields are described
 // at the head of world/bloom.js. A flower is a step below the explorer's cloak in strength; the cloak leads.
+// (THE CLOAK'S BLUE is the one accent of its strength, LOOK-RULES R2.5: src/art/models.js CLOAK_BLUES, hue about 226.
+// The look director, 24 Nov: no flower head in hue 210-240 at a saturation over 0.45; bluebells and gentians sit in the
+// violet-blues, 245-265. src/data/looks/flora.test.mjs holds it.)
 const FLORA_TF = {      // the green wood: carpets under the open canopy, campion and foxglove at the edges, buttercup in damp glades
-  sward: { floor: 0.10, gm: 0.18, leaf: [M('sapGreen', 'quinGold', 0.4), M('sapGreen', 'oliveGreen', 0.5), M('oliveGreen', 'hookersGreen', 0.5)] },   // (the blades' own greens, olive-gold in the light: F10)
+  // (the blades' own greens, F10 / LOOK-RULES R2.4, olive-gold in the light. MEASURED 24 Nov, the lit grass of the 1.8 m
+  // stills, ?bladegreen=0 -> on: hue 70 -> 66 here and 72 -> 64 at the autumn landing, V 0.71 -> 0.69 and 0.72 -> 0.66, S
+  // 0.79-0.84 both ways (the ground under the blades, which is another lane's, and the paint's own richness): so the
+  // washes are quieter, olive with yellow ochre, and take less of the ground's colour, gm 0.12)
+  sward: { floor: 0.10, gm: 0.12, leaf: [M('oliveGreen', 'yellowOchre', 0.4), pig('oliveGreen'), M('oliveGreen', 'hookersGreen', 0.5)] },
   blooms: [
-    { kind: 'bluebell', shape: 'bell', c: M('ultramarine', 'cobaltViolet', 0.45), head: [0.010, 0.015], stalk: [0.16, 0.30], heads: [3, 6], drift: 8, peak: 22, share: 0.8, hab: { canopy: [0.05, 0.35] }, season: [0, 0.45], bold: 1 },
+    { kind: 'bluebell', shape: 'bell', c: M('cobaltViolet', 'ultramarine', 0.2), head: [0.010, 0.015], stalk: [0.16, 0.30], heads: [3, 6], drift: 8, peak: 22, share: 0.8, hab: { canopy: [0.05, 0.35] }, season: [0, 0.45], bold: 1 },
     { kind: 'wood anemone', shape: 'rayed', c: D('cobaltViolet', 0.86), eye: M('quinGold', 'lemonYellow', 0.4), head: [0.012, 0.018], stalk: [0.08, 0.16], heads: [1, 1], drift: 6, peak: 26, share: 0.7, hab: { canopy: [0.05, 0.30] }, season: [0, 0.35] },
     { kind: 'red campion', shape: 'rayed', c: M('alizarin', 'roseMadder', 0.5), head: [0.012, 0.019], stalk: [0.32, 0.58], heads: [1, 3], drift: 9, peak: 10, share: 0.6, hab: { canopy: [0.6, 0.1] }, season: [0, 0.8], bold: 1 },
     { kind: 'buttercup', shape: 'cup', c: mixc(K('lemonYellow', 'lemonYellow'), pig('lemonYellow'), 0.3), eye: K('lemonYellow', 'lemonYellow'), head: [0.011, 0.017], stalk: [0.24, 0.48], heads: [1, 4], drift: 10, peak: 16, share: 0.9, hab: { canopy: [0.5, 0.0], wet: [-0.6, 0.4] }, season: [0, 0.7], bold: 1 },
     { kind: 'foxglove', shape: 'spike', c: M('roseMadder', 'alizarin', 0.35), head: [0.14, 0.26], stalk: [0.55, 0.95], heads: [1, 1], drift: 12, peak: 3, share: 0.35, hab: { canopy: [0.7, 0.25] }, season: [0, 0.6], bold: 1 },
     // (the year, the coordinator's ruling of 24 Nov: every place keeps a bold kind in flower near the eye in every season;
     // in the green wood's autumn the cyclamen under the crowns and the hawkbit in the glades)
-    { kind: 'ivy-leaved cyclamen', shape: 'cup', c: M('roseMadder', 'cobaltViolet', 0.3), head: [0.012, 0.018], stalk: [0.06, 0.12], heads: [1, 3], drift: 7, peak: 16, share: 0.55, hab: { canopy: [0.05, 0.4] }, season: [0.45, 1], bold: 1 },
+    { kind: 'ivy-leaved cyclamen', shape: 'cup', c: M('roseMadder', 'cobaltViolet', 0.3), head: [0.012, 0.018], stalk: [0.06, 0.12], heads: [1, 3], drift: 10, peak: 20, share: 0.8, hab: { canopy: [0.05, 0.4] }, edge: -0.1, season: [0.45, 1], bold: 1 },
     { kind: 'autumn hawkbit', shape: 'rayed', c: mixc(K('lemonYellow', 'lemonYellow'), pig('lemonYellow'), 0.3), eye: pig('quinGold'), head: [0.014, 0.021], stalk: [0.14, 0.34], heads: [1, 2], drift: 11, peak: 14, share: 0.8, hab: { canopy: [0.45, 0.05] }, season: [0.4, 1], bold: 1 },
     // (the coordinator, 24 Nov: the bold kinds near the eye in every place; in the green wood's open glades, the ox-eye)
     { kind: 'ox-eye daisy', shape: 'rayed', c: D('neutralTint', 0.75), eye: M('quinGold', 'lemonYellow', 0.3), head: [0.020, 0.030], stalk: [0.25, 0.50], heads: [1, 2], drift: 10, peak: 14, share: 0.9, hab: { canopy: [0.45, 0.05] }, season: [0, 0.65], bold: 1 },
@@ -37,7 +44,7 @@ const FLORA_TF = {      // the green wood: carpets under the open canopy, campio
 const FLORA_AW = {      // the autumn wood: violet against the gold and yellow-green is the floor's own complement
   // (its trees stand apart over grass, so its flowers grow well under the crowns: the landing's canopy share is 0.66 and at
   // the old ramps, which ended at 0.5, the first place the owner sees had no flower in view, COUNTED 24 Nov)
-  sward: { floor: 0.10, gm: 0.18, leaf: [M('oliveGreen', 'quinGold', 0.45), M('sapGreen', 'quinGold', 0.3), M('oliveGreen', 'hookersGreen', 0.4)] },   // (the blades' own greens, olive-gold in the light: F10)
+  sward: { floor: 0.10, gm: 0.12, leaf: [M('oliveGreen', 'yellowOchre', 0.5), M('oliveGreen', 'rawSienna', 0.2), M('oliveGreen', 'hookersGreen', 0.4)] },   // (the blades' own greens, as the green wood's, a step more golden)
   blooms: [
     { kind: 'Michaelmas aster', shape: 'rayed', c: M('cobaltViolet', 'roseMadder', 0.15), eye: M('quinGold', 'cadOrange', 0.2), head: [0.012, 0.019], stalk: [0.28, 0.55], heads: [2, 4], drift: 9, peak: 11, share: 0.9, hab: { canopy: [0.88, 0.35] }, edge: -0.2, season: [0.3, 1], bold: 1 },
     { kind: 'harebell', shape: 'bell', c: pig('cobaltViolet'), head: [0.010, 0.015], stalk: [0.20, 0.36], heads: [1, 3], drift: 7, peak: 12, share: 0.6, hab: { canopy: [0.92, 0.4] }, edge: -0.2 },
@@ -58,7 +65,7 @@ const FLORA_AW = {      // the autumn wood: violet against the gold and yellow-g
 const FLORA_AM = {      // the alpine meadow: gentian and pinks on the high turf, globe flower in the damp, ox-eye on the dry
   sward: { floor: 0.08 },
   blooms: [
-    { kind: 'gentian', shape: 'cup', c: M('ultramarine', 'cobaltBlue', 0.3), head: [0.012, 0.019], stalk: [0.04, 0.10], heads: [1, 1], drift: 6, peak: 20, share: 0.8, hab: { height: [120, 380] }, season: [0, 0.55], bold: 1 },
+    { kind: 'gentian', shape: 'cup', c: mixc(K('cobaltViolet', 'cobaltViolet'), pig('ultramarine'), 0.2), head: [0.012, 0.019], stalk: [0.04, 0.10], heads: [1, 1], drift: 6, peak: 20, share: 0.8, hab: { height: [120, 380] }, season: [0, 0.55], bold: 1 },
     { kind: 'alpine aster', shape: 'rayed', c: M('cobaltViolet', 'roseMadder', 0.15), eye: M('quinGold', 'lemonYellow', 0.3), head: [0.014, 0.021], stalk: [0.10, 0.20], heads: [1, 1], drift: 8, peak: 12, share: 0.45 },
     { kind: 'ox-eye daisy', shape: 'rayed', c: D('neutralTint', 0.75), eye: M('quinGold', 'lemonYellow', 0.3), head: [0.020, 0.030], stalk: [0.25, 0.50], heads: [1, 2], drift: 10, peak: 16, share: 1.0, hab: { wet: [0.6, 0.0] }, season: [0, 0.6], bold: 1 },
     { kind: 'globe flower', shape: 'cup', c: mixc(K('lemonYellow', 'lemonYellow'), pig('lemonYellow'), 0.3), eye: K('lemonYellow', 'lemonYellow'), head: [0.016, 0.024], stalk: [0.25, 0.45], heads: [1, 1], drift: 9, peak: 10, share: 0.6, hab: { wet: [0.0, 0.5] }, season: [0, 0.45] },
@@ -110,9 +117,7 @@ export default {
   // (the oil look: Earth takes the look's golden hours whole: its wood is the owner's reference clip's)
   // (and in the oil look the explorer lands in the autumn wood: the first site and the first autumn site change places)
   // (rivers: the oil look's river system, src/world/surface.js _riversOil: channels that split and rejoin, pools, side streams)
-  // (airTop: the far-view design's FV1 on this world -- the ground's air, the cloud deck, the relief's rounding and the
-  // visibility follow the horizon's dip; world/index.js AIRTOP. Earth is the only world it has been looked at on.)
-  oil: { gold: 1, sites: { 0: 'autumn_woodland', 4: 'temperate_forest' }, rivers: 1, riverAt: [53.82, -8.34, -2.78], leaves: 0.5, airTop: 1 },
+  oil: { gold: 1, sites: { 0: 'autumn_woodland', 4: 'temperate_forest' }, rivers: 1, riverAt: [53.82, -8.34, -2.78], leaves: 0.5 },
   flora: {
     tall: [
       { kit: 'broadleaf', scale: 1.25, vary: 1, bark: [[0.975, 0.965, 0.945], [0.27, 0.24, 0.26]], leaf: [[0.76, 0.85, 0.42], [0.58, 0.75, 0.36], [0.40, 0.58, 0.42]], barkP: [0.675, 0, 1.3, 0.25], leafP: [0.85, 0.34, 1.0, 0.28], wind: 0.10, far: [13.5, 11.8, 0], obs: [0.34, 11.5],

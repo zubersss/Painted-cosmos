@@ -48,6 +48,16 @@ test('every flower kind is drawable', () => {
   }
 });
 
+test('no flower head at the cloak\'s blue (LOOK-RULES R2.5: hue 210-240 at S over 0.45 is the cloak\'s alone)', () => {
+  const hs = (c) => { const mx = Math.max(...c), mn = Math.min(...c), d = mx - mn; if (d < 1e-6) return [0, 0];
+    let h = mx === c[0] ? ((c[1] - c[2]) / d) % 6 : mx === c[1] ? (c[2] - c[0]) / d + 2 : (c[0] - c[1]) / d + 4; h *= 60; if (h < 0) h += 360; return [h, d / mx]; };
+  for (const { where, f } of floras) for (const b of f.blooms) for (const k of ['c', 'eye']) {
+    if (!b[k]) continue;
+    const [h, sat] = hs(b[k]);
+    assert.ok(!(h >= 210 && h <= 240 && sat > 0.45), where + ' ' + b.kind + '.' + k + ' at hue ' + h.toFixed(0) + ' S ' + sat.toFixed(2) + ': the cloak\'s blue');
+  }
+});
+
 test('the year: a kind with no window is always in flower, and a window opens and closes', () => {
   for (let t = 0; t <= 1.0001; t += 0.05) assert.strictEqual(inFlower(null, t), 1);
   assert.strictEqual(inFlower([0, 1], 0.5), 1);
