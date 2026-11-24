@@ -440,8 +440,16 @@ Branch `water-bodies` = lane 0 + look-proto v37.1 + `origin/design-water` (W1's 
   0.2 .. 0.5). The sea-only lines where vOpen >= 0.75 (wpL always the sea there). SEEN: the strait's chop across the view,
   the coast in level bands (`sea-foreshortened-...-v37-before-now.jpg`, `sea-strait150-crop-v37-before-now.jpg` on
   water-sea). PROVEN: default against water-paint 05bfe0a's files, at most 28 of 518400 pixels by 2 of 255.
-- NEXT: F's word on 9ec9b3a; then the sea's sparkle (sparse light strokes toward the sun, a few dark troughs) if F wants
-  it; after the branches meet (the coordinator's call): the pool's pcThinLayer to W3's
+- **F on 9ec9b3a: (a) and (b) ACCEPTED.** FIRST THING TO CHECK IN MOTION ON THE OWNER'S DEVICE (F's order): at a grazing
+  look the sea's strokes turn as the eye turns (yaw), because the foreshortening takes the eye's forward for the whole frame.
+  If it swims, the fallback is the crests alone (kG = 0 in WATER_FRAG; the strait then reads as planks again).
+- **THE SEA'S SPARKLE (water-sea ca13cff; W3's 6fcd2ed merged on top, 25e5cde):** far still sea only (so): whole light
+  strokes, more and brighter toward the sun's side (15-22 %, to value 0.88, capped 0.90), whole dark troughs (16 %, to 0.42).
+  MEASURED value p5 / p95 / sd: strait 150 m 0.42 / 0.88 / 0.118 (v37 0.151), coast 150 m 0.41 / 0.88 / 0.127 (v37
+  0.151); 400 m still short (0.105 and 0.089 against 0.138 and 0.117). The POINTED DASH ENDS are W3's (waterchunk.js, all
+  water at the new paint); F's full sheet and the strait crop go when they land. F passes ?wsea for the coordinator's
+  default decision only if it then reads at least as well as v37 in all four rows.
+- NEXT: W3's pointed ends, then the sheet to F; after the branches meet (the coordinator's call): the pool's pcThinLayer to W3's
   pcWStrokes, pcFallMilk and the FALL_ colours into waterchunk.js.
 - Camera places for the falls views: `fallsView(S)` and the scratch `fallcams.mjs` (sea60, sea150, air400, bank, E7).
 
