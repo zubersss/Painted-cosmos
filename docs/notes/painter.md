@@ -13,6 +13,16 @@ sky to a mile: look director), FV2-T and FV7 (the far trees and the air speed te
 `src/render/materials.js`, `src/world/terrain.js`, `src/world/patchgen.js`, `src/world/surface.js` (recipes and far
 colour only). NOT chunks.js, post.js, shared.js, world/index.js (look director), NOT flora.js, florakit.js (trees groups).
 
+**STATE (24 Nov, end of the first session):** FV2 and FV3 built, seen, pushed, ON by default; FV4 a first step, pushed,
+OFF by default (`?rockfield=1`). Reviews asked of the look director and the coordinator for all three (stills in
+`docs/shots/painter/farview/`). Waiting on: the look director's ruling, the slope chart (L8) for FV4, the canopy's row in
+bench.js's air table (sent to the coordinator; PILOT's file). The branch merges clean with look-proto, look-director,
+trees-far and main. Guards: the watercolour game identical to v37.1 (0 pixels), the autumn wood on foot identical (0).
+The lab: `PC_LAB_STATE=<scratch>/lab.json node tools/lab.mjs serve` (background, it is stopped after two hours), then
+`open` a gallery address and `grab`; the views used are cam=high with dy/pitch (150 m dy=-270, 400 m dy=-20, 1 km dy=580,
+pitch -16.4 for 45 deg, -61 for straight down; alpine pitch -1.4), phone 1024x480 quality=1 lite=1 t=0, desktop 1280x720
+quality=2 lite=0. `?candebug=1` colours each canopy dab by what it is.
+
 **FV2, THE PAINTED CANOPY (`?canopy=0|1`, default 1; the oil look on Earth only).** BUILT AND SEEN in stills (list below).
 - `src/world/farstand.js` `standAt`: at every ground vertex, the tree placer's OWN keep share there (`stand`, 0..1: the
   clump field, s.trees, the outside-the-woods group field, water) and the share of needle trees (the grove field picks
