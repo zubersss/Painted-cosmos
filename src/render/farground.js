@@ -596,8 +596,10 @@ float pcRockPlanes(float lvl, vec3 nV, float sunny) {
   // cloud every plane goes down with it. A first form put the lit plane at full light and the side at the local colour:
   // on a light grey family the two were nearly one value, and a range seen with the sun behind the eye had no dark side
   // at all, SEEN at 150 m at noon; the references' rock is mid-value.)
-  float s1 = smoothstep(-0.30, -0.20, b), s2 = smoothstep(0.30, 0.40, b);
-  float lp = max(pcLevel(0.75, 0.02) - mix(mix(2.4, 1.6, s1), 0.5, s2) - 0.5 * gGully * (1.0 - s2), 0.0);
+  // (the lit plane only for a face squarely toward the sun's bearing, over 0.55: from 0.35 a range seen with the sun behind
+  // the eye was all one lit plane, flat grey, SEEN at 420 m at noon)
+  float s1 = smoothstep(-0.20, -0.10, b), s2 = smoothstep(0.50, 0.60, b);
+  float lp = max(pcLevel(0.75, 0.02) - mix(mix(2.4, 1.4, s1), 0.5, s2) - 0.5 * gGully * (1.0 - s2), 0.0);
   lp = mix(min(lp, 1.0), lp, sunny);
   return mix(lvl, lp, gRock);
 }
