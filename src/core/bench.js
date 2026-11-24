@@ -232,6 +232,10 @@ export function attachBench(pc) {
     const farMeshes = (fn) => pc.scene.traverse((o) => { if (o.isMesh && o.material && /^pc-prop-far/.test(mname(o))) fn(o); });
     const treeMeshes = (fn) => pc.scene.traverse((o) => { if (o.isMesh && o.material && /^pc-prop-(tall|far)/.test(mname(o))) fn(o); });
     const flora = () => (pc.world && pc.world._flora) || null;
+    // (the flora lane, 2026-11-24, docs/lead/FLORA-DESIGN.md 4.4) THE NEAR GRASS: the rings of painted marks round the eye
+    // (world/nearground.js), one material each, all named pc-near. They are in no other row: 'no small plants' takes the
+    // PROP undergrowth only, and the plants' flat modes do not reach the near grass's shader.
+    const nearRings = (fn) => { const n = pc.world && pc.world._near; if (n && n.rings) for (const r of n.rings) fn(r); };
     // (the far trees' form swapped while the test runs, world/flora.js setFarCards: the two forms are then timed in the
     // same minute, on a phone as warm for the one as for the other)
     const cards0 = !!(flora() && flora().species && flora().species.some((sp) => sp.cardFar));
@@ -521,6 +525,18 @@ export function attachBench(pc) {
       ...T2ROWS,
       ['no trees', () => show(/^pc-prop-(tall|far)/, false), () => show(/^pc-prop-(tall|far)/, true)],
       ['no small plants', () => show(/^pc-prop-(?!tall|far)/, false), () => show(/^pc-prop-(?!tall|far)/, true)],
+      // (the flora lane) what the near grass costs, all of it and its finest ring alone. Its material's own `visible` is
+      // the switch: the ring's update moves its mesh, never this.
+      ['no near grass', () => nearRings((r) => { r.material.visible = false; }), () => nearRings((r) => { r.material.visible = true; })],
+      ['near grass: the blades only (the fine ring and the carpet)', () => nearRings((r) => { r.material.visible = r.cfg.name === 'fine' || !!r.cfg.carpet; }),
+        () => nearRings((r) => { r.material.visible = true; })],
+      // (G2, FLORA-DESIGN.md 6.2) the carpet of blades near the feet, which four times the near blades are bought with
+      ['no carpet of near blades', () => nearRings((r) => { if (r.cfg.carpet) r.material.visible = false; }), () => nearRings((r) => { r.material.visible = true; })],
+      // (F2, FLORA-DESIGN.md 7.2) the flowers' heads near the eye (their stalks stay: they are blades to the shader)
+      ['no flower heads', () => nearRings((r) => { r.material.uniforms.uNearK.value.z = 1; }), () => nearRings((r) => { r.material.uniforms.uNearK.value.z = 0; })],
+      // (G1, FLORA-DESIGN.md 6.1) the marks outside the picture shaded whole again, as before the cull: what the cull saves
+      ['grass not culled off-screen', () => nearRings((r) => { r.__k = r.material.uniforms.uNearK.value.x; r.material.uniforms.uNearK.value.x = 0; }),
+        () => nearRings((r) => { r.material.uniforms.uNearK.value.x = r.__k == null ? 1 : r.__k; })],
       // (2026-11-20) WHERE THE DRAW CALLS ARE. The table's header says 350 of them and 9.6 ms of script, and a draw
       // call costs a phone's processor something like twenty millionths of a second, so the two numbers are most
       // likely the same number. Counted in the painter's gallery on one frame of the autumn wood: 245 draws, of
