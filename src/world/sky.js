@@ -652,15 +652,20 @@ void main() {
       // overhead and away from it, where the zenith key's blue shows and the low sky goes a cool lilac. Laid in four
       // steps round the sky (by the angle to the sun, its edges a pixel wide and wandering with the sky's own noise)
       // and on the sky's own height bands (tq), so it is painted, not a glow. ?goldsky=0 is the wash as it was.
-      float gT = smoothstep(-0.45, 0.90, sd) * 4.0 + (n1.g - 0.5) * 0.9;
+      float gT = smoothstep(-0.45, 0.90, sd) * 5.0 + (n1.g - 0.5) * 1.1 + (n2.r - 0.5) * 0.45;
       float gTi = floor(gT), fwg = max(fwidth(gT), 1e-4);
-      float side = clamp((gTi + smoothstep(0.5 - fwg, 0.5 + fwg, gT - gTi)) / 4.0, 0.0, 1.0);      // 0 away from the sun .. 1 toward it
+      float side = clamp((gTi + smoothstep(0.5 - fwg, 0.5 + fwg, gT - gTi)) / 5.0, 0.0, 1.0);      // 0 away from the sun .. 1 toward it
       float low = tq;                                                                                  // 0 overhead .. 1 at the horizon band
-      col = mix(col, vec3(0.92, 0.80, 0.58), gold * mix(0.10, 0.82, side) * mix(0.30, 1.0, low));
-      // (away from the sun: the sky's own blue a step deeper overhead, and the low sky a cool lilac, not ochre)
+      // (the gold is laid as a GLAZE over the bands, not a wash that replaces them: each band keeps its own value, so
+      // the steps and strokes under it still read, and only toward the sun and low down does it go to the gold itself)
+      float cl = dot(col, vec3(0.3, 0.5, 0.2));
+      vec3 warmG = clamp(vec3(cl) * vec3(1.20, 0.99, 0.70), 0.0, 1.0);
+      float w = gold * mix(0.40, 1.0, side) * mix(0.50, 1.0, low);
+      col = mix(col, mix(warmG, vec3(0.92, 0.80, 0.58), 0.45 * side * low), w * 0.85);
+      // (away from the sun: overhead the sky's own blue a step deeper; low down a warm rose, the light's last colour)
       float away = gold * (1.0 - side);
-      col = dens(col, 1.0 + 0.30 * away * (1.0 - 0.6 * low));
-      col = mix(col, vec3(0.72, 0.68, 0.86), away * low * 0.32);
+      col = mix(col, dens(col, 1.30) * vec3(0.86, 0.95, 1.14), away * (1.0 - low) * 0.55);
+      col = mix(col, clamp(vec3(cl) * vec3(1.12, 0.93, 0.92), 0.0, 1.0), away * low * 0.35);
     }
     {
       // THE NIGHT SKY'S STREAKS (the owner, 2026-11-16: "make the lines on the sky at night time near the northern lights
