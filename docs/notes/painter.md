@@ -124,18 +124,37 @@ fragments runs the lookup before it is discarded, while a leaf polygon covers ex
 done in the vertex shader. Cards save 3,000-5,000 triangles a tree. Told to the coordinator; so BOTH forms are built and
 the phone prices both in one run.
 
-**What is built (all behind `?trees2=`; without it every tree is what it was):**
-- `?trees2=1` (or `split`): the near AND middle trees drawn by TWO SHORT PROGRAMS (`materials.js` `WOOD_FRAG`,
+**STATE ON 24 NOV, LATE (the owner's phone priced the forms: two short programs 40.3 ms a frame, no near trees at all
+36.6; cards dropped).** The two short programs are THE DEFAULT in the oil look; `?trees2=0` gives the trees as before
+(SEEN pixel-identical to the previous default, `1d7e54f`, at 5 and 10 m). A GUARD: if a device cannot link either
+program, every tree goes back to the one program at once and the console says why (`materials.js TREE_GUARD`, checked by
+the painter after each frame, `render/index.js`; `flora.js update` falls back). PROVEN in headless Chromium with
+`?trees2fail=wood` (or `leaf`), a test switch that puts a line that is not GLSL into that program: in the GAME
+(`/?look=oil&quality=1&body=earth&time=14&trees2fail=wood`) three logged the four broken wood programs at 57 s (its own
+`THREE.WebGLProgram: Shader Error`, with the material's name and the compiler's line), the guard's warning followed in
+the same second, and by the next look every tree mesh was the one program (25 of them, none of the two), no other
+error; in the gallery, both `wood` and `leaf` give a still PIXEL-IDENTICAL to `?trees2=0` at 5 m once the trees have
+been built again. THE BARK'S STREAK CONTRAST (the look director's note: at the 5 m trunk crop the split's streaks were
+flatter and less broken than today's) is today's again: SEEN, the cause was the SIDE TAKEN OFF EVERY TUBE, not the
+programs and not the hair twigs (the split programs on today's tubes match today to 0.11 of 255 in the trunk crop; with
+the hairs back and the side still off it was 4.5), so every tube keeps today's sides (near trees in the sample: 114,712
+triangles against 110,874 with the side off, today 146,800). New default against today: mean difference 0.31 of 255
+at 5 m and at 10 m (was 2.0 at 5 m with the side off). Stills: `A2_default_*`, and the crop
+`A2_default_autumn-phone-5m-trunk-x3_*` (today | the default now | the first split). The wood program also lays the
+two layers as the big program did, each at its own light (it made a small difference, about 9,000 pixels, 0.08 of 255).
+
+**What is built (the oil look only; `?trees2=0` puts every tree back as it was):**
+- THE DEFAULT (was `?trees2=1`): the near AND middle trees drawn by TWO SHORT PROGRAMS (`materials.js` `WOOD_FRAG`,
   `LEAF_FRAG`, chosen by `makePropMaterial(..., { tree: 'wood' | 'leaf' })`), over two groups of one index (wood, then
-  leaves; `flora.js` `splitGroups`), with the near tree's haze of HAIR TWIGS NOT BUILT and a side fewer on every tube
-  (`kits/grove.js`, `trees2`; the hairs were 1,072 to 2,500 triangles a tree). THE SAME TREE: every random number is
-  still drawn, so the skeleton and every leaf are where they were (`src/world/trees2.test.mjs` holds it).
+  leaves; `flora.js` `splitGroups`), with the near tree's haze of HAIR TWIGS NOT BUILT (`kits/grove.js`, `trees2`; the
+  hairs were 1,072 to 2,500 triangles a tree). THE SAME TREE: every random number is still drawn, so the skeleton and
+  every leaf are where they were, the trunk to the bit (`src/world/trees2.test.mjs` holds it).
   The leaf program has NO DISCARD and no alpha to coverage: the lens window, the explorer's window, the wash and the fire
   drop WHOLE LEAVES in the vertex shader (`PROP_VERT`, `PC_TREE_LEAF`), so the card can test depth before painting. The
-  wood program paints a pixel from TWO streaks (its own and the one at its edge) with ONE light at the streak's centre
-  and two tones, where the old program toned every streak of two layers and a wash under them; it pinches a branch in
-  round the lens (`PC_TREE_WOOD`, with `Builder.axis`: a tube's ring carries its centre in `aCard`) instead of
-  discarding, and lays the branches of a wash one by one.
+  wood program lays the bark's two layers of streaks as the big program did, each at its own light, leaving out only
+  the flat wash the coarse layer covers whole and the fine layer's work where neither of its streaks is there; it
+  pinches a branch in round the lens (`PC_TREE_WOOD`, with `Builder.axis`: a tube's ring carries its centre in `aCard`)
+  instead of discarding, and lays the branches of a wash one by one.
 - `?trees2=cards`: the same wood, and the near tree's leaves as CLUSTERS ON CARDS (`kitbuild.js clusterCard`, part 7;
   one six-cornered card where a clump of leaves hung; its chart in DAB CELLS so the shader needs no number of the
   kind's own). The leaves on a card are the ground's own baked dab layer (`dabtex.js SPRAY_GLSL`, shared by the card's
@@ -145,8 +164,10 @@ the phone prices both in one run.
 - `?treedepth=1` (with `?trees2=cards`): package T5. The cards are drawn in DEPTH ONLY before the scene
   (`render/index.js treeDepthFirst`, `materials.js TREE_DEPTH`), then in colour where the depth is EQUAL, with no discard
   and no alpha to coverage; `invariant gl_Position` keeps the two passes' corners identical.
-- Speed-test rows (`core/bench.js`): 'trees: two short programs', 'near trees as clusters', 'clusters with a depth pass
-  first', each swapped in while the test runs (`flora.js setTrees2(mode, depth)`).
+- Speed-test rows (`core/bench.js`): 'trees in one program as before' (it reads 'trees: two short programs' when the
+  run starts with `?trees2=0`), 'near trees as clusters', 'middle trees as clusters', 'clusters with a depth pass
+  first', each swapped in while the test runs (`flora.js setTrees2(mode, depth)`; after the guard has fallen back only
+  the one program is given).
 - Hunks in files of other lanes, each small and said in the commit: `shadow.js` (a card's shadow through its spray;
   cards thinned as leaves), `core/bench.js` (the rows, and its helpers now see a mesh with two materials).
 
@@ -166,9 +187,44 @@ the phone prices both in one run.
 - NOT KNOWN: what the two short programs save on the phone (the design's reading: the bark's long program in every
   near-tree wave; only the bench can say), anything in motion, anything on a real graphics card.
 
-**Next:** A/B stills (5/10/18/30/45 m, autumn and green wood, phone and desktop) -> commit T2 split -> stills of cards
-and T5 (pixel-identical check) -> commit -> T3 (the middle tree) -> report each step to the coordinator and the look
-director (session_01R5Brhzz2JPPF6Ecz6XRQHx).
+- T5 SEEN: with no multisampling, as the phone draws (`?aa=0`), the cards with and without `?treedepth=1` are
+  PIXEL-IDENTICAL (0 pixels of 348,192 differ at 5 m and at 10 m). With multisampling (the gallery's tier 1 in
+  software) they first differed at leaf edges only, because the painter's loop forced alpha to coverage back on for
+  the colour pass (fixed: `render/index.js` leaves the trees' programs alone).
+- DESKTOP top tier (1280 x 600, quality 2, full paint), autumn wood, 5-45 m: `?trees2=1` equals today (lookstats to
+  the hundredth; bark warm-streak share 0.259 against 0.257). Committed: `A2_*_autumn-desktop-*`.
+- THE WOOD DRAWN BACKSIDE (half the wood rasterised): the same picture as DoubleSide once its facing is kept
+  (`PC_WOOD_FLIP`): B2 against B at the phone's settings, mean difference 0.13 of 255. FOUND ON THE WAY: every tube
+  in the kits is wound with its front facing INWARD, so today's bark is lit with its normals pointing into the trunk
+  (the sun side painted as the shade side). Told to the look director; not changed.
+- THE GREEN WOOD (the birches, noon, phone settings, 5-45 m): `?trees2=1` equals today (mean difference 0.31-0.96 of
+  255). The first still after the camera's jump from the spawn differs in its leaves as much as its bark in BOTH A
+  and B (a settling transient after the jump, not the programs); taken after a warm-up frame, 5 m is 0.34.
+- THE SWITCH OFF IS THE PICTURE BEFORE, TO THE BIT (LOOK-RULES R6.1): the look director's S1 (the stream at 16.8 h,
+  1024 x 480) drawn by this branch with no `?trees2` against the same still from the commit the lane started from
+  (`a54173a`, served from a worktree): 0 of 491,520 pixels differ. S1 and S2 with `?trees2=1`: lookstats identical,
+  mean difference 0.72 and 0.18 of 255 (`A2_split_S1-*`, `A2_split_S2-*`).
+- Cards with the denser spray (SPRAY.pres 0.9): still sparser than today at 5 m (`A2_cards-pres09_*`); more cards would
+  close it at more cost. Left there until the phone says cards are worth anything.
+
+**How the stills are made** (the tools are scratch, not committed; recreate from this): `tools/lab.mjs serve`, then
+open `/gallery.html?body=earth&biome=autumn_woodland&season=1&cam=trees&time=16.8&look=oil&lite=1&quality=1&t=0&ui=0&fov=58`
+(+ `&trees2=...`) at 936 x 372; eval a helper that picks the tallest tree within 30 m of the first camera place
+(`world.sampleObstacles`) and sets `__pcGallery.state.pos/yaw/pitch` to stand d metres from it, eye 1.7 m, aimed at
+0.55 of its height; `resume`, wait for `world.busy === 0`, `grab out.png 3`. THE GREEN WOOD is not reachable by
+`?biome=temperate_forest` in the oil look (the first two sites swap: that address lands in the autumn wood); use the
+world's own `findBiome('earth', 'autumn_woodland')` stand, which in the oil look IS the green wood.
+Counts: a copy of `tools/overdraw.mjs` with `QUALITY.level` from the environment (1 is the phone's tier), material
+arrays counted group by group, part 7 thinned as a leaf, `where=spawn` (the spawn is the autumn wood of grove trees;
+its `where=autumn` stand is the green wood's broadleaves, where `?trees2` changes no geometry).
+
+**Next:** a cheaper sway for the near trees behind its own switch (the coordinator's ask); when the look director's
+L2 is final, merge `origin/look-director` and have the split's leaf paint call the same `pcShadeLeaf` (`LEAF_SUN`'s
+`pcLeafDeep` sits on those lines). Keep `PC_WOOD_FLIP` on (today's inside-out bark facing) until the look director
+settles it. NOT KNOWN: the guard on a real phone's driver (it rests on three's own link check, which is on by default
+and which nothing in the game turns off), anything in motion.
+
+(A1, the far trees lane, kept its T1 note here in look-proto; it is theirs and kept as they wrote it:)
 **T1, far trees as painted impostors (`src/render/impostor.js`; `?fartree=impostor`).** For every kind drawn far off as
 leaves (`CAN_CARD`), its lod-0 tree (one variant; `?impvar=2` two) is baked once per world, in a frame hook the first
 time an impostor is drawn (the painter's hooks run outside a render; the renderer is handed over by the first impostor
