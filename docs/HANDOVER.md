@@ -511,12 +511,15 @@ whether the performance work is one more version or a redesign.** Their own row 
 
 ## 3. State right now (update this before you stop)
 
-**STATE 24 Nov, 09:00 (first account): TWELVE HELPER SESSIONS BUILDING, EACH ON ITS OWN BRANCH. `main` is v37.1.**
+**STATE 24 Nov, 09:15 (first account): TWELVE HELPER SESSIONS BUILDING, EACH ON ITS OWN BRANCH. `main` is v38.**
 - The owner's direction (24 Nov): 30 a second on the S23 Ultra, the view from the air good to a mile, much denser
   grass, flowers and more plants, flora before fauna. The v37 speed test that drives it is in the log (24 Nov): as
   set about 89 ms (11 a second); near trees about 52 ms, far trees about 17-21, the plants' fragment work about 34;
   everything that is not a tree runs at the 60 cap.
 - v37.1 is live (24 Nov, pull request #38): the oil look's snow world (Neptune) no longer crashes on load.
+- v38 is live (24 Nov, pull request #39): the speed test asks the trees (?look=oil&bench=trees) and the air
+  (?look=oil&bench=air) and holds two water views in ?bench=1; nothing in the picture changed. WAITING FOR THE OWNER'S
+  TABLES from bench=trees and bench=air: they decide the near trees' form (A2: split against cards) and price the far.
 - ALL DESIGNS IN, on these branches' docs/lead/: TREES-DESIGN.md and FARVIEW-DESIGN.md (on r2), FLORA-DESIGN.md
   (design-flora), WEATHER-DESIGN.md (design-weather), WATER-DESIGN.md (design-water), LOOK-RULES.md and
   LOOK-AUDIT.md (look-director).
