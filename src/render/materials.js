@@ -1231,6 +1231,11 @@ varying vec2 vTurb;
 varying float vStill;
 // (aTurb.z: 1 where the water stands at the sea's level, the sea's own paint level is used there: uWSea)
 varying float vOpen;
+// (THE SHORE, lane W2: xy the way toward land times how near it is, about 128 in the current's frame; z the narrowest
+// crossing, a byte of 1500 m; the sea only, world/shore.js and patchgen.js. Not bound, it reads 0, 0: passed on as none)
+attribute vec4 aShore;
+varying vec4 vShore;
+varying vec3 vCamFwd;    // (the eye's forward, body axes: the same over the frame; the sea's strokes foreshortened, lane W2)
 #endif
 #ifdef PC_RUNOFF
 // (the water that comes and goes with the rain, ?runoff=1: x the depth that exists only in the wet, a byte of 0.6 m; y how
@@ -1308,6 +1313,9 @@ void main() {
     #ifdef PC_WPAINT
       vStill = aTurb.w;
       vOpen = aTurb.z;
+      vShore = aShore.x + aShore.y < 0.002 ? vec4(128.0 / 255.0, 128.0 / 255.0, 1.0, 0.5) : aShore;
+      { mat3 Mw = mat3(modelMatrix); vec3 fw = -vec3(viewMatrix[0][2], viewMatrix[1][2], viewMatrix[2][2]);
+        vCamFwd = vec3(dot(Mw[0], fw), dot(Mw[1], fw), dot(Mw[2], fw)); }
     #endif
   #endif
   vec4 mv = modelViewMatrix * vec4(p + pcRound(vBody), 1.0);
@@ -1345,6 +1353,8 @@ uniform float uWPaint;   // the water's new paint (?wpaint=2): 1 on, 0 v37's (th
 varying float vStill;    // how still the water is here, 0 a current .. 1 a pond, a lake, the sea (world/patchgen.js)
 uniform float uWSea;     // the same on the sea and the water at its level (0 v37's, the default; ?wsea=, else ?wpaint=)
 varying float vOpen;     // 1 water at the sea's level (the sea, a fjord, a lagoon), 0 rivers, ponds, lakes (world/patchgen.js)
+varying vec3 vCamFwd;    // the eye's forward (body axes; the same over the frame): the sea's strokes foreshortened (lane W2)
+varying vec4 vShore;     // xy the way toward land times its nearness (about 128/255 none), z the narrowest crossing (1500 m a byte; the sea only; world/shore.js, lane W2)
 #endif
 #ifdef PC_RUNOFF
 uniform vec4 uRunoff;    // the world's wetness now, the streams' rise (m), the brown (world/waterstate.js)
@@ -1703,6 +1713,7 @@ void main() {
     vec2 wdx = pcGroundChartD(vBody, -dFdx(vToCam), uBodyR), wdy = pcGroundChartD(vBody, -dFdy(vToCam), uBodyR);
     vec3 wr1, wr2; vec2 wds; float wown;
     float wStill = 0.0;      // (how still the water is here, for the new colour below: the new paint's own, 0 in v37's)
+    float wChop = 0.0;       // (how much the sea here is a narrow strait's short chop: lane W2, world/shore.js; 0 elsewhere)
     float wLow = 0.0;        // (how low the eye looks across the water, 0 from the air .. 1 on foot: the new paint's own)
     // (and the churn's own chart, below: it is turned to the current on a far lower floor than the dashes are,
     // because white water must MOVE even in an eddy, where the body of the water is rightly laid still)
@@ -1723,7 +1734,48 @@ void main() {
       vec3 Uf = normalize(abs(up.y) < 0.9 ? vec3(-up.z, 0.0, up.x) : vec3(0.0, up.z, -up.y));
       vec2 fc = pcGroundChartD(vBody, Uf * fl.x + cross(up, Uf) * fl.y, uBodyR);
       fc = dot(fc, fc) > 1e-12 ? normalize(fc) : vec2(1.0, 0.0);
-      vec2 kc = pcGroundChartD(vBody, cross(up, pcPhysWaterDir(sdir)), uBodyR);
+      // THE SHORE (lane W2, world/shore.js; the look director: "a swell's crests lie roughly parallel to the shore as
+      // waves come in"): PHYSICS turns the waves toward a shore only within its sea map round the player, so near land
+      // the mesher hands over the way toward it and how near (vShore), and the wind's waves are turned toward it by that
+      // much, as a swell turns to meet a shore; the strokes then lie along the turned crests. Waves already running out to
+      // sea are left as they are. Out in open water (vShore none) the wind's own crests, as before.
+      vec3 D3w = pcPhysWaterDir(sdir); D3w -= up * dot(D3w, up); D3w = dot(D3w, D3w) > 1e-12 ? normalize(D3w) : Uf;
+      vec2 shm = vShore.xy * (255.0 / 127.0) - (128.0 / 127.0);
+      float shw = min(length(shm), 1.0);
+      // (THE FETCH, the look director: in a narrow strait with the wind across it the water is short chop, not long crests.
+      // The open water upwind is about the narrowest crossing (world/shore.js SHORE_DEF.open, 1500 m a byte), over how
+      // squarely the wind crosses it: across a strait, its width; along it, a few times that)
+      float fetchW = vShore.z * 1500.0;
+      if (shw > 0.02) {
+        vec3 nL = normalize(Uf * shm.x + cross(up, Uf) * shm.y);
+        float cA = dot(D3w, nL), sA = dot(cross(D3w, nL), up);
+        fetchW /= max(abs(cA), 0.3);
+        // (at most about 35 degrees: the swell bends toward a beach, it does not wrap a headland or circle a rock -- the
+        //  look director on the first stills, where the strokes curled into current lines and whirlpools)
+        float ang = clamp(atan(sA, cA), -0.61, 0.61) * shw * smoothstep(-0.95, -0.6, cA);
+        D3w = D3w * cos(ang) + cross(up, D3w) * sin(ang);
+      }
+      // FORESHORTENED, AS A PAINTER LAYS THE SEA (the look director, on the strait seen end-on: the crests ran at the
+      // vanishing point and read as planks of a floor). The crest is turned toward the eye's sideways axis on the water by
+      // how grazing the view is: looking steeply down the wind's crests stay; toward the horizon the sea lies in level bands,
+      // whatever the wind. The sea only (vOpen). Taken from the EYE'S OWN forward, the same over the whole frame, so the
+      // way is one over the screen and no stroke bends or shears across its cell: a way that changed from pixel to pixel
+      // slid each cell's rows by hundreds of metres times its turn. (It turns as the eye turns, at a grazing look.)
+      float kG = 0.0;
+      {
+        vec3 cfw = vCamFwd - up * dot(vCamFwd, up);
+        if (dot(cfw, cfw) > 1e-8 && dot(vCamFwd, vCamFwd) > 1e-8) {
+          kG = step(0.75, vOpen) * smoothstep(0.35, 0.85, 1.0 - abs(dot(normalize(vCamFwd), up)));
+          vec3 sw = normalize(cross(up, normalize(cfw)));
+          vec3 cr = normalize(cross(up, D3w));
+          float a = atan(dot(cross(cr, sw), up), dot(cr, sw));
+          a = a > 1.5707963 ? a - 3.1415927 : (a < -1.5707963 ? a + 3.1415927 : a);      // (a line: the nearer way round)
+          float t = a * kG;
+          D3w = D3w * cos(t) + cross(up, D3w) * sin(t);      // (turning the travel turns its crest the same)
+        }
+      }
+      vec3 kc3 = cross(up, D3w);
+      vec2 kc = pcGroundChartD(vBody, kc3, uBodyR);
       kc = dot(kc, kc) > 1e-12 ? normalize(kc) : vec2(1.0, 0.0);
       float still = max(vStill, 1.0 - smoothstep(0.30, 0.56, coh));
       wStill = still;
@@ -1737,7 +1789,7 @@ void main() {
       // this paint, E4 at the phone's size). The squeeze is worked out from the way the rows stack and the way the eye
       // looks, both smooth over the water: the rows' own size on the screen is a derivative, and the octave's derivative
       // taken from it was blocky from one square of pixels to the next and frayed the strokes' ends.
-      vec3 f3 = Uf * fl.x + cross(up, Uf) * fl.y, k3 = cross(up, pcPhysWaterDir(sdir));
+      vec3 f3 = Uf * fl.x + cross(up, Uf) * fl.y, k3 = shw > 0.02 || kG > 0.0 ? kc3 : cross(up, pcPhysWaterDir(sdir));      // (unturned: exactly as before)
       vec3 d3 = mix(dot(f3, f3) > 1e-6 ? normalize(f3) : k3, dot(k3, f3) < 0.0 ? -k3 : k3, still);
       float rowF = length(cross(cross(up, dot(d3, d3) > 1e-6 ? normalize(d3) : k3), Vd));
       // (up to five times: at three the sea from 400 m, seen at a tenth of a right angle, still had rows under two pixels
@@ -1764,7 +1816,11 @@ void main() {
       float lenF = length(cross(dot(d3, d3) > 1e-6 ? normalize(d3) : k3, Vd));
       // (a river's strokes are NOT laid longer the same way: tried, and seen from the bank looking along the river the
       // near water broke into specks a pixel or two tall, worse than before; measured and dropped)
-      float aspW = still > 0.5 ? 10.0 / max(lenF, 0.34) : 6.0;
+      // (and where the fetch is short, a few hundred metres, the strokes are short chop, three or four widths, broken and
+      // not joined into lines; they lengthen smoothly to the open sea's crests as the fetch grows: the look director.
+      // wChop is 0 off the sea, so ponds and lakes keep the 10 above)
+      wChop = step(0.75, vOpen) * (1.0 - smoothstep(300.0, 900.0, fetchW));
+      float aspW = still > 0.5 ? mix(10.0, 3.0, wChop) / max(lenF, 0.34) : 6.0;
       // (pointed ends on the sea, the look director's note; ponds and rivers keep square ones until F asks for them there)
       gWLens = smoothstep(0.5, 0.75, vOpen) * step(0.5, still);
       pcWStrokes(wch, wdx, wdy, dS, v0 * (1.0 - still), wo4.x, aspW, woc3, wr1, wr2, wown);
@@ -1905,11 +1961,28 @@ void main() {
       // THE SEA FROM THE AIR (E-W2, F's note): with the new strokes and v37's colour, still water far off kept v37's three
       // steps in near equal shares, the deep one very deep: where strokes of two cells and two octaves lie over one another
       // that read as a checker of dark and light blocks. Far still water is laid as the calmest thing on the map, as the
-      // new colour already lays it: most strokes the body, few light ones, few deep ones, and those a closer step.
-      float sk = wStill * smoothstep(40.0, 220.0, dist) * liq;
-      wThL = mix(wThL, 0.74, sk); wThD = mix(wThD, 0.22, sk);
-      cdeep = mix(cdeep, pcDensity(c, 1.65) * vec3(0.92, 0.94, 1.0), sk);
-      clight = mix(clight, mix(c, wLightC, 0.40), sk);
+      // new colour already lays it: most strokes the body, few light ones, few deep ones, and those a closer step. And
+      // its body a step deeper (the look director: v37's mid blue, value about 0.65 to 0.70, where the many light and
+      // deep strokes of v37 had held it; with them few the body alone has to).
+      // (the deeper body and the closer steps are THE SEA's, by the look director's ruling on the sea: so, from vOpen, water at
+      //  the sea's level. Ponds, lakes and rivers keep the calmer values alone, as water-paint has them by default)
+      float sk = wStill * smoothstep(40.0, 220.0, dist) * liq, so = step(0.75, vOpen);      // (only where every pixel takes the sea's level: vOpen 0.75 and over, wpL's own rule)
+      c = mix(c, pcDensity(c, 1.45), sk * so);
+      // THE SEA'S SPARKLE (the look director, measured: the new sea one mid blue-grey, its value spread half v37's): over the
+      // deep body, a few whole light strokes, more and brighter on the sun's side (to about value 0.88, never over 0.90),
+      // and a few whole dark troughs (to about 0.42). Ponds and lakes keep the calm values (so 0).
+      vec3 rfS = reflect(-normalize(vToCam), up), shS = uSunDirL - up * dot(uSunDirL, up); rfS -= up * dot(rfS, up);
+      float sunS = (dot(rfS, rfS) > 1e-8 && dot(shS, shS) > 1e-8 ? smoothstep(-0.1, 0.8, dot(normalize(rfS), normalize(shS))) : 0.0) * max(uDayness, uMoon);
+      // (and more of them the farther: each far stroke covers more of the sea, so fewer carried the sparkle -- the look
+      //  director: 400 m read flatter than v37 while 150 m was right)
+      float fdS = smoothstep(200.0, 600.0, dist);
+      float thLs = mix(0.85, 0.78, sunS) - 0.08 * fdS + 0.03 * wChop;
+      wThL = mix(wThL, mix(0.74, thLs, so), sk); wThD = mix(wThD, mix(0.22, 0.16 + 0.08 * fdS, so), sk);
+      // (and toward the sun they take the SUN'S colour, gold at a golden hour: the references' sun path, broken gold dashes
+      //  on dark teal -- the look director)
+      vec3 lS = mix(c, mix(wLightC, pcOilSunC(), sunS * sunS), mix(0.62, 0.85, sunS));      // (the gold narrower than the share: a path, not the half of the sea) float mS = max(lS.r, max(lS.g, lS.b)); lS *= mS > 0.90 ? 0.90 / mS : 1.0;
+      cdeep = mix(cdeep, mix(pcDensity(c, 1.65) * vec3(0.92, 0.94, 1.0), pcDensity(c, 1.72) * mix(vec3(0.92, 0.94, 1.0), vec3(1.02, 0.89, 1.0), 0.8 * pcGold()), so), sk);      // (at a golden hour the troughs a violet-slate, the clip's warm light and cool shadow: the look director)
+      clight = mix(clight, mix(mix(c, wLightC, 0.40), lS, so), sk);
     }
     #endif
     #ifdef PC_WPAINT

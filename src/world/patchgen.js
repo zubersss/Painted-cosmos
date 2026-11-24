@@ -6,6 +6,7 @@ import { makeSample, NOLQ, SNOW } from './surface.js';
 import { MODE } from '../data/mode.js';
 import { BODIES } from '../data/bodies.js';
 import { canopyOn, groundSeasonOn, rockfieldOn, standAt, bloomFarOn } from './farstand.js';
+import { shoreField, SHORE_DEF } from './shore.js';
 
 export const PATCH_N = 32;                 // cells per patch edge (even, for geomorphing)
 const N = PATCH_N, V = N + 1, E = N + 3;   // E: sample grid with a one-vertex apron for normals
@@ -40,6 +41,7 @@ export const PATCH_VERTS = V * V + 4 * V;
 const _d = [0, 0, 0];
 const _px = new Float64Array(E * E), _py = new Float64Array(E * E), _pz = new Float64Array(E * E);
 const _hh = new Float32Array(E * E), _lq = new Float32Array(E * E);
+const _shoreOut = { lx: 0, ly: 0, w: 0 };   // (the shore's direction at a vertex: world/shore.js)
 const CS = 30;   // floats kept per sample: wash, far wash, parameters, liquid look, strata, the current, the fall, the stand
                  // (21, 22: the far view's), how still (23: the water's), the snow (24: the far view's). (v39.2's merge into the
                  // water branch, 24 Nov, as the coordinator's trial: the water keeps 23, the snow moved to 24, written and read
@@ -454,6 +456,34 @@ export function stepPatch(job, deadline) {
         w2[q] = b8(_col[c + 25] / 0.6); w2[q + 1] = b8(_col[c + 26]);
       }
     }
+    // THE SHORE'S DIRECTION for the sea's strokes (lane W2, the bodies of water; world/shore.js): one more attribute, aShore,
+    // only with the new paint ON THE SEA (?wsea >= 1: the sea is v37's by default, which then pays nothing here) and only on
+    // a patch with sea in it (aTurb.z, the water at the sea's level, written just above): four bytes a vertex, x y the way
+    // toward land times how near it is (about 128: none), in the frame the current is handed over in, z the narrowest
+    // crossing there (a byte of SHORE_DEF.open m: 255 open water), w spare. The paint turns the wind's waves toward the shore,
+    // as a swell turns to meet it, and lays short chop where the water is narrow across the wind (render/materials.js
+    // WATER_FRAG). Never x, y of 0, 0: that is the attribute not bound, which the paint reads as none.
+    let wshore = null;
+    if (wturb && MODE.water && (MODE.water.wsea || 0) >= 1) {
+      const isSea = (j, i) => wturb[(j * V + i) * 4 + 2] > 0;
+      let any = false;
+      for (let j = 0; j < V && !any; j++) for (let i = 0; i < V; i++) if (isSea(j, i)) { any = true; break; }
+      if (any) {
+        const F = shoreField(S), so = _shoreOut;
+        wshore = new Uint8Array(V * V * 4).fill(128);
+        for (let q = 2; q < wshore.length; q += 4) wshore[q] = 255;
+        for (let j = 0; j < V; j++) for (let i = 0; i < V; i++) {
+          if (!isSea(j, i)) continue;
+          const k = (j + 1) * E + (i + 1);
+          const l0 = Math.sqrt(_px[k] * _px[k] + _py[k] * _py[k] + _pz[k] * _pz[k]);
+          F.at(_px[k] / l0, _py[k] / l0, _pz[k] / l0, so);
+          const q = (j * V + i) * 4;
+          wshore[q] = Math.max(1, Math.min(255, Math.round(128 + 127 * so.lx)));
+          wshore[q + 1] = Math.max(1, Math.min(255, Math.round(128 + 127 * so.ly)));
+          wshore[q + 2] = Math.max(0, Math.min(255, Math.round(255 * so.width / SHORE_DEF.open)));
+        }
+      }
+    }
     const widx = [];
     // (NO BLUE CURTAIN AT A FALL, for the bodies-of-water lane's waterfalls, E-W2: a cell with one wet corner is kept, so a
     // cell across a lip -- the river cut at 19.6 m, the sea at 0 -- was one water quad as tall as the cliff, painted with
@@ -477,7 +507,7 @@ export function stepPatch(job, deadline) {
     }
     stepPatch.fallCells = (stepPatch.fallCells || 0) + dropped;      // (counted for the test that proves none drop where nothing falls)
     // thin water (a brook) is left to the terrain's far colour on coarse patches
-    if (widx.length && (level >= 5 || widx.length > N * N * 6 * 0.08)) water = { positions: wpos, depth: wdep, liq: wliq, liqP: wlp, turb: wturb, w2, indices: new Uint16Array(widx) };
+    if (widx.length && (level >= 5 || widx.length > N * N * 6 * 0.08)) water = { positions: wpos, depth: wdep, liq: wliq, liqP: wlp, turb: wturb, w2, shore: wshore, indices: new Uint16Array(widx) };
   }
   return {
     origin: [ox, oy, oz], positions: pos, normals: nor, morph: mor, colors: col, colors2: col2, params: par,
