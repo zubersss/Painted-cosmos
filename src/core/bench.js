@@ -255,6 +255,9 @@ export function attachBench(pc) {
       }
     }
     const WX0 = { ...WX2 };      // (group D: its switches as the address set them, put back after each of its rows)
+    // (lane W1 CLOUDS: whether the 3D clouds are on, and a switch that puts the sky's own flat cloud back in their place)
+    const CLOUDS3D = (() => { try { return +(new URLSearchParams(location.search).get('clouds3d') || 0) > 0; } catch { return false; } })();
+    const clouds3d = (on) => { const c = pc.world && pc.world.clouds; if (c) c.enabled = on; };
     const holdStorm = (on) => { const P = pc.sim && pc.sim.physics; if (P && P.forceWeather) P.forceWeather(on ? { kind: 'storm' } : null); };
     const steps = [
       [AS, null, null],
@@ -322,6 +325,21 @@ export function attachBench(pc) {
         [AS, null, null],
         ['weather: a storm held overhead', () => holdStorm(true), () => holdStorm(false)],
         ['storm: no rain drawn', () => { holdStorm(true); show(/^pc-kit-rain/, false); }, () => { show(/^pc-kit-rain/, true); holdStorm(false); }],
+      ] : []),
+      // (GROUP D, LANE W1 CLOUDS: docs/lead/WEATHER-DESIGN.md 4.5 and 7. Asked only while the 3D clouds are on
+      //  (?clouds3d=1, world/clouds.js). "no clouds drawn" hides every cloud mesh (the lobes, the deck, the valley
+      //  cloud) in the weather of the moment; "clouds as before" puts back the sky's own flat cloud alone, so its gap to
+      //  the row before is what the 3D clouds cost against today's sky. The storm rows hold a storm overhead as the
+      //  weather group's row does, and take the clouds, then their shadows, out of it.)
+      ...(CLOUDS3D ? [
+        [AS, null, null],
+        ['weather: no clouds drawn (fair)', () => show(/^pc-cloud/, false), () => show(/^pc-cloud/, true)],
+        ['weather: clouds as before', () => clouds3d(false), () => clouds3d(true)],
+        ...(WX2.cloudmap ? [
+          ['storm: no clouds drawn', () => { holdStorm(true); show(/^pc-cloud/, false); }, () => { show(/^pc-cloud/, true); holdStorm(false); }],
+          ['storm: no cloud shadows', async () => { holdStorm(true); (await import('../world/wxfield.js')).WX.uCloudShadowK.value = 0; },
+            async () => { (await import('../world/wxfield.js')).WX.uCloudShadowK.value = 1; holdStorm(false); }],
+        ] : []),
       ] : []),
       // (back to the size the device really draws, so the four rows below are measured from IT and not from
       //  whatever sharper size the questions above had to be asked at: see MK at the top of this file)
