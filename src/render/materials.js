@@ -1365,6 +1365,20 @@ void main() {
   float line = uTreeLine + (r3.r - 0.5) * 0.30;
   float skyAmt = smoothstep(line - 0.05, line + 0.05, re + (r1.g - 0.5) * 0.18);
   vec3 skyc = mix(uSkyHorizon, uSkyZenith, clamp(re * 1.2, 0.0, 1.0));
+  #ifdef PC_OIL
+    // THE GOLDEN HOUR IN THE WATER (the first audit's F9, still open in the fresh-eyes audit 2: under a gold sky the
+    // stream and the sea stayed ice-blue). The keys' sky colours carry no gold: the sky's own shader lays it on top
+    // (sky.js, the wash and the warm glow toward the sun). So the water's mirror takes the same two, by the reflected
+    // ray: the wash, strongest low down, and the glow by the ray's angle to the sun. pcGold is the sky's own gold
+    // (the same sun height, day, weather and world dial). With the golden hour's sky (?goldsky=0: as it was).
+    if (uLookG.x > 0.5) {
+      float gW = pcGold();
+      skyc = mix(skyc, vec3(0.92, 0.80, 0.58), gW * mix(0.80, 0.45, smoothstep(0.0, 0.7, re)));
+      vec3 sunVw = normalize((viewMatrix * vec4(uSunDirW, 0.0)).xyz);
+      vec3 RvW = reflect(normalize(vView), normalize(normalMatrix * n));
+      skyc = mix(skyc, vec3(0.93, 0.87, 0.72), pow(max(dot(RvW, sunVw), 0.0), 3.0) * 0.60 * uDayness * (1.0 - uWx.x));
+    }
+  #endif
   #ifdef PC_WPAINT
   vec3 skyT = skyc;
   #endif
