@@ -34,6 +34,7 @@
 import { SEASON, leafNow } from '../data/season.js';
 import { CANOPY, NEEDLE, CANOPY_WORLDS, GROUND_SEASON, ROCKFIELD, canopyOn } from '../world/farstand.js';
 import { MODE } from '../data/mode.js';
+import { pig, dilute, mixc } from '../data/looks/common.js';
 
 export { CANOPY, canopyOn, GROUND_SEASON, ROCKFIELD };
 // ?candab=: the canopy's own dabs against the ground's (0.5: its finer layer is half the ground's finest, its coarser
@@ -41,6 +42,7 @@ export { CANOPY, canopyOn, GROUND_SEASON, ROCKFIELD };
 // cap and shaded side could not be laid with it; a crown wants three or four strokes across.
 export const CANOPY_DAB = (() => { try { const q = new URLSearchParams(location.search); const v = q.has('candab') ? +q.get('candab') : 0.5; return isFinite(v) && v > 0.05 ? Math.min(v, 1) : 0.5; } catch (e) { return 0.5; } })();
 // ?candebug=1: each dab of the canopy in a flat colour that says what it is (see the end of pcCanopyAt). For looking only.
+export const ROCK_DEBUG = (() => { try { const v = +new URLSearchParams(location.search).get('rockdebug'); return isFinite(v) && v > 0 ? v : 0; } catch (e) { return 0; } })();
 export const CANOPY_DEBUG = (() => { try { return new URLSearchParams(location.search).get('candebug') === '1'; } catch (e) { return false; } })();
 
 // THE VERTEX SHADER'S PART: the stand rides in the far wash's spare byte (patchgen.js), morphed as everything else is.
@@ -380,19 +382,157 @@ vec3 pcSeasonLeaf(vec3 leaf, vec3 floorC) {
 export const ROCK_FRAG = /* glsl */`
 #ifdef PC_ROCKF
 uniform float uRockK;     // 1 on a world whose rock is painted so (CANOPY_WORLDS: Earth), 0 elsewhere
+uniform vec3 uRockC0, uRockC1, uRockC2, uRockC3;      // the world's cliff rock: pale, mid, deep, slate (ROCK_LOOK below)
+uniform vec4 uRockB;      // x a bed's mean height (m), y the gullies' spacing (m), z the sea's level (m), w unused
 float gRock = 0.0;        // how much this dab is a rock face (set in pcGroundAt, read in pcGroundPaint)
+float gCliff = 0.0;       // this dab is a cliff's rock (0 or 1: whole dabs), set with gRock
+float gGully = 0.0;       // how far into a gully the cliff dab lies: its light goes down (pcGroundAt)
+float gFaceOn = 0.0;      // (main) this pixel is steep enough that the upright charts may lay its dabs
+float gFaceD = 0.0;       // (main) the dab being painted lies on an upright chart
+#ifdef PC_ROCKDEBUG
+const float uRockDbg = PC_ROCKDEBUG;
+#endif
+vec2 gFaceP;              // (main) at the pixel: the facing (dot of the normal with up), and the strike's way (0 .. 8, pcStrikeWay)
+
+// L8, THE SLOPE CHART (the look director's line, 24 Nov). On a face the ground's chart is edge-on: it is laid on the
+// sphere seen from straight above, so a metre down a cliff is no distance on it, and every dab stretched into a
+// vertical stripe, a different colour from column to column (the coast's ruled wall, F13). An UPRIGHT chart lies on
+// the face instead: u along the strike, v the height, running DOWN the fall line. Pure: no derivative of pB. In cells.
+// THE STRIKE IS TAKEN IN EIGHT FIXED WAYS (every 22.5 degrees on the ground's chart), never turned smoothly: the
+// ground's chart counts kilometres, and a u turned with the face's facing swam by metres as the facing changed from
+// facet to facet. In a fixed way a dab is at most 2 per cent longer than true. (Two were tried first, the chart's own
+// axes: a coast at 45 degrees to them is laid as a staircase of facets whose smoothed facing lies half way between,
+// and half the dabs on it were refused, SEEN in ?rockdebug=1.)
+// (Two charts cannot be blended into one without a seam or a band of crushed dabs: an upright chart and the ground's
+// are kilometres apart in number. So pcSlopeChart falls back to pcGroundChart under about 25 degrees as a hard choice,
+// and the GROUND's dabs cross from one chart to another by WHOLE DABS (pcFaceLayer): each dab keeps its chart by its
+// own number against the share at its own centre, so there is no seam and no dab is cut. Two neighbouring ways of the
+// strike meet the same way.)
+const float PC_STRIKE = 2.5464791;      // (8 / pi: the strike's angle in ways)
+// the strike's angle at a facing, in ways (0 .. 8), from the facing's level part on the ground's chart
+float pcStrikeWay(vec3 n, vec3 upB, float up) {
+  vec2 g = pcGroundChartD(vBody, n - upB * up, uBodyR);
+  return mod(atan(g.x, 1e-7 - g.y) * PC_STRIKE + 8.0, 8.0);      // (the 1e-7: level ground has no strike, and atan(0, 0) is no number)
+}
+// the upright chart of way k (m): u along the strike, v down
+vec2 pcStrikeAxis(float k) { float a = k / PC_STRIKE; return vec2(cos(a), sin(a)); }
+vec2 pcSlopeChart(vec3 pB, vec3 nB, vec3 upB, float cell) {
+  float up = dot(nB, upB);
+  vec2 ch = pcGroundChart(pB, uBodyR);
+  if (up > 0.906) return ch / cell;
+  vec2 g = pcGroundChartD(pB, nB - upB * up, uBodyR);
+  float k = floor(mod(atan(g.x, -g.y) * PC_STRIKE + 8.0, 8.0) + 0.5);
+  return vec2(dot(ch, pcStrikeAxis(k)), uBodyR - length(pB)) / cell;
+}
+// The shares at the pixel (main, once): x how much the place is a face (the upright charts' share: 0 under 37 degrees,
+// all of it by 50), y how much of that is the strike's way j + 1 rather than way j (j = floor(gFaceP.y)).
+// (AT THE PIXEL, NOT CARRIED TO THE DAB'S CENTRE. The coast's wall runs across the terrain's grid, so it is a staircase
+// of facets a few pixels wide, and the facing carried to a centre by its screen derivatives jumped at every facet's
+// edge: each dab was cut into slivers down the face, SEEN in ?rockdebug=1. The smoothed facing itself does not jump; a
+// dab is cut only where a share passes its number inside it, which is in the bands between, and never on a sheer face.)
+vec2 gFaceK;
+// One layer of the ground's dabs on steep land: the upright charts of the strike's two nearest ways and the ground's
+// own, each dab kept by its own number against the shares. The arguments and out as pcDabLayer's (hB: the pixel's
+// height, rdx, rdy its screen derivatives); face out: 0 the ground's chart, 1 way j, 2 way j + 1. A chart whose share is
+// nothing here is not asked: on a face that runs one of the eight ways, one layer costs one look-up.
+void pcFaceLayer(vec2 ch, vec2 dlx, vec2 dly, float hB, float rdx, float rdy, float w, float asp, float lim,
+                 vec3 ocl, vec2 ab, out vec3 rnd, out vec2 ctr, out vec2 ds, out float cov, out vec3 rnd2, out float has2,
+                 out float face) {
+  cov = 0.0; face = 0.0; has2 = 0.0; rnd = vec3(0.5); rnd2 = vec3(0.5); ds = vec2(0.0); ctr = ch;
+  vec3 r, r2; vec2 c, d; float cv, h2;
+  float j = floor(gFaceP.y);
+  for (int a = 0; a < 2; a++) {
+    float sh = gFaceK.x * (a == 0 ? 1.0 - gFaceK.y : gFaceK.y);
+    if (sh <= 0.0) continue;
+    vec2 ax = pcStrikeAxis(j + float(a));
+    pcDabLayer(vec2(dot(ch, ax), -hB), vec2(dot(dlx, ax), -rdx), vec2(dot(dly, ax), -rdy), w, asp, lim, ocl, ab, r, c, d, cv, r2, h2);
+    if (cv <= 0.0 || fract(r.z * 31.1 + r.x * 7.7) >= sh) continue;
+    rnd = r; ctr = c; ds = d; cov = cv; rnd2 = r2; has2 = h2; face = 1.0 + float(a);
+    return;
+  }
+  if (gFaceK.x >= 1.0) return;
+  pcDabLayer(ch, dlx, dly, w, asp, lim, ocl, ab, r, c, d, cv, r2, h2);
+  if (cv <= 0.0 || fract(r.z * 31.1 + r.x * 7.7) < gFaceK.x) return;
+  rnd = r; ctr = c; ds = d; cov = cv; rnd2 = r2; has2 = h2;
+}
+// THE LIGHT OF A FACE. On the staircase wall the smoothed facing turns from column to column, and each column was lit
+// apart: stripes of light and shade down a cliff that is one plane (SEEN). A dab of an upright chart is lit as the
+// face it is laid on: level, it faces straight out from its way of the strike (the side the land falls to); its
+// steepness is the pixel's (gFaceP.x). The body's axes are carried to the eye's by the frame the smoothed facing and
+// up make in both (gFaceA, gFaceB), so the light is the same arithmetic as every other dab's.
+vec3 gFaceNV;                       // the face dab's facing, in the eye's axes (pcGroundAt takes it for its light)
+vec3 gFaceA2, gFaceB2, gFaceUV;     // the smoothed facing's level part in the body's axes and in the eye's, and up in the eye's
+vec2 gFaceG;                        // the smoothed facing's level part on the ground's chart (which side the land falls to)
+void pcFaceFrame(vec3 nP, vec3 upB, float upSm) {
+  gFaceA2 = normalize(nP - upB * upSm + vec3(1e-6, 0.0, 0.0));
+  gFaceUV = normalize(vUpV);
+  vec3 nV = normalize(vNV);
+  gFaceB2 = normalize(nV - gFaceUV * dot(nV, gFaceUV) + vec3(1e-6, 0.0, 0.0));
+  gFaceG = pcGroundChartD(vBody, gFaceA2, uBodyR);
+}
+void pcFaceLight(vec2 ch, float face, vec3 upB) {
+  vec2 ax = pcStrikeAxis(floor(gFaceP.y) + face - 1.0);
+  vec2 n2 = vec2(-ax.y, ax.x);
+  n2 *= dot(n2, gFaceG) < 0.0 ? -4.0 : 4.0;
+  vec3 b = pcGroundUnchart(vBody, ch + n2, uBodyR) - pcGroundUnchart(vBody, ch, uBodyR);
+  vec3 hD = normalize(b - upB * dot(b, upB));
+  float u = gFaceP.x, sn = sqrt(max(1.0 - u * u, 0.0));
+  float c2 = dot(hD, gFaceA2), c3 = dot(hD, cross(upB, gFaceA2));
+  gFaceNV = normalize(gFaceUV * u + (gFaceB2 * c2 + cross(gFaceUV, gFaceB2) * c3) * sn);
+}
+// A dab of an upright chart: its centre's place on the body, EXACT from the chart (its v is the height there; its u
+// is taken along the strike from the pixel's place on the ground's chart), not carried by screen derivatives.
+vec3 pcFaceCentre(vec2 ch, vec2 ctr, float face) {
+  vec2 ax = pcStrikeAxis(floor(gFaceP.y) + face - 1.0);
+  return pcGroundUnchart(vBody, ch + ax * (ctr.x - dot(ch, ax)), uBodyR) * (uBodyR - ctr.y);
+}
+// THE CLIFF'S ROCK (the coordinator, 24 Nov: the coast's wall must read as rock with strata, a broken top, shade in its
+// gullies). Bc a dab's place, hB its height, rnd its numbers, c the place's own wash. Beds by height, each one of the
+// world's four rock tones, leaning and wandering along the face, with a dark seam at a bed's foot and a lit lip at its
+// top; gullies down the face where a slow field across it runs high, where the beds are lost under scree and the light
+// goes (gGully); the last metres over the sea wet and dark. A touch of the place's own hue, so a coast and a range
+// differ. Nothing here varies down the face but the beds: the fields are asked at the place with its height taken out.
+vec3 pcCliffC(vec3 Bc, float hB, vec3 rnd, vec3 c) {
+  vec3 hp = Bc * (uBodyR / max(length(Bc), 1.0));
+  vec4 nG = textureLod(uNoise3D, hp / uRockB.y + 0.31, 0.0);
+  vec4 nS = textureLod(uNoise3D, hp / (uRockB.y * 4.3) + 0.67, 0.0);
+  gGully = smoothstep(0.55, 0.70, nG.r + 0.25 * (nS.g - 0.5));
+  float hb = hB + 9.0 * (nS.b - 0.5) + 0.8 * (nG.a - 0.5);
+  float q = hb / uRockB.x + 0.38 * sin(hb / (uRockB.x * 2.7));
+  float bi = floor(q), f = q - bi;
+  // (the beds alternate a light one and a dark one, each its tone by its own number: four tones at random under a
+  // full sun all came out one tan, the light taking every lit colour toward its gold, SEEN)
+  float t = pcHash3(vec2(bi * 1.37 + 0.21, 3.7)).x;
+  vec3 tone = mod(bi, 2.0) < 0.5 ? (t < 0.72 ? uRockC0 : uRockC3) : (t < 0.6 ? uRockC1 : uRockC2);
+  if (f < 0.10) tone = tone * vec3(0.60, 0.60, 0.66);
+  else if (f > 0.89) tone = mix(tone, uRockC0, 0.55);
+  tone = mix(tone, pcDensity(mix(uRockC1, uRockC2, 0.4), 1.15), gGully * 0.75);
+  float lc = max(dot(c, vec3(0.3, 0.5, 0.2)), 0.05);
+  tone = clamp(tone * mix(vec3(1.0), clamp(c / lc, vec3(0.7), vec3(1.4)), 0.08), 0.0, 1.0);
+  float wet = (1.0 - smoothstep(0.8, 3.2, hB - uRockB.z + 0.9 * (rnd.x - 0.5))) * step(uRockB.z - 1.5, hB);
+  return mix(tone, pcDensity(tone, 1.75) * vec3(0.92, 0.96, 1.05), wet * 0.85);
+}
 // the wash at a dab on steep rock: up the dab centre's facing (dot of the normal with up), Bc its place, strata the
-// biome's (1 - vCol.a)
-// (and only from about 80 m out, all of it by 250 m: it is the far face that reads as a mosaic, and near, on foot, a
-// steep slope is as often turf as rock -- SEEN at the alpine easel, where the whole green slope went grey -- and the
-// ground does not know which; dist is the pixel's own, the same for every pixel of a dab to within its width)
-vec3 pcRockWash(vec3 c, float up, vec3 Bc, float strata, float dist) {
-  gRock = smoothstep(0.82, 0.67, up) * uRockK * smoothstep(80.0, 250.0, dist);
+// biome's (1 - vCol.a), rnd the dab's numbers
+// THE FAR FACES (step 1): from 35 to 48 degrees, only from about 80 m out, all of it by 250 m: it is the far face that
+// reads as a mosaic, and near, on foot, a steep slope is as often turf as rock -- SEEN at the alpine easel, where the
+// whole green slope went grey -- and the ground does not know which; dist is the pixel's own.
+// THE CLIFFS (step 2): from 49 degrees, all of it by 60, at every distance, where the land has beds (strata: the coast,
+// the range; never a wood's cut bank): the world's own rock (pcCliffC). Its top and foot are broken by WHOLE DABS, each
+// rock or turf by its own number and a slow field against the share at its centre: a ragged edge, never a line.
+vec3 pcRockWash(vec3 c, float up, vec3 Bc, float strata, float dist, vec3 rnd) {
+  float hB = length(Bc) - uBodyR;
+  float far = smoothstep(0.82, 0.67, up) * smoothstep(80.0, 250.0, dist);
+  float cl = smoothstep(0.66, 0.50, up) * smoothstep(0.05, 0.20, strata);
+  float nr = textureLod(uNoise3D, Bc / 4.3 + 0.13, 0.0).g;
+  gCliff = step(fract(rnd.y * 7.7 + rnd.z * 3.1) * 0.6 + nr * 0.4, cl * 1.1 - 0.05) * uRockK;
+  gRock = max(far * uRockK, gCliff);
+  gGully = 0.0;
   if (gRock <= 0.0) return c;
+  if (gCliff > 0.5) return pcCliffC(Bc, hB, rnd, c);
   float l = dot(c, vec3(0.3, 0.5, 0.2));
   vec3 rk = mix(vec3(l), c, 0.5);
   if (strata > 0.004) {
-    float hB = length(Bc) - uBodyR;
     float f = fract(hB / 19.3 + 0.6 * sin(hB / 61.0 + 2.3));
     rk = f < 0.42 ? pcDensity(rk, 0.86) : (f < 0.58 ? pcDensity(rk, 1.38) : rk);
   }
@@ -411,7 +551,22 @@ export function canopyUniforms() {
     uCanK: { value: [8.0, 0.62, 60.0, 0.0] },
   };
 }
-export function rockUniforms() { return { uRockK: { value: 0 } }; }
+export function rockUniforms() {
+  const L = ROCK_LOOK.earth;
+  return { uRockK: { value: 0 }, uRockC0: { value: L.c[0].slice() }, uRockC1: { value: L.c[1].slice() }, uRockC2: { value: L.c[2].slice() },
+    uRockC3: { value: L.c[3].slice() }, uRockB: { value: [L.bed, L.gully, 0, 0] } };
+}
+// THE CLIFFS' ROCK, a world at a time (FV4, the cliffs): its four tones, pale, mid, deep and slate, laid by local value
+// (pcTone lights and shades them), a bed's mean height and the gullies' spacing in metres. Each tone is a mix of the
+// shared pigments (data/looks/common.js), so no hue is invented here (the look rules, R2.1); it belongs in the world's
+// look data (an oil.rock of earth.js), which is not this lane's file: asked of its owner. Earth: the coast's sandstone,
+// a pale yellow ochre and a warm grey (Davy's grey with raw umber), a red umber bed (raw umber with burnt sienna) and a
+// cool slate (Payne's grey); beds a few metres thick on a cliff of 25 m over the sea. The pale and the grey beds take
+// turns with the dark ones (pcCliffC): under a full sun four tones at random came out one tan.
+export const ROCK_LOOK = {
+  earth: { c: [dilute(pig('yellowOchre'), 0.35), dilute(mixc(pig('davysGrey'), pig('rawUmber'), 0.4), 0.18),
+               mixc(pig('rawUmber'), pig('burntSienna'), 0.4), dilute(pig('paynesGrey'), 0.25)], bed: 5.5, gully: 22 },
+};
 export function seasonUniforms() {
   return { uSeasonG: { value: [0, 0, 0, 0] }, uCanSum: { value: [0.6, 0.8, 0.3] }, uCanAut: { value: [0.9, 0.6, 0.2] } };
 }
@@ -508,7 +663,10 @@ export const CANOPY_BENCH = { off: false };
 const _c = [0, 0, 0];
 export function syncCanopy(material, S) {
   const u = material && material.uniforms;
-  if (u && u.uRockK) u.uRockK.value = MODE.oil && CANOPY_WORLDS[S.id] ? 1 : 0;
+  if (u && u.uRockK) {
+    u.uRockK.value = MODE.oil && CANOPY_WORLDS[S.id] ? 1 : 0;
+    if (u.uRockB) u.uRockB.value[2] = S.sea == null ? 0 : S.sea;
+  }
   if (!u || !(u.uCanK || u.uSeasonG)) return;
   const spec = MODE.oil && CANOPY_WORLDS[S.id] ? canopySpec(S) : null;
   if (u.uSeasonG) u.uSeasonG.value[1] = 0;

@@ -13,6 +13,13 @@ sky to a mile: look director), FV2-T and FV7 (the far trees and the air speed te
 `src/render/materials.js`, `src/world/terrain.js`, `src/world/patchgen.js`, `src/world/surface.js` (recipes and far
 colour only). NOT chunks.js, post.js, shared.js, world/index.js (look director), NOT flora.js, florakit.js (trees groups).
 
+**STATE (24 Nov, second session, mid-step):** FV2 and FV3 ON by default (the coordinator merged FV2 into look-proto,
+v39). FV4 step 2, THE COAST CLIFF, built and SEEN from the sea at E-W2's widest fall, behind `?rockfield=1` (still off
+by default): see FV4 below. In progress: its 150 m / 400 m / 1 km / straight-down A/B sheets, the mountain faces it also
+changes, then the canopy's 3 px floor (look director) and the ground's air cost (a lead: terrain.js sets
+`material.uniformsNeedUpdate` for every patch, so three.js re-sends the whole uniform list per patch per frame;
+being measured). Scratch: a worktree of farview + water-bodies (not pushed) for the falls stills.
+
 **STATE (24 Nov, end of the first session):** FV2 and FV3 built, seen, pushed, ON by default; FV4 a first step, pushed,
 OFF by default (`?rockfield=1`). Reviews asked of the look director and the coordinator for all three (stills in
 `docs/shots/painter/farview/`). Waiting on: the look director's ruling, the slope chart (L8) for FV4, the canopy's row in
@@ -113,8 +120,47 @@ BUILT AND SEEN, a first step; NOT the cure for the smear (F13 needs the look dir
   its lilac). Honest verdict: a modest step; the faces still smear vertically and the far mountains still read faceted
   (F12 is the coarse mesh's silhouette: triangle count, unpriced). Phone cost: per vertex for the snow; about 25
   instructions on a steep dab only (at most 0.7 ms on an alpine air view on the design's bound, nothing on foot in a wood).
-- **Next for FV4:** the slope chart (L8) from the look director, then dabs laid along the contour on rock; a per-vertex
-  rock value (would need a new 4-byte attribute: no spare byte left) to keep steep turf green while rock goes grey.
+- **STEP 2 (24 Nov, second session): THE COAST CLIFF, behind the same `?rockfield=1`.** The coordinator put it first:
+  the berm's ruled wall round E-W2's falls (`water-bodies`), which read as vertical rainbow stripes from the sea.
+  WHY IT STRIPED (SEEN, `?rockdebug=1..4`): (1) the ground's chart is laid from straight above, so on a face a dab is
+  stretched down it; (2) the wall is a STAIRCASE of upright facets (the coast runs across the terrain's grid), its
+  smoothed vertex facing has gentle columns every few metres, and everything carried to a dab's centre by screen
+  derivatives jumped at every facet's edge; (3) the vertex washes at the wall's top are the coast's patchy colours.
+  WHAT IS DONE (all in `farground.js` ROCK_FRAG and TERRAIN_FRAG's dab loop):
+  - L8 `pcSlopeChart(pB, nB, upB, cell)` and the UPRIGHT CHARTS: u along the strike, v the height running down. The
+    strike is taken in EIGHT FIXED WAYS (22.5 deg apart on the ground's chart, at most 2 % stretch), never turned
+    smoothly (a smoothly turned u swims by metres: the chart counts kilometres). `pcFaceLayer` lays each of the three
+    ground layers on steep land: the strike's two nearest ways and the ground's own chart, each dab kept by its own
+    number against the shares (face share 37 to 50 deg; the two ways by the strike's place between them), so there is
+    no seam and no crushed band: the look director asked for a smooth blend, which two charts kilometres apart in number
+    cannot give; whole dabs crossing over is the same idea without one.
+  - The shares are asked AT THE PIXEL (smoothed facing, continuous), not carried to the centre. The facing for the face
+    decisions is the STEEPER of the smoothed and the triangle's own (cross of gBdx, gBdy): on the staircase every
+    triangle is upright. A face dab's centre is EXACT from its chart (`pcFaceCentre`: v is the height there), and it
+    takes the pixel's own washes (no carry). Its LIGHT is a plane facing straight out from its way of the strike
+    (`pcFaceLight`), mapped into the eye's axes by the frame the smoothed facing and up make in both: before, each
+    column of the staircase was lit apart (stripes of light and shade).
+  - THE CLIFF'S ROCK (`pcCliffC`), from 49 deg (all by 60), at every distance, where the land has beds (strata over
+    0.2: the coast, the range; never a wood's cut bank): beds by height (`ROCK_LOOK.earth`: 5.5 m mean, leaning and
+    wandering along the face), a light bed and a dark one in turn (pale yellow ochre or slate; warm grey or red umber:
+    mixes of the shared pigments, data/looks/common.js), a dark seam at a bed's foot and a lit lip at its top; GULLIES
+    down the face where a slow field across it runs high (22 m), the beds lost under scree and the light taken to the
+    shade (level 0.9); the last 1 to 3 m over the sea wet and dark. The cliff's edge with the turf is broken by whole
+    dabs (each rock or turf by its own number and a 4 m field against the share at its centre). No leaf shadow and no
+    fallen leaves on rock (the leaf-shadow pattern, laid flat, ran down the cliff in dark blocks: SEEN, fixed). Between
+    the dabs on a cliff the rock at the pixel's own place.
+  - SEEN at E-W2's widest fall (scratch merge of farview + water-bodies, `?rivers=tree&falls=1`): from the sea at 68 m
+    the wall reads as a layered sea cliff (cream, umber and slate beds, dark gullies, wet foot); 150 m: a rock wall
+    under the turf; 400 m straight down: a thin rock edge along the coast. Stills `fv4_cliff_*` (A rockfield=0 above,
+    B below).
+  - NOT DONE: the TOP SILHOUETTE is still ruled from the sea (a geometry change in surface.js near the wall; not without
+    E-W2, hydro.js measures the lip on that surface); NO BEACH (the wall drops into 22 m of water at the falls: there is
+    no ground at its foot to paint); the staircase itself shows from 150 m (zig-zag of the wall in plan).
+  - Debug: `?rockdebug=1` dab charts (red/orange upright, blue/cyan ground chart on steep land, grey between), `=2`
+    the smoothed facing, `=3` the triangle's, `=4` the beds' heights.
+- **Next for FV4:** judge the mountain faces with the cliff paint (it applies to every steep bedded face on Earth),
+  then the broken top with E-W2; a per-vertex rock value (a new 4-byte attribute, `aFar`, offered to the water and
+  flora groups) to keep steep turf green.
 
 Branch: `cosmos` (shared with PILOT and PHYSICS, one working tree). Commits: `tools/commit.sh painter`.
 This file was rewritten by the second PAINTER agent (the first ran out of working context). The

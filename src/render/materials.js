@@ -6,7 +6,7 @@ import * as THREE from 'three';
 // THE GROUND SEEN FROM THE AIR (group C, the far view): the canopy painted into the ground. Its shader text, its uniforms
 // and its switch (?canopy=) live in render/farground.js; the hooks in the ground's shaders are all inside #ifdef PC_CANOPY, which is set
 // only in the oil look with the switch on.
-import { CANOPY, CANOPY_DEBUG, CANOPY_DAB, CANOPY_VERT_DECL, CANOPY_VERT_MAIN, CANOPY_FRAG, canopyUniforms, GROUND_SEASON, SEASON_VERT, SEASON_VERT_MAIN, SEASON_FRAG, seasonUniforms, ROCKFIELD, ROCK_FRAG, rockUniforms } from './farground.js';
+import { CANOPY, CANOPY_DEBUG, CANOPY_DAB, CANOPY_VERT_DECL, CANOPY_VERT_MAIN, CANOPY_FRAG, canopyUniforms, GROUND_SEASON, SEASON_VERT, SEASON_VERT_MAIN, SEASON_FRAG, seasonUniforms, ROCKFIELD, ROCK_FRAG, rockUniforms, ROCK_DEBUG } from './farground.js';
 import { G, PHYS, PHYSW, PREV, OIL, LOOK, BURNPAINT, register, ensureGlobals, makeBodyUniforms } from './shared.js';
 import { MODE } from '../data/mode.js';
 import { FLORA_GLSL } from '../physics/flora.glsl.js';
@@ -450,10 +450,16 @@ void pcGroundAt(vec2 ds, float w, vec3 rnd, out vec3 c, out float lvl, out float
   // facet, what was carried that far was nonsense: strokes of cyan, black and white on Pluto's lilac mountains, the
   // survey of the worlds)
   vec2 dsA = ds * min(1.0, 24.0 / max(length(ds), 1e-3));
+  #ifdef PC_ROCKF
+    if (gFaceD > 0.5) dsA = vec2(0.0);      // (a dab of an upright chart takes the pixel's own washes and facing: carried, they jumped at every facet of a staircase wall, render/farground.js gFaceK)
+  #endif
   vec4 colC = clamp(vCol + gCdx * dsA.x + gCdy * dsA.y, 0.0, 1.0);
   vec3 col2C = clamp(vCol2 + gC2dx * dsA.x + gC2dy * dsA.y, 0.0, 1.0);
   vec4 parC = vPar + gPdx * dsA.x + gPdy * dsA.y;
   vec3 nVc = normalize(vNV + gNvdx * dsA.x + gNvdy * dsA.y), nLc = normalize(vNL + gNldx * dsA.x + gNldy * dsA.y);
+  #ifdef PC_ROCKF
+    if (gFaceD > 0.5) nVc = gFaceNV;        // (a dab of an upright chart is lit as a plane along the strike, render/farground.js pcFaceLight)
+  #endif
   c = mix(col2C, colC.rgb, gMid);                  // (far away the forest floor is its canopy)
   // (the lighter paint looks up no noise for a dab: its hue and weight vary by the dab's own numbers alone, pcGroundPaint)
   vec4 n1 = vec4(0.5), n2 = vec4(0.5);
@@ -471,7 +477,9 @@ void pcGroundAt(vec2 ds, float w, vec3 rnd, out vec3 c, out float lvl, out float
   // as everything else here is.
   float upN = dot(nLc, normalize(Bc));
   #ifdef PC_ROCKF
-    c = pcRockWash(c, upN, Bc, 1.0 - colC.a, length(vView));      // (the far view, FV4: a rock face in its own value and beds, render/farground.js)
+    if (gFaceD > 0.5) upN = gFaceP.x;
+    c = pcRockWash(c, upN, Bc, 1.0 - colC.a, length(vView), rnd);      // (the far view, FV4: a rock face in its own value and beds, a cliff in the world's rock, render/farground.js)
+    parC.z *= 1.0 - gRock;      // (no leaf shadow on a rock face: its pattern is laid flat and ran down a cliff in dark blocks, SEEN)
   #endif
   ${SKYUP('upN')}
   snowC = pcSnowCover(upN, rnd.z * 0.5 + n2.b * 0.3 + n1.a * 0.2, parC.z);
@@ -500,6 +508,9 @@ void pcGroundAt(vec2 ds, float w, vec3 rnd, out vec3 c, out float lvl, out float
   float x = dot(nVc, gSunV) * 0.5 + 0.5;
   float sunny = min(pcSunAtSoft(Bc, parC.z * mix(0.82, 1.0, gMid), 8.0, w, fract(rnd.y * 5.7)), 1.0 - pcCast(Bc, (rnd.x - 0.5) * 0.3));
   lvl = pcLevel(mix(min(x, 0.44) - 0.10 * parC.z, x + (rnd.z - 0.5) * 0.10, sunny), 0.03);
+  #ifdef PC_ROCKF
+    lvl = mix(lvl, min(lvl, 0.9), gGully);      // (a cliff's gully is in its own shade, render/farground.js pcCliffC)
+  #endif
   #ifdef PC_FIRE
     // AND A HOLE IS IN ITS OWN SHADOW. Nothing else in the picture tells the eye that a dark patch on flat ground
     // is a hole and not a stain; the light going out of it, as it does down a well, is what makes it one.
@@ -522,6 +533,13 @@ void pcGroundAt(vec2 ds, float w, vec3 rnd, out vec3 c, out float lvl, out float
 }
 // One stroke's paint from that: its own colour (a fallen leaf's, for the share fk of the strokes), the snow, the light.
 vec3 pcGroundPaint(vec3 c, vec3 leaf, float fk, vec3 rnd, float snowC, float lvl) {
+  #ifdef PC_ROCKDEBUG
+    // (?rockdebug=1, for looking only: a dab of an upright chart red (a cliff's rock) or orange; a dab of the ground's
+    // chart on steep land blue (rock) or cyan)
+    if (uRockDbg > 3.5 && gFaceD > 0.5) { float hq = (length(gBc) - uBodyR) / 5.5; float fq = fract(hq); return fq < 0.11 ? vec3(0.0) : fq > 0.88 ? vec3(1.0) : mod(floor(hq), 2.0) < 0.5 ? vec3(1.0, 0.3, 0.2) : vec3(0.2, 0.4, 1.0); }
+    if (uRockDbg > 1.5 && uRockDbg < 3.5) { float uq = dot(normalize(vNL), normalize(vBody)); vec3 nF = normalize(cross(gBdx, gBdy)); float uf = abs(dot(nF, normalize(vBody))); float q = uRockDbg > 2.5 ? uf : uq; return q < 0.3 ? vec3(0.5, 0.0, 0.0) : q < 0.5 ? vec3(1.0, 0.1, 0.1) : q < 0.64 ? vec3(1.0, 0.6, 0.1) : q < 0.8 ? vec3(1.0, 1.0, 0.2) : q < 0.86 ? vec3(0.2, 0.9, 0.2) : vec3(0.3); }
+    if (gFaceOn > 0.5) return (gFaceD > 0.5 ? (gCliff > 0.5 ? vec3(1.0, 0.15, 0.1) : vec3(1.0, 0.7, 0.1)) : (gCliff > 0.5 ? vec3(0.1, 0.25, 1.0) : vec3(0.1, 0.9, 1.0))) * (0.55 + 0.45 * rnd.x);
+  #endif
   #ifdef PC_CANOPY
     // (a dab of the painted canopy: the crown's own wash in the crown's own light, one flat colour, render/farground.js)
     if (gCan > 0.5) return pcTone(pcDabTint(gCanC, rnd, gCanLf), gCanL);
@@ -535,7 +553,7 @@ vec3 pcGroundPaint(vec3 c, vec3 leaf, float fk, vec3 rnd, float snowC, float lvl
   #ifdef PC_ROCKF
     // (the far view, FV4: on a rock face no dab is laid a step darker by its own number, and its pigment and stray
     // are halved, so the face reads in lit and shaded planes by its own facing, render/farground.js)
-    cg = mix(cg, c, 0.5 * gRock);
+    cg = mix(cg, c, max(0.5 * gRock, gCliff));      // (a cliff's dab keeps its bed's tone: no stray pigment)
     lvl -= (1.0 - f) * step(0.58, fract(rnd.x * 11.1)) * 0.9 * step(1.5, lvl) * (1.0 - gRock);
     vec3 k = pcDabTint(mix(cg, leaf, f), mix(rnd, vec3(0.5), 0.5 * gRock), f);
   #else
@@ -798,6 +816,21 @@ void main() {
       gSunCh = scCan / max(length(scCan), 1e-6);
     }
   #endif
+  #ifdef PC_ROCKF
+    // (the far view, FV4: on steep land the dabs are laid on upright charts, render/farground.js pcFaceLayer; a pixel
+    // under about 31 degrees never asks)
+    // (the facing is the STEEPER of the smoothed one and the triangle's own: on the coast's staircase wall every
+    // triangle is upright, and the smoothed facing had gentle columns every few metres, SEEN in ?rockdebug=2 and 3)
+    vec3 nP = normalize(vNL);
+    float upSm = dot(nP, upB);
+    gFaceP = vec2(min(upSm, abs(dot(normalize(cross(gBdx, gBdy)), upB))), 0.5);
+    gFaceOn = uRockK * step(gFaceP.x, 0.86);
+    if (gFaceOn > 0.5) {
+      gFaceP.y = pcStrikeWay(nP, upB, upSm);
+      gFaceK = vec2(smoothstep(0.80, 0.64, gFaceP.x), smoothstep(0.30, 0.70, fract(gFaceP.y)));
+      pcFaceFrame(nP, upB, upSm);
+    }
+  #endif
   // (the speed test's flat ground: no strokes at all, shared.js uOilL.y; the lighter paint: two layers, the coarsest
   // left to the ground's own colour)
   if (uOilL.y > 0.5 && uOilL.y < 1.5) rem = 0.0;
@@ -810,12 +843,29 @@ void main() {
     if (L == 2 && uOilL.x > 0.5) break;
     float ws = L == 0 ? 1.0 : L == 1 ? 2.0 : 4.0, w = o4.x * ws;
     vec3 rnd, rnd2; vec2 ds, ctr; float cov, has2;
+    #ifdef PC_ROCKF
+      float faceD = 0.0;
+      if (gFaceOn > 0.5) pcFaceLayer(ch, dlx, dly, rB - uBodyR, rdx, rdy, w, uOilS.z, 4.0 * wpx * uOilS.w * ws, ocl,
+                                     L == 0 ? vec2(0.35, 0.65) : L == 1 ? vec2(0.0, 0.35) : vec2(1.0, -1.0), rnd, ctr, ds, cov, rnd2, has2, faceD);
+      else
+    #endif
     pcDabLayer(ch, dlx, dly, w, uOilS.z, 4.0 * wpx * uOilS.w * ws, ocl,
                L == 0 ? vec2(0.35, 0.65) : L == 1 ? vec2(0.0, 0.35) : vec2(1.0, -1.0), rnd, ctr, ds, cov, rnd2, has2);
     if (cov <= 0.0) continue;
     gCtrB = pcGroundUnchart(vBody, ctr, uBodyR) * (rB + rdx * ds.x + rdy * ds.y);
     #ifdef PC_CANOPY
       gCtrCh = ctr;
+    #endif
+    #ifdef PC_ROCKF
+      gFaceD = faceD;
+      // (a dab of an upright chart: its centre's place from its own chart, and its place on the ground's chart)
+      if (faceD > 0.5) {
+        gCtrB = pcFaceCentre(ch, ctr, faceD);
+        pcFaceLight(ch, faceD, upB);
+        #ifdef PC_CANOPY
+          gCtrCh = ch + dlx * ds.x + dly * ds.y;
+        #endif
+      }
     #endif
     pcGroundAt(ds, w, rnd, c, lvl, snowC, leaf, canopy);
     // (under trees the floor is nearly all fallen leaves, with the earth dark between: the clip's. A world may keep
@@ -829,6 +879,9 @@ void main() {
     float fk = clamp(canopy * 1.6, 0.0, 0.88) * gVar * (uGroundK.w > 0.0 ? uGroundK.w : 1.0);
     #ifdef PC_SEASONG
       fk *= pcSeasonLeafK();                 // (a quarter of the fallen leaves in high summer, all of them in autumn)
+    #endif
+    #ifdef PC_ROCKF
+      fk *= 1.0 - gRock;                     // (no leaf lies on a rock face)
     #endif
     acc += rem * cov * pcGroundPaint(c, leaf, fk, rnd, snowC, lvl);
     rem *= 1.0 - cov;
@@ -847,7 +900,16 @@ void main() {
       vec4 canM = pcCanopyMean(vFarS, vPar.w);
       bareC = mix(bareC, canM.rgb, canM.a);
     #endif
-    vec3 bare = pcTone(bareC, pcLevel(mix(min(x0, 0.44) - 0.10 * vPar.z, x0, sun0), 0.05));
+    float lvl0 = pcLevel(mix(min(x0, 0.44) - 0.10 * vPar.z, x0, sun0), 0.05);
+    #ifdef PC_ROCKF
+      // (on a cliff the ground between the dabs is the cliff's rock at the pixel's own place, render/farground.js)
+      float clP = smoothstep(0.66, 0.50, gFaceP.x) * smoothstep(0.05, 0.20, 1.0 - vCol.a) * gFaceOn;
+      if (clP > 0.0) { bareC = mix(bareC, pcCliffC(vBody, rB - uBodyR, vec3(0.5), bareC), clP); lvl0 = mix(lvl0, min(lvl0, 0.9), gGully * clP); }
+    #endif
+    vec3 bare = pcTone(bareC, lvl0);
+    #ifdef PC_ROCKDEBUG
+      if (gFaceOn > 0.5 && uRockDbg < 1.5) bare = vec3(0.5);
+    #endif
     #ifdef PC_FIRE
       // (the powers, fire) The ground that shows BETWEEN the strokes is charred too, or a burnt patch would show its
       // old green through the gaps between its black strokes. This one is a smooth wash and not a stroke, so it takes
@@ -1076,7 +1138,7 @@ export function makeTerrainMaterial(bodyU) {
   // (the far view, FV3: the floor and the far colour follow the year; compiled in only with the oil look and ?groundseason=)
   if (LOOK.oil && GROUND_SEASON) { m.defines = m.defines || {}; m.defines.PC_SEASONG = 1; Object.assign(m.uniforms, seasonUniforms()); }
   // (the far view, FV4: rock faces, strata and snow that read from afar; compiled in only with the oil look and ?rockfield=)
-  if (LOOK.oil && ROCKFIELD) { m.defines = m.defines || {}; m.defines.PC_ROCKF = 1; Object.assign(m.uniforms, rockUniforms()); }
+  if (LOOK.oil && ROCKFIELD) { m.defines = m.defines || {}; m.defines.PC_ROCKF = 1; Object.assign(m.uniforms, rockUniforms()); if (ROCK_DEBUG) m.defines.PC_ROCKDEBUG = _gf(ROCK_DEBUG); }
   // (the powers, fire: the ground goes black where the fire passed. Only with ?powers=1 and ?look=oil; see addFire.)
   addFire(m, true);
   return register(m, 'terrain');
