@@ -35,6 +35,9 @@ A separate session builds W1 CLOUDS once the look director's sky ceiling (touch 
 | `?farwind=1` | the far plants read the map |
 | `?cloudmap=1` | the cloud and rain map, the rain field for the water group, and the storm-held bench rows |
 | `?stormland=1` | storms born from the land (turns on `windmap` and `cloudmap` too) |
+| `?rainlook=1` | a downpour reads as one: more of the box's drops drawn, from nearer the eye, each a third longer |
+| `?rainshaft=1` | rain shafts under every raining storm 1 to 7 km off (`world/storms.js`; turns on `cloudmap`; oil look only) |
+| `?bolts=1` | lightning bolts, cloud to ground (`world/storms.js`; turns on `cloudmap`; oil look only) |
 
 ## Done
 
@@ -201,9 +204,65 @@ A separate session builds W1 CLOUDS once the look director's sky ceiling (touch 
 - **Suites:** physics 438, world 65, unit 325, 0 failing.
 - **Bit-identical** with the switches off (162,000 numbers).
 
+### W3.3: A DOWNPOUR THAT READS AS ONE (`src/physics/three/kits.js`, behind `?rainlook=1`)
+
+- **What was wrong:** at the spawn's own thunderstorm (23.7 mm/h) a few dozen strokes were in view: a light shower to
+  the eye. The box already holds about 1,500 drops at tier 1; the painter's dials drew few of them.
+- **Built:** three of those dials are let go while the switch is on, and put back exactly when it is off: all of the
+  drops drawn from about three quarters of a downpour up (`shareGain` 1.4, from 1); drops from 3.5 m out drawn (from
+  6 m); each stroke a third longer (`exposure` and `maxLen` x 1.35). The number of drops in the box is unchanged.
+- **NOT built (said plainly):** the box's rain read from the map's four corners, and the kitmat `rain` and `snow`
+  strings (touch T7, not needed so far). The box's rate is still `here.weather`, which with `?stormland` already reads
+  the cloud top and the windward and lee factor.
+- **Seen:** `W3.3_A_rain_spawnstorm_rainlook_off.jpg` and `W3.3_B_..._on.jpg`, the spawn's thunderstorm from the
+  ground. B has visibly more rain strokes, and longer ones, across the whole picture; the leaves and the sky are the same.
+- **Phone cost, derived:** the drops drawn go up about a quarter at full rain, each a third longer and some nearer:
+  about 1.7 to 2 times the rain's own pixels. The rain's own cost is the gap between the rows 'weather: a storm held
+  overhead' and 'storm: no rain drawn'; run the table with `?rainlook=1` and the same gap is the new cost.
+
+### W3.4: RAIN SHAFTS AND LIGHTNING BOLTS (`src/world/storms.js`, new; behind `?rainshaft=1` and `?bolts=1`)
+
+- **Rain shafts:** one instanced draw. Under every raining storm cell 1 to 7 km away (rate x strength squared at
+  least 2 mm/h, at most 12), an open cylinder from the cloud base to the ground, its top leaning upwind. It is painted
+  in small vertical strokes, with no outline and no blur: 440 columns round, each in runs with gaps, thinned by distance,
+  in the haze's grey. Inside a storm's own curtain (within 0.6 of its radius) it is not drawn: the rain round the eye is
+  the particles'.
+- **Bolts:** one small draw, only while a flash is on. For each cloud-to-ground flash brighter than 0.12 and younger than
+  0.5 s, a seeded jagged channel (16 segments) with one to three branches, from the cloud base to the ground. It is 2 to 4
+  pixels wide whatever its distance, white, with no glow.
+- **Needs a hook in `world/index.js`** (touch T2, the look director's file): 6 lines, saved as
+  `docs/shots/physics/weather-build/T2_world_index_js.patch.txt`. **It is NOT in this branch's commit**; the stills were
+  taken with it applied locally. Without the hook nothing of `storms.js` is loaded, ever.
+- **Seen:**
+  - `W3.4_A_alpine450_shafts_off.jpg` / `W3.4_B_..._on.jpg`: the alpine station from 450 m, facing a mature land storm
+    1 km off (game time 7,049).
+    - B shows the shafts as pale vertical strokes: a band over the left-hand slopes, and to the right a row of thin
+      separate wavy lines against the far ground.
+    - **Not good yet:** the right-hand part reads as a comb of lines more than a curtain of rain. Over the slopes the
+      strokes read as scratches on the mountain. **It needs the look director's eye.**
+  - `W3.4_A_valley_bolt_off.jpg` / `W3.4_B_..._on.jpg` (and a 4x crop): from a valley 500 m from a cloud-to-ground flash,
+    looking up.
+    - B shows a thin, crisp, white jagged bolt with one branch, onto the ridge; nothing else differs.
+    - **What is wrong in that picture is not the bolt:** the sky over a mature storm is still today's fair sky, so the
+      bolt starts out of blue air. That is lane W1 (the clouds that read the cloud map). The bolt is also short (154 m),
+      because the cloud base is only that far over a ridge at 377 m.
+  - How to get these frames: the gallery with `&physics=1&stormland=1&rainshaft=1&bolts=1&wtime=7049.15&t=30&pre=12`,
+    then re-anchor the land storms with t0 = 1999 through `tools/lab.mjs eval`. The gallery fixes the sun from the
+    camera's spot, so a camera moved 1.6 km away needs `time=16.6` to keep the same storms.
+- **Phone cost, derived** (the v37 table: the ground's paint 24 to 34 ns a pixel; the shaft's shader is about a third):
+  - one storm's curtain 3 km off is about 5 % of the picture with both walls: about 0.2 ms;
+  - three in view: about 0.6 ms;
+  - bolts: a few hundred pixels, nothing measurable;
+  - no storm in view: nothing.
+- **Speed-test row:** 'storm: no rain shafts or bolts' (it hides `pc-storm-*`), asked only while one of the two
+  switches is on. It means something only with a storm in sight.
+- **Suites:** physics 438, world and looks 65, unit 325, 0 failing.
+
 ## NEXT
 
-1. **W3.3:** rain marks longer (`particles.js`, `three/kits.js`, the kitmat `rain` and `snow` strings), and the box's
-   rain from the map's four corners.
-2. **W3.4:** `world/storms.js`: rain shafts and bolts. Needs a hook in `world/index.js` (touch T2, the look
-   director's).
+1. **The look director's review** of the W3.3 and W3.4 stills, and their decision on the T2 hook (6 lines in
+   `world/index.js`). Change the shafts as they say.
+2. **W3.3's remainder**, if wanted: the box's rain from the map's four corners.
+3. **Then the water group's turn on `physics/index.js`** (touch T6): the rain field is in place for them
+   (`fields.rain`: `cells`, `cellsX`, `now`, `GLSL`, `rainAt`, `rainBetween`, `throughfall`).
+4. W1 CLOUDS is another session's; the storm cannot be seen as a cloud until it lands.

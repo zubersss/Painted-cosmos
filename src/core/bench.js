@@ -323,6 +323,12 @@ export function attachBench(pc) {
         ['weather: a storm held overhead', () => holdStorm(true), () => holdStorm(false)],
         ['storm: no rain drawn', () => { holdStorm(true); show(/^pc-kit-rain/, false); }, () => { show(/^pc-kit-rain/, true); holdStorm(false); }],
       ] : []),
+      // (group D: the rain shafts under distant storms and the lightning bolts, world/storms.js. Not with the storm held
+      //  overhead: a shaft is not drawn round the eye, so the row means something only with a storm in sight, about
+      //  1 to 7 km away -- the weather of the moment, as the table is run. Derived for the phone: about 0.2 ms a storm in view.)
+      ...((WX2.rainshaft || WX2.bolts) ? [
+        ['storm: no rain shafts or bolts', () => show(/^pc-storm-/, false), () => show(/^pc-storm-/, true)],
+      ] : []),
       // (back to the size the device really draws, so the four rows below are measured from IT and not from
       //  whatever sharper size the questions above had to be asked at: see MK at the top of this file)
       [AS, () => sharpen(1), null],

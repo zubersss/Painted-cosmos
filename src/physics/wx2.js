@@ -12,6 +12,9 @@
 //   ?cloudmap=1   the cloud and rain map of the whole world, and the rain field for the water group (cloudfield.js)
 //   ?stormland=1  storms born from the land: afternoon storms at the wind map's convection sites (weather.js STORMLAND),
 //                 the weather living under its own cloud top, more rain windward and less in the lee
+//   ?rainlook=1   a downpour reads as one: more of the box's drops drawn the harder it rains, nearer the eye, longer
+//   ?rainshaft=1  rain shafts hanging under every raining storm in view (world/storms.js; needs the cloud map)
+//   ?bolts=1      lightning bolts, cloud to ground (world/storms.js; needs the cloud map)
 const Q = (typeof location !== 'undefined' && location && location.search) ? new URLSearchParams(location.search) : null;
 const flag = (k, d) => (Q && Q.has(k) ? Q.get(k) !== '0' && Q.get(k) !== 'false' : d);
 const ALL = flag('wx2', false);
@@ -23,6 +26,9 @@ export const WX2 = {
   farwind: flag('farwind', ALL),
   cloudmap: flag('cloudmap', ALL),
   stormland: flag('stormland', ALL),
+  rainlook: flag('rainlook', ALL),
+  rainshaft: flag('rainshaft', ALL),
+  bolts: flag('bolts', ALL),
   // (the speed test's row 'weather: wind map frozen': the map stops refreshing, so the script's change is its cost)
   freeze: false,
 };
@@ -30,3 +36,4 @@ export const WX2 = {
 if (WX2.nearmap || WX2.farwind) WX2.windmap = true;
 // (storms born from the land need the map's sites, and the weather's own top needs the cloud map)
 if (WX2.stormland) { WX2.windmap = true; WX2.cloudmap = true; }
+if (WX2.rainshaft || WX2.bolts) WX2.cloudmap = true;
