@@ -17,6 +17,10 @@ import { dirToFace } from './cubesphere.js';
 import { EASELS, STANDS } from '../art/easels.js';
 import { bloomTint } from './bloom.js';
 
+// ?glades=1 (FV, the far view, the look director's second audit finding 1, C's part; OFF by default): the oil look's woods
+// open in WHOLE GLADES of grass between the stands, with a short ragged edge, instead of thinning softly (forest recipe).
+const GLADES = (() => { try { return new URLSearchParams(location.search).get('glades') === '1'; } catch (e) { return false; } })();
+
 const _cf = {};
 
 const NOT = {};
@@ -476,7 +480,17 @@ class Surface {
     // (the oil look may open a wood: the biome's oil.glade = [from, to] in place of 0.24, 0.62: more and wider glades of
     // grass between the stands, as the owner's references of a forest from the air have)
     const gl = MODE.oil && bi.oil && bi.oil.glade ? bi.oil.glade : null;
-    const glade = smoothstep(gl ? gl[0] : 0.24, gl ? gl[1] : 0.62, nA(x * fg + 61.0, y * fg + 3.0, z * fg - 17.0));
+    const gn = nA(x * fg + 61.0, y * fg + 3.0, z * fg - 17.0);
+    let glade = smoothstep(gl ? gl[0] : 0.24, gl ? gl[1] : 0.62, gn);
+    // (WHOLE GLADES, ?glades=1: from the air a glade that thinned over the whole width of the noise's step read as a wood
+    // a little thinner, never as an opening -- "there are no glades", the look director's second audit at 150 m; the
+    // references show "between the stands, glades of yellow-green grass". The same glades, about the middle of the old
+    // step, but open WHOLE: no tree in them, the edge a short step ragged by a finer field.)
+    const gWhole = GLADES && MODE.oil;
+    if (gWhole) {
+      const gm = 0.5 * ((gl ? gl[0] : 0.24) + (gl ? gl[1] : 0.62));
+      glade = smoothstep(gm - 0.035, gm + 0.035, gn + 0.06 * nC(x * fv * 0.6 + 9.0, y * fv * 0.6 - 5.0, z * fv * 0.6 + 2.0));
+    }
     const pz = smoothstep(-0.12, 0.34, nA(x * fp - 23.0, y * fp + 41.0, z * fp + 9.0) + (b.h - L) * 0.018 - 0.1) * smoothstep(7, 30, s);
     const v1 = nC(x * fv - 3.0, y * fv, z * fv + 21.0);
     set3(b, pal.grassMid);
@@ -496,7 +510,7 @@ class Surface {
     // (the rivers of the tree's point bars: the trees stand back from the bar and 6 m beyond it, so their crowns do not hide
     //  it from the air -- F, 24 Nov; c.barZone, world/rivers.js, written every call there and read only when it is attached)
     const bz = this.rivers ? c.barZone || 0 : 0;
-    b.trees = clamp((1 - 0.82 * glade) * (1 - rk) * open * (1 - Math.max(bar, bz)), 0, 1);
+    b.trees = clamp((1 - (gWhole ? 1.0 : 0.82) * glade) * (1 - rk) * open * (1 - Math.max(bar, bz)), 0, 1);
     b.canopy = clamp(b.trees * 1.05 + (1 - open) * 0.35, 0, 1);
     b.birch = clamp(0.74 - pz * 0.72 + 0.3 * (1 - smoothstep(6, 18, s)), 0.06, 1);
     // (the oil look may set a wood's mix of kinds: the biome's oil.tallMix. A number: the share of the first kind, everywhere.

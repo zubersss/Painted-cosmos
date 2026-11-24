@@ -44,7 +44,24 @@ drifts smoothly from point to point, and the dabs' own small drift. Now the land
 number (white, or pale blue) with a value step of its own (a little lighter or darker), and the ground between takes the
 snow's white. Ramp measure on the ridge (steps over 0.005 that are over 0.03): 23 to 31 per cent; the small steps left
 are most likely the air's smooth fade with distance (not measured apart). 5221c6e: the ?bloomfar index slip fixed.
-A1 (trees far) took the far crowns' shadows from my list; I keep the glades. FV6(b) ?bloomfar: the ground
+A1 (trees far) took the far crowns' shadows from my list; I keep the glades.
+THE NOON LIT PLANE (v39.6, the look director's ruling), BEHIND ?noonlit=N (OFF by default): at a high sun the lit plane
+in two values by the face's dot with the sun at the dab (0.6 of a level less under 0.80), and its colour the family's
+violet times the warm lean, N the strength. MEASURED lit rock S median: 150 m noon 0.052 (off), 0.049 (N 3: cooler,
+not more coloured), 0.112 (N 7: the near mountain lavender, the warm/cool split gone); 1 km noon 0.035 to 0.040 (the
+air rules there); 420 m at 16.8 h pixel-identical. RULED by the look director: keep the VALUE SPLIT ONLY, as part of
+?rockfield (on); the colour part and ?noonlit removed (next commit after 5b9400e). It changes 0.48 per cent of pixels at
+150 m noon and 0.34 at 420 m; 16.8 h identical. Averaging the violet and
+the warm tone first cancelled to neutral (no change at all): multiplied now. 87b25e8: A1's far crown shadow hook in
+pcCanopyAt behind ?farshadow=1. NEXT: the glades from the air (LOOK-AUDIT-2 finding 1, C's part), and B's ask on
+?bloomfar: fewer flower dabs near the eye (a third below 60 m) (DONE dba551d).
+THE GLADES (LOOK-AUDIT-2 finding 1, C's part), BEHIND ?glades=1 (OFF by default; next commit after dba551d): the wood's
+own glade field (surface.js forest recipe, oil look) opened WHOLE: no tree inside, the edge a short ragged step about the
+middle of the old soft step; the far trees and the painted roof follow it by themselves (both read s.trees). SEEN at
+the autumn woodland (the gallery's default season) from 150 m and 420 m at noon and 150 m at 16.8 h: dark stands with
+crisp yellow-green glades between. HONEST: the wood's darks fall (V<0.3 in the lower half 51.5 to 45.1 per cent at
+150 m, 20.7 to 18.7 at 420 m) because glades replace trees; and the on-foot landing view changes (an open glade on one
+bank). Next for the glades if wanted: denser stands outside them, so the wood keeps its darks. FV6(b) ?bloomfar: the ground
 between the dabs takes no drift under 150 m (1ed9553, B's ask). B's flower line landed (design-flora dd86fb3); F passed it with 6cf9c7a.
 Scratch: `wt37` = main at v37.1.
 

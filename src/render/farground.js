@@ -32,11 +32,11 @@
 // ?canopy=0 takes it out (world/farstand.js reads it): the ground's program is compiled without any of it and the
 // mesher packs nothing new, so the picture is the one before to the bit. Only in the oil look, only on CANOPY_WORLDS.
 import { SEASON, leafNow } from '../data/season.js';
-import { CANOPY, NEEDLE, CANOPY_WORLDS, GROUND_SEASON, ROCKFIELD, canopyOn, BLOOM_FAR, bloomFarOn, bloomPaletteOf } from '../world/farstand.js';
+import { CANOPY, NEEDLE, CANOPY_WORLDS, GROUND_SEASON, ROCKFIELD, canopyOn, bloomFar, bloomFarOn, bloomPaletteOf } from '../world/farstand.js';
 import { MODE } from '../data/mode.js';
 import { pig, dilute, mixc } from '../data/looks/common.js';
 
-export { CANOPY, canopyOn, GROUND_SEASON, ROCKFIELD, BLOOM_FAR };
+export { CANOPY, canopyOn, GROUND_SEASON, ROCKFIELD, bloomFar };
 // ?candab=: the canopy's own dabs against the ground's (0.5: its finer layer is half the ground's finest, its coarser
 // layer the ground's finest). From a few hundred metres up the ground's dab is as big as a whole crown, so the roof's
 // cap and shaded side could not be laid with it; a crown wants three or four strokes across.
@@ -274,7 +274,8 @@ void pcCanopyAt(vec3 P, vec2 ch, float stand, float needle, vec3 floorC, float l
       if (inF > 0.5) {
         vec2 fF = textureLod(uShAir, qF.xy * 0.5 + 0.5, 0.5).rg;
         float covF = fF.r * step(fF.g / max(fF.r, 1e-3) - 0.0006, qF.z);
-        if (covF > 0.40 + 0.26 * fract(rnd.y * 5.7)) gCanL = min(gCanL, pcLevel(0.33, 0.03));
+        // (one notch lighter than the neighbour's-shadow level, 0.40 for 0.33, the look director: so the sunlit glades stay bright at 16 h)
+        if (covF > 0.40 + 0.26 * fract(rnd.y * 5.7)) gCanL = min(gCanL, pcLevel(0.40, 0.03));
       }
     }
   #endif
@@ -637,7 +638,12 @@ float pcRockPlanes(float lvl, vec3 nV, float sunny) {
   // to the sun's colour, the side and the away planes to the cool violet shade key, so the two sides read by hue as well
   // as by value even with the sun behind the eye, gRockT for pcRockTemp)
   float s1 = smoothstep(-0.20, -0.10, b), s2 = smoothstep(0.50, 0.60, b);
-  float lp = max(pcLevel(0.75, 0.02) - mix(mix(2.4, 1.8, s1), 0.5, s2) - 0.5 * gGully * (1.0 - s2), 0.0);
+  // (THE NOON LIT PLANE IN TWO VALUES, the look director's ruling for v39.6: with the sun high and behind the eye every face
+  // in view is the lit plane, one value, and the mountain had no form; a painter lights the gentle tops that meet the sun
+  // squarely and keeps the steeper faces 0.6 of a level down, by the face's own dot with the sun at the dab. At a high sun
+  // only (kN), so a low sun keeps its planes as they were. Part of the rock faces, ?rockfield, on.)
+  float kN = smoothstep(0.55, 0.85, dot(gSunV, upV));
+  float lp = max(pcLevel(0.75, 0.02) - mix(mix(2.4, 1.8, s1), 0.5, s2) - 0.5 * gGully * (1.0 - s2) - 0.6 * s2 * kN * (1.0 - smoothstep(0.76, 0.84, d)), 0.0);
   gRockT = mix(mix(-1.0, -0.75, s1), 0.8, s2);
   lp = mix(min(lp, 1.0), lp, sunny);
   return mix(lvl, lp, gRockP);
@@ -656,6 +662,11 @@ vec3 pcRockTemp(vec3 k) {
   // low sun as before, up to the noon key with the sun overhead)
   float kN = smoothstep(0.55, 0.85, dot(gSunV, normalize(vUpV)));
   vec3 cool = mix(vec3(0.86, 0.84, 1.25), vec3(0.82, 0.80, 1.34), kN);
+  // (and at noon the lit plane's colour is the family's own grey-violet with the warm lean, not a near-neutral warm grey:
+  // rock S median 0.035 at 420 m noon, MEASURED, aimed at about 0.12 to 0.16 by the look director, never pastel)
+  // (the noon lit plane's COLOUR was tried, the family's violet times the warm lean (b7e43a1, ?noonlit): it reached S 0.11
+  // only by turning the rock lavender and losing the warm-lit, cool-shade split; the look director closed it: a front-lit
+  // grey mountain at noon is honest, and at 1 km the air is theirs. The two lit values above stay.)
   vec3 t = gRockT > 0.0 ? mix(vec3(1.0), wC, gRockT) : mix(vec3(1.0), cool, -gRockT);
   return clamp(k * mix(vec3(1.0), t, gRockP), 0.0, 1.0);
 }
@@ -697,7 +708,10 @@ void pcBloomAt(vec2 dsA, vec3 rnd) {
   gBloom = 0.0;
   if (uBloomOn < 0.5) return;
   float k = clamp(vBloomK + gBkdx * dsA.x + gBkdy * dsA.y, 0.0, 1.0);
-  if (k <= 0.02 || fract(rnd.z * 23.17 + rnd.y * 5.31) >= 0.9 * k) return;
+  // (near the eye a third as many: at 10 m the drifts' strokes took 46 per cent of the ground and the meadow was a quilt of
+  // flower colour with little green, MEASURED by flora B; the look director wants about 10 to 15 per cent there. 0.3 of the
+  // cover under 60 m, rising to 0.9 by 250 m)
+  if (k <= 0.02 || fract(rnd.z * 23.17 + rnd.y * 5.31) >= mix(0.3, 0.9, smoothstep(60.0, 250.0, length(vView))) * k) return;
   // (far off a dab takes the SLOPE's kind, bloom.js o.fi2, not its drift's own: every dab its own kind made a confetti
   // from 420 m, SEEN by flora B; whole dabs cross over from 250 to 400 m, each by its own number)
   float farK = smoothstep(250.0, 400.0, length(vView));
