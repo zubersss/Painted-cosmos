@@ -190,6 +190,11 @@ export function stepPatch(job, deadline) {
               _col[cc + 3 + t] = base2 + (SNOW[t] - base2) * k2;
             }
           }
+          // (SNOW WINS OVER ROCK: where snow still lies after the shedding, the place reports no beds, so the ground's rock
+          // faces (render/farground.js, which lay rock only where the land has beds) leave it as snow. Read off the wash's
+          // whiteness instead, half the peaks' snow was taken for rock: white 8.3 to 4.7 per cent at the alpine view, SEEN.)
+          const left = st > 0 ? sk * (1 - 0.6 * st) : sk;
+          _col[k * CS + 16] *= 1 - sstep(0.15, 0.35, left);
         }
       }
       // morph target: where this vertex sits on the parent's (half resolution) mesh
