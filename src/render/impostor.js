@@ -538,6 +538,20 @@ void main() {
   vec2 HR = uImpH[ly].xy;   // the cylinder's half height, the ball's radius
   vVF = uImpH[ly].z;
   mat3 ir = mat3(im);
+  // NOTHING WORKED OUT FOR A TREE THAT IS NOT DRAWN (the air view's cost, 24 Nov). A far mesh is culled whole by three,
+  // but every tree in a mesh that is drawn ran all of this shader: from 1 km up, of the 75,725 trees in the far meshes
+  // shown, 10,291 stood in the view and in range (MEASURED in the gallery). So a tree out of its range (vis 0), behind the
+  // eye, or wholly outside the view's sides -- its crown's ball, half as large again, against each plane -- leaves at
+  // once, its quad put outside the clip box. Nothing drawn changes.
+  {
+    float rS = HR.y * max(length(ir[0]), length(ir[1])) * 1.5 + 1.0;
+    vec4 cc = projectionMatrix * modelViewMatrix * vec4(io + ir * CR.xyz + pcRound(io + uOrigin), 1.0);
+    float kx = rS * sqrt(projectionMatrix[0][0] * projectionMatrix[0][0] + 1.0), ky = rS * sqrt(projectionMatrix[1][1] * projectionMatrix[1][1] + 1.0);
+    if (vis <= 0.0 || cc.w < -rS || cc.x - cc.w > kx || -cc.x - cc.w > kx || cc.y - cc.w > ky || -cc.y - cc.w > ky) {
+      gl_Position = vec4(0.0, 0.0, 2.0, 1.0);
+      return;
+    }
+  }
   mat3 iv = inverse(ir);
   // the nearest baked view, from the eye's direction in the kit's own space (render/impostor.js viewCell)
   vec3 d = normalize(iv * (uCamLocal - io) - CR.xyz);
@@ -1018,6 +1032,7 @@ void main() {
   float di = distance(io, uCamLocal);
   float j = 1.0 + (aInst.z - 0.5) * uLod.z;
   float vis = step(uLod.x * j, di) * (1.0 - smoothstep(uLod.y * j * uLod.w, uLod.y * j, di)) * uImpK.x;
+  if (vis <= 0.0) { gl_Position = vec4(0.0, 0.0, 2.0, 1.0); return; }      // (out of its range: nothing worked out, as IMP_VERT)
   int ly = int(aInst2.y + 0.5);
   vec4 CR = uImpC[ly];
   vec2 HR = uImpH[ly].xy;
