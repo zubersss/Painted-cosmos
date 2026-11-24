@@ -5,7 +5,7 @@
 // Additive: setTime(seconds), setDebugView(n), setLook({...}), info, dispose().
 import * as THREE from 'three';
 import { Post } from './post.js';
-import { G, SHEET, WX, QUALITY, FRAME_HOOKS, GLAZES, MOTION, PREV, LOOK, OIL, SHADOW, ensureGlobals, SCREEN, MATERIALS } from './shared.js';
+import { G, SHEET, WX, QUALITY, FRAME_HOOKS, GLAZES, MOTION, PREV, LOOK, OIL, SHADOW, ensureGlobals, SCREEN, MATERIALS, PREPASSES } from './shared.js';
 const _lv = new THREE.Vector3();
 import { makeWashMaterial, makePaintUniforms, standInFor, bindBodyUniforms, defaultBodyUniforms, TREE_DEPTH, TREE_GUARD, treeGuardCheck } from './materials.js';
 import { VERT_PARS, VERT_END, FRAG_PARS } from './chunks.js';
@@ -257,6 +257,7 @@ export function createPainter(renderer) {
     // place them all again, though nothing has moved in between: when the shadow pass has drawn this frame, the scene
     // pass takes the places as they are. Counted at a phone's size: 872 objects were placed 2.8 times a frame, now once.)
     const sf0 = shadow ? shadow.frames : 0;
+    for (const p of PREPASSES) p(renderer, scene, camera);      // (group D, T5: the cloud shadow map, world/clouds.js; empty, nothing runs)
     if (shadow) shadow.render(renderer, scene, camera);
     const placed = !!shadow && shadow.frames !== sf0 && scene.matrixWorldAutoUpdate === true;
     if (LOOK.oil) {
