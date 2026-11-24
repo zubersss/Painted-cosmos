@@ -351,6 +351,8 @@ export function attachBench(pc) {
       pack: ['impostors from 45 m', async () => { handTo(27, 45); if (form0 !== 'impostor') await farForm('impostor'); }, async () => { handBack(); if (form0 !== 'impostor') await farForm(form0); }],
       // (the far wood in the wind, ?farwind=1: the far impostors' own uPhysOn set to 0 for the row, as 'no wind in shader')
       farStill: ['far trees still in the wind', () => farWind(false), () => farWind(true)],
+      // (with the impostors the far trees read no shadow map: what do shadows cost from the air without the far cards?)
+      noSh: ['no shadows at all', () => B({ shadow: false }), () => B({ shadow: true })],
       noFar: ['no far trees', () => show(/^pc-prop-far/, false), () => show(/^pc-prop-far/, true)],
       farFlat: ['far trees one flat colour', () => B({ flat: 3 }), () => B({ flat: 0 })],
       noNear: ['no near trees', () => show(/^pc-prop-tall/, false), () => show(/^pc-prop-tall/, true)],
@@ -554,7 +556,7 @@ export function attachBench(pc) {
       [AS, null, null],
       T0.mid45, T0.hand, T0.pack,
       ...airAt(150, 30, [T0.noFar, T0.blob, T0.imp, T0.farFlat, T0.a2c, T0.farStill]),
-      ...airAt(400, 45, [T0.noFar, T0.blob, T0.imp]),
+      ...airAt(400, 45, [T0.noFar, T0.blob, T0.imp, T0.noSh]),
       onFoot,
       [AS + ', last', null, null],
     ];
