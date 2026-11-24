@@ -290,7 +290,28 @@ water), the river still a little over the band; E5 0.12 to 0.37 saturation, valu
 note still water is the calmest thing: a step deeper, less mirror, strokes 10:1 and in close values, white only on the sun's
 path. NIGHT (F's ask): the light strokes keep a step of light over the pulled body, the moon's marks are left out of the
 pull (`s2-E1-night-23h-wpaint2-crest-ab.jpg`: water V 0.45, land 0.22).
-**WHERE THIS LANE STANDS (24 Nov, late)** -- read first. water-paint has v39.3 merged (d87f1e1). F PASSED the river on foot
+**THE DEFAULT FOR v39.6 (24 Nov, night; the coordinator's one commit, on v39.5 and water-sea 848b04e)** -- read first.
+With the oil look: the new strokes on rivers, ponds and small lakes (`wpaint` 1), v37's on the sea AND ON LAKES WIDER THAN
+ABOUT 150 M (`wsea` 0; the look director has not passed the sea's coverage yet, E-W2 is on it; the wide lakes follow the
+sea's level through E-W2's `S.hydro.lakeWidthAt`, eased 120..180 m into the mesher's open byte, tested: a 759 m lake south
+of the landing is open, the landing's river is not). `?wpaint=0` is v37's water everywhere; the watercolour game is not
+touched (no `?look=oil`: nothing of this is compiled). A current's strokes in cells of 8 m near the eye (26 m before, still
+water keeps 26): a bend turns each cell's strokes about a nearer middle, so they bunch less into the bands the look
+director and E traced at the landing's confluence (`fin-B10` stills); not a full cure (one way a stroke would need the
+current at each stroke's own centre, which the shader cannot read; the mesher would have to hand a per-cell way). COST,
+the water alone in the frame at the landing's river from its bank: +17 % of the water's cost with the 8 m cells (+29 %
+with 26 m; within the scatter, about 10 points). THE GOLDEN HOUR SOFTENED after the game's first view: with 0.45 less
+wash and the sun's path at exponent 14 the river seen from the game's camera at a golden hour went a pale cream (S 0.17
+against v37's 0.36); now 0.30 less wash, the path to 24 and its marks gold rather than white: S 0.35 V 0.67 (v37 S 0.30
+V 0.69), the low sun's path a broad run of gold strokes (`s11-game-first-view-ab.jpg`). PROVEN against v39.5 (1cb697c),
+`clouds3d=0`, t=5: `?wpaint=0` E3 3640, E4 7009, S150 5 pixels of 518400 differ, all by at most 2 of 255; the
+watercolour game (no `?look=oil`) by a stream and over the sea: 0 pixels. MEASURED, the default against `?wpaint=0`:
+on foot at the landing's river from its bank (1024 x 480 phone settings, noon) edge share 68 % -> 34 %, V 0.74 -> 0.67.
+Stills (default against `?wpaint=0`): `s11-trees-ab.jpg` (cam=trees: v39.5's rivers left it a meadow, no water in frame),
+`s11-B10-ab.jpg` (10 m over the landing, B's view as near as I could set it), `s11-F1-ab.jpg` (on foot at the landing's
+river), `s11-HI-ab.jpg` (the river from 150 m), `s11-S150-ab.jpg` (the sea from 150 m: v37 in both, by design),
+`s11-game-first-view-ab.jpg`.
+**WHERE THIS LANE STOOD (24 Nov, late)** water-paint has v39.3 merged (d87f1e1). F PASSED the river on foot
 (2b869d8) on one condition, its cost; the coordinator: cut it to about +30 % of the water's cost at a bank (6 frames
 each, like for like), then ONE commit on v39.4 making the new paint the oil look's default (`?wpaint=0` the opt-out),
 carrying E-W2's sea fixes (water-sea) and the wide-lakes rule (E-W2's `S.hydro.lakeWidthAt(x, y, z)`, design-water

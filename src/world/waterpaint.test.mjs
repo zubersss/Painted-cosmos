@@ -64,3 +64,18 @@ test('the default (?wpaint=1, the sea on v37): the sea is told from the river an
     assert.ok(stillAt(off(P0, 100, 320)) > 200, 'and the pond is still still');
   } finally { waterFromSearch(''); }
 });
+
+test('with the oil look\'s water: a lake over 150 m wide is open water (the sea\'s paint level), the landing\'s river is not', async () => {
+  waterFromSearch('?look=oil');
+  try {
+    const WH = await import('./waterhooks.js');
+    await WH.loadWater(); WH.ensureWater('earth');
+    assert.ok(S.hydro && typeof S.hydro.lakeWidthAt === 'function', 'the bodies of water give the lake\'s width');
+    const lake = off(P0, -75, -325);
+    assert.ok(S.hydro.lakeWidthAt(...lake) > 200, 'a wide lake south of the landing');
+    const o = stillAt(lake, 7, 2);
+    assert.ok(o !== null && o > 250, 'the wide lake takes the sea\'s level: ' + o);
+    const r = stillAt(off(P0, 0, -10), 7, 2);
+    assert.ok(r !== null && r === 0, 'the landing\'s river keeps the rivers\' paint: ' + r);
+  } finally { waterFromSearch(''); }
+});

@@ -1823,8 +1823,11 @@ void main() {
       float aspW = still > 0.5 ? mix(10.0, 3.0, wChop) / max(lenF, 0.34) : 6.0;
       // (pointed ends on the sea, the look director's note; ponds and rivers keep square ones until F asks for them there)
       gWLens = smoothstep(0.5, 0.75, vOpen) * step(0.5, still);
+      // (a current's strokes in smaller cells, 8 m near the eye where v37's were 26, so a bend turns each cell's strokes
+      // about a nearer middle and they do not bunch into bands: the look director's one way a stroke)
+      gWCellMin = mix(8.0, 26.0, still);
       pcWStrokes(wch, wdx, wdy, dS, v0 * (1.0 - still), wo4.x, aspW, woc3, wr1, wr2, wown);
-      gWLens = 0.0;
+      gWLens = 0.0; gWCellMin = 26.0;
       // (the lace: along the current wherever there is one, at the water's own pace, on its own octaves)
       aDir = coh > 0.02 ? fc : kc; aSpd = coh > 0.02 ? v0 : 0.0;
       ao4 = pcStrokeOct4(dist * graze * 1.1, uOilPx.z * 0.40);
@@ -1901,9 +1904,12 @@ void main() {
       // the stream's colour moved by under 0.02, because over half the water's own blue wash is laid over everything and
       // the sun's path is a narrow lobe). At a golden hour less of the blue wash, so the light strokes carry the sky's
       // gold, and the sun's path widened (in the sun's own colour, wsun below); noon is as it was.
+      // (softened after the game's first view, 24 Nov night: at 0.45 less wash and the path at 14 the river seen from the
+      // game's camera at a golden hour went a pale cream, S 0.17 against v37's 0.36, a tenth of it near white -- the
+      // widened path's marks white-gold over a wide lobe and the cream sky's mirror over the thinned wash)
       float gW = pcGold();
-      wBodyK *= 1.0 - 0.45 * gW;
-      wSunE = mix(wSunE, 14.0, gW);
+      wBodyK *= 1.0 - 0.30 * gW;
+      wSunE = mix(wSunE, 24.0, gW);
     }
     #endif
     c = mix(c, pcDensity(vLiq.rgb, wBodyD) * vec3(0.80, 0.95, 1.06), wBodyK * (1.0 - vLiqP.x) * (1.0 - vLiqP.y));
@@ -2000,6 +2006,9 @@ void main() {
     #endif
     float wsp = pow(max(dot(reflect(-normalize(vToCam), up), uSunDirL), 0.0), wSunE) * wSunK * max(uDayness, uMoon) * (1.0 - uWx.x);
     vec3 wsun = min(mix(pcOilSunC(), vec3(1.0), 0.35) * 1.06, vec3(1.0));
+    #ifdef PC_WPAINT
+    if (wpL > 0.5) wsun = min(mix(pcOilSunC(), vec3(1.0), 0.35 * (1.0 - pcGold())) * 1.02, vec3(1.0));      // (gold, not white, at a golden hour)
+    #endif
     float wau = uAuroraK * (1.0 - uDayness);
     vec3 w1 = wr1.x > wThL ? clight : (wr1.x < wThD ? cdeep : c), w2 = wr2.x > wThL ? clight : (wr2.x < wThD ? cdeep : c);
     w1 = wr1.z < 0.34 * wau ? mix(vec3(0.10, 0.74, 0.60), vec3(0.24, 0.96, 0.56), step(0.5, fract(wr1.z * 31.7))) : w1;

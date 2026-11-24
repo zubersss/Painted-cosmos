@@ -396,11 +396,25 @@ export function stepPatch(job, deadline) {
     // S.sea, 0 on a world that names none); within 0.15 m of it is the sea, 0.45 m above it is not, and between the paint
     // breaks the change with noise. No samples: the level is already known at every vertex.
     // (Only with the switch: without it both bytes stay 0, as they were, and nothing reads them.)
+    // AND A WIDE LAKE IS OPEN WATER TOO (the look director's condition on the split, 24 Nov: lakes wider than about 150 m stay
+    // on the sea's paint until the sea's own passes; E-W2's S.hydro.lakeWidthAt, world/hydro.js: the lake's width in metres
+    // from the drainage node nearest, 0 where there is no lake of a basin, so ponds and tarns keep the rivers' paint). Eased
+    // from 120 to 180 m. One array read a vertex, and only for water.
     if (wturb && MODE.water && Math.max(MODE.water.wpaint, MODE.water.wsea || 0) >= 1) {
       const seaL = S.sea == null ? 0 : S.sea;
+      const LW = S.hydro && typeof S.hydro.lakeWidthAt === 'function' ? S.hydro : null;
       for (let j = 0; j < V; j++) for (let i = 0; i < V; i++) {
         const k = (j + 1) * E + (i + 1);
-        if (_lq[k] > -1e5) { const d = Math.abs(_lq[k] - seaL); wturb[(j * V + i) * 4 + 2] = d <= 0.15 ? 255 : d >= 0.45 ? 0 : Math.round(255 * (0.45 - d) / 0.3); }
+        if (_lq[k] > -1e5) {
+          const d = Math.abs(_lq[k] - seaL);
+          let op = d <= 0.15 ? 1 : d >= 0.45 ? 0 : (0.45 - d) / 0.3;
+          if (LW && op < 1) {
+            const l0 = Math.sqrt(_px[k] * _px[k] + _py[k] * _py[k] + _pz[k] * _pz[k]) || 1;
+            const lw = LW.lakeWidthAt(_px[k] / l0, _py[k] / l0, _pz[k] / l0) || 0;
+            if (lw > 120) op = Math.max(op, sstep(120, 180, lw));
+          }
+          wturb[(j * V + i) * 4 + 2] = Math.round(255 * op);
+        }
       }
       const st = (_stillSamp && _stillSamp.w.length >= S.nB) ? _stillSamp : (_stillSamp = makeSample(S.nB));
       const gs = Math.max(1, Math.round(6 / cellM)), G = Math.ceil((V - 1) / gs) + 1;

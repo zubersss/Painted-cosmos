@@ -91,7 +91,12 @@ vec2 pcWCellOf(vec2 ch, float C) { return floor(ch / C + pcWWob(ch, C) + 0.5); }
 float gWLens = 0.0;
 // a cell for strokes wL wide (m) and asp long: 26 m near the eye, as v37's, never under sixty-six strokes' widths, and
 // at least two and a half strokes long (a stroke laid long to make up for foreshortening must still lie in its cell)
-float pcWCellC(float wL, float asp) { return max(26.0, wL * max(66.0, 2.5 * asp)); }
+// (and never under gWCellMin metres: 26 as v37's for still water, whose strokes all lie one way; less for a current, whose
+// strokes each cell turns about its own middle by the way the water runs at the pixel: the look director and the water
+// lead on the bend by the landing, 24 Nov: with 26 m cells a point 13 m from the middle moved metres for a few degrees of
+// turn and the strokes bunched into bands. Set by the caller, as gWLens.)
+float gWCellMin = 26.0;
+float pcWCellC(float wL, float asp) { return max(gWCellMin, wL * max(66.0, 2.5 * asp)); }
 // One cell's stroke over the pixel. ch: the pixel's chart (m); cell, C: the cell and its size; mC: how far past its edge
 // (in cells, along each axis) a stroke's centre may lie and the stroke still be the cell's; d, n: the way its strokes
 // run and across it (chart, unit); tdx, tdy: the turned chart's screen derivatives and wdx, wdy the chart's own (m a
