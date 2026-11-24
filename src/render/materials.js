@@ -3340,8 +3340,13 @@ void main() {
   float range = mix(uNear.x, uNear.y, fract(h * 7.31));
   float vis = (1.0 - smoothstep(range * 0.72, range, di)) * smoothstep(0.0, 0.7, uNear.z - iPar.w) * smoothstep(uNear2.x, uNear2.y, di);
   // (the speed test's 'half the near grass': a share of the marks folded to nothing here, before any is rasterised, so
-  //  the row prices a mark whole; at 0, the default, this multiplies by exactly 1)
-  vis *= step(uNearCut, fract(h * 5.13 + 0.37));
+  //  the row prices a mark whole. By PLACE, in half-metre cells of the ground, so that a plant of several marks -- a
+  //  stalk, its leaf, its heads, which stand within a few centimetres of one root -- goes whole, but for the rare one
+  //  that straddles a cell's edge (the flora lane's ask). At 0, the default, nothing here is worked out at all.)
+  if (uNearCut > 0.0) {
+    vec3 cq = floor(iRoot * 2.0);
+    vis *= step(uNearCut, fract(sin(dot(cq, vec3(12.9898, 78.233, 37.719))) * 43758.5453));
+  }
   float flex = iExt.y;
   // fresh snow buries what is short: no stroke stands on a snowfield but the tall stubble
   float snowK = 1.0 - smoothstep(0.12, 0.50, uWx.z) * (1.0 - 0.30 * smoothstep(0.62, 0.95, iAxis.w));
