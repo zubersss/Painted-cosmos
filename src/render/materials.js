@@ -1571,9 +1571,12 @@ void main() {
       vec3 f3 = Uf * fl.x + cross(up, Uf) * fl.y, k3 = cross(up, pcPhysWaterDir(sdir));
       vec3 d3 = mix(dot(f3, f3) > 1e-6 ? normalize(f3) : k3, dot(k3, f3) < 0.0 ? -k3 : k3, still);
       float rowF = length(cross(cross(up, dot(d3, d3) > 1e-6 ? normalize(d3) : k3), Vd));
-      float graze = 1.0 / max(rowF, 0.333);
+      // (up to five times: at three the sea from 400 m, seen at a tenth of a right angle, still had rows under two pixels
+      // and its thinnest strokes were dotted lines along the swell, the look director's "faint dotted grain")
+      float graze = 1.0 / max(rowF, 0.2);
       vec4 wo4 = pcStrokeOct4(dist * graze * 1.1, uOilPx.z * 1.1);
-      vec3 woc3 = vec3(wo4.w - wo4.z, dFdx(wo4.w), dFdy(wo4.w));
+      vec2 wocR = pcWOctRate(vBody, Vd, up, dist, uBodyR);
+      vec3 woc3 = vec3(wo4.w - wo4.z, wocR);
       // (with the new colour, still water's strokes are longer, as calm water is laid: the look director, on E3)
       // THE SEA FROM THE AIR (E-W2, F's note of 24 Nov: "large blocky dabs in a dark-and-light checker"): still water's
       // strokes are long at every level of the paint, and kept long ON THE SCREEN whichever way they lie: a stroke that
@@ -1586,7 +1589,7 @@ void main() {
       // (the lace: along the current wherever there is one, at the water's own pace, on its own octaves)
       aDir = coh > 0.02 ? fc : kc; aSpd = coh > 0.02 ? v0 : 0.0;
       ao4 = pcStrokeOct4(dist * graze * 1.1, uOilPx.z * 0.40);
-      aoc3 = vec3(ao4.w - ao4.z, dFdx(ao4.w), dFdy(ao4.w));
+      aoc3 = vec3(ao4.w - ao4.z, wocR);
     } else
     #endif
     {
@@ -1696,6 +1699,16 @@ void main() {
       wThL = mix(wThL, 0.74, sk); wThD = mix(wThD, 0.22, sk);
       cdeep = mix(cdeep, pcDensity(c, 1.65) * vec3(0.92, 0.94, 1.0), sk);
       clight = mix(clight, mix(c, wLightC, 0.40), sk);
+    }
+    #endif
+    #ifdef PC_WPAINT
+    if (wpL > 1.5) {
+      // THE NEW COLOUR'S SATURATION HELD (the look director, 24 Nov: the sea from 150 m an electric blue, S 0.78; wanted
+      // 0.40 to 0.55). The body is the water's own wash laid heavy, and laid heavy by density each channel darkens by its
+      // own share, so the blue grows purer the deeper it is laid: Earth's sea 0.52 0.72 0.84 came out at 0.19 0.46 0.73.
+      // Above S 0.36 the saturation is now taken in, a third of what is over it kept, at the same value: the strokes
+      // keep their steps of light and dark, the sun's path and an aurora's green (laid below) are untouched.
+      c = mix(c, pcWSatKnee(c, 0.36, 0.35), liq); cdeep = mix(cdeep, pcWSatKnee(cdeep, 0.36, 0.35), liq); clight = mix(clight, pcWSatKnee(clight, 0.36, 0.35), liq);
     }
     #endif
     float wsp = pow(max(dot(reflect(-normalize(vToCam), up), uSunDirL), 0.0), wSunE) * wSunK * max(uDayness, uMoon) * (1.0 - uWx.x);

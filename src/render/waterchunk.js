@@ -92,9 +92,11 @@ float pcWCellC(float wL) { return max(26.0, 66.0 * wL); }
 // pixel); wL: a stroke's width (m); asp: its length over its width; spd: how fast the strokes run along d (m/s; 0
 // still); oc: how far toward the next octave at the pixel, and its screen derivatives; fine: the finer layer (its
 // strokes thin out toward the next octave). Returns 1 where the stroke is real here (its centre in this cell, and
-// present); pri: its place in the pile.
+// present), 2 where it is the cell's but has thinned away (the finer layer); pri: its place in the pile; nOn: whether the
+// stroke that has the rest of the pixel at its edge is there too (the finer layer: by its own number against the pixel's
+// share of the way to the next octave).
 float pcWCand(vec2 ch, vec2 cell, float C, vec2 mC, vec2 d, vec2 n, vec2 tdx, vec2 tdy, vec2 wdx, vec2 wdy, float wL, float asp,
-              float spd, vec3 oc, bool fine, out vec3 rnd, out vec3 rndN, out float own, out float pri) {
+              float spd, vec3 oc, bool fine, out vec3 rnd, out vec3 rndN, out float own, out float pri, out float nOn) {
   float hf = pcWHash(cell + C * 0.0137);
   vec2 rel = ch - cell * C;
   // (each cell its own pace, a sixth either way, so two cells' strokes never march in step: v33's spread)
@@ -118,24 +120,32 @@ float pcWCand(vec2 ch, vec2 cell, float C, vec2 mC, vec2 d, vec2 n, vec2 tdx, ve
   vec2 dv = d * v.x + n * v.y;
   // (its centre in this cell or within mC of it: see pcWStrokes)
   vec2 fc = (ch + dv) / C + pcWWob(ch + dv, C) + 0.5 - cell;
+  nOn = 1.0;
   if (any(lessThan(fc, -mC)) || any(greaterThan(fc, 1.0 + mC))) return 0.0;
   if (fine) {
-    vec2 ds = pcChartToPx(dv, wdx, wdy, 1.0e4);
-    if (rnd.z < smoothstep(0.15, 0.85, oc.x + dot(oc.yz, ds))) return 0.0;
+    nOn = rndN.z < smoothstep(0.15, 0.85, oc.x) ? 0.0 : 1.0;
+    // (how far toward the next octave at the stroke's centre: the pixel's, carried along the water by its smooth rate.
+    // It was carried by the screen derivatives, which are one value over each square of four pixels; over a stroke
+    // twenty widths long the small differences from one square to the next grew larger than the fade, and a long
+    // stroke was there in one square and gone in the next: a row of dots, the look director's "faint dotted grain")
+    if (rnd.z < smoothstep(0.15, 0.85, oc.x + dot(oc.yz, dv))) return 2.0;
   }
   return 1.0;
 }
 // The water's stroke at a pixel. ch, wdx, wdy: the water's chart and its screen derivatives (chunks.js pcGroundChart,
 // pcGroundChartD from a position measured from the eye); d: the way the strokes run here (chart, unit); spd: how fast
 // they run (m/s); w0: the finer octave's stroke width (pcStrokeOct4's x); asp: length over width; oc: (pcStrokeOct4's
-// w - z, and the screen derivatives of its w). Out as pcThinLayer's: the top stroke's numbers, the numbers of the stroke
+// w - z, and how fast its w changes along the chart, a metre of it: from the way the eye looks, not a derivative --
+// pcWOctRate). Out as pcThinLayer's: the top stroke's numbers, the numbers of the stroke
 // that has the rest of the pixel at its edge, how much of the pixel is its own. Returns 0 where no stroke is real (a
 // gap where two cells meet): the numbers are then the middle ones, and the water's own body shows.
 float pcWStrokes(vec2 ch, vec2 wdx, vec2 wdy, vec2 d, float spd, float w0, float asp, vec3 oc, out vec3 rnd, out vec3 rndN, out float own) {
   vec2 n = vec2(-d.y, d.x);
   vec2 tdx = vec2(dot(wdx, d), dot(wdx, n)), tdy = vec2(dot(wdy, d), dot(wdy, n));
-  float best = -1.0;
   rnd = vec3(0.5, 0.99, 0.99); rndN = rnd; own = 1.0;
+  // (a stroke of the finer layer that has thinned away here, but whose neighbour's edge reaches the pixel)
+  float edgeF = -1.0, ownE = 0.0;
+  vec3 rE = rnd;
   for (int L = 0; L < 2; L++) {
     bool fine = L == 0;
     if (fine && oc.x > 0.93) continue;      // (every stroke of the finer octave has gone)
@@ -152,18 +162,53 @@ float pcWStrokes(vec2 ch, vec2 wdx, vec2 wdy, vec2 d, float spd, float w0, float
     vec2 reach = mC * 2.3;
     vec2 nearE = min(fr, 1.0 - fr);
     vec2 side = vec2(fr.x < 0.5 ? -1.0 : 1.0, fr.y < 0.5 ? -1.0 : 1.0);
+    float best = -1.0, second = -1.0;
+    vec3 rb = rnd, rNb = rnd, r2b = rnd; float ob = 1.0, nb = 1.0;
     for (int k = 0; k < 3; k++) {
       vec2 cell = cA;
       if (k == 1) { if (nearE.x >= reach.x) continue; cell.x += side.x; }
       if (k == 2) { if (nearE.y >= reach.y) continue; cell.y += side.y; }
-      vec3 r, rN; float o, pr;
-      if (pcWCand(ch, cell, C, mC, d, n, tdx, tdy, wdx, wdy, wL, asp, spd, oc, fine, r, rN, o, pr) > 0.5 && pr > best) {
-        best = pr; rnd = r; rndN = rN; own = o;
+      vec3 r, rN; float o, pr, no;
+      float got = pcWCand(ch, cell, C, mC, d, n, tdx, tdy, wdx, wdy, wL, asp, spd, oc, fine, r, rN, o, pr, no);
+      if (got > 0.5 && got < 1.5) {
+        if (pr > best) { second = best; r2b = rb; best = pr; rb = r; rNb = rN; ob = o; nb = no; }
+        else if (pr > second) { second = pr; r2b = r; }
       }
+      // (a thinned stroke whose neighbour is there and reaches into the pixel: that neighbour has the pixel's edge)
+      if (fine && got > 1.5 && no > 0.5 && o < 0.999 && pr > edgeF) { edgeF = pr; rE = rN; ownE = 1.0 - o; }
     }
-    if (best >= 0.0) return 1.0;            // (a stroke of the finer octave lies over every coarser one)
+    if (fine) {
+      // THE EDGE OF A FINER STROKE OVER THE COARSER LAYER IS DRAWN AS SUCH (the look director, 24 Nov: stair-stepped
+      // stroke edges on the sea). Where a stroke of the finer layer has thinned away the coarser one shows; the edge of
+      // the finer stroke beside it was blended toward that thinned neighbour, which is not there, so it was a hard edge
+      // in steps of a pixel. It is now blended toward the water's body (the middle numbers), which most of the coarser
+      // strokes are: asking the coarser layer itself there tripled the new paint's cost at the bank (measured).
+      // (and where two cells' strokes lie over one another, the edge of the top one is blended toward the one under it, not
+      // toward its own neighbour, which may not be drawn there: a thin sliver of a stroke between two of another cell's
+      // was otherwise caught or missed by each pixel's centre, a dotted line)
+      if (best >= 0.0) { rnd = rb; rndN = second >= 0.0 ? r2b : (nb > 0.5 ? rNb : vec3(0.5, 0.99, 0.99)); own = ob; return 1.0; }
+    } else {
+      // (and where the pixel's own finer stroke has thinned away but its neighbour's edge reaches in, that edge is drawn
+      // over the coarser stroke, which this pixel asks for anyway)
+      if (edgeF >= 0.0) { rnd = rE; rndN = best >= 0.0 ? rb : rE; own = ownE; return 1.0; }
+      if (best >= 0.0) { rnd = rb; rndN = second >= 0.0 ? r2b : rNb; own = ob; return 1.0; }
+    }
   }
   return 0.0;
+}
+// How fast pcStrokeOct4's w changes along the water's chart, a metre of it (the oc.yz of pcWStrokes): its w is the
+// log2 of the distance, and the distance grows along the water the way the eye looks across it (toEye: from the place to
+// the eye, unit; up: the place's up). Smooth over the water: no screen derivative.
+vec2 pcWOctRate(vec3 body, vec3 toEye, vec3 up, float dist, float R) {
+  vec3 tg = -(toEye - up * dot(toEye, up));
+  return pcGroundChartD(body, tg, R) / (max(dist, 0.05) * 0.6931472);
+}
+// The saturation of a colour taken in above s0, k of what is over it kept, at the same value (the new colour: WATER_FRAG).
+vec3 pcWSatKnee(vec3 c, float s0, float k) {
+  float V = max(max(c.r, c.g), c.b), m = min(min(c.r, c.g), c.b);
+  float S = V > 1e-4 ? (V - m) / V : 0.0;
+  if (S <= s0) return c;
+  return vec3(V) - (vec3(V) - c) * ((s0 + (S - s0) * k) / S);
 }
 // RAIN ON WATER (lane W3, ?wpaint=2 step 5): rings, each a thin crisp broken circle, growing and fading in about a third
 // of a second, from three grids of hashed cells in the water's own chart (no texture). How many by the rain rate AT THIS

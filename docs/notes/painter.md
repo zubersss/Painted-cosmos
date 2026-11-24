@@ -151,6 +151,33 @@ water), the river still a little over the band; E5 0.12 to 0.37 saturation, valu
 note still water is the calmest thing: a step deeper, less mirror, strokes 10:1 and in close values, white only on the sun's
 path. NIGHT (F's ask): the light strokes keep a step of light over the pulled body, the moon's marks are left out of the
 pull (`s2-E1-night-23h-wpaint2-crest-ab.jpg`: water V 0.45, land 0.22).
+**THE SEA'S FIX, the paint's half (24 Nov, evening; E-W2 has the strokes' direction along the shore).** Three faults the
+look director named, each found and fixed in the paint (`?wsea=1` / `?wsea=2` to see them on the sea; rivers take the
+first two by default):
+- THE FAINT DOTTED GRAIN was long strokes coming and going in squares of four pixels: whether a stroke of the finer
+  octave has thinned away is asked at its centre, carried there from the pixel by the screen derivatives, which are one
+  value per 2 x 2 pixels; over a stroke 20 to 29 widths long (E-W2's long still-water strokes) their small steps grew
+  past the fade. Now carried by the smooth rate the octave changes across the water, from the way the eye looks
+  (`pcWOctRate`, waterchunk.js; `pcWStrokes`' `oc.yz` is that rate now). And strokes seen low are laid up to 5x larger
+  (was 3x), so the rows stay over two pixels at 400 m.
+- THE STAIR-STEPPED EDGES: the edge of a finer stroke beside one that has thinned away was blended toward that absent
+  neighbour, so it had no blend at all. Now toward the water's body colour, which most coarser strokes are (asking the
+  coarser layer itself there was right but tripled the new paint's cost at the bank: measured, then dropped). And where
+  two cells' strokes lie over one another the top one's edge is blended toward the one under it.
+  MEASURED (isolated light pixels on the water, a count of dots and edge steps, per 10,000 water pixels, 960 x 540):
+  400 m 39 before, 30 after (v37 24); 150 m 59 before, 44 after. What is left sits on the strokes' diagonal edges.
+- THE ELECTRIC BLUE at `?wpaint=2` (S 0.78): the body is laid heavy by density, which makes each channel darker by its
+  own share and the blue purer the deeper it goes. Above S 0.36 the saturation is now taken in to a third of the excess,
+  at the same value (`pcWSatKnee`): MEASURED on the sea, S 0.50 at 150 m, 0.40 at 400 m, 0.28 at 1 km; value spread
+  0.11 / 0.10 / 0.08.
+COST: none measurable. Bank view (E2, phone settings, software, 6 frames each): the new paint adds 34 % of the water's
+own cost before and 29 % after (single runs scatter 10 to 20 points). Rivers by default take the first two fixes:
+E2, E3, E4 against 05bfe0a change slightly, nothing broken (`s8-rivers-*-ab.jpg`).
+Stills for the look director: `s8-sea-S150-phone.jpg`, `s8-sea-S400-phone.jpg`, `s8-sea-S1k-phone.jpg` (v37 / `?wsea=1` /
+`?wsea=2`, 936 x 372 tier 1) and `s8-sea-S150-desktop.jpg` (1280 x 720 tier 2).
+NOT fixed here: at `?wsea=2` the shallows by the coast and the islands are a soft lighter glow (the bed by depth), which
+reads close to a blur; and the strokes still fan out from a point over the bay (a fixed wind direction on a 4 km
+world), which is E-W2's shore direction.
 **THE DEFAULT NOW (24 Nov, evening): the new strokes on rivers, ponds and lakes, v37's on the sea.** The mesher marks water
 standing at the sea's level (`patchgen.js`, the spare byte `aTurb.z`: within 0.15 m of `S.sea` 1, from 0.45 m above it 0;
 no samples, the level is known at every vertex) and the paint picks its level per pixel: `uWPaint` (`?wpaint=`, default 1)
