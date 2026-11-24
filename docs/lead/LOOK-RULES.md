@@ -206,6 +206,19 @@ golden hours are `pcGold()`. Targets for Earth (other worlds keep their own keys
   mean value seen from far must be the mean of its lit and shaded leaves near (a thinned crown must not show more
   of its dark core: audit F7).
 
+- **R3.9 MUST (24 Nov, for the sharper phone picture and dynres): two kinds of pixel threshold, kept apart.**
+  The strokes themselves are sized as a share of the picture's height (`uOilA.x * uOilPx.y / 720`, and the octave in
+  metres from the screen angle, so the scene pass's resolution cancels out): a sharper picture or a dynres step makes
+  them crisper, never larger or smaller on the screen. Every OTHER threshold set in pixels must say which kind it is:
+  (a) A LOOK threshold (when a crown becomes one patch, one tone, when a band or a bark turns, when a far tree is left
+  to the canopy, when strokes merge into a mass) is a decision about how big a thing LOOKS: write it in pixels at
+  480 lines and scale it by `uOilPx.y / 480`, so the design is the same at any resolution and a dynres step never
+  flips a crown from strokes to a patch. (b) An ANTI-GRAIN floor (R4.5's 1.3 px, a stroke never under about 2.5-3 px,
+  a head's minimum half-width, the canopy dab's floor, the thinnest water row) is about the real pixel: keep it in
+  real pixels. Today's (a) thresholds in real pixels to convert: A1's crown mass (30 px), one tone (4-7 px), bark as
+  leaves (30 px), the gust's small crowns (4-10 px), ?impminpx (4 px). Measures quoted in pixels (my pattern length,
+  crown widths) were taken at 480 lines and scale with the lines.
+
 ## R4. The crispness rule (the owner, 15 Nov: "I hate the blur the most")
 
 - **R4.1 MUST:** no blur, no depth of field, no motion blur, no glow that softens, no bloom, no FXAA or TAA on the
