@@ -842,7 +842,12 @@ export function attachHydro(S, drain, rivers, opts) {
   if (!S || !drain || !MODE.oil) return S ? S.hydro : null;
   if (S.hydro) return S.hydro;
   const W = MODE.water || {};
-  const want = { lakes: !!W.lakes, ponds: !!W.ponds, puddles: !!W.puddles, falls: !!W.falls, fjord: !!W.fjord };
+  // WHICH WORLDS. A part is built on a world only where that world's look asks for it: lakes where it gives oil.lakeK, fjords
+  // where it gives oil.fjords, ponds and puddles where a look or a biome gives oil.ponds / oil.puddles (their chance and share,
+  // read in their builders), the falls wherever the rivers reach a sea cliff (world/rivers.js draws its tree on Earth only).
+  // So the switches can be on by default in the oil look and change Earth alone (the coordinator, 24 Nov: Earth first).
+  const lookO = (S.look && S.look.oil) || {};
+  const want = { lakes: !!W.lakes && lookO.lakeK != null, ponds: !!W.ponds, puddles: !!W.puddles, falls: !!W.falls, fjord: !!W.fjord && !!lookO.fjords };
   if (!want.lakes && !want.ponds && !want.puddles && !want.falls && !want.fjord) return null;
   const hy = new Hydro(S, drain, rivers || S.rivers || null, want, opts).build();
   // nothing of it does anything: leave the surface as it was

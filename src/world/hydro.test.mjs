@@ -192,3 +192,12 @@ test('outside every lake, pond, puddle and cut the ground is exactly as it was',
   assert.equal(other, 0, 'changed outside every part: ' + other + ' (same ' + same + ', inside ' + inside + ')');
   assert.ok(same > 4000);
 });
+
+test('only a world whose look asks for them gets them: with every switch on, Venus and Neptune are as they were', () => {
+  for (const id of ['venus', 'neptune']) {
+    const S2 = getSurface(id), D2 = ensureDrainage(id);
+    if (!D2) continue;
+    assert.equal(HY.attachHydro(S2, D2, S2.rivers), null, id + ' gets no water parts');
+    assert.equal(S2.hydro, null);
+  }
+});
