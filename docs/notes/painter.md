@@ -425,6 +425,18 @@ is 0.30 of 255 at 5 m and at 10 m (0.31 with `?light=old`, as before the merge);
 picture by 1.7, so the wood follows it; `?light=old&trees2=0` is pixel-identical to the still before the merge. Stills
 `A2_*-v39_*`. (The cards' own program, `CARD_FRAG`, does not take the one light: cards are dropped.)
 
+**COUNTED AT THE LANDING after v39 (Node, the scratch copy of `tools/overdraw.mjs`, `where=spawn`, phone tier 1, the
+counter's 787 x 443 = 0.348 Mpixel at fov 55, on foot; `?trees2=0` against the default):** near wood 71,504 -> 39,920
+triangles, near leaves 47,110 both, middle trees unchanged (wood 21,310, leaves 34,356: the middle tree never had hair);
+the whole frame 1,509,543 -> 1,477,959. Wood fragments rasterised (only the faces seen are drawn now): near 111,117 ->
+56,581, middle 39,873 -> 24,250. Tree fragments painted: the old program discards, so it cannot test depth first
+(about 379k: every fragment of the near and middle trees); the split, with the depth test first in three's own order,
+about 148k (simulated). DRAW CALLS: near 11 -> 22, middle 18 -> 36 in the colour pass, and as many again for each of
+those meshes inside the shadow square (three draws a mesh with two materials group by group even under the shadow
+pass's one material): up to +58 a frame. All of that was already in the phone's 40.3 ms; since then only +3,128 near
+wood triangles (the sides kept), 0.2 % of the frame. (A shadow-only mesh of one material per split mesh would take the
+shadow pass back to one draw a tree mesh; not built: the shadow pass is A1's.)
+
 **What is built (the oil look only; `?trees2=0` puts every tree back as it was):**
 - THE DEFAULT (was `?trees2=1`): the near AND middle trees drawn by TWO SHORT PROGRAMS (`materials.js` `WOOD_FRAG`,
   `LEAF_FRAG`, chosen by `makePropMaterial(..., { tree: 'wood' | 'leaf' })`), over two groups of one index (wood, then
