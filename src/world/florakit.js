@@ -73,7 +73,7 @@ export function firGeometry(seed, lod) {
 // fine bare twigs). A slender stem that bends a little, boughs from a third of its height that fork, and at the
 // boughs' ends the twigs: thin slivers one by one (leafCards, painted in the kind's "leaf" washes, which are its twigs'
 // colours), so that a crown is a haze of fine strokes and no tube is thinner than the pixel can carry.
-export function bareGeometry(seed, lod) {
+export function bareGeometry(seed, lod, spec) {
   const rnd = mulberry32(seed), B = new Builder();
   const H = 6.0 + rnd() * 3.5, lean = (rnd() - 0.5) * 1.2, lz = (rnd() - 0.5) * 0.9, ph = rnd() * 3;
   const segs = lod === 0 ? 7 : 3, sides = lod === 0 ? 6 : 4, pts = [], rad = [];
@@ -801,7 +801,7 @@ export const TALL_KITS = {
   aspen: (seed, lod, spec) => aspenGeometry(seed, lod, spec),
   tallpine: (seed, lod, spec) => tallPineGeometry(seed, lod, spec),
   // (the oil look's trees of the snow are forms of their own: a `fir` conifer, a `bare` broadleaf)
-  broadleaf: (seed, lod, spec) => (spec && spec.bare ? bareGeometry(seed, lod) : birchGeometry(seed, lod, spec)), conifer: (seed, lod, spec) => (spec && spec.fir ? firGeometry(seed, lod) : pineGeometry(seed, lod, spec)), fungus: fungusGeometry,
+  broadleaf: (seed, lod, spec) => (spec && spec.bare ? bareGeometry(seed, lod, spec) : birchGeometry(seed, lod, spec)), conifer: (seed, lod, spec) => (spec && spec.fir ? firGeometry(seed, lod) : pineGeometry(seed, lod, spec)), fungus: fungusGeometry,
   // (2026-11-19, the owner's six from the sheet of ten: one grammar, six rows of numbers, kits/grove.js)
   roundmaple: groveGeometry('roundmaple'), poplar: groveGeometry('poplar'), oak: groveGeometry('oak'),
   birch: groveGeometry('birch'), willow: groveGeometry('willow'), sapling: groveGeometry('sapling'),
