@@ -2,9 +2,10 @@
 // Builds the vertex data of one quadtree node of the cube-sphere. Kept free of three so it can
 // be unit-tested in Node and moved into a worker later without changes.
 import { faceToDir } from './cubesphere.js';
-import { makeSample, NOLQ } from './surface.js';
+import { makeSample, NOLQ, SNOW } from './surface.js';
 import { MODE } from '../data/mode.js';
 import { BODIES } from '../data/bodies.js';
+import { canopyOn, groundSeasonOn, rockfieldOn, standAt } from './farstand.js';
 
 export const PATCH_N = 32;                 // cells per patch edge (even, for geomorphing)
 const N = PATCH_N, V = N + 1, E = N + 3;   // E: sample grid with a one-vertex apron for normals
@@ -39,8 +40,9 @@ export const PATCH_VERTS = V * V + 4 * V;
 const _d = [0, 0, 0];
 const _px = new Float64Array(E * E), _py = new Float64Array(E * E), _pz = new Float64Array(E * E);
 const _hh = new Float32Array(E * E), _lq = new Float32Array(E * E);
-const CS = 21;   // floats kept per sample: wash, far wash, parameters, liquid look, strata, the current, the fall
+const CS = 24;   // floats kept per sample: wash, far wash, parameters, liquid look, strata, the current, the fall, the stand, the snow
 const _col = new Float32Array(E * E * CS);
+const _fs = [0, 0];     // (the stand and its needle share at a sample: world/farstand.js)
 let _s = null;
 
 function b8(v) { v = v * 255 + 0.5; return v < 0 ? 0 : v > 255 ? 255 : v | 0; }
@@ -93,6 +95,17 @@ export function stepPatch(job, deadline) {
   const span = 2 / (1 << level);
   const u0 = -1 + ix * span, v0 = -1 + iy * span, du = span / N;
   let minH = job.minH, maxH = job.maxH, anyWater = job.anyWater;
+  // (THE PAINTED CANOPY, group C: on a world whose wood is painted as a roof of crowns from the air, each vertex is
+  // told how many trees the placer keeps there and how many are needle trees -- world/farstand.js, render/farground.js.
+  // Off, or on any other world, nothing is computed and the bytes are the ones they always were.)
+  const can = canopyOn(S.id);
+  // (and the floor that follows the year, FV3: the trees here in woods painted in an autumn palette and in a summer one
+  // (surface.js canA, canS), in the parameters' first and second bytes -- the dry and wet washes', which the oil look's
+  // ground never reads)
+  const gse = groundSeasonOn(S.id);
+  // (and the rock, FV4: how much snow the surface laid over each wash, so that it can be shed off the steep faces once
+  // the patch's normals are known, below)
+  const rkf = rockfieldOn(S.id);
   // 1. sample the surface on the apron grid, a row at a time
   // (S.foot: how far apart this patch's samples lie, in metres, while they are taken: the oil look's surface draws a
   // river into the far colour as wide as that, so that a river is still a line on the land from high up, where the
@@ -118,6 +131,9 @@ export function stepPatch(job, deadline) {
         _col[c + 10] = s.qr; _col[c + 11] = s.qg; _col[c + 12] = s.qb; _col[c + 13] = s.qk; _col[c + 14] = s.qglow; _col[c + 15] = s.qcloud; _col[c + 16] = s.strata;
         _col[c + 17] = s.fu || 0; _col[c + 18] = s.fv || 0;      // (the oil look's rivers: the current, surface.js; 0 everywhere else)
         _col[c + 19] = s.fspd || 0; _col[c + 20] = s.turb || 0;  // (the drainage field's own speed and churn, where a surface gives them; 0 otherwise)
+        if (can) { standAt(S, _d[0], _d[1], _d[2], s, _fs); _col[c + 21] = _fs[0]; _col[c + 22] = _fs[1]; }
+        if (gse) { _col[c + 6] = s.canA || 0; _col[c + 7] = s.canS || 0; }
+        _col[c + 23] = rkf ? s.snowK || 0 : 0;
       }
     }
   }
@@ -145,6 +161,29 @@ export function stepPatch(job, deadline) {
       let nx = ay * bz - az * by, ny = az * bx - ax * bz, nz = ax * by - ay * bx;
       const il = 1 / Math.sqrt(nx * nx + ny * ny + nz * nz);
       nor[o] = nx * il; nor[o + 1] = ny * il; nor[o + 2] = nz * il;
+      // SNOW DOES NOT LIE ON A CLIFF (the far view, FV4; the references: the snow mountains the lightest thing in the
+      // picture, on ledges and in gullies, with dark rock ribs between). The surface lays snow by height and noise alone,
+      // so a face of 60 degrees above the snowline was as white as a ledge, and a range from the air was a white cone.
+      // Where the face is steeper than about 50 degrees most of the snow is taken off it again -- the wash under the snow is found
+      // by undoing the surface's own mix (it laid SNOW over it by snowK), and laid again with less of it -- in both washes.
+      if (rkf) {
+        const sk = _col[(k) * CS + 23];
+        if (sk > 0.01) {
+          const pr = 1 / Math.sqrt(_px[k] * _px[k] + _py[k] * _py[k] + _pz[k] * _pz[k]);
+          const upn = (nor[o] * _px[k] + nor[o + 1] * _py[k] + nor[o + 2] * _pz[k]) * pr;
+          // (from about 49 degrees, all but a fifth of it by 61: MEASURED from 400 m, shedding from 38 degrees took the snow
+          // off nearly every summit -- at a far patch's spacing a summit's faces all read steep -- and the range went grey)
+          const st = sstep(0.66, 0.48, upn);
+          if (st > 0) {
+            const k2 = sk * (1 - 0.8 * st), cc = k * CS, iv = 1 / (1 - sk);
+            for (let t = 0; t < 3; t++) {
+              const base = (_col[cc + t] - SNOW[t] * sk) * iv, base2 = (_col[cc + 3 + t] - SNOW[t] * sk) * iv;
+              _col[cc + t] = base + (SNOW[t] - base) * k2;
+              _col[cc + 3 + t] = base2 + (SNOW[t] - base2) * k2;
+            }
+          }
+        }
+      }
       // morph target: where this vertex sits on the parent's (half resolution) mesh
       const io = i & 1, jo = j & 1;
       if (io || jo) {
@@ -158,8 +197,10 @@ export function stepPatch(job, deadline) {
       }
       const c = k * CS, q = (j * V + i) * 4;
       col[q] = b8(_col[c]); col[q + 1] = b8(_col[c + 1]); col[q + 2] = b8(_col[c + 2]); col[q + 3] = b8(1 - _col[c + 16]);
-      col2[q] = b8(_col[c + 3]); col2[q + 1] = b8(_col[c + 4]); col2[q + 2] = b8(_col[c + 5]); col2[q + 3] = 255;
-      par[q] = b8(_col[c + 6]); par[q + 1] = b8(_col[c + 7]); par[q + 2] = b8(_col[c + 8]); par[q + 3] = b8(_col[c + 9]);
+      // (the painted canopy, where it is on: the far wash's spare byte carries the stand, and the parameters' fourth -- a
+      // crack's depth, which the oil look's ground never paints -- the needle share; world/farstand.js)
+      col2[q] = b8(_col[c + 3]); col2[q + 1] = b8(_col[c + 4]); col2[q + 2] = b8(_col[c + 5]); col2[q + 3] = can ? b8(_col[c + 21]) : 255;
+      par[q] = b8(_col[c + 6]); par[q + 1] = b8(_col[c + 7]); par[q + 2] = b8(_col[c + 8]); par[q + 3] = b8(_col[c + (can ? 22 : 9)]);
       if (!io && !jo) {
         // the parent's own normal here: its grid is twice as wide (at the border the apron is one cell deep)
         const il2 = i > 0 ? k - 2 : k - 1, ir2 = i < N ? k + 2 : k + 1, jl2 = j > 0 ? k - 2 * E : k - E, jr2 = j < N ? k + 2 * E : k + E;

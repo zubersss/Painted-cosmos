@@ -1,8 +1,326 @@
 # PAINTER notes
 
+## Hand-over of THE FAR VIEW, group C, branch `farview` (READ THIS FIRST if you are group C; kept current)
+
+A helper session of the coordinator (24 Nov) works here on the ground seen from the air, after the owner's words of
+24 Nov: "things should look good far before I get there like when im flying high in the sky up to a mile I want trees
+from a distance to look good rocks the water the grass". The design is `docs/lead/FARVIEW-DESIGN.md` on `r2`; the look's
+rules and audit are `docs/lead/LOOK-RULES.md` and `LOOK-AUDIT.md` on `look-director`. This lane's packages: FV2 (the
+canopy painted into the ground), FV3 (the floor and the far colour follow the year), FV4 (rock faces, strata and snow
+from afar; the audit's F12 faceted mountains and F13 cliff smears, with the look director). Not this lane's: FV1 (the
+sky to a mile: look director), FV2-T and FV7 (the far trees and the air speed test: trees-far group), FV5 (water), FV6
+(meadows). Files of this lane: `src/render/farground.js` (new), `src/world/farstand.js` (new), TERRAIN_VERT/FRAG in
+`src/render/materials.js`, `src/world/terrain.js`, `src/world/patchgen.js`, `src/world/surface.js` (recipes and far
+colour only). NOT chunks.js, post.js, shared.js, world/index.js (look director), NOT flora.js, florakit.js (trees groups).
+
+**STATE (24 Nov, end of the first session):** FV2 and FV3 built, seen, pushed, ON by default; FV4 a first step, pushed,
+OFF by default (`?rockfield=1`). Reviews asked of the look director and the coordinator for all three (stills in
+`docs/shots/painter/farview/`). Waiting on: the look director's ruling, the slope chart (L8) for FV4, the canopy's row in
+bench.js's air table (sent to the coordinator; PILOT's file). The branch merges clean with look-proto, look-director,
+trees-far and main. Guards: the watercolour game identical to v37.1 (0 pixels), the autumn wood on foot identical (0).
+The lab: `PC_LAB_STATE=<scratch>/lab.json node tools/lab.mjs serve` (background, it is stopped after two hours), then
+`open` a gallery address and `grab`; the views used are cam=high with dy/pitch (150 m dy=-270, 400 m dy=-20, 1 km dy=580,
+pitch -16.4 for 45 deg, -61 for straight down; alpine pitch -1.4), phone 1024x480 quality=1 lite=1 t=0, desktop 1280x720
+quality=2 lite=0. `?candebug=1` colours each canopy dab by what it is.
+
+**FV2, THE PAINTED CANOPY (`?canopy=0|1`, default 1; the oil look on Earth only).** BUILT AND SEEN in stills (list below).
+- `src/world/farstand.js` `standAt`: at every ground vertex, the tree placer's OWN keep share there (`stand`, 0..1: the
+  clump field, s.trees, the outside-the-woods group field, water) and the share of needle trees (the grove field picks
+  the pair, the roll the kind). A copy of `floraplace.js placeTrees`' arithmetic, not a call: `src/world/farstand.test.mjs`
+  counts the placer's real trees over 147 cells against it (MEASURED: autumn wood 1,901 real against 1,855 predicted,
+  green wood 2,590 / 2,557, mountain 42 / 42; needle share 0.186 real / 0.169 predicted). If the placer changes, the
+  test fails. Packed by `patchgen.js` into the far wash's spare alpha byte (stand) and the parameters' fourth byte (the
+  needle share: a crack's depth, which the oil ground never painted), only when `canopyOn(S.id)`; otherwise the bytes
+  are the old ones. MEASURED in Node: +0.26 ms a patch (+8.5 %) of the mesher's time slice.
+- `src/render/farground.js`: the GLSL and the uniforms. The canopy is laid in ITS OWN TWO LAYERS OF DABS
+  (`pcCanopyLayers`, called first in TERRAIN_FRAG's leaf-dab branch), at `?candab=` (0.5) and twice that of the ground's
+  finest cell: from a few hundred metres up the ground's own dab is as big as a whole crown (SEEN in the debug view,
+  `?candebug=1`), so a cap and a shaded side could not be laid with it. Each dab asks, at its own centre, which crown of a
+  jittered 8 m grid on the ground chart it lies on (four cells tried; a cell holds a crown by 1 - exp(-3 stand), the
+  placer's cover): a lit cap toward the sun (larger with a high sun), the body, the shaded side, a taller neighbour's
+  shadow, or the floor between crowns (in a crown's shadow or under a close roof: the crowns' own deepest wash, little
+  sky fill; at an open edge: left to the ground's own dabs). Where a crown is no bigger than a canopy dab, one cell, one
+  hash, the crown's mean light turned by the hill. Needle trees in groups of a few crowns (`pcCanNeedle`), dark, narrower.
+  Colours: `syncCanopy` (called by terrain.js each frame) writes the far trees' own washes for the season (the same look
+  data and rule as flora.js setSeason: each kind with its `oil` entry, broadleaf summer/autumn dresses averaged, the
+  family red riding the season), and each crown takes its place on the family run as the far tree does. Gate, at the
+  dab's centre: the eye looks down on it (5 degrees or more), 15 to 30 m above it or more, 60 m away or more; a pixel
+  with the eye less than 10 m above it skips everything at one comparison (on foot, nearly every pixel).
+- The ground's own dabs under the roof also ask the canopy (so the slivers between canopy dabs are crown-coloured), and
+  the bare ground between dabs takes the crowns' mean over the share they cover.
+- The canopy's lights are held at level 2.6 (between local and lit paint): with the full lit paint the lemon crowns
+  passed V 0.90 (a 1 km still went 11.1 to 13.7 per cent over 0.90; with the cap 11.1, as before).
+- Speed test handle: `CANOPY_BENCH.off` (farground.js) lays no canopy at run time (MEASURED: the same picture as
+  `?canopy=0` but for 465 pixels at most 2/255 apart). The row for core/bench.js's air table is sent to the coordinator
+  (bench.js is PILOT's): `['canopy painted off (FV2)', () => { CANOPY_BENCH.off = true; }, () => { CANOPY_BENCH.off = false; }]`.
+- **SEEN (stills opened, `docs/shots/painter/farview/fv2_*`, A above B):** autumn wood 150 m, 400 m, 1 km at 45 degrees
+  and 400 m straight down at the phone's settings (1024x480, tier 1, lighter paint), 150 m and 400 m in summer, 150 m and
+  400 m on the desktop's top tier (1280x720, tier 2, full paint), the alpine range at 400 m (unchanged but for a few
+  pixels: few trees there), and on foot (S1, 16.8 h): IDENTICAL, 0 of 491,520 pixels differ. The watercolour game at the
+  400 m view: 0 pixels differ. In summer the change is largest: the green wood no longer stands on a gold floor and the
+  far hill is green. From 1 km the "carpet of giant leaves" becomes a roof of smaller crown-coloured strokes in stands of
+  yellow, orange and red, with dark conifer groups.
+- **lookstats (docs/lead/lookstats.py on look-director), A -> B:** V over 0.90: 150 m 11.8 -> 9.9 %, 400 m 10.5 -> 6.9,
+  1 km 11.1 -> 11.1, down 21.3 -> 14.6, summer 150 m 10.1 -> 4.2, summer 400 m 9.3 -> 2.4, desktop 150 m 12.4 -> 9.8,
+  desktop 400 m 11.6 -> 7.3. S(V<0.3): never higher (150 m 0.40 -> 0.35; 1 km 0.82 both: that is the space sky, FV1).
+- **PHONE COST, DERIVED (nothing measured on a phone).** On foot: one dot product and a comparison per pixel in main,
+  then one comparison each where the canopy is asked (its layers, each ground dab, the bare ground) and two derivatives:
+  about 12 instructions of the ground's about 700, so at most 1.7 % of the v37 table's 4.8 ms, 0.08 ms. From the air:
+  where crowns are no bigger than a canopy dab (most of a view from 400 m up) a canopy dab is about 300 instructions and
+  2 to 3 texture reads and it REPLACES a ground dab (about 400 and 3 to 4) wherever it covers, so roughly even (within
+  plus or minus 10 % of the ground's pixel work: at most 1.7 ms either way on the design's 17 ms bound); in the near band
+  of a 150 m view a canopy dab tries four crowns, about 550 instructions, so about +15 % of the ground's pixel work over
+  the picture: between +0.4 ms (if the ground's 2.4 ms were all triangles) and +2.5 ms (if the 17 ms were all pixels).
+  SOFTWARE DRAWING here (CPU, not a phone, for direction only), whole frame, canopy on against off in the same page:
+  150 m +3.3 %, 400 m within noise (-2.6 % / +0.5 %), 1 km +6 to 7 %. The mesher: +0.26 ms a patch (+8.5 %) in Node.
+  Confirm on the phone with the air table's row.
+- Suites: unit 325, world 59 (57 + farstand.test.mjs's 2), physics 416; all.mjs static passes.
+
+**FV3, THE FLOOR AND THE FAR COLOUR FOLLOW THE YEAR (`?groundseason=0|1`, default 1; oil look, Earth).** BUILT AND SEEN.
+- `surface.js` sample: two blended shares of TREES, those of woods painted in a summer palette (`canS`, every wood but
+  one whose look says `autumn: 1`) and in an autumn one (`canA`); `patchgen.js` packs them into the parameters' first two
+  bytes (dry and wet, which the oil ground never reads), only with the switch on.
+- `farground.js` SEASON_VERT: in the VERTEX shader the far colour vCol2 moves by (now - summer mean) x canS + (now -
+  autumn mean) x canA, broadleaves only (x (1 - needle share)); the means are the painted canopy's own (`crownMean`, the
+  family run at each season). SEASON_FRAG: the fallen leaves' share is 0.7 of itself in high summer, all of it in autumn,
+  and a summer leaf is last year's (the floor's own wash toward its brown, a third to grey).
+- MEASURED / SEEN: at the top of autumn the autumn wood is IDENTICAL on foot (0 of 491,520 pixels) and, from 400 m, the
+  only pixels that move (20,966) are the green wood and the wetland on the horizon, whose broadleaves do turn gold
+  (fv3_wood_400m_45deg_12h_autumn_changed_pixels_magenta.jpg). Three earlier forms were measured wrong and replaced: the
+  season read off the palette's hue (19,518 pixels of the autumn wood moved on foot), a blended palette-season byte
+  (43,595 pixels where the wood meets the mountain), and canopy in place of trees (the river banks turned turquoise in
+  summer: the canopy counts a bank's shade). In summer: the far hills lose their orange, fewer red leaves on the floor
+  (fv3_* sheets). lookstats: summer 400 m V>0.90 2.4 -> 2.7 %, 150 m 4.2 -> 4.1; ON FOOT IN SUMMER S(V<0.3) 0.61 -> 0.63
+  (worse by 0.02 on C7; the darkest 15 % 0.47 -> 0.45): the dark pixels that change were brown leaves in shade, now
+  grass in shade, whose paint is today's saturated green (audit F4, the look director's L2). Phone cost: per vertex for
+  the far colour; about 10 instructions a dab for the leaves (about 1.5 % of the ground's: at most 0.07 ms on foot,
+  0.25 ms in the air on the design's bounds).
+
+**FV4, ROCK FACES AND SNOW FROM AFAR (`?rockfield=0|1`, DEFAULT 0 until the look director rules; oil look, Earth).**
+BUILT AND SEEN, a first step; NOT the cure for the smear (F13 needs the look director's slope chart, L8: asked 24 Nov).
+- `surface.js` sample `snowK`: how much SNOW the recipe laid over the wash (alpine: by height and noise only).
+  `patchgen.js`: once the patch's normals are known, the snow is taken off faces from about 49 degrees, all but a fifth by
+  61 (the surface's own mix undone, laid again with less), in both washes. First tried from 38 degrees: it took the snow
+  off nearly every summit at a far patch's spacing and the range went grey (SEEN; fixed).
+- `farground.js` ROCK_FRAG (`pcRockWash`, uRockK Earth only): on steep dabs (35 to 48 degrees) from 80 m out (all by
+  250 m) the wash goes half way to its own value (the alpine green and cream patches off the faces), two densities of it
+  by height band where the biome has strata; in pcGroundPaint no dab on rock is laid a step darker by its own number and
+  its pigment and stray are halved. Without the distance fade the whole green slope at the alpine easel went grey (SEEN:
+  the ground cannot tell steep turf from rock; there is no spare byte left to tell it).
+- SEEN (fv4_* sheets): alpine 400 m at 30 deg: summits keep snow, steepest faces dark rock, the lilac/mint mottle calmer
+  (V>0.90 4.8 -> 3.3 %, S(V<0.3) 0.11 -> 0.13); 1 km: rock ribs through the snow (V>0.90 5.8 -> 4.2 %); coast cliffs at
+  400 m: next to no change; on foot at the alpine easel: the same to the hundredth in lookstats (only the far peak loses
+  its lilac). Honest verdict: a modest step; the faces still smear vertically and the far mountains still read faceted
+  (F12 is the coarse mesh's silhouette: triangle count, unpriced). Phone cost: per vertex for the snow; about 25
+  instructions on a steep dab only (at most 0.7 ms on an alpine air view on the design's bound, nothing on foot in a wood).
+- **Next for FV4:** the slope chart (L8) from the look director, then dabs laid along the contour on rock; a per-vertex
+  rock value (would need a new 4-byte attribute: no spare byte left) to keep steep turf green while rock goes grey.
+
 Branch: `cosmos` (shared with PILOT and PHYSICS, one working tree). Commits: `tools/commit.sh painter`.
 This file was rewritten by the second PAINTER agent (the first ran out of working context). The
 first agent's record of M1 is kept at the end ("Earlier answers").
+
+## Hand-over of THE FLORA LANE, branch `design-flora` (kept current after every step; read with the oil look's below)
+
+Built by a painter helper session at the coordinator's word (24 Nov), after its design `docs/lead/FLORA-DESIGN.md` was
+accepted. The lane follows that design's section 11 order. The coordinator merges this branch into `look-proto`; this
+lane never merges. HELD by the coordinator until the trees lane lands: package O and F4 (anything in `flora.js`,
+`floraplace.js placeUnder`, a new `underkit.js`). NOT TO BE TOUCHED by this lane: `PROP_VERT` / `PROP_FRAG`, `kitmat.js`,
+`chunks.js`, `post.js`, `shared.js` (a look-director session owns the shared light and paint: `docs/lead/LOOK-RULES.md`
+on branch `look-director`: READ, and followed; its R3.1 took out this lane's root step, below). In `surface.js` only ONE
+`bloomTint` call (the far-view lane edits that file).
+
+**Switches** (oil look only; 1 by default; 0 gives the package back exactly as it was): `world/nearground.js` `FLORA`:
+`?grass2=0` the whole grass package; `?nearcull=0` the off-screen cull alone; `?sheen=0` the gusts' sheen;
+`world/bloom.js` `bloomSwitches`: `?bloom=0` the flowers from the map (the rings lay their old flowers, no tint);
+`?bloomair=0` the drifts' colour in the ground alone. The watercolour game: SEEN pixel for pixel the same as the clean
+commit (the alpine meadow's easel, every change of this lane in).
+
+**Done:**
+1. Speed-test rows (`core/bench.js`, after 'no small plants'): 'no near grass', 'near grass: the blades only (the fine
+   ring)', 'grass not culled off-screen'. The near grass was in no row before (its material is `pc-near`).
+2. G1, THE CULL (`materials.js NEAR_VERT`, under `PC_OIL`, uniform `uNearK.x` set by `nearground.js`): a mark whose root
+   is outside the picture by more than its own reach, or past its range, is sent outside the clip volume before the bend
+   field and the air are worked out. SEEN: the autumn landing at 1.8 m and 10 m with the cull on and off, pixel for pixel
+   the same (0 pixels at 1.8 m; 3 at 10 m, and the same 3 differ between two grabs with the cull on: frame noise).
+   COUNTED earlier at the landing: 60-70 per cent of the near marks are outside the picture. The phone's saving is
+   derived (-0.3 to -1.9 ms) until the row 'grass not culled off-screen' measures it.
+
+3. G4 and G2 (`nearground.js` `CARPET`, `layCarpet`, `styleOf` `leafB` / `gmB` / `carpet`; `materials.js` `NEAR_VERT`
+   `vSheen`, `NEAR_FRAG` the root step and the sheen, uniform `uNearL` = (paint on, sheen strength, the bend in rad the
+   sheen grows over: 0.03 to 0.35)). THE CARPET: a fifth ring, first, cell 0.45 m, reach 7 m (8 at the top tier, none at
+   the low one), fades in 0.5-1.2 m, gone above 14 m: three times the fine ring's blades a square metre, each blade's
+   own range 5 to 7 m. THE BLADES' OWN GREENS: a blade takes a quarter of the ground's wash where it took six tenths, and
+   in the oil look the biome's `oil.under.leaf` (the greens its PROP undergrowth wears; the autumn wood's watercolour
+   `under` is straw); a biome may set `oil.flora.sward` = { gm, carpet }. (A step deeper at a blade's root was built and
+   TAKEN OUT in step 5: LOOK-RULES R3.1, a stroke is one flat colour; the sward's dark roots are the ground's paint under
+   it, `bloom.js bloomTint` with a biome's `oil.flora.sward.floor`.) THE SHEEN: PHYSICS' bend leaning a blade away from the eye lifts it a step (needs physics: the game, or the
+   gallery's `&physics=1`). SEEN, before and after at the same camera (`docs/shots/painter/flora-design/g2g4-*`): the
+   autumn landing at 1.8 m goes from a leaf carpet with straw blades to a sward of green and yellow-green blades; the
+   green wood gets dark spiky blades against the light; the meadow fills in near the feet; from 10 m nothing changes (the
+   carpet reaches 7 m from the eye), as designed. The sheen SEEN working only at an exaggerated setting (`g4-sheen-test-*`:
+   5,524 pixels change); the gallery's weather at the landing is nearly calm (0.67 m/s, a 2 degree bend), so at the
+   default it shows nothing here: it is for the game's wind and cannot be judged in motion on this machine.
+   MEASURED (`tools/overdraw.mjs`, scratch copy, tier 1, 936 x 372): the carpet adds 65,500 fragments (5,300 to 6,460 of
+   its marks in range, 15,900 to 19,400 triangles) at the meadow looking 24 degrees down and at the landing looking level.
+   DERIVED for the phone: +1.3 ms (0.8 to 2.3), before G1's and G3's savings.
+   NOT LIKED YET, for the next steps: the PROP undergrowth's big tufts (orange in autumn) still stand out of the sward
+   (flora.js: HELD); some dark accent blades in shade are near black (a look-director question: the root step and the
+   dark tone together).
+
+4. G3, THE MIDDLE BAND (`materials.js NEAR_VERT` `vTeeth` and the fan's growth, `NEAR_FRAG` the fan's blade count;
+   `nearground.js` the mid ring's own ranges and `layBroad`'s grass touches): a fan-brush touch is cut into as many blades
+   as leave each about two pixels (never under two; it was five to ten whatever its size); each touch's own range is
+   0.4 to 1 of the ring's (was 0.66 to 1), so past about 25 m the band thins, and a touch grows up to 1.4 times by 40 m
+   to keep the cover; the touches are narrower (0.6), more upright, and in the blades' own greens. SEEN
+   (`g3-meadow-10m-before-after.jpg`, `g234-*`): from 10 m the meadow's speckle of tiny yellow combs is mostly gone; from
+   1.8 m the band at 12-40 m is calmer, with its white flower dashes still there (they go in step 5). MEASURED (scratch
+   overdraw counter, the touches' growth mirrored in it; `tools/overdraw.mjs` itself, the coordinator's file, does not know
+   it yet): the middle ring's fragments 114,040 -> 59,756 at the meadow (self-lap 2.12 -> 1.53) and 140,971 -> 99,057 at
+   the landing (3.76 -> 2.89; its stones by the river are unchanged). THE WHOLE NEAR GRASS, carpet included, against
+   24 Nov: +11,300 fragments at the meadow (205,826 -> 217,000) and +23,600 at the landing (230,452 -> 254,100). DERIVED
+   for the phone: +0.2 to +0.5 ms for four times the blades near the feet, before the cull's saving (-0.3 to -1.9 ms).
+
+5. THE FLOWERS, F1-F3 AND A1 (`world/bloom.js` new; `data/looks/earth.js` `FLORA_TF` ... `FLORA_MW` as each biome's
+   `oil.flora`; `nearground.js` `layBlooms`, `layBroad`'s drift touches, `iTone` (a mark's second colour, packed:
+   `packTone`), `BLOOM_HEAD` 2.0; `materials.js` the six heads in `NEAR_FRAG` (kinds 7 rayed, 8 cup, 9 bell, 10 spike,
+   11 froth, 12 cushion), `vTone`, the head's height in pixels in `vTeeth`, the `lying` test now 5.5 to 6.5;
+   `surface.js` ONE call `bloomTint` at the end of `sample`; `core/bench.js` 'no flower heads' (`uNearK.z`).)
+   THE MAP: `bloomAt` decides for any point which of the biome's kinds blooms there and how densely, from its habitat
+   (canopy, wet -- near a river or a little above standing water --, meadow, height, cliff lip, rock), drifts at the
+   kind's own size, colonies four times that, and slopes rich or poor at 430 m. Every distance reads it: the fine ring
+   lays PLANTS (a stalk, a leaf, one to six heads by kind, each head one of six shapes in two flat colours, its second
+   colour data, details cut only where a piece is two pixels or more); the middle ring lays the drift's colour as round
+   touches (a spike taller, a cushion a cushion); the ground's colour takes the drift (near paint 0.4 of its cover, far
+   colour up to 0.7). Five or six kinds a place in named pigments (bluebell, anemone, campion, buttercup, foxglove;
+   aster, harebell, hawkbit, goldenrod; gentian, alpine aster, ox-eye, globe flower, alpine pink, poppy; thrift, sea
+   campion, sea aster, trefoil; marigold, loosestrife, meadowsweet, cotton grass, yellow flag; desert marigold,
+   globemallow). SEEN, bloom off and on at the same cameras (`f-*-bloom-off-on.jpg`): the meadow at 1.8 m a real
+   wildflower meadow, a drift of violet asters with gold eyes in front, ox-eye and poppies behind (`f-meadow-asters-crop-
+   3x.jpg`: the petals and eyes clean, lit and shaded whole); the green wood a bluebell drift under the trees with
+   anemones; the autumn landing harebells and hawkbit; the coast pink thrift cushions and violet asters (its yellow
+   trefoil had vanished on the ochre grass: cut back); the wetland cotton grass and marigolds; from 10 m the meadow's
+   drifts are pale and red patches. NOT GOOD ENOUGH YET: from 150 m a drift is only a faint pale patch (the colour mixed
+   into the ground is a mixture; the cure is a dab that takes the flower's colour WHOLE, which needs a channel in
+   `patchgen.js` and a branch in `TERRAIN_FRAG`: the far-view lane's files, asked of the coordinator); the first heads
+   at real size (two to three centimetres) sank into the denser sward as dots, hence `BLOOM_HEAD` 2.
+   MEASURED: Node, 61,206 full surface samples over the six places, 331 ms with the map against 364 without (noise: the
+   map costs nothing measurable in the ground's build); the scratch overdraw counter at the meadow: fine ring 91,786 ->
+   93,821 fragments, middle ring 59,756 -> 54,873 (the touches replace the old dashes): THE FLOWERS COST NO FRAGMENTS
+   NET; about 2,500 more marks in the fine ring, most of them outside the picture and dropped by the cull. DERIVED for
+   the phone: about 0 to +0.1 ms. Row: 'no flower heads'.
+   NOT DONE IN THIS STEP: the year (the flowers are laid once and do not follow `SEASON`; a ground's colour baked at
+   different moments would seam).
+6. A2-A3, THE FAR MARKS, AND THE DARKS QUIETER (`nearground.js layVista`: in a drift's heart its first sward drag is
+   the drift's colour, close to the ground's as these drags are, `?vistaink=`; `grassTurn`: on level grass the drags
+   are combed one way -- a westerly wandering a fifth of a turn over 1.5 km --, on a slope they keep the contour, handed
+   over by the slope drag by drag; `bloom.js bloomTint`: the floor under a dense sward a step deeper in VALUE and a
+   little quieter, `oil.flora.sward.floor` 0.06 to 0.10; dark accent blades keep the ground's share they had, 0.6).
+   SEEN (`a-*-flora-off-on.jpg`, all of the lane off against all on): from 60 m and 150 m the change is SUBTLE: the
+   meadow a little deeper in tone with faint pale drift patches; the comb cannot be told by eye in these frames. The
+   look director's numbers (`docs/lead/lookstats.py` on `look-director`, run on the A and B PNGs): the meadow at 1.8 m
+   S(V<.3) 0.96 -> 0.85, V>.90 2.5 -> 1.3 per cent; the autumn landing 0.53 -> 0.52, V>.90 3.1 -> 1.9; from 150 m 0.26
+   -> 0.25 and the whole picture's saturation 0.52 -> 0.46; BUT from 60 m S(V<.3) 0.43 -> 0.47 (the picture as a whole
+   quieter, 0.63 -> 0.55) and in the green wood 0.41 -> 0.46: both under R2.2's 0.50, both raised. The green wood's
+   cause is the shared shade recipe (materials.js `deepO`, R1.2b: a green blade in shade to saturation 0.91) laid on
+   four times the blades; its cure is the look director's shared foliage shade (their build lane L2), not this lane's.
+   A floor deepened as a glaze of its own colour (tried first) raised the meadow's darks to 0.52 from 60 m and was
+   changed to the quieter step above.
+7. THE MEADOW FIXES (the coordinator on step 5: "the 'on' still is LESS striking than 'off' near the eye ... small violet
+   asters sprinkled evenly, like confetti"; asked: drifts clustered near the eye, heads bigger and bolder, the bold kinds
+   in every place's near mix). What was done, in the order it was SEEN:
+   - FIRST TRY, NOT GOOD (7fdc02e): one patch field shared by every kind. COUNTED with a Node script over 1,500 random
+     60 m squares of Earth (the scratch `bloomstats.mjs`, its method in the commit): it halved the ground in a drift
+     (meadow 29 -> 19 %, green wood 16 -> 8 %) and the landing had no flower in view.
+   - `bloom.js bloomAt`: the density is BIMODAL, ss(0.06, 0.28) of the product of the fields (a drift solid inside, a
+     short ragged step, almost nothing between: four soft fields multiplied had lain at a middling density everywhere,
+     which IS the confetti); a softer shared patch field (`PT`); drift hearts with a 0.30 step and edge 0.05; sprinkle
+     0.03. COUNTED: meadow 47 % of its ground in a drift (40 % dense), 2 % of 60 m views without one; green wood 25 %;
+     coast 36 %; autumn wood 15 % (its kinds now grow under its open crowns, ramps to 0.88-0.92, and `edge: -0.2`).
+   - THE LANDING always stands in a patch (`bloom.js`: full within 18 m of `S._spawn`, gone by 45 m): the patch field
+     happened to leave the first view's bank bare.
+   - HEADS: `BLOOM_HEAD` 2.0 -> 2.5, a cell's plants in one tuft; NEAR_VERT gives every head (kinds 7-12) a least size on
+     screen, half-width 2.6 px (bells 2.0, spikes and froth 1.4), the whole head grown, as a share per ring (`uNearK.w`:
+     middle 0.85, far 0.6). The middle and far rings lay the drift's own head kind where they laid 1-2 px round touches.
+   - THE BOLD KINDS: the alpine meadow led by the poppy, the ox-eye and a new meadow buttercup (the aster a sprinkle);
+     the green wood's buttercup in every glade (most in the damp) and an ox-eye in the open; the autumn wood's hawkbit
+     bigger.
+   - THE GROUND'S TINT for a flower far round the wheel from the grass (red, violet) is a third as strong (`hueNear`):
+     from 10 m the poppy drifts were rust-brown mud; such drifts are carried by their heads now.
+   - C6 (V > 0.90 at most 4 %): the dense meadow at 1.8 m measured 6.9 %, then 5.7, 3.1 (but the buttercups read as
+     orange marigolds), and 3.8 % with the yellow cups' gold a glaze of lemon over quinacridone gold mixed six tenths back
+     to lemon, their upper part four tenths, and the ox-eye D 0.75.
+   SEEN (`m-*-bloom-off-on.jpg`, `?bloom=0` against on, the f-* cameras): the meadow at 1.8 m is dense drifts of
+   buttercups, ox-eyes, asters and poppies, and from 10 m the drifts read as dots of their colours; the green wood a solid
+   bluebell drift; the landing drifts of violet asters on the bank, goldenrod and hawkbit at the water and the feet. From
+   150 m a few more red and white flecks, no drifts: that still waits for the far-view lane's channel (FV6 with C).
+   lookstats A -> B: meadow 1.8 m S(V<.3) 0.89 -> 0.88, V>.90 2.5 -> 3.8 %; 10 m 0.81 -> 0.77, 0.3 -> 1.3 %; 150 m 0.17
+   -> 0.19; green wood 0.47 -> 0.48; landing 0.47 -> 0.43, 2.4 -> 2.4 %.
+   COST (the scratch overdraw counter, 936 x 372 class, the level eye; the heads' least size replayed): the meadow's near
+   marks 149,344 -> 143,649 fragments (the new flowers replace the old ones); THE LANDING 279,137 -> 352,549 (+73k: +1.5 ms
+   at K2's 20 ns, 0.9-2.6, and about 1.4 times that at the phone's picture), of which the heads' least size is 13.7k. OVER
+   the design's F budget (+1, at most +1.8 ms). The dials: the least size (2.6 px), the landing's patch, a kind's `peak`.
+   RULED by the coordinator: hold the look (the owner's own ask), trim only what does not show: the middle and far rings'
+   least size is 1.9k of the 73k (COUNTED, near ring only against all) and makes the drifts read from 10 m: kept.
+8. THE LOOK DIRECTOR'S NOTES on 7 (a PASS with two notes): the near buttercup drift "one orange carpet": `bloomAt` gives a
+   runner-up kind where its drift is nearly as strong (`out.bloom2`, `out.mix`), a cell is a clump of one or the other,
+   and one cell in three in a drift is grass; buttercups and hawkbits butter-yellow (a glaze of lemon on lemon, hue 51);
+   asters violet (hue 269) and harebells cobalt violet (257). THE CLOAK'S BLUE (CLOAK_BLUES, hue ~226): no head at hue
+   210-240 over S 0.45: the bluebell to hue 249, the gentian (which sat AT 226) to 248; `flora.test.mjs` guards it.
+   Lit heads S <= 0.90 and V <= 0.88, two flat colours, no head bigger than the cloak at 2 m: F's four limits, agreed.
+9. THE YEAR (the coordinator's ruling: build it behind its own switch; no place ever flowerless near the eye; season-true
+   kinds). `?bloomyear=0` off. Each kind `season: [from, to]` on SEASON.t in sevenths and `bold: 1` on the bold kinds;
+   autumn kinds added where a place had none: the ivy-leaved cyclamen and an autumn hawkbit (green wood), the autumn
+   crocus and the hawkbit (high meadow), heather (cliff tops), knapweed for the autumn wood's summer (its hawkbit alone was
+   one yellow carpet). `bloomAt(..., tEval)` chooses for a point of the year and spreads the kinds in flower over the
+   ground the others left (their drift edge lowered by 0.45 of the share out of flower). HELD (`?season=`): one clump as
+   the map says now, and the ground's colour and far marks follow it. TURNING (the game): a cell holds a summer clump and
+   an autumn clump, each packed with its half of the year in iTone's top six bits (`packWin`), a third of the cells one, a
+   third the other, a third both with the room shared; NEAR_VERT thins out-of-window marks one by one (stalks too) and
+   shrinks heads before they go; nothing is laid again. The fine ring's pool +25 % while the year turns. The ground's
+   colour and the far marks do NOT follow a turning year (a colour baked at two moments would seam).
+   SEEN (`y-*`): the year moved from 0.15 to 0.85 in one page (not held): the landing's knapweed and hawkbits give way to
+   asters and goldenrod with asters at the feet; the green wood's bluebells to pink cyclamen up to the feet; the meadow's
+   buttercups and ox-eyes to late poppies and hawkbits with crocus beyond. At ?season=0.85 against ?bloomyear=0 likewise.
+   FIRST TRIES that failed and why: laid one after the other, the summer clump took the whole room (the turning autumn all
+   but bare); held without the spreading, the green wood's feet were bare in autumn. COUNTED in Node, ground in a drift
+   at year 0.15 / 0.5 / 0.85: meadow 56 / 55 / 59 %, coast 50 / 42 / 41, green wood 34 / 23 / 40, autumn wood 16 / 16 / 16.
+   lookstats: V > 0.90 under 4 % in every year still (3.0-3.7 %); S(V<.3) moves 0.02-0.03 at most.
+10. THE LIME (F10, agreed with the look director: the blades' own data, the ground C's, the light F's): `oil.flora.sward.leaf`
+   per biome (the green wood: olive with yellow ochre / olive / olive with hooker's; the autumn wood a step more golden)
+   and `sward.gm` 0.12, behind `?bladegreen=0`. MEASURED, the lit grass of the 1.8 m stills (`l-*`, off -> on): the landing
+   hue 72 -> 61, V 0.72 -> 0.66; the green wood 70 -> 63, 0.71 -> 0.69: inside R2.4's hue and value; BUT S 0.84 -> 0.82 and
+   0.79 -> 0.78, over R2.4's 0.75: it is the ground under the blades (C's palette) and the paint's own richness (F's chain),
+   which the blades' data cannot move. The meadow (no sward.leaf) measures hue 70, S 0.81, V 0.65.
+
+**Tests:** `tests/` 325 of 325, `src/world/` + `src/data/looks/` 65 of 65. `src/physics/` 415 of 416: the one failure is
+`loose.test.mjs` P25 ("under the closed wood the litter still puffs: 2"), which is FLAKY ON THE CLEAN COMMIT TOO (it
+failed 1 run in 5 there with none of this lane's changes): reported to the coordinator, not this lane's.
+
+**Next:** the look director's standard set (S1-S6 at 1024 x 480) with `lookstats.py`; then FV6 (meadows from the air)
+with C (C owns patchgen.js and TERRAIN_FRAG; the bloom channel from `bloomAt` is to be agreed with it). The coordinator
+will put the new flora in front of the owner behind one switch once told. O and F4 wait for the trees lanes.
+**THE SWITCH (the owner, 24 Nov: "No do make it look different"):** the lane is ON by default in the oil look; `?flora=old`
+(also `=0`) is the ONE opt-out, today's flora for comparison. The cull of unseen marks (G1) stays on either way.
+**PROVED** (bc04da1, five gallery views, each world settled before the grab: the autumn wood at 16.8, the alpine meadow at
+11, the green wood at night, the autumn wood from 420 m, the meadow in the watercolour game): `?flora=old` on design-flora
+against look-proto 0d5533b with no switch: 0 pixels differ in all five.
+**Branch state:** design-flora = look-proto v39 d9d9ed7 + this lane's seven files (`git diff origin/look-proto` shows only
+them); ?flora=old proved against v39 too (0 pixels, five views). The coordinator merged design-flora into look-proto for the
+next release after batch 1 of the final set (ACCEPTED by the coordinator, PASS by the look director).
+**THE FINAL SET** (`final-<place>-<height>-<season>-old-new.jpg`, ?flora=old above, the default below, ?season=0.15 and 0.85,
+the f-* cameras): the autumn landing, the meadow (and from 150 m), the green wood, the coast, the wetland, at 1.8 m and 10 m.
+Folded in while it was taken: under v39's brighter light the yellow, scarlet and white heads a step deeper for C6; past the
+near ring the runner-up kind a fifth of its share (the look director: no confetti at 10-30 m) and whites from the far ring a
+step deeper (no paper flecks at 150 m); a yellow cup's upper part its own yellow deeper, no gold (the coordinator: near
+buttercups leaned orange), the marsh marigold and yellow flag the same; the cotton grass a soft grey-white, fewer. Every
+still of the set inside C6 but the landing at 10 m in autumn, 4.2 % (4.9 % in the old picture) and the coast (25 %, 30 % in
+the old: its cliffs and sea). A2 (trees near) counted the lane at the landing: 26,928 marks against 12,967, 357k fragments
+against 272k (the rebuilt middle band halves today's 176k to 92k); its rows in ?bench=foot price it on the phone. A2's hooks
+(NEAR_VERT uNearCut, NEAR_FRAG flat mode 8) are to be kept when they reach look-proto.
+A lesson recorded: af83f25 copied data/looks/earth.js from a scratch copy older than a merge and dropped the look director's
+`airTop` (found by the 420 m proof, fixed in 2f779d8); never copy a whole shared file over a merge, apply the lane's diff. ASKED OF THE FAR-VIEW LANE through the coordinator: a ground dab that takes a drift's colour WHOLE
+(pointillist) from `bloomAt`, the one thing that would make drifts read from 150 m and a mile.
 
 ## Hand-over of THE FAR TREES (trees lane A1, branch `trees-far`; kept current by that session)
 
@@ -12,10 +330,68 @@ FV7 of `docs/lead/FARVIEW-DESIGN.md`. A second session (A2, branch `trees-near`)
 the same time: this lane touches only the far parts of `flora.js`, `florakit.js`, the plant material's far branch,
 `render/impostor.js`, `render/shadow.js` and new rows in `core/bench.js`.
 
-**State (update this line every step):** T0 committed (rows built and run in software: they work; their timings mean
+**State (update this line every step):** (24 Nov, about 14:35) SMALL CROWNS ARE THE DEFAULT (`?impsmall=0` the old
+way), after F passed them with its colour fixes; look-director at 64f1742 merged into trees-far on the coordinator's
+word (8f3848d; the impostor.js conflict kept my azL line and added F's pcSummerTree line). SEEN on the real branch,
+phone settings, autumn wood 15.4 h, roof on (`A1_small_default_*`): 1 km, the impostor zone hue 92 S 0.36 V 0.56 with
+?impsmall=0, hue 85 S 0.46 V 0.68 by default, C's roof past the reach hue 77 S 0.46 V 0.74; 150 m V 0.48 -> 0.51,
+pixels under V 0.3 29 -> 26 percent; the same to 2/255 as the scratch measurement. Goes into v39.3. Before that: look-proto v39 (d9d9ed7) merged into trees-far and
+pushed (my far trees compile under the new light: guard not tripped, swap 21 ms). NEXT, ON THE COORDINATOR'S WORD
+"v39.2 is on look-proto" (it carries F's colour fixes, look-director up to 64f1742): merge origin/look-proto, make the
+small crowns the default (IMP.small 12, ?impsmall=0 the opt-out), run the 1 km seam check F asked for (hue and
+saturation of the impostor zone against C's roof), push, tell F and the coordinator. Do NOT merge look-director into
+trees-far (the coordinator). MEASURED under v39, phone settings, 1 km, roof on: rule off V 0.65 S 0.35 hue 80, rule on V
+0.75 S 0.42 hue 78, the roof past the reach V 0.68 S 0.37 hue 70 (the new air lifts the darks: no pixel under V 0.3
+either way). The same with F's colour fixes is being measured in a scratch copy (`ld`, never pushed). T6 extra (the
+coordinator): the split trees drawn whole in the shadow pass behind `?shwhole=1` (OFF), row 'split trees whole in
+shadow pass'; MEASURED on foot with ?trees2=1: 226 -> 207 draws (every visible casting split mesh), picture
+byte-identical; the default is the coordinator's call. The bake fix's 1-2/255 difference: accepted by the coordinator.
+Scratch worktrees removed. URGENT FIX DONE for v39.1 (the coordinator): during
+the bake over frames the far wood was gone; now today's far trees stand in until the bake is done and hand over in that
+frame (flora.js impWant / impOn, _impReady; impostor.js step(), onReady, bakeTick), the bake counts as busy from the
+frame it is asked for. SEEN, gallery autumn wood 16.8 h on foot, phone settings: mid-bake (step 5 of 78, not ready,
+busy 1) today's far trees across the river, 5,915 drawn, 0 impostors; after (78 frames, 10.7 s of bake in software) the
+swap in one frame, 20.4 ms here, then 4,920 impostors and only the 1,068 conifers in today's form on foot (no tree
+drawn twice, no impostor kind left in today's form), page ready only then; 400 m up 83,520 impostors
+(`A1_bake_foot_mid_vs_after.jpg`, `A1_bake_after_air400.jpg`). Before that: SMALL CROWNS IN TWO STEPS built behind `?impsmall=1`
+(OFF by default), as F ruled (11:07): at a view of 12 texels or fewer the strokes facing the sun take the cap's level and
+the rest exactly one level under it, no stroke jitter, no inner shade; 24+ texels and the conifer core untouched. SEEN
+at phone settings with C's roof (`A1_small_*`): 150 m the far crowns a lit mass and a mid shade instead of lit/black
+confetti, near crowns unchanged; 1 km the wood V 0.49 -> 0.75 (the roof past it 0.74), pixels under V 0.3 37 -> 7
+percent, so the value step at the seam is gone, but the wood is now a bright lime, S 0.80 against the roof's 0.50 (the
+lime-not-olive question, F's). Desktop A/B (1920x1080 tier 2) being shot; then to F for the ruling on the default. All
+speed-test alpha-0 writes in materials.js now write 1 (coordinator's leave). Coordinator: v39.1 (impostor default +
+guard) is in its gate on look-proto; merge origin/look-proto when told. look-proto 0d5533b merged into
+trees-far (1ecf744, pushed). SEAM, SEEN in a scratch merge of trees-far with C's branch farview (d720b02, never pushed),
+phone settings 936x372, autumn wood 15.4 h, impostors drawn in marker colours (?impdebug=1) and A/B ?canopy=0 / 1
+(`docs/shots/painter/trees-far/A1_seam_*`): the impostors' reach is the horizon or nearly at 150 m (farScale 1.75,
+about 1,050 m; horizon 1,106 m) and at 400 m (2.5, 1,500 m; horizon 1,833 m): the roof alone is under half a percent of
+the wood there, so no seam. At 1 km (farScale 3, 1,800 m; horizon 3,000 m) the roof alone carries a ring at the disc's
+edge and the change is plain: MEASURED inside the reach V 0.49 with 37 percent of pixels under V 0.3, the roof-only band
+V 0.74 with none; the roof alone over the same zone (impostors not drawn) V 0.68, 12 percent. The darks are the
+impostors' own leaf strokes at the two coarsest levels (84 percent of their pixels at 1 km; trunks 3, conifer cores 5),
+each crown of 1-3 px still split into a lit stroke and a shaded one: the confetti R1.3c forbids, and what C's roof
+avoids by taking a crown smaller than a dab to its mean light. So the seam and the crown-size note are one fix. Inside
+the reach C's roof replaces the yellow and orange leaf floor between the trees with crowns (V unchanged, 0.50 to 0.49).
+Also FIXED (0c873ea): the debug colours and the speed test's flat rows wrote alpha 0, which with alpha to coverage
+laid nothing on a multisampled picture (the first marker stills showed no far tree; the far flat row measured less than
+it said); the plant program's own rows 2 and 4 outside the far branch still write 0 (not this lane's; told the
+coordinator). Waiting: F on the crown-size note; C on the seam. THE IMPOSTORS ARE THE DEFAULT FAR TREES of the oil look (after F passed the
+grain fix on foot and from the air, and the owner's phone timed them: 150 m up 151 ms -> 16.7, the screen's cap);
+`?fartree=old` (or cards, lump, blob) is today's far tree. THE GUARD (`render/impostor.js` probe / fail): before the first
+bake step the impostor program is compiled on a one-tree mesh and three's own diagnostics read; a compile failure, a
+bake that throws or an atlas that comes out empty puts the far tier back to today's form (and the hand-over as it was)
+and the console says '[painted cosmos] far impostors off, today's far trees instead: <why>'. PROVEN in headless Chromium
+with `?impfail=compile` and `?impfail=bake`: impFailed set, 0 impostor trees, 5,915 trees in today's form. Row 'no
+shadows at all (400 m up)' added to `?bench=trees`. Earlier, after the look director's review: the grain fix (cb5666f), the bake in steps
+(7a48921) and the far wind (`?farwind=1`) committed; impostors still behind `?fartree=impostor`, waiting for the owner's
+`&bench=trees` table and F's verdict on the grain crops. Before that: T0 committed (rows built and run in software: they work; their timings mean
 nothing here, only the owner's phone can time them). T1 (impostors) committed behind `?fartree=impostor`, SEEN in A/B
 stills at the phone's and the desktop's settings (`docs/shots/painter/trees-far/`); not yet the default (waits for the
-owner's phone: `&bench=trees` has the row). Next: T4 (hand-over distances), then T6. Nothing merged.
+owner's phone: `&bench=trees` has the row). T4 committed: with the impostors on, the middle tree hands to the impostor
+at 45 m (was 57); the near hand-over stays at 27 m (18 m waits for A2's middle tree). T6: the impostors' own shadows
+from the air built behind `?impshadow=1`, NOT the default (the low-sun A/B is mixed); T6's main part, cheaper shadows of
+the near and middle trees drawn as clusters, waits for A2's cluster trees. Nothing merged.
 
 **T0, the speed test's tenth form (`src/core/bench.js`).** `?bench=1` the whole table with the new rows; `?bench=trees`
 the tree questions alone, on foot and from the air (24 rows); `?bench=air` or `?bench=air,<m>` the air table (FV7: 400 m
@@ -49,18 +425,76 @@ fragments runs the lookup before it is discarded, while a leaf polygon covers ex
 done in the vertex shader. Cards save 3,000-5,000 triangles a tree. Told to the coordinator; so BOTH forms are built and
 the phone prices both in one run.
 
-**What is built (all behind `?trees2=`; without it every tree is what it was):**
-- `?trees2=1` (or `split`): the near AND middle trees drawn by TWO SHORT PROGRAMS (`materials.js` `WOOD_FRAG`,
+**STATE ON 24 NOV, LATE (the owner's phone priced the forms: two short programs 40.3 ms a frame, no near trees at all
+36.6; cards dropped).** The two short programs are THE DEFAULT in the oil look; `?trees2=0` gives the trees as before
+(SEEN pixel-identical to the previous default, `1d7e54f`, at 5 and 10 m). A GUARD: if a device cannot link either
+program, every tree goes back to the one program at once and the console says why (`materials.js TREE_GUARD`, checked by
+the painter after each frame, `render/index.js`; `flora.js update` falls back). PROVEN in headless Chromium with
+`?trees2fail=wood` (or `leaf`), a test switch that puts a line that is not GLSL into that program: in the GAME
+(`/?look=oil&quality=1&body=earth&time=14&trees2fail=wood`) three logged the four broken wood programs at 57 s (its own
+`THREE.WebGLProgram: Shader Error`, with the material's name and the compiler's line), the guard's warning followed in
+the same second, and by the next look every tree mesh was the one program (25 of them, none of the two), no other
+error; in the gallery, both `wood` and `leaf` give a still PIXEL-IDENTICAL to `?trees2=0` at 5 m once the trees have
+been built again. THE BARK'S STREAK CONTRAST (the look director's note: at the 5 m trunk crop the split's streaks were
+flatter and less broken than today's) is today's again: SEEN, the cause was the SIDE TAKEN OFF EVERY TUBE, not the
+programs and not the hair twigs (the split programs on today's tubes match today to 0.11 of 255 in the trunk crop; with
+the hairs back and the side still off it was 4.5), so every tube keeps today's sides (near trees in the sample: 114,712
+triangles against 110,874 with the side off, today 146,800). New default against today: mean difference 0.31 of 255
+at 5 m and at 10 m (was 2.0 at 5 m with the side off). Stills: `A2_default_*`, and the crop
+`A2_default_autumn-phone-5m-trunk-x3_*` (today | the default now | the first split). The wood program also lays the
+two layers as the big program did, each at its own light (it made a small difference, about 9,000 pixels, 0.08 of 255).
+
+**MERGED v39 (look-proto, 24 Nov): the new light.** The split's leaves follow the look director's L2 shade with no line
+of their own (their paint is made in `PROP_VERT`, shared with the one program; `LEAF_SUN`'s `pcLeafDeep` is now
+`pcShadeLeaf`). The WOOD program needed one change: v39 lights the big program's bark by the ONE LIGHT (L3, `pcLit`,
+picked by `uLookF.z`, on by default; `?light=old` turns it off), so `pcWoodLevel` and the wash under the layers now take
+it the same way. SEEN at the phone's settings, autumn wood 16.8 h: under v39's light the default against `?trees2=0`
+is 0.30 of 255 at 5 m and at 10 m (0.31 with `?light=old`, as before the merge); the new light itself moves the
+picture by 1.7, so the wood follows it; `?light=old&trees2=0` is pixel-identical to the still before the merge. Stills
+`A2_*-v39_*`. (The cards' own program, `CARD_FRAG`, does not take the one light: cards are dropped.)
+
+**ON FOOT TO UNDER 33 ms (the coordinator's job, 24 Nov, after the ground from the air was found to hold no 30 ms:
+the v38.2 table had the whole 400 m frame at 17.9 ms with impostors, ground included).** DERIVED from the phone's own
+rows: v39.1 (split trees + impostors) is about 22 ms on foot (40.3 split - 18.5 old far trees + 0.7 impostors; and
+'no trees' was at the 16.7 cap in v37, so all that is not a tree fits under 16.7). Never timed together: the owner's
+next table decides. Built for that table: `?bench=foot` (core/bench.js), the frame on foot without the trees'
+questions, and THE NEAR GRASS AND FLOWERS' FIRST ROWS (in the full table too): 'no near grass or flowers', 'near
+grass: half its marks' (`materials.js NEAR_VERT uNearCut`, folded away before any is rasterised, by place in
+half-metre cells so a flower plant of several marks goes whole, the flora lane's ask; at 0, the default, not worked
+out at all), 'near grass one flat colour' (`uOilL.y` 8 in `NEAR_FRAG`). Also fixed: my wood
+program honours the flat mode 7, so 'near bark one flat colour' measures the split's bark. SEEN: the default still
+pixel-identical to before; each mode acts (half: fewer blades and leaves; flat: every mark in its flat wash; bark flat).
+The speed test's panel now lists the three tests (trees, air, foot) with their addresses and how to send each.
+STANDING BY (24 Nov, 13:10) for the owner's three tables (bench=trees, bench=air, bench=foot on v39.2): no cut is
+built until they show where the on-foot frame goes. COUNTED (Node, landing, phone tier 1, 936 x 442, on foot): the near grass today 12,967 marks (fine ring 6,941, middle
+4,333, vista 1,693), 38,901 triangles, 272k fragments rasterised, 107k pixels covered, about 110k painted after the
+depth test; the flora lane's branch (design-flora e55f6cc) 26,928 marks (fine 15,608, carpet 6,460, middle 3,167),
+80,784 triangles, 357k fragments, about 172k painted after the depth test.
+
+**COUNTED AT THE LANDING after v39 (Node, the scratch copy of `tools/overdraw.mjs`, `where=spawn`, phone tier 1, the
+counter's 787 x 443 = 0.348 Mpixel at fov 55, on foot; `?trees2=0` against the default):** near wood 71,504 -> 39,920
+triangles, near leaves 47,110 both, middle trees unchanged (wood 21,310, leaves 34,356: the middle tree never had hair);
+the whole frame 1,509,543 -> 1,477,959. Wood fragments rasterised (only the faces seen are drawn now): near 111,117 ->
+56,581, middle 39,873 -> 24,250. Tree fragments painted: the old program discards, so it cannot test depth first
+(about 379k: every fragment of the near and middle trees); the split, with the depth test first in three's own order,
+about 148k (simulated). DRAW CALLS: near 11 -> 22, middle 18 -> 36 in the colour pass, and as many again for each of
+those meshes inside the shadow square (three draws a mesh with two materials group by group even under the shadow
+pass's one material): up to +58 a frame. All of that was already in the phone's 40.3 ms; since then only +3,128 near
+wood triangles (the sides kept), 0.2 % of the frame. (A shadow-only mesh of one material per split mesh would take the
+shadow pass back to one draw a tree mesh; not built: the shadow pass is A1's.)
+
+**What is built (the oil look only; `?trees2=0` puts every tree back as it was):**
+- THE DEFAULT (was `?trees2=1`): the near AND middle trees drawn by TWO SHORT PROGRAMS (`materials.js` `WOOD_FRAG`,
   `LEAF_FRAG`, chosen by `makePropMaterial(..., { tree: 'wood' | 'leaf' })`), over two groups of one index (wood, then
-  leaves; `flora.js` `splitGroups`), with the near tree's haze of HAIR TWIGS NOT BUILT and a side fewer on every tube
-  (`kits/grove.js`, `trees2`; the hairs were 1,072 to 2,500 triangles a tree). THE SAME TREE: every random number is
-  still drawn, so the skeleton and every leaf are where they were (`src/world/trees2.test.mjs` holds it).
+  leaves; `flora.js` `splitGroups`), with the near tree's haze of HAIR TWIGS NOT BUILT (`kits/grove.js`, `trees2`; the
+  hairs were 1,072 to 2,500 triangles a tree). THE SAME TREE: every random number is still drawn, so the skeleton and
+  every leaf are where they were, the trunk to the bit (`src/world/trees2.test.mjs` holds it).
   The leaf program has NO DISCARD and no alpha to coverage: the lens window, the explorer's window, the wash and the fire
   drop WHOLE LEAVES in the vertex shader (`PROP_VERT`, `PC_TREE_LEAF`), so the card can test depth before painting. The
-  wood program paints a pixel from TWO streaks (its own and the one at its edge) with ONE light at the streak's centre
-  and two tones, where the old program toned every streak of two layers and a wash under them; it pinches a branch in
-  round the lens (`PC_TREE_WOOD`, with `Builder.axis`: a tube's ring carries its centre in `aCard`) instead of
-  discarding, and lays the branches of a wash one by one.
+  wood program lays the bark's two layers of streaks as the big program did, each at its own light, leaving out only
+  the flat wash the coarse layer covers whole and the fine layer's work where neither of its streaks is there; it
+  pinches a branch in round the lens (`PC_TREE_WOOD`, with `Builder.axis`: a tube's ring carries its centre in `aCard`)
+  instead of discarding, and lays the branches of a wash one by one.
 - `?trees2=cards`: the same wood, and the near tree's leaves as CLUSTERS ON CARDS (`kitbuild.js clusterCard`, part 7;
   one six-cornered card where a clump of leaves hung; its chart in DAB CELLS so the shader needs no number of the
   kind's own). The leaves on a card are the ground's own baked dab layer (`dabtex.js SPRAY_GLSL`, shared by the card's
@@ -70,8 +504,10 @@ the phone prices both in one run.
 - `?treedepth=1` (with `?trees2=cards`): package T5. The cards are drawn in DEPTH ONLY before the scene
   (`render/index.js treeDepthFirst`, `materials.js TREE_DEPTH`), then in colour where the depth is EQUAL, with no discard
   and no alpha to coverage; `invariant gl_Position` keeps the two passes' corners identical.
-- Speed-test rows (`core/bench.js`): 'trees: two short programs', 'near trees as clusters', 'clusters with a depth pass
-  first', each swapped in while the test runs (`flora.js setTrees2(mode, depth)`).
+- Speed-test rows (`core/bench.js`): 'trees in one program as before' (it reads 'trees: two short programs' when the
+  run starts with `?trees2=0`), 'near trees as clusters', 'middle trees as clusters', 'clusters with a depth pass
+  first', each swapped in while the test runs (`flora.js setTrees2(mode, depth)`; after the guard has fallen back only
+  the one program is given).
 - Hunks in files of other lanes, each small and said in the commit: `shadow.js` (a card's shadow through its spray;
   cards thinned as leaves), `core/bench.js` (the rows, and its helpers now see a mesh with two materials).
 
@@ -91,9 +527,91 @@ the phone prices both in one run.
 - NOT KNOWN: what the two short programs save on the phone (the design's reading: the bark's long program in every
   near-tree wave; only the bench can say), anything in motion, anything on a real graphics card.
 
+- T5 SEEN: with no multisampling, as the phone draws (`?aa=0`), the cards with and without `?treedepth=1` are
+  PIXEL-IDENTICAL (0 pixels of 348,192 differ at 5 m and at 10 m). With multisampling (the gallery's tier 1 in
+  software) they first differed at leaf edges only, because the painter's loop forced alpha to coverage back on for
+  the colour pass (fixed: `render/index.js` leaves the trees' programs alone).
+- DESKTOP top tier (1280 x 600, quality 2, full paint), autumn wood, 5-45 m: `?trees2=1` equals today (lookstats to
+  the hundredth; bark warm-streak share 0.259 against 0.257). Committed: `A2_*_autumn-desktop-*`.
+- THE WOOD DRAWN BACKSIDE (half the wood rasterised): the same picture as DoubleSide once its facing is kept
+  (`PC_WOOD_FLIP`): B2 against B at the phone's settings, mean difference 0.13 of 255. FOUND ON THE WAY: every tube
+  in the kits is wound with its front facing INWARD, so today's bark is lit with its normals pointing into the trunk
+  (the sun side painted as the shade side). Told to the look director; not changed.
+- THE GREEN WOOD (the birches, noon, phone settings, 5-45 m): `?trees2=1` equals today (mean difference 0.31-0.96 of
+  255). The first still after the camera's jump from the spawn differs in its leaves as much as its bark in BOTH A
+  and B (a settling transient after the jump, not the programs); taken after a warm-up frame, 5 m is 0.34.
+- THE SWITCH OFF IS THE PICTURE BEFORE, TO THE BIT (LOOK-RULES R6.1): the look director's S1 (the stream at 16.8 h,
+  1024 x 480) drawn by this branch with no `?trees2` against the same still from the commit the lane started from
+  (`a54173a`, served from a worktree): 0 of 491,520 pixels differ. S1 and S2 with `?trees2=1`: lookstats identical,
+  mean difference 0.72 and 0.18 of 255 (`A2_split_S1-*`, `A2_split_S2-*`).
+- Cards with the denser spray (SPRAY.pres 0.9): still sparser than today at 5 m (`A2_cards-pres09_*`); more cards would
+  close it at more cost. Left there until the phone says cards are worth anything.
+
+**How the stills are made** (the tools are scratch, not committed; recreate from this): `tools/lab.mjs serve`, then
+open `/gallery.html?body=earth&biome=autumn_woodland&season=1&cam=trees&time=16.8&look=oil&lite=1&quality=1&t=0&ui=0&fov=58`
+(+ `&trees2=...`) at 936 x 372; eval a helper that picks the tallest tree within 30 m of the first camera place
+(`world.sampleObstacles`) and sets `__pcGallery.state.pos/yaw/pitch` to stand d metres from it, eye 1.7 m, aimed at
+0.55 of its height; `resume`, wait for `world.busy === 0`, `grab out.png 3`. THE GREEN WOOD is not reachable by
+`?biome=temperate_forest` in the oil look (the first two sites swap: that address lands in the autumn wood); use the
+world's own `findBiome('earth', 'autumn_woodland')` stand, which in the oil look IS the green wood.
+Counts: a copy of `tools/overdraw.mjs` with `QUALITY.level` from the environment (1 is the phone's tier), material
+arrays counted group by group, part 7 thinned as a leaf, `where=spawn` (the spawn is the autumn wood of grove trees;
+its `where=autumn` stand is the green wood's broadleaves, where `?trees2` changes no geometry).
+
+**`?treesway=whole` (the coordinator's ask for a cheaper sway, 24 Nov):** the NEAR trees bend whole, as the middle trees
+already do (T3), without PHYSICS' per-branch crown (`pcPhysCrown`: two field lookups, 24 sines, 4 powers, 3 arctangents
+a vertex). Built as the near tier being given the middle tier's own programs (`-mid`, branch off; each mesh sets its
+tier's ranges before it is drawn, so one program serves both). With the two short programs only. Speed-test row 'near
+trees bend whole (no branch sway)' (`flora.js setTreeSway`, `core/bench.js`). SEEN: compiles and draws; the near
+programs are the `-mid` ones and swap back; the still at rest is PIXEL-IDENTICAL to the default (the gallery's held clock
+has no wind, so no still can show the sway): HOW IT LOOKS IN MOTION IS NOT KNOWN, only the owner's phone can show it.
+Note for the bench: the 9.5 ms 'near trees: no wind in shader' row cuts the wind of every tall material, the middle tier
+too, and the middle tier lost its crown sway with the split already; that row wants running again on the split default.
+
+**Next:** when the look director's
+L2 is final, merge `origin/look-director` and have the split's leaf paint call the same `pcShadeLeaf` (`LEAF_SUN`'s
+`pcLeafDeep` sits on those lines). Keep `PC_WOOD_FLIP` on (today's inside-out bark facing) until the look director
+settles it. NOT KNOWN: the guard on a real phone's driver (it rests on three's own link check, which is on by default
+and which nothing in the game turns off), anything in motion.
+
+(A1, the far trees lane, kept its T1 note here in look-proto; it is theirs and kept as they wrote it:)
+
 **Next:** A/B stills (5/10/18/30/45 m, autumn and green wood, phone and desktop) -> commit T2 split -> stills of cards
 and T5 (pixel-identical check) -> commit -> T3 (the middle tree) -> report each step to the coordinator and the look
 director (session_01R5Brhzz2JPPF6Ecz6XRQHx).
+**THE FAR WOOD IN THE WIND (`?farwind=1`, the weather group's far wind field).** With it the impostor material takes the
+plants' physics uniforms (`PHYS`, shared) and its vertex shader leans the quad over the tree's foot by `pcPhysBendLite`
+(one bend a tree, read at its foot; stiff 1), so the top moves and the foot does not. Today that function reads the bend
+field near the eye; once the look director binds `uPhysFar` (look-director shared.js) and the weather group's
+flora.glsl.js lands, the same call reads the far field beyond 128 m with no change here. SEEN only as a still (with
+`physics=1`): the impostors draw whole and lean a little; motion is for the phone. Row: 'far trees still in the wind'
+(on foot and 150 m up), which sets the impostors' own `uPhysOn` to 0.
+
+**THE BAKE IN STEPS (`ImpostorAtlas.bake(renderer, budgetMs)`).** One step is one tree at one level: its 64 views drawn
+into its own square of the target and that square read back (at most 2.4 MB) into the level's array. The frame hook runs
+as many steps as fit in 4 ms of a frame (`?impbake=<ms>`, 0 = all at once, which the stills here use), always at least
+one; the impostors draw nothing until the last step (Earth: 13 trees x 6 levels = 78 steps). CHECKED: baked step by step
+it is byte for byte the one-shot atlas (0 of 50,319,360 bytes differ); here a step is about 0.13 s of software drawing.
+On the phone the steps' time is not measured; with one step a frame the far trees come in after 78 frames at worst.
+
+**THE GRAIN FIX (after the look director's review of T1, 24 Nov; it supersedes the T1 paragraph below where they
+differ).** Every leaf of a stroke now takes the stroke's ONE normal (the crown's front surface) and ONE inner shade, and is
+written at the stroke's own depth, so overlapping strokes are laid whole (no texel of the one behind pokes through);
+strokes 4.5 texels (so at least 2.5 px at the phone's level; `?impstroke=`); half the inner shade a stroke's depth gives
+(`?impdeep=`) and 0.35 of a near leaf's light jitter (`?impjit=`), so a crown reads as a lit mass and a shaded one; no
+read of the shadow map (a texel's place would cut a stroke at a shadow's edge); the silhouette by COVER: the four texels
+round the point weighed bilinearly, nothing laid under a half (a quarter on a multisampled picture, with alpha to
+coverage), so the outline is a smooth line at the pixel, not stair-steps (4 fetches a fragment instead of 1); the shade
+through the shared `pcShadeLeaf` wherever chunks.js has it (look-director c4306fc; detected in the text, else pcTone);
+nothing of a crown under V 0.18 (the ruling for the darkest conifer); the level a stroke is read from is coarser on a
+taller picture (about 3.5 px at 1080 lines, not yet seen on a desktop). ON FOOT the conifer kinds keep today's far form
+(their dark spikes, which the look director judged better on the skyline) below 40 m of height and become impostors
+from the air; the broadleaves are impostors at every height (`?impfoot=all|none`; flora.js tier 4 = far as impostor).
+MEASURED (phone, 150 m): lit crowns hue 67, S 0.60 (ruling: under about 80 and 0.75), but V 0.91 (R1.2c's lit canopy
+0.60-0.82: the lit step of the shared data colour, not a gain of the impostor's); V under 0.18 1.4 % of the picture
+(today 13.5 %); S(V<0.3) 0.35 -> 0.16. On foot the frame is 719k triangles (all impostors 609k, today 1,247k): the
+conifer cards cost about 145k. Stills `A1_grainfix_*`, 3x crops `A1_grainfix_crops_3x.jpg`.
+
 **T1, far trees as painted impostors (`src/render/impostor.js`; `?fartree=impostor`).** For every kind drawn far off as
 leaves (`CAN_CARD`), its lod-0 tree (one variant; `?impvar=2` two) is baked once per world, in a frame hook the first
 time an impostor is drawn (the painter's hooks run outside a render; the renderer is handed over by the first impostor
@@ -129,6 +647,35 @@ STILL WRONG / NOT KNOWN: the view switches (about 13 degrees apart, nearest, no 
 seen in motion; the hard edge where the trees end 1 km up (the far-view lane's painted canopy, FV2, is meant for it);
 the darkest conifer strokes are V 0.13 (R1.2c asks 0.18 for conifers); the hand-over at 57 m to the middle tree (T4);
 the bake is one long step at the first far draw (could be spread over frames).
+
+**T4, the hand-over distances (`flora.js` `setHandover`, `?treenear=` / `?treemid=` in metres at the phone's scale).**
+The full tree's and the middle tree's reach (T0 90 m, T1 190 m before the picture's scale) are per world now
+(`flora.t0`, `flora.t1`; the leaves-by-distance schedule reads `t0` as it is drawn, so they can move while the game runs;
+`shadow.js` `SHADOW_TIERS.mid` follows). With the impostors on, the middle tree stops at 45 m at the phone's picture
+(was 57) and the impostor takes over there; without them nothing changes unless the address says so. The design's full
+tree to 18 m is NOT taken by default: SEEN, with today's middle tree a tree 15 to 20 m off turns into an umbrella of
+big kites (`A1_handover_near18_phone.jpg`); it waits for the near lane's new middle tree (`?treenear=18` tries it).
+SEEN at 45 m (`A1_handover_stream_15h_{A,B}_phone.jpg`, `A1_handover_bank_3x.jpg`): the 40 to 57 m band of the far bank
+becomes impostors that match the ones behind them. Found and fixed on the way: a young oak at 50 m drew as a bare stump
+-- each quad stood 0.35 of its radius toward the eye, so a big neighbour's quad came out nearer and hid the small
+tree's crown; quads now stand at the tree's middle (`IMP.push` 0, `?imppush=`), and the limbs are kept to the third
+level (left out from the second, a small tree's crown floated over its trunk); `A1_impostor_stumpfix_4x.jpg`.
+COUNTED (phone, gallery, on foot, impostors on): middle tree to 57 m 651k triangles, 194 calls; to 45 m 609k, 178 calls.
+DERIVED: the middle trees from 45 to 57 m, about 42k triangles a frame at 0.043 to 0.124 ms per 1000 (the skeptic's
+range) and their pixels painted by the impostor instead: about -2 to -6 ms. Rows: 'middle trees only to 45 m',
+'trees hand over at 18 / 45 m', 'impostors from 45 m' (the package as `?fartree=impostor` ships it).
+Debug: `?impdebug=1` paints each impostor texel flat by what it is and the level it was read from.
+
+**T6, the impostors' shadows from the air (`render/impostor.js` `makeImpostorShadowMaterial`; `?impshadow=1`).** Above
+60 m (where no near or middle tree stands in the shadow square) each far impostor mesh joins the shadow pass's own list
+(`SHADOW_CROWD`, as the animals do) with a shadow twin: the quad turned to face the SUN, the baked view nearest the
+sun's direction read at the map's own texel, a third of the crown's strokes casting (`uThinLeaf`, as a near crown). SEEN
+at 17 h (`A1_impshadow_{air150,air400}_17h_{A,B}_phone.jpg`, `A1_impshadow_air150_2x.jpg`): plum shade lies beside the
+crowns in the glades and along the river banks, but the canopy as a whole gets darker (lookstats V median 0.51 -> 0.42 at
+150 m) and at 400 m the gain is slight. Not clearly earned, so OFF by default; the look director and the owner to rule.
+COUNTED: +33 calls and +48k triangles at 150 m, +41 calls at 400 m (the shadow pass's fragments not measured).
+T6's main part (the near and middle trees casting as clusters with the spray's coverage, about -0.8 ms) needs A2's
+cluster trees first.
 
 ## Hand-over of THE OIL LOOK, prototype on branch `look-proto` (READ THIS FIRST; kept current)
 

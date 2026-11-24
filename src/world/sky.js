@@ -65,6 +65,8 @@ uniform vec4 uOilG;
 uniform vec4 uOilS;         // x: how far the far air leans to the blue-violet of the owner's aerial references
 uniform vec4 uSkyOil;       // x cloud shaping, y the ceiling on the sky's value, z the cloud's lit side (the dials above)
 uniform vec4 uSkyAir;       // x: how far the lowest band is the land's own air   y: how high that band stands (dot(view, up))
+uniform vec4 uLookN;        // w: the air from the air (L5; render/shared.js OIL.uLookN, set by world/index.js)
+uniform vec4 uLookG;        // x: the golden hour's sky painted by direction and in bands (render/shared.js OIL.uLookG)
 #endif
 
 vec3 dens(vec3 c, float d) { return clamp(c - (c - c * c) * (d - 1.0), 0.0, 1.0); }
@@ -151,9 +153,14 @@ float pcAirGold(float sunE) {
   float moon = (1.0 - uAtmo.y) * (1.0 - uAtmo.x);
   return (1.0 - smoothstep(0.48, 0.86, sunE)) * uAtmo.y * (1.0 - moon) * (1.0 - uWxSky.x) * uOilG.w;
 }
-vec3 pcSkyAir(vec3 h, float sunE) {
-  vec3 warm = mix(pow(h, vec3(uOilC.x)), vec3(0.95, 0.85, 0.63), 0.75 * pcAirGold(sunE));
-  return mix(warm, vec3(0.48, 0.50, 0.63), uOilS.x);
+vec3 pcSkyAir(vec3 h, float sunE, float sd, float lk) {
+  // (L5: from the air, the gold toward the sun and the blue-violet away from it, as the land's far air: chunks.js
+  // pcAtmosV. sd is dot(view, sun); lk how far it applies -- uLookN.w for the AIR the land ends in (the band under the
+  // horizon and the lowest band laid last), 0 for the sky's own bands above it: laid through them it flattened the
+  // painted sky from a mile up into one periwinkle (seen). On foot uLookN.w is 0 and this is the band as it was.)
+  float side = smoothstep(-0.4, 0.7, sd);
+  vec3 warm = mix(pow(h, vec3(uOilC.x)), vec3(0.95, 0.85, 0.63), 0.75 * pcAirGold(sunE) * mix(1.0, 0.45 + 0.55 * side, lk));
+  return mix(warm, vec3(0.48, 0.50, 0.63), clamp(uOilS.x * mix(1.0, mix(1.5, 0.45, side) * 1.2, lk), 0.0, 1.0));
 }
 
 // NOTHING IN THE SKY IS PAPER WHITE any more, the sun's own disc and the light close round it apart. Measured on the
@@ -209,7 +216,14 @@ vec3 pcAuroraLight(float az, float e, float e0, float hgt, float fold, float wob
 void main() {
   vec3 d = normalize(vDirL);
   vec3 up = normalize(uCamL);
-  float e = dot(d, up);
+  float e = dot(d, up), eR = e;      // (eR: the true dot(view, up), for what is placed by geometry -- the cloud sea, the aurora's and the rain's directions)
+  #ifdef PC_OIL
+    // (THE AIR'S TOP, world/index.js AIRTOP: from the air the bands, the strokes and the low air band are laid from the
+    // TRUE horizon, which stands uSkyAir.z below level (as dot(view, up); 0 on foot and over the wood, where nothing
+    // changes). From a mile up on Earth it is 44 degrees down, and everything between it and level was one flat band
+    // of haze. Mapped so the true horizon reads 0 and the zenith still 1.)
+    if (uSkyAir.z < -1e-4) e = (e - uSkyAir.z) / (1.0 - uSkyAir.z);
+  #endif
   float sd = dot(d, uSunDirL);
   float sunE = dot(uSunDirL, up);
 
@@ -246,8 +260,8 @@ void main() {
     // On its own this closes almost none of the seam - the sky's own density, warm band and ceiling are laid over
     // it afterwards - which is why the band at the very bottom is laid again, last of all, at the end of this
     // shader. This keeps the HUE of the two the same all the way up the lower sky.)
-    vec3 airO = pcSkyAir(uHaze, sunE);        // what the far land ends in: chunks.js pcAtmos, on the same haze key
-    vec3 bandO = mix(mix(pcSkyFar(uSkyHorizon, uOilS.x * 1.35), uSkyHorizon, 0.18), pcSkyAir(uSkyHorizon, sunE), uSkyAir.x);
+    vec3 airO = pcSkyAir(uHaze, sunE, sd, uLookN.w);        // what the far land ends in: chunks.js pcAtmos, on the same haze key
+    vec3 bandO = mix(mix(pcSkyFar(uSkyHorizon, uOilS.x * 1.35), uSkyHorizon, 0.18), pcSkyAir(uSkyHorizon, sunE, sd, 0.0), uSkyAir.x);
     vec3 midO = mix(zenO, bandO, 0.62);
     float tb = t * 6.0 + (n1.r - 0.5) * 1.7 + (n2.g - 0.5) * 0.35;
     float tbi = floor(tb), fwb = max(fwidth(tb), 1e-4);
@@ -333,7 +347,7 @@ void main() {
   // pale line lifted out of the wash, rays running up from it and fading into violet; folded along the horizon
   // (anchored to the planet, drifting slowly). By day a pale ghost in the blue, by night the palest thing low down.
   if (uAurora.x > 0.001) {
-    vec3 ha = normalize(d - up * e + up * 1e-4);
+    vec3 ha = normalize(d - up * eR + up * 1e-4);
     vec4 fa = texture(uNoise3D, ha * 1.25 + vec3(0.7, 0.2, uTime * 0.0015));
     vec4 fb = texture(uNoise3D, ha * 3.4 + vec3(0.1, uTime * 0.002, 0.4));
     float fold = smoothstep(0.38, 0.62, fa.r * 0.7 + fb.g * 0.3);                    // where along the horizon a curtain hangs
@@ -367,11 +381,11 @@ void main() {
     // where the top of the far cloud lies for this eye: below eye level (its own horizon) from above it,
     // above eye level from a bench lower than the cloud tops (the islands then stand in a bank of it)
     float et = rc0 > rs ? -sqrt(max(0.0, 1.0 - (rs * rs) / (rc0 * rc0))) : sin(atan((rs - rc0) / 450.0));
-    vec3 hz2 = normalize(d - up * e + up * 1e-4);
+    vec3 hz2 = normalize(d - up * eR + up * 1e-4);
     vec4 h1 = texture(uNoise3D, hz2 * 2.2 + 0.31);
     vec4 h2 = texture(uNoise3D, hz2 * 7.0);
     float head = (0.016 + 0.085 * smoothstep(0.30, 0.78, h1.r) + 0.020 * h2.g) * uSeaC.z;       // heads of cumulus stand up along it
-    float above = e - et;
+    float above = eR - et;
     float deck = 0.0, hollow = 0.0;
     if (above < head) {
       deck = 1.0 - smoothstep(head * 0.80, head, above);                              // a crisp upper edge
@@ -528,7 +542,7 @@ void main() {
   // strongest low in the sky (anchored to the planet: they do not turn with the camera)
   float veil = max(uWxSky.z, uWxSky.w);
   if (veil > 0.01) {
-    vec3 hz = normalize(d - up * e + up * 1e-4);
+    vec3 hz = normalize(d - up * eR + up * 1e-4);
     vec3 side = cross(up, hz);
     vec3 vq = hz * 1.7 + side * (e * 1.1) + up * (e * 0.30) + vec3(uTime * 0.004, 0.0, 0.0);
     float drag = texture(uNoise3D, vq).r * 0.75 + texture(uNoise3D, vq * 2.3 + 0.3).g * 0.25;
@@ -628,7 +642,44 @@ void main() {
     col = mix(col, vec3(0.93, 0.87, 0.72), pow(max(sd, 0.0), 3.0) * 0.60 * uAtmo.y * (1.0 - uAtmo.x) * (1.0 - uWxSky.x));
     // (the golden hours, as chunks.js pcGold: the whole sky warms, most of all low down, where it meets the air's pale gold)
     float gold = (1.0 - smoothstep(0.48, 0.86, sunE)) * uAtmo.y * (1.0 - uAtmo.x) * (1.0 - uWxSky.x) * uOilG.w;
-    col = mix(col, vec3(0.92, 0.80, 0.58), gold * mix(0.80, 0.45, smoothstep(0.0, 0.7, e)));
+    vec3 colW = mix(col, vec3(0.92, 0.80, 0.58), gold * mix(0.80, 0.45, smoothstep(0.0, 0.7, e)));      // (the wash as it was)
+    if (uLookG.x < 0.5 || uSkyAir.w <= 0.0) {
+      col = colW;
+    } else {
+      // (ON THE GROUND THE WASH HOLDS: the coordinator's ruling, the owner chose S1 for its warm golden mood. The rings
+      // below come in with the eye's height, uSkyAir.w, a dip of 10 to 17 degrees -- Earth 62 m to 180 m -- as the
+      // sky's remap to the true horizon does, so the view from the air gets them and every view on foot is the wash.)
+      // THE GOLDEN HOUR'S SKY, PAINTED (24 Nov; the coordinator: from the air and from the ground at 16.8 the sky was one
+      // flat ochre wash). The wash above laid the same gold all round the sky, 0.80 of it low down and 0.45 high, so
+      // every direction came out the same ochre and the bands and strokes under it were lost. A painter's golden hour
+      // keeps the gold where the light is: warm and strongest low toward the sun, cooling round the sky and deepening
+      // overhead and away from it, where the zenith key's blue shows and the low sky goes a cool lilac. ?goldsky=0 is
+      // the wash as it was everywhere.
+      // (rings round the sun, five steps by the angle to it, their edges a pixel wide and wandering with the sky's noise:
+      // pale gold close to the sun, gold, a warm peach, a cool lilac, and away from the sun the sky's own blue a step
+      // deeper. Each ring is laid as a glaze that keeps the value of what is under it -- the sky's height bands, the
+      // clouds -- so the steps and shapes under it still read; strongest low in the sky, lighter overhead.)
+      float gT = smoothstep(-0.55, 0.97, sd) * 5.0 + (n1.g - 0.5) * 0.9 + (n2.r - 0.5) * 0.35;
+      float gTi = clamp(floor(gT), 0.0, 4.0), fwg = max(fwidth(gT), 1e-4);
+      float ring = clamp(gTi + smoothstep(0.5 - fwg, 0.5 + fwg, gT - gTi), 0.0, 5.0);      // 0 away from the sun .. 5 by it
+      float low = tq;                                                                      // 0 overhead .. 1 at the horizon band
+      float cl = dot(col, vec3(0.3, 0.5, 0.2));
+      vec3 rc = ring < 1.5 ? mix(vec3(0.62, 0.68, 0.90), vec3(0.76, 0.70, 0.86), ring - 0.5)
+              : ring < 2.5 ? mix(vec3(0.76, 0.70, 0.86), vec3(0.90, 0.72, 0.64), ring - 1.5)
+              : ring < 3.5 ? mix(vec3(0.90, 0.72, 0.64), vec3(0.93, 0.77, 0.52), ring - 2.5)
+              : mix(vec3(0.93, 0.77, 0.52), vec3(0.96, 0.88, 0.66), clamp(ring - 3.5, 0.0, 1.0));
+      vec3 rv = mix(rc, clamp(rc * (cl / max(dot(rc, vec3(0.3, 0.5, 0.2)), 1e-3)), 0.0, 1.0), 0.55);   // (the ring keeping the value under it)
+      float amt = gold * mix(0.30, 0.88, low) * mix(0.75, 1.0, ring / 5.0);
+      vec3 cR = ring < 0.5 ? mix(col, dens(col, 1.30) * vec3(0.86, 0.95, 1.14), gold * mix(0.55, 0.30, low))      // (away: the blue deeper)
+                       : mix(col, rv, amt);
+      // (and all round the sky, low down, the golden hour's warm air: away from the sun a rose band over the far land,
+      // a step under the ring's own colour, so a view with its back to the sun still has its warm horizon and the blue
+      // only above it)
+      vec3 rose = vec3(0.92, 0.76, 0.68);
+      vec3 rosev = mix(rose, clamp(rose * (cl / 0.80), 0.0, 1.0), 0.55);
+      cR = mix(cR, rosev, gold * smoothstep(0.55, 0.95, low) * (1.0 - smoothstep(1.5, 3.0, ring)) * 0.55);
+          col = mix(colW, cR, uSkyAir.w);
+    }
     {
       // THE NIGHT SKY'S STREAKS (the owner, 2026-11-16: "make the lines on the sky at night time near the northern lights
       // closer to the ... references ... the patterns in the sky"). The clip's night sky, looked at closely: LONG, THIN,
@@ -729,7 +780,9 @@ export function makeSkyUniforms() {
     // ONE AIR FOR THE LAND AND THE SKY (see pcSkyAir in the shader above). x: how far the sky's lowest band is the
     // same air the far land ends in (?skyair=; 0 is the sky exactly as it was, which is the other half of the pair
     // to show the owner). y: how high that band stands, as dot(view, up) -- 0.075 is about four degrees over the
-    // horizon, which is a painter's band low down and not a wall of one colour (?skyairtop=).
+    // horizon, which is a painter's band low down and not a wall of one colour (?skyairtop=). z: where the TRUE
+    // horizon stands from the air, as dot(view, up), set each frame by world/index.js (AIRTOP); 0 on the ground.
+    // w: how far the eye is up for the sky's air-only paint (the golden hour's rings), 0 on the ground, 1 from 180 m.
     uSkyAir: { value: new THREE.Vector4(_qn('skyair', 1), _qn('skyairtop', 0.075), 0, 0) },
     ...OIL,
   };

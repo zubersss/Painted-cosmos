@@ -48,6 +48,10 @@
 //   ?bench=trees  the tree questions only, on foot and in the air: shorter, so the phone is cooler for each row
 //   ?bench=air    the air table (FV7 of docs/lead/FARVIEW-DESIGN.md): 400 m up and 45 degrees down, or ?bench=air,150
 //                 for another height; the questions every air lane waits on.
+//   ?bench=foot   the frame ON FOOT at the landing, the parts that are not the trees (the owner's 33 ms, 24 Nov): the
+//                 near grass and flowers (whole, half of their marks, one flat colour: what a blade and a pixel of the
+//                 sward cost, for the denser flora to come), the small plants, the ground, the shadows, the light in
+//                 the air, then the trees for scale, and the water's own views last.
 
 import { BUILD } from './build.js';
 import { MAX_PIXELS } from './preset.js';   // (the ceiling on the 'every pixel the screen has' row)
@@ -203,6 +207,18 @@ export function attachBench(pc) {
   // picture sharper until the frame is clearly off the cap and asks every question THERE. The costs are then of a
   // bigger picture than the device draws -- the header says so plainly -- but they are real costs, and the order
   // and the size of them is what the questions are for.
+  // THE THREE TABLES, IN PLAIN WORDS (the coordinator, 24 Nov: the owner runs them on waking, one after another). Each
+  // address is this very page with only the table changed, so whatever else the owner's link carried is kept.
+  const GUIDE = (() => {
+    const at = (m) => { const q = new URLSearchParams(location.search); q.set('look', 'oil'); q.set('bench', m); return location.origin + location.pathname + '?' + q.toString(); };
+    const which = MODE_B === 'trees' ? 1 : MODE_B === 'air' || MODE_B.startsWith('air,') ? 2 : MODE_B === 'foot' ? 3 : 0;
+    return 'THREE SPEED TESTS, one after another. For each: open its address, lay the phone down and do not touch it until the\n'
+      + 'table says "done" at the bottom, press Copy the table, and paste it into the chat. Then open the next one.\n'
+      + '  1 the trees:             ' + at('trees') + '\n'
+      + '  2 the view from the air: ' + at('air') + '\n'
+      + '  3 on foot:               ' + at('foot') + '\n'
+      + (which ? 'THIS IS TEST ' + which + ' OF 3.' : 'THIS IS THE WHOLE TABLE (not one of the three).') + '\n\n';
+  })();
   let MK = 1;             // how much sharper each way the questions are asked (1: not capped, asked as drawn)
   let capMs = 0;          // the frame interval the device is held at, if it is held at one
   const head = (r0) => {
@@ -210,7 +226,7 @@ export function attachBench(pc) {
     try { const gl = R.getContext(), e = gl.getExtension('WEBGL_debug_renderer_info'); if (e) gpu = String(gl.getParameter(e.UNMASKED_RENDERER_WEBGL)); } catch { /* not told */ }
     const i = P.info || {}, c = R.domElement;
     const sun = sunOut == null ? '' : sunOut ? 'sun out (shadows drawn)' : 'sun not out (no shadows drawn)';
-    return 'PAINTED COSMOS SPEED TEST 10' + (MODE_B === '1' ? '' : ' (' + MODE_B + ')') + ', ' + BUILD + ': press Copy the table at the bottom, then paste it\n' +
+    return GUIDE + 'PAINTED COSMOS SPEED TEST 10' + (MODE_B === '1' ? '' : ' (' + MODE_B + ')') + ', ' + BUILD + ': press Copy the table at the bottom, then paste it\n' +
       gpu.slice(0, 64) + ' | depth ' + (i.depth || '?') + ' | ' + sun + '\n' +
       'picture ' + (i.internalWidth || c.width) + 'x' + (i.internalHeight || c.height) + ' | screen ' + window.innerWidth + 'x' + window.innerHeight + ' @' + (window.devicePixelRatio || 1).toFixed(2) + (pin ? ' | held still' : ' | NOT HELD') +
       ' | tier ' + i.quality + ' | edges ' + (P.aaMode ? P.aaMode() : '?') + ' | paint ' + (P.lite ? 'lighter' : 'full') +
@@ -220,7 +236,7 @@ export function attachBench(pc) {
         + 'So the + / - below are real costs, but of a picture ' + (MK * MK).toFixed(1) + ' times the one it draws. Rows 24 on are back at that size.' : '');
   };
   const run = async () => {
-    el.textContent = 'speed test: waiting for the first view...';
+    el.textContent = GUIDE + 'speed test: waiting for the first view...';
     // (MK and capMs are filled by the probe below, before the rows; head() reads them.)
     while (!window.__pcReady) await wait(250);
     if (pc.settle) await Promise.race([pc.settle(12), wait(20000)]);
@@ -232,6 +248,10 @@ export function attachBench(pc) {
     const farMeshes = (fn) => pc.scene.traverse((o) => { if (o.isMesh && o.material && /^pc-prop-far/.test(mname(o))) fn(o); });
     const treeMeshes = (fn) => pc.scene.traverse((o) => { if (o.isMesh && o.material && /^pc-prop-(tall|far)/.test(mname(o))) fn(o); });
     const flora = () => (pc.world && pc.world._flora) || null;
+    // (the flora lane, 2026-11-24, docs/lead/FLORA-DESIGN.md 4.4) THE NEAR GRASS: the rings of painted marks round the eye
+    // (world/nearground.js), one material each, all named pc-near. They are in no other row: 'no small plants' takes the
+    // PROP undergrowth only, and the plants' flat modes do not reach the near grass's shader.
+    const nearRings = (fn) => { const n = pc.world && pc.world._near; if (n && n.rings) for (const r of n.rings) fn(r); };
     // (the far trees' form swapped while the test runs, world/flora.js setFarCards: the two forms are then timed in the
     // same minute, on a phone as warm for the one as for the other)
     const cards0 = !!(flora() && flora().species && flora().species.some((sp) => sp.cardFar));
@@ -241,6 +261,15 @@ export function attachBench(pc) {
     const swapT2 = async (mode, depth) => {
       const f = flora();
       if (!f || !f.setTrees2 || f.setTrees2(mode, depth == null ? t2d : depth) == null) return;
+      await wait(400);
+      if (pc.settle) await Promise.race([pc.settle(12), wait(20000)]);
+    };
+    // (?treesway=whole: the near trees bend whole, as the middle ones do, without the crown's branch-by-branch sway;
+    //  world/flora.js setTreeSway, the trees' patches built again. With the two short programs only.)
+    const sw0 = !!(flora() && flora().swayWhole);
+    const swapSway = async (whole) => {
+      const f = flora();
+      if (!f || !f.setTreeSway || f.setTreeSway(whole) == null) return;
       await wait(400);
       if (pc.settle) await Promise.race([pc.settle(12), wait(20000)]);
     };
@@ -286,6 +315,7 @@ export function attachBench(pc) {
       ['near trees as clusters', () => swapT2('cards-near', false), () => swapT2(t2a)],
       ['middle trees as clusters', () => swapT2('cards-mid', false), () => swapT2(t2a)],
       ['clusters with a depth pass first', () => swapT2('cards', true), () => swapT2(t2a)],
+      [sw0 ? 'near trees: branch sway as before' : 'near trees bend whole (no branch sway)', () => swapSway(!sw0), () => swapSway(sw0)],
     ];
     // ---- THE TENTH FORM'S HANDLES (see the top of this file) ----------------------------------------------------
     const tallMats = () => mats(/^pc-prop-tall/);
@@ -312,6 +342,15 @@ export function attachBench(pc) {
         m.needsUpdate = true;
       }
     };
+    const farWind = (on) => {
+      for (const m of mats(/^pc-prop-far-impostor/)) {
+        const U = m.uniforms;
+        if (!U || !U.uPhysOn) continue;
+        if (!on) { if (!m.userData.benchPhys) m.userData.benchPhys = U.uPhysOn; U.uPhysOn = { value: 0 }; }
+        else if (m.userData.benchPhys) { U.uPhysOn = m.userData.benchPhys; m.userData.benchPhys = null; }
+        m.uniformsNeedUpdate = true;
+      }
+    };
     const a2c = (on) => { for (const m of mats(/^pc-prop-/)) { if (on) { if (m.userData.benchA2C != null) { m.alphaToCoverage = m.userData.benchA2C; m.userData.benchA2C = null; } } else { if (m.userData.benchA2C == null) m.userData.benchA2C = m.alphaToCoverage; m.alphaToCoverage = false; } } };
     const farForm = async (form) => {
       const f = flora();
@@ -319,8 +358,12 @@ export function attachBench(pc) {
       await wait(400);
       if (pc.settle) await Promise.race([pc.settle(12), wait(30000)]);
     };
-    const form0 = (() => { const f = flora(); return f ? (f.farForm || (f.impOn ? 'impostor' : cards0 ? 'cards' : 'lump')) : 'cards'; })();
+    let hand0 = null;
+    const handTo = (n, m) => { const f = flora(); if (!f || !f.setHandover) return; if (!hand0) hand0 = [f.t0 * 0.30, f.t1 * 0.30]; f.setHandover(n, m); };
+    const handBack = () => { const f = flora(); if (!f || !f.setHandover || !hand0) return; f.setHandover(hand0[0], hand0[1]); hand0 = null; };
+    const form0 = (() => { const f = flora(); return f ? (f.farForm || (f.impWant || f.impOn ? 'impostor' : cards0 ? 'cards' : 'lump')) : 'cards'; })();
     // the rows themselves: [label, on, off]
+    const shw0 = (() => { const f = flora(); return f ? !!f.shadowWhole : true; })();      // (the shadow pass's whole-draw setting as the run starts: shWhole)
     const T0 = {
       leaves: ['near trees: leaves only', nearPart('leaves'), nearPart(null)],
       wood: ['near trees: wood only', nearPart('wood'), nearPart(null)],
@@ -333,9 +376,22 @@ export function attachBench(pc) {
       // (T1: the far trees as painted impostors, two triangles a tree, swapped in the same minute; render/impostor.js.
       //  If the run was started with ?fartree=impostor this row asks the other way: the tree of flat pieces.)
       imp: form0 === 'impostor' ? ['far trees of flat pieces', () => farForm('cards'), () => farForm(form0)] : ['far trees as impostors', () => farForm('impostor'), () => farForm(form0)],
+      // (T4, the hand-over at the phone's scale: the middle tree to the far one at 45 m instead of 57; the design's
+      //  full target, 18 m and 45 m; and the far package as ?fartree=impostor ships it, the impostors from 45 m)
+      mid45: ['middle trees only to 45 m', () => handTo(27, 45), () => handBack()],
+      hand: ['trees hand over at 18 / 45 m', () => handTo(18, 45), () => handBack()],
+      pack: ['impostors from 45 m', async () => { handTo(27, 45); if (form0 !== 'impostor') await farForm('impostor'); }, async () => { handBack(); if (form0 !== 'impostor') await farForm(form0); }],
+      // (the far wood in the wind, ?farwind=1: the far impostors' own uPhysOn set to 0 for the row, as 'no wind in shader')
+      farStill: ['far trees still in the wind', () => farWind(false), () => farWind(true)],
+      // (with the impostors the far trees read no shadow map: what do shadows cost from the air without the far cards?)
+      noSh: ['no shadows at all', () => B({ shadow: false }), () => B({ shadow: true })],
       noFar: ['no far trees', () => show(/^pc-prop-far/, false), () => show(/^pc-prop-far/, true)],
       farFlat: ['far trees one flat colour', () => B({ flat: 3 }), () => B({ flat: 0 })],
       noNear: ['no near trees', () => show(/^pc-prop-tall/, false), () => show(/^pc-prop-tall/, true)],
+      // (T6, the shadow pass: a split tree (?trees2) one draw there, the default, against one a material, ?shwhole=0;
+      //  the row asks the other way from how the run started; flora.setShadowWhole)
+      shWhole: [shw0 ? 'split trees by part in shadow pass' : 'split trees whole in shadow pass',
+        () => { const f = flora(); if (f && f.setShadowWhole) f.setShadowWhole(!shw0); }, () => { const f = flora(); if (f && f.setShadowWhole) f.setShadowWhole(shw0); }],
     };
     const r = (row, tag) => [row[0] + tag, row[1], row[2]];
     // THE AIR ROWS: an "as set" that lifts the pin (it is the base the questions after it are set against), the
@@ -444,6 +500,16 @@ export function attachBench(pc) {
         if (MK <= 1) await sharpen(1);
       }
     }
+    // THE NEAR GRASS AND FLOWERS (the pc-near rings, world/nearground.js): in no row until 24 Nov, though the header has
+    // named them since the second form. Whole; half of their marks, folded away by number in the vertex shader before
+    // any is rasterised (materials.js NEAR_VERT uNearCut), so the gap to 'as set' is half the marks' whole cost; and
+    // every mark kept but painted one flat colour (shared.js uOilL.y 8), so that gap is the sward's paint a pixel.
+    const nearCut = (k) => { for (const m of mats(/^pc-near$/)) if (m.uniforms && m.uniforms.uNearCut) m.uniforms.uNearCut.value = k; };
+    const GRASS = [
+      ['no near grass or flowers', () => show(/^pc-near$/, false), () => show(/^pc-near$/, true)],
+      ['near grass: half its marks', () => nearCut(0.5), () => nearCut(0)],
+      ['near grass one flat colour', () => B({ flat: 8 }), () => B({ flat: 0 })],
+    ];
     const WX0 = { ...WX2 };      // (group D: its switches as the address set them, put back after each of its rows)
     const holdStorm = (on) => { const P = pc.sim && pc.sim.physics; if (P && P.forceWeather) P.forceWeather(on ? { kind: 'storm' } : null); };
     const steps = [
@@ -474,7 +540,7 @@ export function attachBench(pc) {
       // (TENTH FORM, 2026-11-24: the near trees' 51.8 ms split six ways, and the depth questions; see the top)
       T0.leaves, T0.wood, T0.bark, T0.wind, T0.side, T0.order, T0.a2c,
       [AS, null, null],
-      T0.blob, T0.imp,
+      T0.blob, T0.imp, T0.mid45, T0.hand, T0.pack,
       // (2026-11-23, after speed test 9: the near trees are 62.7 ms of a 101 ms frame and NOTHING in that table says
       //  why. These three rows split it. "hand over at half the distance" is not a diagnostic -- it IS the change
       //  that would be made, so the device measures the fix and not a guess. "half their leaves" drives the leaf
@@ -490,6 +556,18 @@ export function attachBench(pc) {
       ...T2ROWS,
       ['no trees', () => show(/^pc-prop-(tall|far)/, false), () => show(/^pc-prop-(tall|far)/, true)],
       ['no small plants', () => show(/^pc-prop-(?!tall|far)/, false), () => show(/^pc-prop-(?!tall|far)/, true)],
+      // (the flora lane) what the near grass costs (all of it: GRASS's first row), and its finest ring alone. Its material's own `visible` is
+      // the switch: the ring's update moves its mesh, never this.
+      ['near grass: the blades only (the fine ring and the carpet)', () => nearRings((r) => { r.material.visible = r.cfg.name === 'fine' || !!r.cfg.carpet; }),
+        () => nearRings((r) => { r.material.visible = true; })],
+      // (G2, FLORA-DESIGN.md 6.2) the carpet of blades near the feet, which four times the near blades are bought with
+      ['no carpet of near blades', () => nearRings((r) => { if (r.cfg.carpet) r.material.visible = false; }), () => nearRings((r) => { r.material.visible = true; })],
+      // (F2, FLORA-DESIGN.md 7.2) the flowers' heads near the eye (their stalks stay: they are blades to the shader)
+      ['no flower heads', () => nearRings((r) => { r.material.uniforms.uNearK.value.z = 1; }), () => nearRings((r) => { r.material.uniforms.uNearK.value.z = 0; })],
+      // (G1, FLORA-DESIGN.md 6.1) the marks outside the picture shaded whole again, as before the cull: what the cull saves
+      ['grass not culled off-screen', () => nearRings((r) => { r.__k = r.material.uniforms.uNearK.value.x; r.material.uniforms.uNearK.value.x = 0; }),
+        () => nearRings((r) => { r.material.uniforms.uNearK.value.x = r.__k == null ? 1 : r.__k; })],
+      ...GRASS,
       // (2026-11-20) WHERE THE DRAW CALLS ARE. The table's header says 350 of them and 9.6 ms of script, and a draw
       // call costs a phone's processor something like twenty millionths of a second, so the two numbers are most
       // likely the same number. Counted in the painter's gallery on one frame of the autumn wood: 245 draws, of
@@ -563,11 +641,13 @@ export function attachBench(pc) {
       [AS, null, null],
       T0.side, T0.order, T0.a2c, T0.noNear,
       [AS, null, null],
-      ...T2ROWS,
+      ...T2ROWS, T0.shWhole,
       [AS, null, null],
-      T0.blob, T0.imp, T0.noFar, T0.farFlat,
-      ...airAt(150, 30, [T0.noFar, T0.blob, T0.imp, T0.farFlat, T0.a2c]),
-      ...airAt(400, 45, [T0.noFar, T0.blob, T0.imp]),
+      T0.blob, T0.imp, T0.noFar, T0.farFlat, T0.farStill,
+      [AS, null, null],
+      T0.mid45, T0.hand, T0.pack,
+      ...airAt(150, 30, [T0.noFar, T0.blob, T0.imp, T0.farFlat, T0.a2c, T0.farStill]),
+      ...airAt(400, 45, [T0.noFar, T0.blob, T0.imp, T0.noSh]),
       onFoot,
       [AS + ', last', null, null],
     ];
@@ -582,6 +662,9 @@ export function attachBench(pc) {
         ['ground one flat colour', () => B({ flat: 1 }), () => B({ flat: 0 })],
         T0.noFar, T0.farFlat, T0.blob, T0.imp,
         ['no water drawn', () => show(/^pc-water/, false), () => show(/^pc-water/, true)],
+        // (the far view's canopy painted into the ground, FV2: render/farground.js; the same picture as ?canopy=0)
+        ['canopy painted off (FV2)', async () => { try { (await import('../render/farground.js')).CANOPY_BENCH.off = true; } catch { /* none */ } },
+          async () => { try { (await import('../render/farground.js')).CANOPY_BENCH.off = false; } catch { /* none */ } }],
         T0.a2c,
         ['no shadows at all', () => B({ shadow: false }), () => B({ shadow: true })],
       ]),
@@ -589,7 +672,30 @@ export function attachBench(pc) {
       onFoot,
       [AS + ', last', null, null],
     ];
+    // ?bench=foot: the frame on foot at the landing without the trees' questions (the owner's 33 ms, 24 Nov). With the
+    // two short programs and the impostors as the default trees the frame is expected near 22 ms (derived, never
+    // measured), so these rows are asked off the cap, where they can be read: each against the "as set" row before it.
+    const footSteps = [
+      [AS, null, null],
+      ...GRASS,
+      [AS, null, null],
+      ['no small plants', () => show(/^pc-prop-(?!tall|far)/, false), () => show(/^pc-prop-(?!tall|far)/, true)],
+      ['no ground drawn', () => ground(false), () => ground(true)],
+      ['ground one flat colour', () => B({ flat: 1 }), () => B({ flat: 0 })],
+      [AS, null, null],
+      ['no shadows at all', () => B({ shadow: false }), () => B({ shadow: true })],
+      ['trees cast no shadow', () => treeMeshes((o) => o.layers.disable(2)), () => treeMeshes((o) => o.layers.enable(2))],
+      ['no light in the air', () => B({ shaft: false }), () => B({ shaft: true })],
+      [lite0 ? 'the full paint' : 'the lighter paint', () => B({ lite: !lite0 }), () => B({ lite: lite0 })],
+      [AS, null, null],
+      ['no near trees', () => show(/^pc-prop-tall/, false), () => show(/^pc-prop-tall/, true)],
+      T0.bark, T0.noFar,
+      ['no trees', () => show(/^pc-prop-(tall|far)/, false), () => show(/^pc-prop-(tall|far)/, true)],
+      [AS + ', last', null, null],
+      ...waterRows,
+    ];
     if (MODE_B === 'trees') steps.splice(0, steps.length, ...treeSteps);
+    else if (MODE_B === 'foot') steps.splice(0, steps.length, ...footSteps);
     else if (MODE_B === 'air' || MODE_B.startsWith('air,')) steps.splice(0, steps.length, ...airSteps);
     const rows = [];
     let r0 = null, base = null;
@@ -636,5 +742,5 @@ export function attachBench(pc) {
     el.textContent = head(r0) + '\n' + rows.join('\n') + '\ndone. (+ / - ms: against the "as set" row before it)' + warn;
     pc.bench = rows;
   };
-  run().catch((e) => { el.textContent = 'speed test failed: ' + ((e && e.message) || e); });
+  run().catch((e) => { el.textContent = GUIDE + 'speed test failed: ' + ((e && e.message) || e); });
 }
