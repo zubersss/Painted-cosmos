@@ -13,6 +13,18 @@ sky to a mile: look director), FV2-T and FV7 (the far trees and the air speed te
 `src/render/materials.js`, `src/world/terrain.js`, `src/world/patchgen.js`, `src/world/surface.js` (recipes and far
 colour only). NOT chunks.js, post.js, shared.js, world/index.js (look director), NOT flora.js, florakit.js (trees groups).
 
+**STATE (24 Nov, second session, night): THE MOUNTAINS PASSED for v39.4** by the look director: the coordinator takes
+farview up to cc354f3 (c1c8eaa + stills only); 62e62fa (planes and the mountain family only on whole beds) is NOT in
+v39.4 and goes to v39.5 with the alpine 420 m noon pair. THE RED SMUDGES on the alpine ridges, CAUSE FOUND: flower
+drifts (world/bloom.js, flora B) are laid into the land's wash right up to the summit snow (the ground's flat mode,
+the speed test's flat 1, shows it: `fv4_alpine_smudge_cause_wash_flat.jpg`), and my snow shedding (patchgen.js) undoes
+the surface's snow mix on steep faces, which brings anything laid over the snow back magnified by 1/(1 - snowK), up to
+16 times and below zero. ?bloomair=0 clears them (dark red 0.72 to 0.02 per cent of the land). Mine: the undone wash
+held to 0..1 (red becomes a smaller grey blot, 0.19). B's: one line in bloomAt, no flower in snow (sent; tested in my
+tree, not committed: 0.14, the summit white 4.1 to 5.6 per cent). Next for v39.5 (the look director's order): the far
+rock's 1-2 px pale speckle at 1 km measured against v37 (fade the under-layer by pixel span if over), the snowy tops in
+fewer bigger patches, a stronger cool side plane at noon. Scratch: `wt37` = main at v37.1 for that comparison.
+
 **STATE (24 Nov, second session, evening):** FV2 and FV3 ON by default. FV4 (THE COAST CLIFF AND THE MOUNTAINS) is ON
 BY DEFAULT from farview d4cab64 (`?rockfield=0` the opt-out; the oil look on Earth only), for v39.4, PASSED by the look
 director on the condition that snow wins over rock (done: d4cab64 + 77ba0b6; stills for that pass in

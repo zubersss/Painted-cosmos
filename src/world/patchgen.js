@@ -183,9 +183,13 @@ export function stepPatch(job, deadline) {
           // were laid, SEEN by the look director: snow wins over rock above the snowline, so only the sheerest faces shed)
           const st = sstep(0.57, 0.34, upn);
           if (st > 0) {
+            // (the wash found under the snow is held to 0..1: anything laid over the snowy wash after the snow -- a flower
+            // drift's colour, world/bloom.js -- comes back from the undoing magnified by 1/(1 - snow), up to 16 times, and
+            // went below 0: the dark red smudges on the alpine ridges, SEEN 24 Nov, gone with ?bloomair=0)
             const k2 = sk * (1 - 0.6 * st), cc = k * CS, iv = 1 / (1 - sk);
             for (let t = 0; t < 3; t++) {
-              const base = (_col[cc + t] - SNOW[t] * sk) * iv, base2 = (_col[cc + 3 + t] - SNOW[t] * sk) * iv;
+              const base = Math.min(1, Math.max(0, (_col[cc + t] - SNOW[t] * sk) * iv));
+              const base2 = Math.min(1, Math.max(0, (_col[cc + 3 + t] - SNOW[t] * sk) * iv));
               _col[cc + t] = base + (SNOW[t] - base) * k2;
               _col[cc + 3 + t] = base2 + (SNOW[t] - base2) * k2;
             }
