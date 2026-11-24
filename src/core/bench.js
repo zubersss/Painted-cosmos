@@ -318,7 +318,7 @@ export function attachBench(pc) {
       await wait(400);
       if (pc.settle) await Promise.race([pc.settle(12), wait(30000)]);
     };
-    const form0 = (() => { const f = flora(); return f ? (f.farForm || (cards0 ? 'cards' : 'lump')) : 'cards'; })();
+    const form0 = (() => { const f = flora(); return f ? (f.farForm || (f.impOn ? 'impostor' : cards0 ? 'cards' : 'lump')) : 'cards'; })();
     // the rows themselves: [label, on, off]
     const T0 = {
       leaves: ['near trees: leaves only', nearPart('leaves'), nearPart(null)],
@@ -329,6 +329,9 @@ export function attachBench(pc) {
       order: ['near trees after the ground', () => tallMeshes((o) => { o.renderOrder = 6; }), () => tallMeshes((o) => { o.renderOrder = 0; })],
       a2c: ['plants without alpha-to-cov', () => a2c(false), () => a2c(true)],
       blob: ['far trees as crossed cards', () => farForm('blob'), () => farForm(form0)],
+      // (T1: the far trees as painted impostors, two triangles a tree, swapped in the same minute; render/impostor.js.
+      //  If the run was started with ?fartree=impostor this row asks the other way: the tree of flat pieces.)
+      imp: form0 === 'impostor' ? ['far trees of flat pieces', () => farForm('cards'), () => farForm(form0)] : ['far trees as impostors', () => farForm('impostor'), () => farForm(form0)],
       noFar: ['no far trees', () => show(/^pc-prop-far/, false), () => show(/^pc-prop-far/, true)],
       farFlat: ['far trees one flat colour', () => B({ flat: 3 }), () => B({ flat: 0 })],
       noNear: ['no near trees', () => show(/^pc-prop-tall/, false), () => show(/^pc-prop-tall/, true)],
@@ -468,7 +471,7 @@ export function attachBench(pc) {
       // (TENTH FORM, 2026-11-24: the near trees' 51.8 ms split six ways, and the depth questions; see the top)
       T0.leaves, T0.wood, T0.bark, T0.wind, T0.side, T0.order, T0.a2c,
       [AS, null, null],
-      T0.blob,
+      T0.blob, T0.imp,
       // (2026-11-23, after speed test 9: the near trees are 62.7 ms of a 101 ms frame and NOTHING in that table says
       //  why. These three rows split it. "hand over at half the distance" is not a diagnostic -- it IS the change
       //  that would be made, so the device measures the fix and not a guess. "half their leaves" drives the leaf
@@ -499,8 +502,8 @@ export function attachBench(pc) {
       ['no light in the air', () => B({ shaft: false }), () => B({ shaft: true })],
       [lite0 ? 'the full paint' : 'the lighter paint', () => B({ lite: !lite0 }), () => B({ lite: lite0 })],
       // (TENTH FORM) THE AIR: no row had ever timed it. The same spot, from 150 m and 400 m up.
-      ...airAt(150, 30, [T0.noFar, T0.blob]),
-      ...airAt(400, 45, [T0.noFar]),
+      ...airAt(150, 30, [T0.noFar, T0.blob, T0.imp]),
+      ...airAt(400, 45, [T0.noFar, T0.imp]),
       onFoot,
       // (the water's rows, at the bank and at the shore: see THE WATER VIEWS above)
       ...waterRows,
@@ -528,9 +531,9 @@ export function attachBench(pc) {
       [AS, null, null],
       ...T2ROWS,
       [AS, null, null],
-      T0.blob, T0.noFar, T0.farFlat,
-      ...airAt(150, 30, [T0.noFar, T0.blob, T0.farFlat, T0.a2c]),
-      ...airAt(400, 45, [T0.noFar, T0.blob]),
+      T0.blob, T0.imp, T0.noFar, T0.farFlat,
+      ...airAt(150, 30, [T0.noFar, T0.blob, T0.imp, T0.farFlat, T0.a2c]),
+      ...airAt(400, 45, [T0.noFar, T0.blob, T0.imp]),
       onFoot,
       [AS + ', last', null, null],
     ];
@@ -543,12 +546,12 @@ export function attachBench(pc) {
       ...airAt(airH, 45, [
         ['no ground drawn', () => ground(false), () => ground(true)],
         ['ground one flat colour', () => B({ flat: 1 }), () => B({ flat: 0 })],
-        T0.noFar, T0.farFlat, T0.blob,
+        T0.noFar, T0.farFlat, T0.blob, T0.imp,
         ['no water drawn', () => show(/^pc-water/, false), () => show(/^pc-water/, true)],
         T0.a2c,
         ['no shadows at all', () => B({ shadow: false }), () => B({ shadow: true })],
       ]),
-      ...(airH < 1000 ? airAt(1000, 45, [T0.noFar]) : []),
+      ...(airH < 1000 ? airAt(1000, 45, [T0.noFar, T0.imp]) : []),
       onFoot,
       [AS + ', last', null, null],
     ];
