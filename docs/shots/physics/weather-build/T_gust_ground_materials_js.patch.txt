@@ -1,8 +1,8 @@
 diff --git a/src/render/materials.js b/src/render/materials.js
-index c166588..1742cf7 100644
+index 90e608d..97ca3fd 100644
 --- a/src/render/materials.js
 +++ b/src/render/materials.js
-@@ -333,6 +333,9 @@ uniform vec4 uHeart;      // a great pale marking seen from orbit: xyz its place
+@@ -316,6 +316,9 @@ uniform vec4 uHeart;      // a great pale marking seen from orbit: xyz its place
  // (Not carried over from the watercolour yet: strata, cracks, puddles, the trodden track, a world's great marking.)
  varying vec3 vRel;
  vec3 gBdx, gBdy, gC2dx, gC2dy, gNvdx, gNvdy, gNldx, gNldy, gSunV, gBc;
@@ -12,7 +12,7 @@ index c166588..1742cf7 100644
  vec3 gMark;      // (the powers, fire) what the fire has done where this stroke lies: see pcMarksAt below
  vec3 gCtrB;       // a dab's own place on the body (set before pcGroundAt; x > 1e20: none, the place is carried from the pixel)
  vec4 gCdx, gCdy, gPdx, gPdy;
-@@ -512,6 +515,22 @@ vec3 pcGroundPaint(vec3 c, vec3 leaf, float fk, vec3 rnd, float snowC, float lvl
+@@ -524,6 +527,30 @@ vec3 pcGroundPaint(vec3 c, vec3 leaf, float fk, vec3 rnd, float snowC, float lvl
    // (GRASS in the shade is a deep green, its own colour laid heavier with half the cool key over it, as a leaf's shade
    // is; under the key whole a shaded meadow was a violet-brown floor: the owner's references of 2026-11-16 have the
    // shade on grass blue-green. Only where the stroke's wash is green; earth, litter, rock and snow shade as they did.)
@@ -28,14 +28,22 @@ index c166588..1742cf7 100644
 +    if (gr > 0.0) {
 +      if (gGust < 0.0) gGust = pcGustBand(gBc);
 +      float gb = gGust * gr;
-+      if (gb > 0.0) k = mix(k, min(vec3(1.0), mix(k, vec3(dot(k, vec3(0.3, 0.5, 0.2))), 0.45) * 1.12 + vec3(0.01, 0.03, 0.06)), gb * 0.85);
++      if (gb > 0.0) {
++        // (the look director, 24 Nov: the sheen is a GREYING AND COOLING, not a lightening -- half the saturation, a touch
++        //  toward the sky's blue-grey, and a lift of at most 0.06 that never reaches a stroke already over 0.80, or a
++        //  lemon floor goes to cream fog)
++        float kv = max(k.r, max(k.g, k.b));
++        vec3 sv = mix(k, vec3(dot(k, vec3(0.3, 0.5, 0.2))), 0.45) * vec3(0.94, 0.99, 1.10);
++        sv = min(vec3(1.0), sv + 0.06 * (1.0 - smoothstep(0.70, 0.80, kv)) * vec3(0.90, 0.95, 1.0));
++        k = mix(k, sv, gb * 0.85);
++      }
 +    }
 +  }
 +  #endif
    vec3 tn = pcTone(k, lvl);
    float grn = smoothstep(0.02, 0.10, k.g - max(k.r, k.b)) * (1.0 - snowC);
-   if (grn > 0.0) tn = mix(tn, mix(pcBody(pcDensity(k, 1.35)) * mix(vec3(1.0), pcOilShadeC(), 0.5) * 0.80, tn, smoothstep(1.2, 2.0, lvl)), grn);
-@@ -990,6 +1009,12 @@ void main() {
+   if (grn > 0.0) tn = mix(tn, mix(pcShadeLeaf(k), tn, smoothstep(1.2, 2.0, lvl)), grn);
+@@ -1034,6 +1061,12 @@ void main() {
  #endif
  `;
  
@@ -48,10 +56,10 @@ index c166588..1742cf7 100644
  export function makeTerrainMaterial(bodyU) {
    const m = new THREE.ShaderMaterial({
      name: 'pc-terrain',
-@@ -1001,6 +1026,8 @@ export function makeTerrainMaterial(bodyU) {
-     vertexShader: TERRAIN_VERT, fragmentShader: TERRAIN_FRAG,
-   });
-   m.userData.pcPainted = true;
+@@ -1055,6 +1088,8 @@ export function makeTerrainMaterial(bodyU) {
+   if (LOOK.oil && GROUND_SEASON) { m.defines = m.defines || {}; m.defines.PC_SEASONG = 1; Object.assign(m.uniforms, seasonUniforms()); }
+   // (the far view, FV4: rock faces, strata and snow that read from afar; compiled in only with the oil look and ?rockfield=)
+   if (LOOK.oil && ROCKFIELD) { m.defines = m.defines || {}; m.defines.PC_ROCKF = 1; Object.assign(m.uniforms, rockUniforms()); }
 +  // (the weather group's gust bands seen from the air, ?gustbands=1, the oil look only: physics flora.glsl.js)
 +  if (LOOK.oil && GUSTBANDS) { m.defines = m.defines || {}; m.defines.PC_GUST = 1; }
    // (the powers, fire: the ground goes black where the fire passed. Only with ?powers=1 and ?look=oil; see addFire.)
