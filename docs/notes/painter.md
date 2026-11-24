@@ -789,10 +789,16 @@ follows F's one storm-light switch (`?stormlight=0` turns it off with the land's
 off the crowns' part alone; the ramp is A1's far crowns' (kSt = smoothstep(0.15, 0.6, uStorm) x uLookS.x x
 uStormLeaf). SEEN under `wx=storm` (a maple from 9 m, one page with no switch, the switches flipped live: uStormLeaf 0
 for `?stormleaf=0`, LOOK.stormLight 0 through the page's own shared.js for `?stormlight=0`, the path the address
-takes; 54 tall materials at 0.5, uLookS.x 1, uStorm 0.9, no program failed): on the crown pixels free of the storm's
-own motion (17 per cent of the frame moves between two grabs on this build, low in the frame), the default V 0.318 S
-0.551, and both switches V 0.349 S 0.70, the crowns as they were; the default grabbed again matches it. Still
+takes; 54 tall materials at 0.5, uLookS.x 1, uStorm 0.9, no program failed): on the crown pixels that did not change
+between two grabs of the default (17 per cent of the frame did: most likely the world still building round the camera
+after it was moved, see the no-storm check; I first took it for the storm's own motion), the default V 0.318 S 0.551,
+and both switches V 0.349 S 0.70, the crowns as they were. Still
 `A2_stormleaf_default_maple9m_storm_default_stormlight0_stormleaf0.jpg` (default, ?stormlight=0, ?stormleaf=0).
+NO STORM, 0 PIXELS, SEEN: a page with no weather (uStorm 0), the same maple, the world let SETTLE first (after the
+camera moved the near patches and plants went on building for some 30 frames: 124,807 pixels between grabs, then 0;
+the gallery's t=0 already freezes time): the default, ?stormleaf=0, ?stormlight=0 and the default again, 0 pixels
+apart each. The watercolour game cannot change: the step sits inside #ifdef PC_OIL. (A note for the lab: after moving
+the camera, step frames until two grabs match before any A/B.)
 The history of it follows.
 
 **THE CROWNS UNDER A STORM (`?stormleaf=1`, OFF; the coordinator after F's storm light, look-director e2b9c14, which
