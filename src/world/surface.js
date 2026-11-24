@@ -15,6 +15,7 @@ import { MODE } from '../data/mode.js';
 import { makeNoise, hashString, hash3i, smoothstep, clamp } from './noise.js';
 import { dirToFace } from './cubesphere.js';
 import { EASELS, STANDS } from '../art/easels.js';
+import { bloomTint } from './bloom.js';
 
 const _cf = {};
 
@@ -1059,6 +1060,9 @@ class Surface {
         }
       }
     }
+    // (the flora lane, the oil look only: a flower drift's colour in the ground, and the sward's own shade at its roots;
+    // world/bloom.js. With the look off, ?bloom=0 and ?grass2=0, or no data, it returns at once and writes nothing.)
+    if (full) bloomTint(this, o, x, y, z, top);
     return o;
   }
 

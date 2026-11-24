@@ -300,6 +300,8 @@ export function attachBench(pc) {
         () => nearRings((r) => { r.material.visible = true; })],
       // (G2, FLORA-DESIGN.md 6.2) the carpet of blades near the feet, which four times the near blades are bought with
       ['no carpet of near blades', () => nearRings((r) => { if (r.cfg.carpet) r.material.visible = false; }), () => nearRings((r) => { r.material.visible = true; })],
+      // (F2, FLORA-DESIGN.md 7.2) the flowers' heads near the eye (their stalks stay: they are blades to the shader)
+      ['no flower heads', () => nearRings((r) => { r.material.uniforms.uNearK.value.z = 1; }), () => nearRings((r) => { r.material.uniforms.uNearK.value.z = 0; })],
       // (G1, FLORA-DESIGN.md 6.1) the marks outside the picture shaded whole again, as before the cull: what the cull saves
       ['grass not culled off-screen', () => nearRings((r) => { r.__k = r.material.uniforms.uNearK.value.x; r.material.uniforms.uNearK.value.x = 0; }),
         () => nearRings((r) => { r.material.uniforms.uNearK.value.x = r.__k == null ? 1 : r.__k; })],

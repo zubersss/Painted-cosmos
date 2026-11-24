@@ -18,6 +18,7 @@ import { getSurface, makeSample, NOLQ } from './surface.js';
 import { makeNearMaterial } from '../render/materials.js';
 import { QUALITY, LOOK } from '../render/shared.js';
 import { getLook } from '../data/looks.js';
+import { bloomAt, bloomSwitches, hasBlooms, SHAPES } from './bloom.js';
 
 // cell (m); range (m) at quality 0, 1, 2 (0: the ring is not laid); marks per cell; the ring
 // fades in between `inner` distances (so a broad touch is never held up to the eye); how soft
@@ -77,7 +78,7 @@ const VISTA = (() => {
 //   `?nearcull=` 0 keeps the grass but shades every mark again, in view or not (G1; the speed test's row does the same).
 //   `?sheen=`    0 takes away the gusts' sheen on the blades (G4: needs PHYSICS' bend, so the game, or the gallery's &physics=1).
 const FLORA = (() => {
-  const f = { grass2: 1, cull: 1, sheen: 1 };
+  const f = { grass2: 1, cull: 1, sheen: 1, bloom: 0 };
   try {
     const q = new URLSearchParams(location.search), on = (k) => !q.has(k) || (q.get(k) !== '0' && q.get(k) !== 'false');
     f.grass2 = on('grass2') ? 1 : 0;
@@ -85,6 +86,8 @@ const FLORA = (() => {
     f.sheen = f.grass2 && on('sheen') ? 1 : 0;
   } catch { /* no address to read */ }
   if (!LOOK.oil) { f.grass2 = 0; f.cull = 0; f.sheen = 0; }
+  // (F1-F3: the flowers from world/bloom.js's map, ?bloom=0 off; read there, where the ground's colour reads it too)
+  f.bloom = LOOK.oil ? bloomSwitches().bloom : 0;
   return f;
 })();
 export { FLORA };
@@ -110,6 +113,12 @@ const lerp = (a, b, t) => a + (b - a) * t;
 const clamp01 = (x) => Math.max(0, Math.min(1, x));
 const sstep = (a, b, x) => { const t = clamp01((x - a) / (b - a)); return t * t * (3 - 2 * t); };
 const dens = (c, d) => Math.max(0, Math.min(1, c - (c - c * c) * (d - 1)));   // the pigment density model
+// (F2) a colour packed in one float for a mark's second colour (the shader unpacks it: materials.js NEAR_VERT vTone)
+// (F2) a painted flower is drawn larger than life: at the game's distances a real head of two or three centimetres is
+// three to five pixels and sinks into the sward (SEEN, the level meadow, 24 Nov). The data keeps real sizes; this is the
+// painter's licence, one number for all of them.
+const BLOOM_HEAD = 2.0;
+const packTone = (c) => 1 + Math.round(Math.max(0, Math.min(1, c[0])) * 63) * 4096 + Math.round(Math.max(0, Math.min(1, c[1])) * 63) * 64 + Math.round(Math.max(0, Math.min(1, c[2])) * 63);
 // smooth value noise on the cell grid (drifts of flowers, where the grass stands tall)
 function vnoise(x, y, seed) {
   const xi = Math.floor(x), yi = Math.floor(y), fx = x - xi, fy = y - yi, sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy);
@@ -180,6 +189,10 @@ class Ring {
     const attr = (name, size) => { const a = new THREE.InstancedBufferAttribute(new Float32Array(N * size), size); a.setUsage(THREE.DynamicDrawUsage); g.setAttribute(name, a); return a; };
     this.aRoot = attr('iRoot', 3); this.aAxis = attr('iAxis', 4); this.aPar = attr('iPar', 4); this.aCol = attr('iCol', 4); this.aExt = attr('iExt', 2);
     this.attrs = [this.aRoot, this.aAxis, this.aPar, this.aCol, this.aExt];
+    // (F2, the oil look only: a mark's SECOND colour, packed in one float -- a daisy's eye, a cushion's flowers -- set as
+    // data like every colour, LOOK-RULES R2.1; 0: none, the shader takes its second tone from the mark's own colour)
+    this.aTone = LOOK.oil ? attr('iTone', 1) : null;
+    if (this.aTone) this.attrs.push(this.aTone);
     g.instanceCount = 0;
     this.material = makeNearMaterial(bu);
     this.material.uniforms.uNearK.value.set(FLORA.cull, 0, 0, 0);
@@ -199,7 +212,10 @@ class Ring {
     // plane: whole sheets of them stood leaning into the sky (Earth's alpine meadow, reached from the forest). What
     // has changed is now kept, and sent again with whatever changes next, until the GPU has taken it: `sent`)
     this.sent = false;
-    this.aExt.onUpload(() => { this.sent = true; });       // (the last of the five: all are taken in one go)
+    // (all are taken in one go; with the second colour there are six, and the account waits for both of the last two)
+    this.upl = 0;
+    this.aExt.onUpload(() => { this.upl |= 1; if (this.upl === (this.aTone ? 3 : 1)) { this.sent = true; this.upl = 0; } });
+    if (this.aTone) this.aTone.onUpload(() => { this.upl |= 2; if (this.upl === 3) { this.sent = true; this.upl = 0; } });
     this.pending = []; this.li = 1e9; this.lj = 1e9; this.lf = -1; this.now = 0; this.filled = false; this.range = 0; this.lastGrown = -10; this.okAt = -10;
     this.s = makeSample(S.nB); this.d = [0, 0, 0]; this.fo = { face: 0, u: 0, v: 0 };
   }
@@ -346,7 +362,7 @@ class Ring {
     // which biome's ground this is (borders intermix clump by clump)
     let bi = s.top, acc = 0; const pick = this.pick = hash3i(i, j, 3, seed);
     for (let q = 0; q < S.nB; q++) { acc += s.w[q]; if (pick < acc) { bi = q; break; } }
-    this.st = this.styles[bi];
+    this.st = this.styles[bi]; this.bi = bi;
     // (a biome without undergrowth of its own, the forests, grows grass wherever the canopy lets it)
     const und = S.biomes[bi].small ? (s.under || 0) : 1;
     this.canopy = Math.min(1, s.canopy || 0);
@@ -372,7 +388,7 @@ class Ring {
 
   // one mark: (ou, ov) where in the clump on the ground's plane, lift above it; the way it grows
   // (0: the ground's normal leaned by `tilt` toward `la`; 1: the normal itself), its measure and wash
-  put(ou, ov, lift, tilt, la, len, wid, kind, hz, born, cr, cg, cb, curl, flex) {
+  put(ou, ov, lift, tilt, la, len, wid, kind, hz, born, cr, cg, cb, curl, flex, tone = 0) {
     if (!this.free.length) return -1;
     const o = this.free.pop(); this.slots.push(o); if (o >= this.high) this.high = o + 1; this.touch(o);
     const { ux, uy, uz, vx, vy, vz, nx, ny, nz, x, y, z } = this;
@@ -385,6 +401,7 @@ class Ring {
     P[o * 4] = wid; P[o * 4 + 1] = kind; P[o * 4 + 2] = hz; P[o * 4 + 3] = born;
     C[o * 4] = cr; C[o * 4 + 1] = cg; C[o * 4 + 2] = cb; C[o * 4 + 3] = curl;
     E[o * 2] = this.canopy; E[o * 2 + 1] = flex;
+    if (this.aTone) this.aTone.array[o] = tone;
     return o;
   }
 
@@ -402,7 +419,9 @@ class Ring {
     const gr = s.r, gg = s.g, gb = s.b, canopy = this.canopy, shore = this.shore;
     const H = (k) => hash3i(i, j, k, seed);
     const tall = sstep(0.52, 0.74, this.rough);
-    let left = lowQ ? per >> 1 : per;
+    // (F2: where the map grows flowers they are plants of several marks; the cell is given room for them)
+    const blooming = FLORA.bloom && hasBlooms(this.S, this.bi);
+    let left = (lowQ ? per >> 1 : per) + (blooming ? 10 : 0);
     // by the water: stones, moss, a few dark sedges
     if (shore > 0.25 && st.rock) {
       const ns = Math.min(left, H(60) < shore ? 2 : 1);
@@ -433,7 +452,10 @@ class Ring {
       left -= nl;
     }
     // flowers in drifts: a stalk and a head; a drift is of one kind
-    const fl = st.flower > 0 && st.flowers ? st.flower * sstep(0.50, 0.70, this.drift) * this.meadow * (1 - 0.6 * canopy) : 0;
+    // (F2, the flora lane: where the biome has blooms of its own -- data/looks/*.js `oil.flora.blooms`, world/bloom.js --
+    // they are laid from the one map instead, as plants: layBlooms below)
+    if (blooming) left -= this.layBlooms(i, j, born, 0.36, left - 2);
+    const fl = !blooming && st.flower > 0 && st.flowers ? st.flower * sstep(0.50, 0.70, this.drift) * this.meadow * (1 - 0.6 * canopy) : 0;
     if (fl > 0.02 && left > 1) {
       const nf = Math.min(left >> 1, H(100) < fl * 1.3 ? (H(101) < fl * 0.6 ? 3 : 2) : (H(101) < fl * 2 ? 1 : 0));
       const fc = st.flowers[Math.min(st.flowers.length - 1, Math.floor(this.which * st.flowers.length * 0.999))];
@@ -521,6 +543,54 @@ class Ring {
     }
   }
 
+  // ---- F2, flowers as plants: one to several heads on a forking stalk, a leaf at the foot, in drifts from the map ----
+  // `area` the cell's ground (m2), `room` how many marks it may take. Returns how many it took.
+  layBlooms(i, j, born, area, room) {
+    if (room < 2) return 0;
+    const st = this.st, s = this.s, seed = this.seed, H = (k) => hash3i(i, j, k, seed);
+    const o = bloomAt(this.S, this.x, this.y, this.z, s, this.bi, this.bo || (this.bo = { kind: -1, bloom: null, dens: 0, heart: 0 }));
+    if (o.kind < 0 || o.dens < 0.01) return 0;
+    const b = o.bloom, sh = SHAPES[b.shape] || (DAB + CRISP), C = this.cfg.cell;
+    const want = o.dens * (b.peak || 8) * area;
+    let nP = Math.floor(want) + (H(500) < want - Math.floor(want) ? 1 : 0);
+    if (nP <= 0) return 0;
+    const gr = s.r, gg = s.g, gb = s.b, tall = sstep(0.52, 0.74, this.rough);
+    const lc = st.leafB ? st.leafB[1] : (st.leaf ? st.leaf[1] : [gr, gg, gb]);
+    const sc0 = lerp(lc[0], gr, 0.35), sc1 = lerp(lc[1], gg, 0.35), sc2 = lerp(lc[2], gb, 0.35);
+    const tone = b.eye ? packTone(b.eye) : 0;
+    let used = 0;
+    for (let p = 0; p < nP && used < room - 1; p++) {
+      const q1 = H(510 + p), q2 = H(530 + p), q3 = H(550 + p), q4 = H(570 + p), q5 = H(590 + p);
+      const ou = (q1 - 0.5) * C * 0.9, ov = (q2 - 0.5) * C * 0.9, la = q4 * 6.2832, tilt = 0.04 + 0.16 * q5;
+      const jit = 0.93 + 0.14 * q3, cr = b.c[0] * jit, cg = b.c[1] * jit, cb = b.c[2] * jit;
+      if (sh === SHAPES.cushion) {
+        // a low dome of leaves with its flowers on top: one mark (its leaves the mark's colour, its flowers its second)
+        const r0 = (b.head[0] + (b.head[1] - b.head[0]) * q3) * 1.3, bc = b.body || lc;
+        this.put(ou, ov, 0, 0.05 * q5, la, r0 * 1.4, r0, SHAPES.cushion, q1 * 0.61 + q2 * 0.39, born, bc[0], bc[1], bc[2], 0, 0.3, packTone(b.c));
+        used++; continue;
+      }
+      const L = (b.stalk[0] + (b.stalk[1] - b.stalk[0]) * q3) * (1.15 + 0.25 * tall);
+      // the stalk, and one short leaf at its foot when there is room
+      this.put(ou, ov, 0, tilt, la, L, 0.010 + 0.004 * q5, FLICK, q3, born, sc0, sc1, sc2, (q5 - 0.5) * 0.3, 1); used++;
+      if (used < room - 2 && q4 > 0.35) { this.put(ou, ov, 0, 0.55 + 0.3 * q1, la + 2.1, 0.06 + 0.07 * q2, 0.014, FLICK, q2, born, sc0 * 0.92, sc1 * 0.92, sc2 * 0.92, 0.3, 1); used++; }
+      const nh = Math.max(1, Math.round(b.heads[0] + (b.heads[1] - b.heads[0]) * q2));
+      for (let h = 0; h < nh && used < room; h++) {
+        const qh = H(610 + p * 7 + h), r0 = (b.head[0] + (b.head[1] - b.head[0]) * qh) * (h > 0 && sh !== SHAPES.bell ? 0.85 : 1) * (sh === SHAPES.spike ? 1.3 : BLOOM_HEAD);
+        // heads on a forking stalk: the first at the top, the others lower and a little out to the side; bells hang
+        // along the upper half of a nodding stalk; a spike is one tall head at the top
+        const hu = (qh - 0.5) * 0.06 * (h > 0 ? 1 : 0), hv = (H(640 + p * 7 + h) - 0.5) * 0.06 * (h > 0 ? 1 : 0);
+        if (sh === SHAPES.spike) {
+          this.put(ou, ov, 0, tilt, la, r0, 0.018 + 0.012 * qh, SHAPES.spike, qh, born, cr, cg, cb, Math.max(0.05, L - r0 * 0.85), 1, tone);
+        } else {
+          const held = sh === SHAPES.bell ? L * (0.55 + 0.42 * (1 - h / nh)) - r0 * 2 : L * (1 - 0.22 * h) - r0;
+          this.put(ou + hu, ov + hv, 0, tilt, la, r0 * 2, r0, sh, qh, born, cr, cg, cb, Math.max(0.02, held), 1, tone);
+        }
+        used++;
+      }
+    }
+    return used;
+  }
+
   // ---- G2, the carpet: tufts of single blades near the feet, three times the fine ring's a square metre ----
   // The blades are the fine ring's own (the same lengths, widths, leans, curls and colours: layFine's grass below), laid in
   // one to three tufts a cell; there are no stones, leaves or flowers here, which the fine ring lays.
@@ -569,7 +639,32 @@ class Ring {
     let left = per, k = 0;
     const at = (q1, q2) => [(q1 - 0.5) * C * 0.92, (q2 - 0.5) * C * 0.92];
     // a drift of flowers: dashes of the flower's colour at the height of the sward
-    const fl = st.flower > 0 && st.flowers ? st.flower * sstep(0.50, 0.70, this.drift) * this.meadow * (1 - 0.6 * canopy) : 0;
+    // (F3, the flora lane: where the biome has blooms of its own the drift is laid from the map as round touches of its
+    // colour, as many as its heart says, and a spike as a taller one; the horizontal dashes read as white and red lines)
+    const blooming = FLORA.bloom && !cfg.vista && hasBlooms(this.S, this.bi);
+    if (blooming) {
+      const o = bloomAt(this.S, this.x, this.y, this.z, s, this.bi, this.bo || (this.bo = { kind: -1, bloom: null, dens: 0, heart: 0 }));
+      if (o.kind >= 0 && o.dens > 0.03 && left > 1) {
+        const b = o.bloom, sh = SHAPES[b.shape] || 0, v = o.dens * (far ? 10 : 9);
+        const nf = Math.min(left - 1, Math.floor(v) + (H(100) < v - Math.floor(v) ? 1 : 0));
+        for (let q = 0; q < nf; q++, k++) {
+          const q1 = H(102 + q), q2 = H(106 + q), q3 = H(110 + q), p = at(q1, q2), jit = 0.94 + 0.12 * q2;
+          const st0 = b.stalk ? b.stalk[0] + (b.stalk[1] - b.stalk[0]) * q3 : 0.2;
+          if (sh === SHAPES.cushion) {
+            const r0 = (b.head[0] + (b.head[1] - b.head[0]) * q1) * 1.3 * kw, bc = b.body || b.c;
+            this.put(p[0], p[1], 0, 0, 0, r0 * 1.4, r0, SHAPES.cushion, q3, born, bc[0], bc[1], bc[2], 0, 0, packTone(b.c));
+          } else if (sh === SHAPES.spike) {
+            const hh = (b.head[0] + (b.head[1] - b.head[0]) * q1) * kh;
+            this.put(p[0], p[1], 0, 0, 0, hh, 0.035 * kw, DAB + CRISP, q3, born, b.c[0] * jit, b.c[1] * jit, b.c[2] * jit, Math.max(0, st0 - hh * 0.8) * kh, flex);
+          } else {
+            const r0 = (0.045 + 0.05 * q1) * kw;
+            this.put(p[0], p[1], 0, 0, 0, r0 * 1.6, r0, DAB + CRISP, q3, born, b.c[0] * jit, b.c[1] * jit, b.c[2] * jit, st0 * 0.85 * kh, flex);
+          }
+        }
+        left -= nf;
+      }
+    }
+    const fl = !blooming && st.flower > 0 && st.flowers ? st.flower * sstep(0.50, 0.70, this.drift) * this.meadow * (1 - 0.6 * canopy) : 0;
     if (fl > 0.04) {
       const nf = Math.min(left - 1, 1 + (H(100) < fl * 1.5 ? 1 : 0) + (far && H(101) < fl ? 1 : 0));
       const fc = st.flowers[Math.min(st.flowers.length - 1, Math.floor(this.which * st.flowers.length * 0.999))];

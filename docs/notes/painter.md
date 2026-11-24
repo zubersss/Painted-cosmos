@@ -11,11 +11,14 @@ accepted. The lane follows that design's section 11 order. The coordinator merge
 lane never merges. HELD by the coordinator until the trees lane lands: package O and F4 (anything in `flora.js`,
 `floraplace.js placeUnder`, a new `underkit.js`). NOT TO BE TOUCHED by this lane: `PROP_VERT` / `PROP_FRAG`, `kitmat.js`,
 `chunks.js`, `post.js`, `shared.js` (a look-director session owns the shared light and paint: `docs/lead/LOOK-RULES.md`
-on branch `look-director`, to be read and followed when it appears). In `surface.js` only ONE `bloomTint` call (the
-far-view lane edits that file).
+on branch `look-director`: READ, and followed; its R3.1 took out this lane's root step, below). In `surface.js` only ONE
+`bloomTint` call (the far-view lane edits that file).
 
-**Switches** (`world/nearground.js` `FLORA`, oil look only; 1 by default; 0 gives the package back exactly as it was):
-`?grass2=0` the whole grass package; `?nearcull=0` the off-screen cull alone; `?sheen=0` the gusts' sheen.
+**Switches** (oil look only; 1 by default; 0 gives the package back exactly as it was): `world/nearground.js` `FLORA`:
+`?grass2=0` the whole grass package; `?nearcull=0` the off-screen cull alone; `?sheen=0` the gusts' sheen;
+`world/bloom.js` `bloomSwitches`: `?bloom=0` the flowers from the map (the rings lay their old flowers, no tint);
+`?bloomair=0` the drifts' colour in the ground alone. The watercolour game: SEEN pixel for pixel the same as the clean
+commit (the alpine meadow's easel, every change of this lane in).
 
 **Done:**
 1. Speed-test rows (`core/bench.js`, after 'no small plants'): 'no near grass', 'near grass: the blades only (the fine
@@ -33,8 +36,9 @@ far-view lane edits that file).
    the low one), fades in 0.5-1.2 m, gone above 14 m: three times the fine ring's blades a square metre, each blade's
    own range 5 to 7 m. THE BLADES' OWN GREENS: a blade takes a quarter of the ground's wash where it took six tenths, and
    in the oil look the biome's `oil.under.leaf` (the greens its PROP undergrowth wears; the autumn wood's watercolour
-   `under` is straw); a biome may set `oil.flora.sward` = { gm, carpet }. A blade's lowest fifth is a step deeper (dark
-   roots). THE SHEEN: PHYSICS' bend leaning a blade away from the eye lifts it a step (needs physics: the game, or the
+   `under` is straw); a biome may set `oil.flora.sward` = { gm, carpet }. (A step deeper at a blade's root was built and
+   TAKEN OUT in step 5: LOOK-RULES R3.1, a stroke is one flat colour; the sward's dark roots are the ground's paint under
+   it, `bloom.js bloomTint` with a biome's `oil.flora.sward.floor`.) THE SHEEN: PHYSICS' bend leaning a blade away from the eye lifts it a step (needs physics: the game, or the
    gallery's `&physics=1`). SEEN, before and after at the same camera (`docs/shots/painter/flora-design/g2g4-*`): the
    autumn landing at 1.8 m goes from a leaf carpet with straw blades to a sward of green and yellow-green blades; the
    green wood gets dark spiky blades against the light; the meadow fills in near the feet; from 10 m nothing changes (the
@@ -61,14 +65,46 @@ far-view lane edits that file).
    24 Nov: +11,300 fragments at the meadow (205,826 -> 217,000) and +23,600 at the landing (230,452 -> 254,100). DERIVED
    for the phone: +0.2 to +0.5 ms for four times the blades near the feet, before the cull's saving (-0.3 to -1.9 ms).
 
+5. THE FLOWERS, F1-F3 AND A1 (`world/bloom.js` new; `data/looks/earth.js` `FLORA_TF` ... `FLORA_MW` as each biome's
+   `oil.flora`; `nearground.js` `layBlooms`, `layBroad`'s drift touches, `iTone` (a mark's second colour, packed:
+   `packTone`), `BLOOM_HEAD` 2.0; `materials.js` the six heads in `NEAR_FRAG` (kinds 7 rayed, 8 cup, 9 bell, 10 spike,
+   11 froth, 12 cushion), `vTone`, the head's height in pixels in `vTeeth`, the `lying` test now 5.5 to 6.5;
+   `surface.js` ONE call `bloomTint` at the end of `sample`; `core/bench.js` 'no flower heads' (`uNearK.z`).)
+   THE MAP: `bloomAt` decides for any point which of the biome's kinds blooms there and how densely, from its habitat
+   (canopy, wet -- near a river or a little above standing water --, meadow, height, cliff lip, rock), drifts at the
+   kind's own size, colonies four times that, and slopes rich or poor at 430 m. Every distance reads it: the fine ring
+   lays PLANTS (a stalk, a leaf, one to six heads by kind, each head one of six shapes in two flat colours, its second
+   colour data, details cut only where a piece is two pixels or more); the middle ring lays the drift's colour as round
+   touches (a spike taller, a cushion a cushion); the ground's colour takes the drift (near paint 0.4 of its cover, far
+   colour up to 0.7). Five or six kinds a place in named pigments (bluebell, anemone, campion, buttercup, foxglove;
+   aster, harebell, hawkbit, goldenrod; gentian, alpine aster, ox-eye, globe flower, alpine pink, poppy; thrift, sea
+   campion, sea aster, trefoil; marigold, loosestrife, meadowsweet, cotton grass, yellow flag; desert marigold,
+   globemallow). SEEN, bloom off and on at the same cameras (`f-*-bloom-off-on.jpg`): the meadow at 1.8 m a real
+   wildflower meadow, a drift of violet asters with gold eyes in front, ox-eye and poppies behind (`f-meadow-asters-crop-
+   3x.jpg`: the petals and eyes clean, lit and shaded whole); the green wood a bluebell drift under the trees with
+   anemones; the autumn landing harebells and hawkbit; the coast pink thrift cushions and violet asters (its yellow
+   trefoil had vanished on the ochre grass: cut back); the wetland cotton grass and marigolds; from 10 m the meadow's
+   drifts are pale and red patches. NOT GOOD ENOUGH YET: from 150 m a drift is only a faint pale patch (the colour mixed
+   into the ground is a mixture; the cure is a dab that takes the flower's colour WHOLE, which needs a channel in
+   `patchgen.js` and a branch in `TERRAIN_FRAG`: the far-view lane's files, asked of the coordinator); the first heads
+   at real size (two to three centimetres) sank into the denser sward as dots, hence `BLOOM_HEAD` 2.
+   MEASURED: Node, 61,206 full surface samples over the six places, 331 ms with the map against 364 without (noise: the
+   map costs nothing measurable in the ground's build); the scratch overdraw counter at the meadow: fine ring 91,786 ->
+   93,821 fragments, middle ring 59,756 -> 54,873 (the touches replace the old dashes): THE FLOWERS COST NO FRAGMENTS
+   NET; about 2,500 more marks in the fine ring, most of them outside the picture and dropped by the cull. DERIVED for
+   the phone: about 0 to +0.1 ms. Row: 'no flower heads'.
+   NOT DONE IN THIS STEP: the year (the flowers are laid once and do not follow `SEASON`; a ground's colour baked at
+   different moments would seam); A2-A3 (the vista ring's drifts and the comb).
+
 **Tests:** `tests/` 325 of 325, `src/world/` + `src/data/looks/` 65 of 65. `src/physics/` 415 of 416: the one failure is
 `loose.test.mjs` P25 ("under the closed wood the litter still puffs: 2"), which is FLAKY ON THE CLEAN COMMIT TOO (it
 failed 1 run in 5 there with none of this lane's changes): reported to the coordinator, not this lane's.
 
-**Next:** step 5: `world/bloom.js` (the one map of where flowers grow), the flower kinds per place (`earth.js`
-`oil.flora.blooms`), heads as new touch shapes, the middle band's drift touches, ONE `bloomTint` call in `surface.js`;
-then the vista ring's drifts and the comb (A2-A3).
+**Next:** A2-A3, the vista ring's drifts and the grass's comb; then the look director's standard set (S1-S6 at 1024 x
+480) with `lookstats.py` for the review; O and F4 wait for the trees lane.
 
+
+## Hand-over of THE OIL LOOK, prototype on branch `look-proto` (READ THIS FIRST; kept current)
 
 Branch: `look-proto`, cut from `main` at `5e85754`. Nothing here is live. The plan, the owner's instructions, the sort of
 the references and the crispness rule are on branch `r2`: `docs/HANDOVER.md` (section 2, and 4a-2: the overhaul plan the
