@@ -496,8 +496,10 @@ class RiverNet {
     //    one (the level the field is taken at changes across the river: so a twig never crosses it)
     const parent = Math.max(0, dC - hw);
     let ku = 0, kv = 0;
-    const fm = R / 190, mask = smoothstep(-0.05, 0.25, nA(x * fm - 61.1, y * fm + 2.9, z * fm + 30.3));
-    if (parent < 110 && mask > 0.01) {
+    // (?runoff=1: the twigs are RUNNELS, water only in the wet, and reach further up the slopes: 160 m from a stream)
+    const ro = MODE.water && MODE.water.runoff, twigR = ro ? 160 : 110;
+    const fm = R / 190, mn = nA(x * fm - 61.1, y * fm + 2.9, z * fm + 30.3), mask = ro ? smoothstep(-0.45, -0.15, mn) : smoothstep(-0.05, 0.25, mn);
+    if (parent < twigR && mask > 0.01) {
       const e = 2.0, eR = e / R, K3 = 150 / 1.25;
       const q0 = S._sf3(x, y, z), qf = q0 - (sd > 0 ? 0 : 0.17);
       let qs = Math.abs(qf) * K3;
@@ -507,7 +509,7 @@ class RiverNet {
         const g3 = Math.sqrt((q1 - q0) * (q1 - q0) + (q2 - q0) * (q2 - q0)) / e;
         const qt = Math.abs(qf) / Math.max(g3, 0.42 / K3);
         qs = qt + (qs - qt) * smoothstep(28, 45, qs);
-        lay(qs, 0.5 * mask * (1 - smoothstep(10, 85, parent)), 3.0, 2);
+        lay(qs, 0.5 * mask * (1 - smoothstep(10, ro ? 125 : 85, parent)), 3.0, 2);
       }
     }
     c.pool = deep; c.bar = bar;
@@ -540,7 +542,14 @@ class RiverNet {
     if (lake > 0) lv += (dr.level - lv) * lake;
     c.lvR = lv;
     c.still = Math.max(lake, deep * 0.6);
-    c.swell = win === 0 ? Math.min(1, Math.pow(Math.max(acc, 1) / 400, 0.4)) : win === 2 ? 0.1 : 0;
+    c.swell = Math.max(win === 0 ? Math.min(1, Math.pow(Math.max(acc, 1) / 400, 0.4)) : win === 2 ? 0.1 : 0, lake * 0.6);
+    // (?runoff=1: WATER THAT IS THERE ONLY IN THE WET -- the runnels, and the heads of the smallest streams of the tree -- with
+    //  its depth at full wet; the level above is that full level, so the water's mesh holds it, and the paint shows it only
+    //  as far as the rain has filled it: world/waterstate.js, the water-paint lane's uRunoff)
+    if (ro && best < W + 1) {
+      if (win === 2) c.cap = 0.6;
+      else if (win === 0 && si >= 0 && acc < 40) c.cap = 0.6 * (1 - smoothstep(24, 40, acc));
+    }
     return best;
   }
 }

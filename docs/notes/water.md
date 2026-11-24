@@ -98,6 +98,30 @@ This session is the water group's lead: it answers their questions on the design
 - NEXT for W1, if the review asks: stronger meanders on the big rivers (references: long S-bends); the main river by the
   landing is now a brook (a spring with a larger catchment would bring a wider one past it: one number in Earth's look).
 
+### RUNOFF (data side built 24 Nov, this session; ?runoff=1 with ?rivers=tree): the owner's own ask
+
+"how the water collects and drifts into ponds or into runways into the rivers and oceans". The DATA is this session's, the
+DRAWING the water-paint lane's (E-W3/W4): the contract below was sent to it before building.
+- `src/data/mode.js`: `?runoff=1` (`MODE.water.runoff`; counts as a part that changes the world).
+- `src/world/rivers.js` (under runoff): the twigs are RUNNELS: about four in five of them run (half without runoff), and
+  they reach 160 m from a stream (110 without); `c.cap = 0.6` m on a runnel, and on the heads of the tree's smallest streams
+  (catchment under 40 nodes, eased from 24); the water level there is the FULL one. `c.swell` (how much water rises after
+  rain) is now also 0.6 of a lake's basin.
+- `src/world/waterstate.js` (new): `WATERSTATE = { wet, rise, mud, rain, from }`, a hydrograph at the eye stepped once a
+  frame (a WATER_PART): from the weather's rain field when the physics has it (`physics.fields.rain.rainBetween` over the
+  last 30 min and 3 h, asked twice a second), else from the ground's wetness (the world's `uWx.y`). `RUNOFF` holds the
+  numbers: runnels full at 2 mm in half an hour, up in 60 s, down in 600 s; streams up to 0.4 m for 20 mm in three hours,
+  up in 300 s, down in 1,800 s; mud 0.7 of the rise.
+- `src/world/waterhooks.js`: loads waterstate.js when `?runoff=1`; the frame's ctx now carries `physics` (world/index.js
+  passes it).
+- THE PAINT'S SIDE (E-W3/W4): `depthNow = vDepth - (1 - WATERSTATE.wet) * cap`, discard where none is left; the water lifted
+  by `WATERSTATE.rise * swell`; a swollen river browner by `mud`. Until that lands ?runoff=1 shows only the longer, denser
+  twigs, all the time.
+- SEEN (a Node map of the surface, not the renderer): `docs/shots/painter/water-runoff/map-runoff-storm-dry-3km.jpg`, the
+  runnels (cyan) running at full wet and gone in the dry.
+- Test: `src/world/runoff.test.mjs` (the switch; the hydrograph's timings; the part reading the rain field when there is
+  one, the wetness when not, not every frame; the data: runnels carry cap, rivers swell, the landing dry).
+
 ## Stations and tools
 
 The stations E0..E12 are in the design's appendix B; the camera helper for the gallery in appendix A (`window.__off`,

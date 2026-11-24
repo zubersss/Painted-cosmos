@@ -11,9 +11,10 @@
 //                        world's first terrain patch (a patch built earlier keeps the old ground and will not meet its
 //                        neighbours), so main.js calls it for the first world and world/index.js for every world the eye
 //                        arrives at, at the top of its frame.
-//   frame(st, dt, camL)  the water's own frame for the world the eye is on (world/index.js, once a frame): every part in
-//                        WATER_PARTS is stepped. A part registers itself from its own module when it is loaded:
-//                          WATER_PARTS.push({ name, update(ctx) })   ctx = { st, bodyId, root, body, dt, camL, lighting }
+//   frame(st, dt, camL, lighting, physics)  the water's own frame for the world the eye is on (world/index.js, once a frame):
+//                        every part in WATER_PARTS is stepped. A part registers itself from its own module when it is loaded:
+//                          WATER_PARTS.push({ name, update(ctx) })   ctx = { st, bodyId, root, body, dt, camL, lighting, physics }
+//                        (physics: PHYSICS' facade when the game runs one, else null: its fields.rain is the weather's rain)
 //   WATER_BENCH          rows for the speed test's two water views (core/bench.js): a part pushes
 //                          { name, view: 'bank' | 'shore', on: () => ..., off: () => ... }
 //                        and the test times it against that view's own "as set" row. So a lane adds its own rows without
@@ -29,7 +30,7 @@ const attached = new Set();
 // The parts of the WORLD the address asks for (the paint's and the player's parts are read where they are used).
 function wants() {
   const W = MODE.water || {};
-  return { rivers: !!W.rivers, hydro: !!(W.lakes || W.ponds || W.puddles || W.falls || W.fjord), falls: !!W.falls };
+  return { rivers: !!W.rivers, hydro: !!(W.lakes || W.ponds || W.puddles || W.falls || W.fjord), falls: !!W.falls, runoff: !!W.runoff };
 }
 
 export function loadWater() {
@@ -43,6 +44,7 @@ export function loadWater() {
     w.rivers ? one('./rivers.js') : null,
     w.hydro ? one('./hydro.js') : null,
     w.falls ? one('./falls.js') : null,      // (it registers itself in WATER_PARTS when it loads)
+    w.runoff ? one('./waterstate.js') : null, // (so does the runoff's hydrograph)
   ]).then(([d, r, h]) => { DR = d; RIV = r; HYD = h; return true; });
   return loaded;
 }
@@ -60,10 +62,11 @@ export function ensureWater(bodyId) {
   } catch (e) { console.warn('water: the parts did not attach to ' + bodyId, e); }
 }
 
-const _ctx = { st: null, bodyId: '', root: null, body: null, dt: 0, camL: null, lighting: null };
-export function frame(st, dt, camL, lighting) {
+const _ctx = { st: null, bodyId: '', root: null, body: null, dt: 0, camL: null, lighting: null, physics: null };
+export function frame(st, dt, camL, lighting, physics) {
   if (!WATER_PARTS.length || !st) return;
   _ctx.st = st; _ctx.bodyId = st.id; _ctx.root = st.root; _ctx.body = st.body; _ctx.dt = dt; _ctx.camL = camL; _ctx.lighting = lighting;
+  _ctx.physics = physics || null;
   for (const p of WATER_PARTS) {
     try { p.update(_ctx); } catch (e) { if (!p._warned) { p._warned = true; console.warn('water: ' + p.name + ' failed', e); } }
   }
