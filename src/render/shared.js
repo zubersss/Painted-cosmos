@@ -105,6 +105,7 @@ export const LOOK = {
   // of bright LIME crowns, lit at V 0.91 over the rules' 0.60-0.82): world/flora.js lays the trees' summer leaf colours
   // through it. 1 unless ?light=old; ?canopygreen=0 alone is the colours as they were.
   canopyGreen: _qn('canopygreen', _LN),
+  treeVar: _qn('treevar', _LN),      // (each summer tree its own green: OIL.uLookG.y)
 };
 MODE.oil = LOOK.oil;      // (for the look data and the surface, which do not load this module: data/mode.js)
 MODE.calm = LOOK.oil && !!(_qs && _qs.get('floor') === 'calm');      // (a calmer forest floor, to compare: data/looks/earth.js)
@@ -226,6 +227,8 @@ export const OIL = {
   // THE GOLDEN HOUR'S SKY (24 Nov, the coordinator: the golden-hour sky was one flat ochre wash; world/sky.js):
   //   x how far the sky's gold lies toward the sun and in bands, cooling and deepening away from it and overhead
   //     (1 unless ?light=old; ?goldsky=0 alone is the wash as it was)
+  //   y each summer tree its own green (chunks.js pcSummerTree): world/index.js sets it each frame to LOOK.treeVar times
+  //     one less the season (0 in autumn); ?treevar=0 alone, or ?light=old, is every tree of a kind in the same greens
   uLookG: { value: new THREE.Vector4(_qn('goldsky', _LN), 0, 0, 0) },
 };
 

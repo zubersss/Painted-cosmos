@@ -1865,6 +1865,7 @@ void main() {
         lA = mix(lA, pa, famL.a); lB = mix(lB, pb, famL.a);
         lC = mix(lC0, mix(pb, lC0, 0.55) * vec3(0.92, 0.80, 0.84), famL.a);
       }
+      { float tsL = fract(inst.z * 9.73 + 0.37); lA = pcSummerTree(lA, tsL, uLookG.y); lB = pcSummerTree(lB, tsL, uLookG.y); lC = pcSummerTree(lC, tsL, uLookG.y); }      // (each summer tree its own green: chunks.js)
       float twigL = step(1.5, kindL);
       float hueL = inst.x + (hL - 0.5) * 1.7;
       vec3 cs = mix(lA, lB, clamp(0.5 + hueL * 0.5, 0.0, 1.0));
@@ -2167,6 +2168,7 @@ void main() {
       leafA = mix(leafA, pa, famO.a); leafB = mix(leafB, pb, famO.a);
       leafC = mix(leafC, mix(pb, leafC, 0.55) * vec3(0.92, 0.80, 0.84), famO.a);
     }
+    { float tsO = fract(vInst.z * 9.73 + 0.37); leafA = pcSummerTree(leafA, tsO, uLookG.y); leafB = pcSummerTree(leafB, tsO, uLookG.y); leafC = pcSummerTree(leafC, tsO, uLookG.y); }      // (each summer tree its own green: chunks.js)
     float snowyO = step(0.5, kindO) * step(kindO, 1.5), twigO = step(1.5, kindO);
     // (a leaf at the lens is a slab across the picture: within two and a half to four and a half metres of the eye, each
     // leaf by its own number, the leaves of a tree are not laid, whole: the eye stands in a ragged window. Of a tree of
