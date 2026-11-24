@@ -212,15 +212,15 @@ vec3 pcShadeLeaf(vec3 c) {
 // variety between crowns, some warmer and golder, some bluer and deeper, by kind and by tree, so the summer wood from
 // the air reads as many trees, not one green"). The autumn wood already does this (each tree keeps to its own piece of
 // yellow, orange and red: uLeafFam); a summer wood had every tree of a kind in the same three greens. By the tree's own
-// number tf (0..1): three in ten lean warm and golden (more red, less blue, a breath lighter), three in ten lean cool,
-// blue and deeper, the rest stay as they are, each by a small amount so no crown leaves the canopy's band (lit V 0.60
-// to 0.82). k is uLookG.y: how much summer there is (world/index.js: the switch times one less the season), 0 in autumn,
+// number tf (0..1): over a third lean warm and golden (more red, less blue, a breath lighter), over a third lean cool,
+// blue and deeper, the rest stay as they are, each by an amount that keeps every crown in the canopy's band (lit V 0.60
+// to 0.82). (Strengthened once after the first stills: at 150 m the first amounts read as one green.) k is uLookG.y: how much summer there is (world/index.js: the switch times one less the season), 0 in autumn,
 // so the autumn wood's own colours are untouched.
 vec3 pcSummerTree(vec3 c, float tf, float k) {
   if (k <= 0.0) return c;
-  vec3 warm = c * vec3(1.10, 1.03, 0.80);
-  vec3 cool = pcDensity(c * vec3(0.86, 0.96, 1.12), 1.18);
-  float w = smoothstep(0.62, 0.72, tf), q = 1.0 - smoothstep(0.28, 0.38, tf);
+  vec3 warm = c * vec3(1.17, 1.06, 0.72);
+  vec3 cool = pcDensity(c * vec3(0.80, 0.95, 1.18), 1.28);
+  float w = smoothstep(0.60, 0.66, tf), q = 1.0 - smoothstep(0.34, 0.40, tf);
   return mix(c, clamp(mix(mix(c, warm, w), cool, q), 0.0, 1.0), k);
 }
 // ONE LIGHT (L3, 2026-11-24; LOOK-AUDIT F3, LOOK-RULES R1.2a). The level for a stroke facing the sun by x (half-
