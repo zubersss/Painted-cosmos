@@ -326,6 +326,7 @@ export function attachBench(pc) {
     ];
     // ---- THE TENTH FORM'S HANDLES (see the top of this file) ----------------------------------------------------
     const tallMats = () => mats(/^pc-prop-tall/);
+    const ORDER_OLD = /[?&]treeorder=0\b/.test(location.search || '');      // (flora.js TREES_AFTER_GROUND turned off)
     const tallMeshes = (fn) => pc.scene.traverse((o) => { if (o.isMesh && o.material && /^pc-prop-tall/.test(mname(o))) fn(o); });
     const nearPart = (v) => () => { const f = flora(); if (f) f.benchNear = v; };
     // (no wind in the near trees' vertex shader: their own uPhysOn is 0 while the rest of the world's stays as it is.
@@ -380,7 +381,10 @@ export function attachBench(pc) {
       bark: ['near bark one flat colour', () => B({ flat: 7 }), () => B({ flat: 0 })],
       wind: ['near trees: no wind in shader', () => noWind(true), () => noWind(false)],
       side: ['near trees one-sided', () => oneSide(true), () => oneSide(false)],
-      order: ['near trees after the ground', () => tallMeshes((o) => { o.renderOrder = 6; }), () => tallMeshes((o) => { o.renderOrder = 0; })],
+      // (24 Nov: the near trees are drawn after the ground BY DEFAULT now, flora.js TREES_AFTER_GROUND, after this row read
+      //  -0.8 ms on the owner's phone; so the row asks the other way round, unless the address put the old order back)
+      order: ORDER_OLD ? ['near trees after the ground', () => tallMeshes((o) => { o.renderOrder = 6; }), () => tallMeshes((o) => { o.renderOrder = 0; })]
+        : ['near trees before the ground (as before)', () => tallMeshes((o) => { o.renderOrder = 0; }), () => tallMeshes((o) => { o.renderOrder = 6; })],
       a2c: ['plants without alpha-to-cov', () => a2c(false), () => a2c(true)],
       blob: ['far trees as crossed cards', () => farForm('blob'), () => farForm(form0)],
       // (T1: the far trees as painted impostors, two triangles a tree, swapped in the same minute; render/impostor.js.
