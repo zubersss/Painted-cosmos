@@ -307,3 +307,16 @@ the owner first. Not started.
   a modest mottle of warmer olive and bluer crowns, not yet a clear many-trees read, because at that distance a crown
   is a few strokes (A1's two-step small crowns, `?impsmall=1`, should let it carry). Stills: build/canopy/treevar_*.
 
+
+## The olive darks (c0ec9f8, 24 Nov): SEEN
+
+- chunks.js pcShadeLeaf, inside the L2 quieting (so `?leafshade=0` or `?light=old` take it out): besides the
+  strongly green darks, dark strokes of hue 44 to 200 under value 0.28-0.34 and over saturation 0.50-0.70 are also
+  turned toward the cool shade's grey, so the olive and ochre-green darks in shade stop reading as mud.
+- SEEN (look-director with and without c0ec9f8, one page each, phone settings): green wood vista 12 and 16.8, coast
+  16.8, autumn stream 16.8. Changed pixels 1.5, 2.2, 0.0 and 3.2 per cent; on them saturation 0.39 to 0.26, 0.58 to
+  0.43, 0.87 to 0.57 (the autumn stream's shaded grass blades), value up 0.01 to 0.03. Hues changed 49 to 71 (10th to
+  90th percentile): the warm reds and oranges untouched. The darks land at about S 0.55, R2.2's target. Stills:
+  build/olive/ (top without, below with).
+- The fresh-eyes audit of v39.2 and its three findings are in `docs/lead/LOOK-AUDIT-2.md`; the cloud shell's limb
+  (?skylimb) fixed on the way is in its section 4.
