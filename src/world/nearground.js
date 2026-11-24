@@ -729,13 +729,19 @@ class Ring {
       if (o.kind >= 0 && o.dens > 0.03 && left > 1) {
         const b = o.bloom, sh = SHAPES[b.shape] || 0, v = o.dens * (far ? 10 : 9) * (two2 ? 1.5 : 1), yr = win ? packWin(win) : packYear(b), tone = (b.eye ? packTone(b.eye) : 0) + yr;
         const nf = Math.min(cap, left - 1, Math.floor(v) + (H(100 + ho) < v - Math.floor(v) ? 1 : 0));
-        const b1 = b, sh1 = sh, tone1 = tone, B2 = o.bloom2, mx2 = o.mix;
+        // (the look director on the final set: past the near ring "the heads are many tiny dots of every colour side by
+        // side, which starts to read as confetti; let each drift keep to one or two kinds at that distance": the runner-up
+        // takes a fifth of the share it takes near the eye; and from the far ring a white head is held a step under the
+        // meadow's lightest grass, as at 150 m pale flecks read as the paper)
+        const b1 = b, sh1 = sh, tone1 = tone, B2 = o.bloom2, mx2 = o.mix * 0.2;
         for (let q = 0; q < nf; q++, k++) {
-          const q1 = H(102 + q + ho), q2 = H(106 + q + ho), q3 = H(110 + q + ho), p = at(q1, q2), jit = 0.94 + 0.12 * q2;
+          const q1 = H(102 + q + ho), q2 = H(106 + q + ho), q3 = H(110 + q + ho), p = at(q1, q2);
+          let jit = 0.94 + 0.12 * q2;
           // (some touches are the runner-up drift's, as in the near ring)
           const two = B2 && H(114 + q + ho) < mx2, b = two ? B2 : b1, sh = two ? (SHAPES[B2.shape] || 0) : sh1;
           const tone = two ? (B2.eye ? packTone(B2.eye) : 0) + (win ? yr : packYear(B2)) : tone1;
           const st0 = b.stalk ? b.stalk[0] + (b.stalk[1] - b.stalk[0]) * q3 : 0.2;
+          if (far) { const mxc = Math.max(b.c[0], b.c[1], b.c[2]), mnc = Math.min(b.c[0], b.c[1], b.c[2]); if (mxc - mnc < 0.25 * mxc) jit *= 0.8; }
           if (sh === SHAPES.cushion) {
             const r0 = (b.head[0] + (b.head[1] - b.head[0]) * q1) * 1.3 * kw, bc = b.body || b.c;
             this.put(p[0], p[1], 0, 0, 0, r0 * 1.4, r0, SHAPES.cushion, q3, born, bc[0], bc[1], bc[2], 0, 0, packTone(b.c) + (win ? yr : packYear(b)));

@@ -31,7 +31,7 @@ const FLORA_TF = {      // the green wood: carpets under the open canopy, campio
     { kind: 'bluebell', shape: 'bell', c: M('cobaltViolet', 'ultramarine', 0.2), head: [0.010, 0.015], stalk: [0.16, 0.30], heads: [3, 6], drift: 8, peak: 22, share: 0.8, hab: { canopy: [0.05, 0.35] }, season: [0, 0.45], bold: 1 },
     { kind: 'wood anemone', shape: 'rayed', c: D('cobaltViolet', 0.86), eye: M('quinGold', 'lemonYellow', 0.4), head: [0.012, 0.018], stalk: [0.08, 0.16], heads: [1, 1], drift: 6, peak: 26, share: 0.7, hab: { canopy: [0.05, 0.30] }, season: [0, 0.35] },
     { kind: 'red campion', shape: 'rayed', c: M('alizarin', 'roseMadder', 0.5), head: [0.012, 0.019], stalk: [0.32, 0.58], heads: [1, 3], drift: 9, peak: 10, share: 0.6, hab: { canopy: [0.6, 0.1] }, season: [0, 0.8], bold: 1 },
-    { kind: 'buttercup', shape: 'cup', c: K('lemonYellow', 'lemonYellow'), eye: mixc(K('lemonYellow', 'lemonYellow'), K('lemonYellow', 'quinGold'), 0.4), head: [0.011, 0.017], stalk: [0.24, 0.48], heads: [1, 4], drift: 10, peak: 16, share: 0.9, hab: { canopy: [0.5, 0.0], wet: [-0.6, 0.4] }, season: [0, 0.7], bold: 1 },
+    { kind: 'buttercup', shape: 'cup', c: K('lemonYellow', 'lemonYellow'), eye: mixc(K('lemonYellow', 'lemonYellow'), pig('oliveGreen'), 0.25), head: [0.011, 0.017], stalk: [0.24, 0.48], heads: [1, 4], drift: 10, peak: 16, share: 0.9, hab: { canopy: [0.5, 0.0], wet: [-0.6, 0.4] }, season: [0, 0.7], bold: 1 },
     { kind: 'foxglove', shape: 'spike', c: M('roseMadder', 'alizarin', 0.35), head: [0.14, 0.26], stalk: [0.55, 0.95], heads: [1, 1], drift: 12, peak: 3, share: 0.35, hab: { canopy: [0.7, 0.25] }, season: [0, 0.6], bold: 1 },
     // (the year, the coordinator's ruling of 24 Nov: every place keeps a bold kind in flower near the eye in every season;
     // in the green wood's autumn the cyclamen under the crowns and the hawkbit in the glades)
@@ -64,17 +64,19 @@ const FLORA_AW = {      // the autumn wood: violet against the gold and yellow-g
 // highest channel 0.88; the asters held violet, hue 255 or more, never the cloak's blue. Under the new light of v39 the
 // meadow at 1.8 m measured V > 0.90 4.8 % (2.7 of it yellow): the buttercups' and hawkbits' yellow is the glaze of lemon on
 // lemon itself (0.86, hue 50) and the meadow buttercup a little fewer, heads [1, 2], peak 13, share 0.75; retaken, 4.1 %
-// (yellow 1.9, white 1.3, red 0.9): the poppy's scarlet a quarter alizarin, the ox-eye D 0.70.)
+// (yellow 1.9, white 1.3, red 0.9): the poppy's scarlet a quarter alizarin, the ox-eye D 0.70. The coordinator on batch 1:
+// near buttercups still leaned orange: a yellow cup's upper part is its own yellow a step deeper (a quarter olive, hue
+// 51), no gold; the marsh marigold and the yellow flag take the same yellow.)
 const FLORA_AM = {      // the alpine meadow: gentian and pinks on the high turf, globe flower in the damp, ox-eye on the dry
   sward: { floor: 0.08 },
   blooms: [
     { kind: 'gentian', shape: 'cup', c: mixc(K('cobaltViolet', 'cobaltViolet'), pig('ultramarine'), 0.2), head: [0.012, 0.019], stalk: [0.04, 0.10], heads: [1, 1], drift: 6, peak: 20, share: 0.8, hab: { height: [120, 380] }, season: [0, 0.55], bold: 1 },
     { kind: 'alpine aster', shape: 'rayed', c: M('cobaltViolet', 'roseMadder', 0.15), eye: M('quinGold', 'lemonYellow', 0.3), head: [0.014, 0.021], stalk: [0.10, 0.20], heads: [1, 1], drift: 8, peak: 12, share: 0.45 },
     { kind: 'ox-eye daisy', shape: 'rayed', c: D('neutralTint', 0.70), eye: M('quinGold', 'lemonYellow', 0.3), head: [0.020, 0.030], stalk: [0.25, 0.50], heads: [1, 2], drift: 10, peak: 16, share: 1.0, hab: { wet: [0.6, 0.0] }, season: [0, 0.6], bold: 1 },
-    { kind: 'globe flower', shape: 'cup', c: K('lemonYellow', 'lemonYellow'), eye: mixc(K('lemonYellow', 'lemonYellow'), K('lemonYellow', 'quinGold'), 0.4), head: [0.016, 0.024], stalk: [0.25, 0.45], heads: [1, 1], drift: 9, peak: 10, share: 0.6, hab: { wet: [0.0, 0.5] }, season: [0, 0.45] },
+    { kind: 'globe flower', shape: 'cup', c: K('lemonYellow', 'lemonYellow'), eye: mixc(K('lemonYellow', 'lemonYellow'), pig('oliveGreen'), 0.25), head: [0.016, 0.024], stalk: [0.25, 0.45], heads: [1, 1], drift: 9, peak: 10, share: 0.6, hab: { wet: [0.0, 0.5] }, season: [0, 0.45] },
     { kind: 'alpine pink', shape: 'cushion', c: pig('roseMadder'), body: M('sapGreen', 'hookersGreen', 0.5), head: [0.05, 0.10], stalk: [0, 0], heads: [1, 1], drift: 7, peak: 6, share: 0.5, season: [0, 0.7] },
     { kind: 'alpine poppy', shape: 'cup', c: M('cadScarlet', 'alizarin', 0.25), eye: M('alizarin', 'sepia', 0.5), head: [0.020, 0.032], stalk: [0.20, 0.40], heads: [1, 2], drift: 10, peak: 14, share: 1.0, season: [0, 0.85], bold: 1 },
-    { kind: 'meadow buttercup', shape: 'cup', c: K('lemonYellow', 'lemonYellow'), eye: mixc(K('lemonYellow', 'lemonYellow'), K('lemonYellow', 'quinGold'), 0.4), head: [0.011, 0.017], stalk: [0.25, 0.50], heads: [1, 2], drift: 10, peak: 13, share: 0.75, season: [0, 0.7], bold: 1 },
+    { kind: 'meadow buttercup', shape: 'cup', c: K('lemonYellow', 'lemonYellow'), eye: mixc(K('lemonYellow', 'lemonYellow'), pig('oliveGreen'), 0.25), head: [0.011, 0.017], stalk: [0.25, 0.50], heads: [1, 2], drift: 10, peak: 13, share: 0.75, season: [0, 0.7], bold: 1 },
     // (the year: the high meadow's autumn, pale violet crocus cups out of the turf, and the hawkbit's yellow)
     { kind: 'autumn crocus', shape: 'cup', c: M('cobaltViolet', 'roseMadder', 0.3), eye: D('cobaltViolet', 0.45), head: [0.014, 0.022], stalk: [0.05, 0.12], heads: [1, 1], drift: 9, peak: 14, share: 0.8, season: [0.55, 1], bold: 1 },
     { kind: 'autumn hawkbit', shape: 'rayed', c: K('lemonYellow', 'lemonYellow'), eye: pig('quinGold'), head: [0.014, 0.021], stalk: [0.14, 0.34], heads: [1, 2], drift: 11, peak: 14, share: 0.8, season: [0.4, 1], bold: 1 },
@@ -99,14 +101,17 @@ const FLORA_DC = {      // the desert canyon: sparse, after rain, in the washes 
     { kind: 'globemallow', shape: 'cup', c: pig('cadOrange'), head: [0.010, 0.015], stalk: [0.20, 0.40], heads: [3, 6], drift: 10, peak: 4, share: 0.5, sprinkle: 0.02, bold: 1 },
   ],
 };
+// (LOOK-RULES C6, the final set 24 Nov: the wetland at 1.8 m measured V > 0.90 5.2 % in summer and 6.9 % in autumn against
+// 0.1 % with ?flora=old, nearly all of it cotton grass, which spread over the autumn wetland as paper-white tufts: its
+// white is a soft grey-white, D 0.78, and a third fewer; the meadowsweet's cream a step down, D 0.60)
 const FLORA_MW = {      // the misty wetland: marigold and iris at the water, loosestrife on the banks, cotton grass over the bog
   sward: { floor: 0.06 },
   blooms: [
-    { kind: 'marsh marigold', shape: 'cup', c: M('quinGold', 'lemonYellow', 0.3), eye: M('quinGold', 'cadOrange', 0.35), head: [0.016, 0.024], stalk: [0.12, 0.25], heads: [1, 2], drift: 6, peak: 14, share: 0.9, hab: { wet: [0.4, 0.9] }, season: [0, 0.4], bold: 1 },
+    { kind: 'marsh marigold', shape: 'cup', c: K('lemonYellow', 'lemonYellow'), eye: mixc(K('lemonYellow', 'lemonYellow'), pig('oliveGreen'), 0.25), head: [0.016, 0.024], stalk: [0.12, 0.25], heads: [1, 2], drift: 6, peak: 14, share: 0.9, hab: { wet: [0.4, 0.9] }, season: [0, 0.4], bold: 1 },
     { kind: 'purple loosestrife', shape: 'spike', c: M('alizarin', 'cobaltViolet', 0.45), head: [0.15, 0.30], stalk: [0.55, 1.0], heads: [1, 1], drift: 10, peak: 4, share: 0.6, hab: { wet: [0.3, 0.8] }, season: [0.1, 1], bold: 1 },
-    { kind: 'meadowsweet', shape: 'froth', c: D('yellowOchre', 0.7), head: [0.035, 0.06], stalk: [0.55, 0.9], heads: [1, 1], drift: 12, peak: 5, share: 0.5, hab: { wet: [0.9, 0.3] }, season: [0, 0.8] },
-    { kind: 'cotton grass', shape: 'froth', c: D('davysGrey', 0.92), head: [0.018, 0.032], stalk: [0.25, 0.45], heads: [1, 3], drift: 14, peak: 18, share: 0.8, hab: { wet: [0.1, 0.5] } },
-    { kind: 'yellow flag', shape: 'cup', c: M('lemonYellow', 'quinGold', 0.3), eye: M('quinGold', 'cadOrange', 0.35), head: [0.028, 0.042], stalk: [0.55, 0.9], heads: [1, 1], drift: 8, peak: 3, share: 0.5, hab: { wet: [0.6, 1.0] }, season: [0, 0.45], bold: 1 },
+    { kind: 'meadowsweet', shape: 'froth', c: D('yellowOchre', 0.6), head: [0.035, 0.06], stalk: [0.55, 0.9], heads: [1, 1], drift: 12, peak: 5, share: 0.5, hab: { wet: [0.9, 0.3] }, season: [0, 0.8] },
+    { kind: 'cotton grass', shape: 'froth', c: D('davysGrey', 0.78), head: [0.018, 0.032], stalk: [0.25, 0.45], heads: [1, 3], drift: 14, peak: 12, share: 0.8, hab: { wet: [0.1, 0.5] } },
+    { kind: 'yellow flag', shape: 'cup', c: K('lemonYellow', 'lemonYellow'), eye: mixc(K('lemonYellow', 'lemonYellow'), pig('oliveGreen'), 0.25), head: [0.028, 0.042], stalk: [0.55, 0.9], heads: [1, 1], drift: 8, peak: 3, share: 0.5, hab: { wet: [0.6, 1.0] }, season: [0, 0.45], bold: 1 },
   ],
 };
 
