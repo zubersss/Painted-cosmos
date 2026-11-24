@@ -5,7 +5,7 @@ import { faceToDir } from './cubesphere.js';
 import { makeSample, NOLQ, SNOW } from './surface.js';
 import { MODE } from '../data/mode.js';
 import { BODIES } from '../data/bodies.js';
-import { canopyOn, groundSeasonOn, rockfieldOn, standAt } from './farstand.js';
+import { canopyOn, groundSeasonOn, rockfieldOn, standAt, bloomFarOn } from './farstand.js';
 
 export const PATCH_N = 32;                 // cells per patch edge (even, for geomorphing)
 const N = PATCH_N, V = N + 1, E = N + 3;   // E: sample grid with a one-vertex apron for normals
@@ -40,10 +40,15 @@ export const PATCH_VERTS = V * V + 4 * V;
 const _d = [0, 0, 0];
 const _px = new Float64Array(E * E), _py = new Float64Array(E * E), _pz = new Float64Array(E * E);
 const _hh = new Float32Array(E * E), _lq = new Float32Array(E * E);
-const CS = 24;   // floats kept per sample: wash, far wash, parameters, liquid look, strata, the current, the fall, the stand, the snow
+const CS = 25;   // floats kept per sample: wash, far wash, parameters, liquid look, strata, the current, the fall, the stand
+                 // (21, 22: the far view's), how still (23: the water's), the snow (24: the far view's). (v39.2's merge into the
+                 // water branch, 24 Nov, as the coordinator's trial: the water keeps 23, the snow moved to 24, written and read
+                 // there. The water lead owns this layout for the water lanes: the runoff's cap and swell take 25 and 26.)
 const _col = new Float32Array(E * E * CS);
 const _fs = [0, 0];     // (the stand and its needle share at a sample: world/farstand.js)
+const _bl = new Float32Array(E * E * 2);      // (the flower drift at a sample, FV6(b): its cover and its palette index; kept apart from _col so it takes no sample slot)
 let _s = null;
+let _stillGrid = new Float32Array(0), _stillSamp = null;      // (scratch: the water's section, how still, on a coarse grid)
 
 function b8(v) { v = v * 255 + 0.5; return v < 0 ? 0 : v > 255 ? 255 : v | 0; }
 function sstep(a, b, x) { const t = (x - a) / (b - a); return t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t); }
@@ -106,6 +111,9 @@ export function stepPatch(job, deadline) {
   // (and the rock, FV4: how much snow the surface laid over each wash, so that it can be shed off the steep faces once
   // the patch's normals are known, below)
   const rkf = rockfieldOn(S.id);
+  // (and the flower drifts from the air, FV6(b), ?bloomfar=1: world/bloom.js's cover and palette index at each sample,
+  // packed in a byte each into an attribute of their own, aBloom; without the switch nothing is computed or built)
+  const blm = bloomFarOn(S);
   // 1. sample the surface on the apron grid, a row at a time
   // (S.foot: how far apart this patch's samples lie, in metres, while they are taken: the oil look's surface draws a
   // river into the far colour as wide as that, so that a river is still a line on the land from high up, where the
@@ -132,8 +140,10 @@ export function stepPatch(job, deadline) {
         _col[c + 17] = s.fu || 0; _col[c + 18] = s.fv || 0;      // (the oil look's rivers: the current, surface.js; 0 everywhere else)
         _col[c + 19] = s.fspd || 0; _col[c + 20] = s.turb || 0;  // (the drainage field's own speed and churn, where a surface gives them; 0 otherwise)
         if (can) { standAt(S, _d[0], _d[1], _d[2], s, _fs); _col[c + 21] = _fs[0]; _col[c + 22] = _fs[1]; }
+        _col[c + 23] = s.still || 0;                              // (the water's: how still, where a water part says; 0 otherwise)
         if (gse) { _col[c + 6] = s.canA || 0; _col[c + 7] = s.canS || 0; }
-        _col[c + 23] = rkf ? s.snowK || 0 : 0;
+        _col[c + 24] = rkf ? s.snowK || 0 : 0;                    // (the far view's snow: 24 since the water took 23)
+        if (blm) { _bl[k * 2] = s.fd || 0; _bl[k * 2 + 1] = s.fi || 0; }
       }
     }
   }
@@ -148,6 +158,7 @@ export function stepPatch(job, deadline) {
   // the same vertex as the parent's (half resolution) mesh paints it: its washes, its parameters and its
   // normal there, so a patch can show exactly what its parent showed and slide to its own look
   const colP = new Uint8Array(nv * 4), col2P = new Uint8Array(nv * 4), parP = new Uint8Array(nv * 4), norP = new Float32Array(nv * 3);
+  const blo = blm ? new Uint8Array(nv * 4) : null, bloP = blm ? new Uint8Array(nv * 4) : null;
   let boundR2 = 0;
   for (let j = 0; j < V; j++) {
     for (let i = 0; i < V; i++) {
@@ -167,7 +178,7 @@ export function stepPatch(job, deadline) {
       // Where the face is steeper than about 50 degrees most of the snow is taken off it again -- the wash under the snow is found
       // by undoing the surface's own mix (it laid SNOW over it by snowK), and laid again with less of it -- in both washes.
       if (rkf) {
-        const sk = _col[(k) * CS + 23];
+        const sk = _col[(k) * CS + 24];
         if (sk > 0.01) {
           const pr = 1 / Math.sqrt(_px[k] * _px[k] + _py[k] * _py[k] + _pz[k] * _pz[k]);
           const upn = (nor[o] * _px[k] + nor[o + 1] * _py[k] + nor[o + 2] * _pz[k]) * pr;
@@ -201,6 +212,7 @@ export function stepPatch(job, deadline) {
       // crack's depth, which the oil look's ground never paints -- the needle share; world/farstand.js)
       col2[q] = b8(_col[c + 3]); col2[q + 1] = b8(_col[c + 4]); col2[q + 2] = b8(_col[c + 5]); col2[q + 3] = can ? b8(_col[c + 21]) : 255;
       par[q] = b8(_col[c + 6]); par[q + 1] = b8(_col[c + 7]); par[q + 2] = b8(_col[c + 8]); par[q + 3] = b8(_col[c + (can ? 22 : 9)]);
+      if (blo) { blo[q] = b8(_bl[k * 2]); blo[q + 1] = b8(_bl[k * 2 + 1] / 15); }
       if (!io && !jo) {
         // the parent's own normal here: its grid is twice as wide (at the border the apron is one cell deep)
         const il2 = i > 0 ? k - 2 : k - 1, ir2 = i < N ? k + 2 : k + 1, jl2 = j > 0 ? k - 2 * E : k - E, jr2 = j < N ? k + 2 * E : k + E;
@@ -222,6 +234,8 @@ export function stepPatch(job, deadline) {
         col2P[v * 4 + t] = (col2[v1 * 4 + t] + col2[v2 * 4 + t] + 1) >> 1;
         parP[v * 4 + t] = (par[v1 * 4 + t] + par[v2 * 4 + t] + 1) >> 1;
       }
+      // (the drift's cover halfway, its colour the stronger neighbour's: an index is a name, not a number to average)
+      if (bloP) { bloP[v * 4] = (blo[v1 * 4] + blo[v2 * 4] + 1) >> 1; bloP[v * 4 + 1] = blo[(blo[v1 * 4] >= blo[v2 * 4] ? v1 : v2) * 4 + 1]; }
       if (io || jo) for (let t = 0; t < 3; t++) norP[v * 3 + t] = (norP[v1 * 3 + t] + norP[v2 * 3 + t]) * 0.5;
     }
   }
@@ -241,6 +255,7 @@ export function stepPatch(job, deadline) {
     const a = dst * 4, b = src * 4;
     norP[o] = norP[p]; norP[o + 1] = norP[p + 1]; norP[o + 2] = norP[p + 2];
     for (let t = 0; t < 4; t++) { col[a + t] = col[b + t]; col2[a + t] = col2[b + t]; par[a + t] = par[b + t]; colP[a + t] = colP[b + t]; col2P[a + t] = col2P[b + t]; parP[a + t] = parP[b + t]; }
+    if (blo) for (let t = 0; t < 4; t++) { blo[a + t] = blo[b + t]; bloP[a + t] = bloP[b + t]; }
   };
   for (let k = 0; k < V; k++) {
     skirt(S0 + k, k); skirt(S0 + V + k, N * V + k); skirt(S0 + 2 * V + k, k * V); skirt(S0 + 3 * V + k, k * V + N);
@@ -322,17 +337,93 @@ export function stepPatch(job, deadline) {
         wturb[q + 1] = aer <= 0 ? 0 : aer >= 1 ? 255 : Math.round(255 * aer);
       } }
     }
+    // HOW STILL THE WATER IS (the water's new paint, ?wpaint=1, the default: lane W3, docs/lead/WATER-DESIGN.md 3.4), into the spare
+    // byte aTurb.w: 0 water with a current .. 1 a pond, a lake, the sea. The paint lays still water's strokes along the
+    // wind's crests, long and level, and never runs them; a current's along it, running. Three things say still:
+    //  - the surface says so (s.still: the lakes, ponds and puddles of the bodies-of-water lane, when it is attached);
+    //  - there is water and no current at all (the sea, a marsh's pools);
+    //  - the water reaches far ACROSS its current, both ways: a river is long along its current and narrow across it,
+    //    a pool is wide every way. v37's rivers (surface.js _riversOil) give every point of a channel a "current" that
+    //    is the tangent of a field's contours, and where the river and its island arm spread into one pool those
+    //    contours close: the junction pond by the landing was painted as a whorl (the design's still w06). MEASURED in
+    //    Node, 1.2 km round the landing at 2 m: neither how fast the current turns (the river's own bends turn as fast as
+    //    the pond's rings over a tenth of its points) nor how well it agrees with itself within 8 or 14 m (0.97 in the
+    //    pond's middle, 0.998 in the river's) tells the pond from the river. Across the current does: the river is at
+    //    most about 44 m wide (_riversOil: half width 2.5 m times 8.9 at its widest pool), so water found WIDE_R = 27 m to
+    //    BOTH sides across the current is a pool. Asked of the surface itself (two samples), on a grid of about 6 m over
+    //    the patch and laid between, so a patch at any level gives about the same answer.
+    // (Only with the switch: without it the byte stays 0, as it was, and nothing reads it.)
+    if (wturb && MODE.water && MODE.water.wpaint >= 1) {
+      const st = (_stillSamp && _stillSamp.w.length >= S.nB) ? _stillSamp : (_stillSamp = makeSample(S.nB));
+      const gs = Math.max(1, Math.round(6 / cellM)), G = Math.ceil((V - 1) / gs) + 1;
+      if (_stillGrid.length < G * G) _stillGrid = new Float32Array(G * G);
+      const grid = _stillGrid, WR = 27 / R;
+      const wetCur = (k) => _lq[k] > -1e5 && _lq[k] > _hh[k] - 0.5 && (_col[k * CS + 17] !== 0 || _col[k * CS + 18] !== 0);
+      for (let gj = 0; gj < G; gj++) for (let gi = 0; gi < G; gi++) {
+        const i = Math.min(V - 1, gi * gs), j = Math.min(V - 1, gj * gs), k = (j + 1) * E + (i + 1);
+        let v = 0;
+        if (wetCur(k)) {
+          // the place, its two tangent axes as surface.js hands the current in, and the way across the current
+          const l0 = Math.sqrt(_px[k] * _px[k] + _py[k] * _py[k] + _pz[k] * _pz[k]), x = _px[k] / l0, y = _py[k] / l0, z = _pz[k] / l0;
+          let ux, uy, uz;
+          if (Math.abs(y) < 0.9) { ux = -z; uy = 0; uz = x; } else { ux = 0; uy = z; uz = -y; }
+          const lu = 1 / Math.sqrt(ux * ux + uy * uy + uz * uz); ux *= lu; uy *= lu; uz *= lu;
+          const vx = y * uz - z * uy, vy = z * ux - x * uz, vz = x * uy - y * ux;
+          const fu = _col[k * CS + 17], fv = _col[k * CS + 18];
+          const ax = -fv * ux + fu * vx, ay = -fv * uy + fu * vy, az = -fv * uz + fu * vz;
+          let both = 1;
+          for (let sgn = -1; sgn <= 1 && both; sgn += 2) {
+            let qx = x + ax * WR * sgn, qy = y + ay * WR * sgn, qz = z + az * WR * sgn; const lq = 1 / Math.sqrt(qx * qx + qy * qy + qz * qz);
+            S.sample(qx * lq, qy * lq, qz * lq, st, false);
+            if (!(st.lq !== NOLQ && st.lq > st.h)) both = 0;
+          }
+          v = both;
+        }
+        grid[gj * G + gi] = v;
+      }
+      for (let j = 0; j < V; j++) for (let i = 0; i < V; i++) {
+        const k = (j + 1) * E + (i + 1), q = (j * V + i) * 4;
+        let sv = _col[k * CS + 23];
+        if (_lq[k] > -1e5 && _lq[k] > _hh[k] - 0.5) {
+          if (_col[k * CS + 17] === 0 && _col[k * CS + 18] === 0) sv = 1;
+          else {
+            const gx = Math.min(i / gs, G - 1), gy = Math.min(j / gs, G - 1), x0 = Math.min(G - 2, Math.floor(gx)), y0 = Math.min(G - 2, Math.floor(gy));
+            const fx = G > 1 ? gx - x0 : 0, fy = G > 1 ? gy - y0 : 0, X0 = Math.max(0, x0), Y0 = Math.max(0, y0), X1 = Math.min(G - 1, X0 + 1), Y1 = Math.min(G - 1, Y0 + 1);
+            const a = grid[Y0 * G + X0] + (grid[Y0 * G + X1] - grid[Y0 * G + X0]) * fx, b = grid[Y1 * G + X0] + (grid[Y1 * G + X1] - grid[Y1 * G + X0]) * fx;
+            sv = Math.max(sv, a + (b - a) * fy);
+          }
+        }
+        wturb[q + 3] = b8(sv);
+      }
+    }
     const widx = [];
+    // (NO BLUE CURTAIN AT A FALL, for the bodies-of-water lane's waterfalls, E-W2: a cell with one wet corner is kept, so a
+    // cell across a lip -- the river cut at 19.6 m, the sea at 0 -- was one water quad as tall as the cliff, painted with
+    // the water's dashes: a flat blue curtain behind every fall. A cell whose four corners all hold liquid but whose
+    // levels spread over 2 m AND over half the cell's width (a face steeper than 1 in 2) is a fall, and the falls' own
+    // sheet draws it. Today's staircase lips, about 0.17 m a metre, are kept. MEASURED, all 30,720 patches of levels 5
+    // and 6 and 800 of 7 and 8 over Earth: today's oil world 0 cells dropped; with the drainage (?flow=1) 32, which is
+    // why it waits for a water part's switch.)
+    // (Only with a water part that changes the world, MODE.water.on: rivers=tree, lakes, falls, fjord ...; without one
+    // nothing is dropped and the mesh is as it was.)
+    let dropped = 0;
+    const fallCut = !!(MODE.water && MODE.water.on);
     for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
       const a = j * V + i, b = a + 1, c = a + V, d = c + 1;
+      const k0 = (j + 1) * E + (i + 1), l0 = _lq[k0], l1 = _lq[k0 + 1], l2 = _lq[k0 + E], l3 = _lq[k0 + E + 1];
+      if (fallCut && l0 > -1e5 && l1 > -1e5 && l2 > -1e5 && l3 > -1e5) {
+        const sp = Math.max(l0, l1, l2, l3) - Math.min(l0, l1, l2, l3);
+        if (sp > 2.0 && sp > 0.5 * cellM) { dropped++; continue; }
+      }
       if (wdep[a] > -0.45 || wdep[b] > -0.45 || wdep[c] > -0.45 || wdep[d] > -0.45) widx.push(a, b, d, a, d, c);
     }
+    stepPatch.fallCells = (stepPatch.fallCells || 0) + dropped;      // (counted for the test that proves none drop where nothing falls)
     // thin water (a brook) is left to the terrain's far colour on coarse patches
     if (widx.length && (level >= 5 || widx.length > N * N * 6 * 0.08)) water = { positions: wpos, depth: wdep, liq: wliq, liqP: wlp, turb: wturb, indices: new Uint16Array(widx) };
   }
   return {
     origin: [ox, oy, oz], positions: pos, normals: nor, morph: mor, colors: col, colors2: col2, params: par,
-    colorsP: colP, colors2P: col2P, paramsP: parP, normalsP: norP,
+    colorsP: colP, colors2P: col2P, paramsP: parP, normalsP: norP, bloom: blo, bloomP: bloP,
     water, boundR: Math.sqrt(boundR2) + drop, minH, maxH, size,
   };
 }
