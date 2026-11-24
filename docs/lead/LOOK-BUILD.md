@@ -383,3 +383,15 @@ the owner first. Not started.
   step: the leaves' and the impostors' own light), stay as bright as in fair weather, the red crowns glowing under a
   storm sky; (2) the river and the lake stay the palest thing under a storm (the water's mirror and wash, W3/E). Both
   to be asked of their lanes: under uStorm the crowns a level down (A1, A2), the water toward the storm's grey (W3).
+
+## State at 17:56, 24 Nov
+
+- Passed for v39.4: C's mountains (farview up to c1c8eaa; flip d4cab64), A1's crown mass + weighted stands + bark at
+  30 px, look-director up to e2b9c14 (water gold, storm light). Passed for v39.5: C's alpine smudge clamp (farview
+  6cf9c7a) with B's no-flower-in-snow line (design-flora dd86fb3, cherry-pick alone).
+- For the owner's phone check (not mine to decide): A2's ?leafgrow=1 (smaller near leaves 6-12 m, sky between).
+- Waiting on: B's phone pair (tuft, comb, round patch → defaults if passed; the pool waits for C's per-dab drift
+  channel with ?bloomfar); A1's far spruce by limb and the 1 km darks re-measure; W3's on-foot river pair (with the
+  golden-hour wash eased) and the storm water; E-W2's full sea sheet after W3's pointed ends; E's far water line
+  tone; C's far rock speckle against v37 and the snowy ridges in fewer patches; A2's ?stormleaf; A1's storm crowns.
+- My open lane: the light's design (a dark frame round a bright warm middle distance). Not started.
