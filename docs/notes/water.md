@@ -483,7 +483,16 @@ Branch `water-bodies` = lane 0 + look-proto v37.1 + `origin/design-water` (W1's 
   as pebbles (my eye, not F's yet); a few white jagged bits at the very bottom of the strait view remain though the short
   strokes are untapered (told W3). Default unchanged by construction (sea-only factors); not re-rendered this time. W3 to
   take 817a5aa (not 848b04e) into the default commit.
-- NEXT: F's verdict on 817a5aa; after the branches meet (the coordinator's call): the pool's pcThinLayer to W3's
+- **F on 817a5aa: better far off, NOT YET near the eye** (pebbles and hexagons side by side where v37 has long overlapping
+  ribbons; the white jagged bits). F's LAST ROUND: (a) near strokes 5-8 widths, thin, pointed, OVERLAPPING in rows; (b) find
+  and remove the white bits; (c) the same sheet and both crops -- else v39.6 ships the river paint and keeps v37's sea.
+  Split with W3: mine the lengths (7bbbb2a: chop 6 near, 7.5 far, taper on again; sd 0.136 / 0.146 / 0.134 / 0.128 against
+  v37 0.157 / 0.157 / 0.160 / 0.129); W3's the overlap (past a point the row's next stroke, not the body) and the bits (not
+  the sun marks, not the taper, not foam or lace as far as I can see from outside the picker). The sheet to F when W3's
+  parts are in, or my part alone if W3 cannot tonight.
+- E (water lead): the owner's phone tables (v39.5) make the water the second cost after the far trees; my bodies add no
+  fragment work of their own beyond the falls' layer (which has its 'no falls' row; the falls view was at the cap).
+- NEXT: W3's overlap and bits, then the sheet and crops to F; after the branches meet (the coordinator's call): the pool's pcThinLayer to W3's
   pcWStrokes, pcFallMilk and the FALL_ colours into waterchunk.js.
 - Camera places for the falls views: `fallsView(S)` and the scratch `fallcams.mjs` (sea60, sea150, air400, bank, E7).
 
