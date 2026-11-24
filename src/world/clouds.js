@@ -153,15 +153,18 @@ void main() {
   float n2 = texture(uNoise3D, dir * 1.30 + iC.w * 3.71).g;
   float rr = iA.w * (0.86 + 0.30 * n1 + 0.10 * n2);
   vec3 off = dir * rr;
-  float sq = abs(iD.x);
+  // (an ANVIL's lobe carries iD.x = -(10 + 100 * top): squash 0.6, and a top plane, top times the cloud's height over
+  // the anvil's underside -- ONE plane for the whole shelf at that lobe's place, so the top edge is a straight line from
+  // the side, lowering downwind as a wedge. Any other lobe: iD.x its squash)
+  bool anv = iD.x < -5.0;
+  float sq = anv ? 0.6 : iD.x;
   off -= up * dot(off, up) * (1.0 - sq);
   vec3 p = iA.xyz + off;
   // THE FLAT BASE: nothing hangs below the cloud's base plane
   float hb = dot(p - iB.xyz, up) + iB.w;
   float base = 0.0;
   if (hb < 0.0) { p -= up * hb; hb = 0.0; base = 1.0; }
-  // an ANVIL's lobe (squash given negative) has a flat top as well: a shelf, flat above and below, lumpy only at its rim
-  if (iD.x < 0.0) { float ht = dot(p - iA.xyz, up) - iA.w * 0.22; if (ht > 0.0) p -= up * ht; }
+  if (anv) { float ht = hb - (-iD.x - 10.0) * 0.01 * iD.y; if (ht > 0.0) { p -= up * ht; hb -= ht; } }
   // the painted normal: the lobe's own, bent toward the direction from a point just over the cloud's BASE (so all of the
   // heap above the shelf faces up and out, toward the light, and only the flat base faces down: the lit top dominates, the
   // review of 24 Nov; bent toward the cloud's middle, a far cloud seen from below was its grey belly all over), and on
@@ -627,11 +630,12 @@ void main() {
   float n1 = texture(uNoise3D, dir * 0.55 + iC.w * 7.13).r;
   float n2 = texture(uNoise3D, dir * 1.30 + iC.w * 3.71).g;
   vec3 off = dir * iA.w * (0.86 + 0.30 * n1 + 0.10 * n2);
-  off -= up * dot(off, up) * (1.0 - abs(iD.x));
+  bool anv = iD.x < -5.0;
+  off -= up * dot(off, up) * (1.0 - (anv ? 0.6 : iD.x));
   vec3 p = iA.xyz + off;
   float hb = dot(p - iB.xyz, up) + iB.w;
-  if (hb < 0.0) p -= up * hb;
-  if (iD.x < 0.0) { float ht = dot(p - iA.xyz, up) - iA.w * 0.22; if (ht > 0.0) p -= up * ht; }
+  if (hb < 0.0) { p -= up * hb; hb = 0.0; }
+  if (anv) { float ht = hb - (-iD.x - 10.0) * 0.01 * iD.y; if (ht > 0.0) p -= up * ht; }
   gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
 }
 `;
@@ -743,14 +747,19 @@ function makeStormTemplate(id, gen) {
   // read as a shelf with a flat shaded underside; at 0.95 of the height, thin and small, it hid in the tower's top dome
   // and the storm from the coast at 3.3 km had no anvil)
   // (thirty overlapping lobes so the shelf is one continuous sheet: eighteen over the longer anvil read from below as
-  // separate round puffs)
+  // separate round puffs. The look director's review of the shelf: MOSTLY DOWNWIND, not a cap round the tower; a WEDGE,
+  // thinning toward its far end, which frays into a few flat lobes. t: how far along it a lobe lies, for its top)
   const NA = 30;
   for (let i = 0; i < NA; i++) {
     const t = (i + 0.5 * H(j++)) / NA;
-    const x = -0.18 + 1.18 * t;
-    const half = 0.16 + 0.26 * t;
+    const x = -0.08 + 1.04 * t;
+    const half = 0.07 + 0.30 * t;
     const z = (H(j++) - 0.5) * 2 * half;
-    L.push({ x, z, y: 1.05 + (H(j++) - 0.5) * 0.01 - 0.01 * t, r: 0.15 + 0.06 * H(j++) + 0.04 * (1 - t), k: K + 1, a: 1 });
+    L.push({ x, z, y: 1.0, t, r: (0.17 - 0.07 * t) * (0.85 + 0.3 * H(j++)), k: K + 1, a: 1 });
+  }
+  for (let i = 0; i < 5; i++) {
+    const t = 1.0 + 0.10 * H(j++);
+    L.push({ x: 0.95 + 0.14 * H(j++), z: (H(j++) - 0.5) * 0.85, y: 1.0, t, r: 0.06 + 0.03 * H(j++), k: K + 1, a: 1 });
   }
   return L;
 }
@@ -1007,7 +1016,9 @@ export function createClouds(scene) {
           const gM = mountTop(k, _w.x, _w.y, _w.z);
           // (its base WELL UNDER the summit, so the peak stands up into the cloud's body and the slopes vanish into it:
           // with the base at the summit's height it sat on the top as a flat white lid, the mountain stills)
-          cover = Math.min(0.95, cover + 0.22 * mK); base = Math.min(base, gM - 140 + 80 * hash(k, 9, 3)); thick = Math.min(thick, 500);
+          // (and lower again, so the land hides its underside on the uphill side; on the open side it has no flat base at
+          // all -- its lobes round below, never a ruled line: the look director's review)
+          cover = Math.min(0.95, cover + 0.22 * mK); base = Math.min(base, gM - 180 + 80 * hash(k, 9, 3)); thick = Math.min(thick, 500);
           mountK = mK;
         }
         keep = Math.max(keep, mK);
@@ -1069,7 +1080,7 @@ export function createClouds(scene) {
         if (tt > 0 && tt < 1) { const mx = camD.x + tx * tt, my = camD.y + ty * tt, mz = camD.z + tz * tt; if (mx * mx + my * my + mz * mz < R * R) continue; }
       }
       if (hidden && dist > 4500) continue;      // (the shadow map covers the ground within some 3.5 km ahead of the eye)
-      clouds.push({ k, gen, s, Rc, T, storm, bx, by, bz, sx, sy, sz, dist, aspect: T / Rc, hidden });
+      clouds.push({ k, gen, s, Rc, T, storm, bx, by, bz, sx, sy, sz, dist, aspect: T / Rc, hidden, mount: mountK > 0 });
     }
     // THE THUNDERSTORMS: the cloud map's convective cells of the storm kind, each a column from the base to the top
     // (the map's own thickness at its core, about 1.8 km on Earth) with an anvil fanned downwind at the top
@@ -1090,9 +1101,9 @@ export function createClouds(scene) {
         // quarter towering, a half mature, then decay; a storm with no stage is taken as mature)
         const stg = c.stage != null ? c.stage : 0.5;
         const La = (1000 + 900 * hash(c.i, c.gen, 7)) * (0.4 + 0.6 * c.w) * (0.25 + 0.75 * smooth(0.25, 0.55, stg));
-        // (the anvil overhangs the tower by more than its own breadth: no shorter than 2.5 times the tower's radius. At its
+        // (the anvil overhangs the tower by more than its own breadth: no shorter than 4 times the tower's radius. At its
         // own length alone it reached some 400 m past a broad tower and hid in the top -- the side views from the coast)
-        const LaT = Math.max(La, Rc * 2.5 * (0.25 + 0.75 * smooth(0.25, 0.55, stg)));
+        const LaT = Math.max(La, Rc * 4.0 * (0.25 + 0.75 * smooth(0.25, 0.55, stg)));
         const rb = R + base, bx = sx * rb, by = sy * rb, bz = sz * rb;
         const dist = Math.hypot(bx + sx * T * 0.5 - camD.x, by + sy * T * 0.5 - camD.y, bz + sz * T * 0.5 - camD.z);
         // (the anvil streams along the storm's OWN drift, the cell's anvilE / anvilN, which on a day of swinging wind aloft can
@@ -1154,7 +1165,7 @@ export function createClouds(scene) {
       let nl = cl.cb ? t.lobes.length : Math.max(pxR < 4 ? 1 : 2, Math.min(t.lobes.length, Math.round(t.lobes.length * smooth(6, 60, pxR))));
       if (hid) nl = Math.min(t.lobes.length, 8);
       const cxA = cl.bx + ux * cl.T * 0.45, cyA = cl.by + uy * cl.T * 0.45, czA = cl.bz + uz * cl.T * 0.45;
-      const baseD = cl.T * 0.45;
+      const baseD = cl.mount ? cl.T * 3 : cl.T * 0.45;
       const air = Math.round(Math.min(0.45, 0.55 * (1 - Math.exp(-cl.dist / 8000))) * 5) / 5;
       const fewK = 1 + 0.35 * (1 - nl / t.lobes.length);
       for (let i = 0; i < nl; i++) {
@@ -1162,12 +1173,14 @@ export function createClouds(scene) {
         const pa = hash(cl.k, cl.gen * 37 + i, 23) * Math.PI, seed = hash(cl.k, cl.gen * 41 + i, 29) * 64;
         if (o.a) {
           // an anvil lobe: along the wind from the tower, fanned across it, flattened; its centre the anvil's, high up
-          const y = o.y * cl.T, r = o.r * cl.La;
+          // (the shelf's top over its underside, in the cloud's height: 0.10 by the tower to 0.035 at the frayed end)
+          const top = 0.10 * (1 - 0.65 * Math.min(1, o.t || 0));
+          const y = (o.y + top * 0.5) * cl.T, r = o.r * cl.La;
           const px = cl.bx + (ax * o.x + bxw * o.z) * cl.La + ux * y, py = cl.by + (ay * o.x + byw * o.z) * cl.La + uy * y, pz = cl.bz + (az * o.x + bzw * o.z) * cl.La + uz * y;
           // (the shelf: its underside a flat plane at the tower's top, its top each lobe's own flat cap; the squash given
           // negative tells the shader it is an anvil's)
           const ac = 0.45 * cl.La, cy0 = cl.T * 1.0;
-          emit(px, py, pz, r, cl.bx + ax * ac + ux * cy0, cl.by + ay * ac + uy * cy0, cl.bz + az * ac + uz * cy0, 0, ex, ey, ez, nx, ny, nz, pa, seed, -0.6, cl.T, 1, air);
+          emit(px, py, pz, r, cl.bx + ax * ac + ux * cy0, cl.by + ay * ac + uy * cy0, cl.bz + az * ac + uz * cy0, 0, ex, ey, ez, nx, ny, nz, pa, seed, -(10 + 100 * top), cl.T, 1, air);
           continue;
         }
         const y = o.y * cl.T;
