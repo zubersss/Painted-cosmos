@@ -71,6 +71,21 @@ const VISTA = (() => {
 //   `grown`: a mark is laid already grown. Over a ring this large the 0.7 s growing-in (GROW_T) would be seen as
 //   a wave of marks arriving from the feet outward, which is the owner's own complaint about things loading in;
 //   nothing pops without it, because a mark has no size at the rim where cells are listed (NEAR_VERT, `vis`).
+// THE FLORA LANE'S SWITCHES (2026-11-24, docs/lead/FLORA-DESIGN.md; the oil look only, the watercolour game never reads them).
+// Each is 1 by default in the oil look and 0 gives that package back exactly as it was.
+//   `?grass2=`   0 takes the whole grass package away (G1-G4): the oil look's near grass as it was on 24 Nov.
+//   `?nearcull=` 0 keeps the grass but shades every mark again, in view or not (G1; the speed test's row does the same).
+const FLORA = (() => {
+  const f = { grass2: 1, cull: 1 };
+  try {
+    const q = new URLSearchParams(location.search), on = (k) => !q.has(k) || (q.get(k) !== '0' && q.get(k) !== 'false');
+    f.grass2 = on('grass2') ? 1 : 0;
+    f.cull = f.grass2 && on('nearcull') ? 1 : 0;
+  } catch { /* no address to read */ }
+  if (!LOOK.oil) { f.grass2 = 0; f.cull = 0; }
+  return f;
+})();
+export { FLORA };
 const V = VISTA.on;
 const RINGS_OIL = [RINGS_WC[0], RINGS_WC[1], Object.assign({}, RINGS_WC[2], { pool: VISTA.pool }), {
   name: 'vista', cell: 13, range: [0, 190 * V, 450 * V], per: 6,
@@ -145,6 +160,7 @@ class Ring {
     this.attrs = [this.aRoot, this.aAxis, this.aPar, this.aCol, this.aExt];
     g.instanceCount = 0;
     this.material = makeNearMaterial(bu);
+    this.material.uniforms.uNearK.value.set(FLORA.cull, 0, 0, 0);
     this.mesh = new THREE.Mesh(g, this.material);
     this.mesh.name = 'near-' + cfg.name + '-' + bodyId; this.mesh.frustumCulled = false; this.mesh.visible = false;
     root.add(this.mesh);

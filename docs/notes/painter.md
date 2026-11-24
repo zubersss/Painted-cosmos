@@ -4,7 +4,35 @@ Branch: `cosmos` (shared with PILOT and PHYSICS, one working tree). Commits: `to
 This file was rewritten by the second PAINTER agent (the first ran out of working context). The
 first agent's record of M1 is kept at the end ("Earlier answers").
 
-## Hand-over of THE OIL LOOK, prototype on branch `look-proto` (READ THIS FIRST; kept current)
+## Hand-over of THE FLORA LANE, branch `design-flora` (kept current after every step; read with the oil look's below)
+
+Built by a painter helper session at the coordinator's word (24 Nov), after its design `docs/lead/FLORA-DESIGN.md` was
+accepted. The lane follows that design's section 11 order. The coordinator merges this branch into `look-proto`; this
+lane never merges. HELD by the coordinator until the trees lane lands: package O and F4 (anything in `flora.js`,
+`floraplace.js placeUnder`, a new `underkit.js`). NOT TO BE TOUCHED by this lane: `PROP_VERT` / `PROP_FRAG`, `kitmat.js`,
+`chunks.js`, `post.js`, `shared.js` (a look-director session owns the shared light and paint: `docs/lead/LOOK-RULES.md`
+on branch `look-director`, to be read and followed when it appears). In `surface.js` only ONE `bloomTint` call (the
+far-view lane edits that file).
+
+**Switches** (`world/nearground.js` `FLORA`, oil look only; 1 by default; 0 gives the package back exactly as it was):
+`?grass2=0` the whole grass package; `?nearcull=0` the off-screen cull alone.
+
+**Done:**
+1. Speed-test rows (`core/bench.js`, after 'no small plants'): 'no near grass', 'near grass: the blades only (the fine
+   ring)', 'grass not culled off-screen'. The near grass was in no row before (its material is `pc-near`).
+2. G1, THE CULL (`materials.js NEAR_VERT`, under `PC_OIL`, uniform `uNearK.x` set by `nearground.js`): a mark whose root
+   is outside the picture by more than its own reach, or past its range, is sent outside the clip volume before the bend
+   field and the air are worked out. SEEN: the autumn landing at 1.8 m and 10 m with the cull on and off, pixel for pixel
+   the same (0 pixels at 1.8 m; 3 at 10 m, and the same 3 differ between two grabs with the cull on: frame noise).
+   COUNTED earlier at the landing: 60-70 per cent of the near marks are outside the picture. The phone's saving is
+   derived (-0.3 to -1.9 ms) until the row 'grass not culled off-screen' measures it.
+
+**Tests:** `tests/` 325 of 325, `src/world/` + `src/data/looks/` 65 of 65. `src/physics/` 415 of 416: the one failure is
+`loose.test.mjs` P25 ("under the closed wood the litter still puffs: 2"), which is FLAKY ON THE CLEAN COMMIT TOO (it
+failed 1 run in 5 there with none of this lane's changes): reported to the coordinator, not this lane's.
+
+**Next:** G4 (the grass in its own greens, dark roots, lit tips, the gusts' sheen) and G2 (the carpet ring).
+
 
 Branch: `look-proto`, cut from `main` at `5e85754`. Nothing here is live. The plan, the owner's instructions, the sort of
 the references and the crispness rule are on branch `r2`: `docs/HANDOVER.md` (section 2, and 4a-2: the overhaul plan the

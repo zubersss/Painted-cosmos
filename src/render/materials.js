@@ -2797,6 +2797,11 @@ uniform vec4 uNear;     // x full density out to here (m), y nothing beyond here
 uniform vec4 uNear2;    // x, y the ring fades in between these distances (m), z how soft its marks are left
 uniform float uTime;
 uniform vec4 uWx;
+#ifdef PC_OIL
+// (the flora lane, docs/lead/FLORA-DESIGN.md) x 1: a mark the eye cannot see is dropped at once (G1); y, z, w: see
+// nearground.js FLORA, where they are set
+uniform vec4 uNearK;
+#endif
 varying vec3 vBody;
 varying vec3 vNV;
 varying vec3 vView;
@@ -2826,6 +2831,24 @@ void main() {
   // every stroke has its own range (so the sward thins with distance) and grows in after it is laid
   float range = mix(uNear.x, uNear.y, fract(h * 7.31));
   float vis = (1.0 - smoothstep(range * 0.72, range, di)) * smoothstep(0.0, 0.7, uNear.z - iPar.w) * smoothstep(uNear2.x, uNear2.y, di);
+  #ifdef PC_OIL
+  // G1, THE MARKS THE EYE CANNOT SEE (2026-11-24, docs/lead/FLORA-DESIGN.md 6.1). A ring is one draw of every mark round
+  // the eye, and every mark used to be shaded whole -- the bend field read three times a vertex, the air -- in view or
+  // not, in range or not: COUNTED at the autumn landing, two thirds of 23,305 marks lay outside the picture, and a mark
+  // past its range was only shrunk to nothing at the end. Here such a mark is sent outside the clip volume before any
+  // of that, and its triangles are dropped, in the phone's binning pass too. Nothing that could reach the picture goes:
+  // the margin is the mark's own reach (its length, its width twice, the height a round touch is held at, a few pixels
+  // for the floor on a far mark's size, and the lean of a bend). A mark with no size (vis 0) drew nothing before either.
+  // uNearK.x 0 (the speed test's row, ?nearcull=0, ?grass2=0) is the ring as it was.
+  if (uNearK.x > 0.5) {
+    vec4 rv = modelViewMatrix * vec4(root, 1.0);
+    float ext = iAxis.w * 1.2 + 2.0 * iPar.x + (dab ? iCol.a : 0.0) + 0.3 + uNear.w * di * 4.0;
+    vec4 rc = projectionMatrix * rv;
+    float kx = ext * sqrt(projectionMatrix[0][0] * projectionMatrix[0][0] + 1.0);
+    float ky = ext * sqrt(projectionMatrix[1][1] * projectionMatrix[1][1] + 1.0);
+    if (vis <= 0.0 || rv.z > ext || abs(rc.x) - rc.w > kx || abs(rc.y) - rc.w > ky) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); return; }
+  }
+  #endif
   float flex = iExt.y;
   // fresh snow buries what is short: no stroke stands on a snowfield but the tall stubble
   float snowK = 1.0 - smoothstep(0.12, 0.50, uWx.z) * (1.0 - 0.30 * smoothstep(0.62, 0.95, iAxis.w));
@@ -3033,6 +3056,8 @@ export function makeNearMaterial(bodyU) {
     uniforms: baseUniforms(bodyU, Object.assign({
       uOrigin: { value: new THREE.Vector3() }, uCamLocal: { value: new THREE.Vector3() },
       uNear: { value: new THREE.Vector4(5, 13, 0, 0.002) }, uNear2: { value: new THREE.Vector4(0.8, 2.6, 0, 0) },
+      // (the flora lane: nearground.js FLORA sets them; 0 is each package off, the ring as it was. Read only in the oil look)
+      uNearK: { value: new THREE.Vector4(0, 0, 0, 0) }, uNearL: { value: new THREE.Vector4(0, 0, 0, 0) },
     }, PHYS)),
     vertexShader: NEAR_VERT, fragmentShader: NEAR_FRAG,
     side: THREE.DoubleSide,
