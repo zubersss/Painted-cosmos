@@ -28,7 +28,7 @@
 // an eighth of its strokes exactly and the rest take a neighbour's colour.
 // Bark is thickened by half a texel at each level, so a trunk far off is a thin line and not a row of dots.
 import * as THREE from 'three';
-import { VERT_PARS, VERT_END, FRAG_PARS } from './chunks.js';
+import { VERT_PARS, VERT_END, FRAG_PARS, PAINT } from './chunks.js';
 import { FOG_VERT, SKYUP, PC_UP_F, FARCROWN, makePaintUniforms } from './materials.js';
 import { FRAME_HOOKS, register, OIL, PHYS, LOOK } from './shared.js';
 import { FLORA_GLSL } from '../physics/flora.glsl.js';
@@ -64,6 +64,25 @@ export const IMP = {
 // top priority). ON by default since the look director passed it (24 Nov: "at 420 m it is the first time the game's
 // wood from the air reads as the references' patchwork"); ?crownmass=0 the old way. IMP_FRAG CROWN MASS.
 const CROWNMASS = !(_q && _q.get('crownmass') === '0');
+// CROWN MASS'S PAINT ONCE A CROWN (the air view's cost, the coordinator's top priority after the owner's phone table of
+// 24 Nov: 'far trees one flat colour' saved as much as no far trees at all, so the cost is the impostors' PAINT, per
+// pixel). Under crown mass every stroke of a crown takes the crown's own colour and its cap's light level, so those are
+// worked out ONCE A CROWN in the vertex shader (vMassC) and not once a pixel: the colour's whole chain (the run, the
+// summer tree, the gust's pale step, density, the dab's tint, the wet wash, the warm paint) and the cap's level. The
+// fragment then skips the stroke light it would throw away. The same arithmetic, so the picture is the same. The two
+// functions it needs from the fragment's own chunk (the dab's tint, the wet wash) are taken from FRAG_PARS as they stand,
+// so they cannot drift. ?imppaint=0: once a pixel, as before; flora.setMassV for the speed test.
+function glslFn(src, head) {
+  const i = src.indexOf(head);
+  if (i < 0) return '';
+  for (let k = src.indexOf('{', i), d = 0; k < src.length; k++) {
+    if (src[k] === '{') d++;
+    else if (src[k] === '}' && --d === 0) return src.slice(i, k + 1) + '\n';
+  }
+  return '';
+}
+const MASSV_FNS = glslFn(FRAG_PARS, 'vec3 pcDabTint(vec3 c, vec3 rnd, float leafy) {') + glslFn(FRAG_PARS, 'vec3 pcWetWash(vec3 c, float amt) {');
+const MASSV = /pcDabTint/.test(MASSV_FNS) && /pcWetWash/.test(MASSV_FNS) && !(_q && _q.get('imppaint') === '0');
 // (THE CROWNS UNDER A STORM, IMP_FRAG: how far of a level the far crowns step down under a storm, beside the land's own
 //  step (the look director's ?stormlight, which scales both). 0.5: SEEN under wx=storm from 150 m, a full step made the
 //  wood one violet-maroon mass, crowns and floor alike; half keeps the crowns red against the storm's grey floor.
@@ -470,6 +489,9 @@ export function impostorQuadGeometry() {
 
 // ---- the painted impostor ----------------------------------------------------------------------------------------
 const IMP_VERT = /* glsl */`
+#ifndef PC_MASS
+#undef PC_MASS_V
+#endif
 ${VERT_PARS}
 ${FOG_VERT}
 attribute vec4 aInst;     // per instance: x hue, y value, z seed, w canopy shade at its foot
@@ -531,6 +553,28 @@ uniform vec4 uMassK2;     // x the share of trees that take their stand's colour
 #ifdef PC_GUST
 flat varying vec3 vGust;  // x how far a gust band has turned this crown's leaves their paler side (0: not at all), y how far a
                           // turned crown is laid in ONE tone (by its smallness on the screen), z the share of its seen face lit
+#endif
+#ifdef PC_MASS_V
+// (crown mass's paint once a crown: MASSV. What the paint chunk reads, declared here as the plants' vertex shader does)
+uniform vec3 uSunDirW;
+uniform vec3 uUpW;
+uniform vec3 uGlaze;
+uniform vec3 uLight;
+uniform float uDayness;
+uniform float uMoon;
+uniform float uStorm;
+uniform vec4 uWx;
+uniform vec4 uOilA;
+uniform vec4 uOilB;
+uniform vec4 uOilD;
+uniform vec4 uOilG;
+uniform vec4 uMassK;
+#ifdef PC_IMP_STORM
+uniform float uImpStorm;
+#endif
+${PAINT}
+${MASSV_FNS}
+flat varying vec4 vMassC;  // the crown's colour under crown mass (xyz) and its cap's light level (w)
 #endif
 void main() {
   mat4 im = instanceMatrix;
@@ -684,6 +728,27 @@ void main() {
     //  step of the dynamic resolution never flips a crown from strokes to a patch. At 480 lines the factor is 1, exactly.)
     vMass = vec3(2.0 * hwv.x * length(ir[0]) / max(di * uOilPx.x, 1e-4) * (480.0 / max(uOilPx.y, 1.0)), clamp(0.5 + 0.5 * dot(vSunK, dc), 0.0, 1.0), famL.a);
   #endif
+  #ifdef PC_MASS_V
+    // (CROWN MASS'S PAINT ONCE A CROWN, MASSV: exactly the fragment's chain for a leaf stroke of a crown under crown mass)
+    {
+      float twV = step(1.5, vKB.x);
+      vec3 rcV = vec3(fract(vInst.z * 3.1), fract(vInst.z * 7.3), fract(vInst.z * 11.7));
+      vec3 csV = mix(vLA, vLB, clamp(0.5 + vInst.x * uMassK2.z * 0.5, 0.0, 1.0));
+      csV = pcSummerTree(csV, fract(vInst.z * 9.73 + 0.37), uLookG.y);
+      #ifdef PC_GUST
+        if (vGust.x > 0.0) csV = mix(csV, min(vec3(1.0), mix(csV, vec3(dot(csV, vec3(0.3, 0.5, 0.2))), 0.45) * 1.12 + vec3(0.01, 0.03, 0.06)), vGust.x);
+      #endif
+      csV = pcWetWash(pcDabTint(pcDensity(csV, 1.0 + vInst.y * 0.4), rcV, 1.0 - twV), 0.7);
+      csV *= mix(1.0, uMassK2.y, smoothstep(0.25, 0.55, csV.r - csV.b));
+      float xcV = max(0.80, vKB.y * 0.8 * (1.0 - twV));
+      float warmV = max(vMass.z, smoothstep(0.25, 0.55, csV.r - csV.b));
+      float stKV = 0.0;
+      #ifdef PC_IMP_STORM
+        stKV = smoothstep(0.15, 0.6, uStorm) * uLookS.x * uImpStorm;
+      #endif
+      vMassC = vec4(csV, max(floor(pcLevel(xcV, 0.002) + 0.5) - uMassK.x * warmV - stKV, 0.0));
+    }
+  #endif
   vFog = pcFogAmountV(di * pcFogBank(vBody));
   gl_Position = projectionMatrix * mv;
   ${VERT_END}
@@ -691,7 +756,11 @@ void main() {
 `;
 
 const IMP_FRAG = /* glsl */`
+#ifndef PC_MASS
+#undef PC_MASS_V
+#endif
 ${FRAG_PARS}
+${'${IMPSHADE_FN}'}
 ${PC_UP_F}
 uniform highp sampler2D uImpTex;
 uniform vec4 uImpK;
@@ -727,6 +796,9 @@ flat varying vec3 vGust;
 flat varying float vVF;
 #ifdef PC_MASS
 flat varying vec3 vMass;
+#endif
+#ifdef PC_MASS_V
+flat varying vec4 vMassC;
 #endif
 void main() {
   #include <logdepthbuf_fragment>
@@ -857,6 +929,9 @@ void main() {
       vec3 cs = mix(vLA, vLB, clamp(0.5 + hue * 0.5, 0.0, 1.0));
       cs = mix(cs, vLC, clamp(azL * 0.55 + (r3.y - 0.5) * 0.6, 0.0, 1.0));
     #endif
+    #ifdef PC_MASS_V
+    if (mass) cs = vMassC.rgb; else {      // (a crown under crown mass: its colour worked out once, in the vertex shader)
+    #endif
     cs = pcSummerTree(cs, fract(vInst.z * 9.73 + 0.37), uLookG.y);      // (each summer tree its own green, as PROP_VERT and PROP_FRAG: chunks.js; the look director)
     // (a crown a gust band has turned: the ground's own pale, cooler step, whole: GUST in the vertex shader)
     #ifdef PC_GUST
@@ -868,6 +943,9 @@ void main() {
       //  channel near 1 lit or not, so a lower light step hardly moves it (MEASURED: the cap a level down, V 0.86 to 0.84).
       //  So a warm crown's own paint is laid deeper, an ochre and a burnt orange: its colour times uMassK2.y, by its warmth.)
       if (mass) cs *= mix(1.0, uMassK2.y, smoothstep(0.25, 0.55, cs.r - cs.b));
+    #endif
+    #ifdef PC_MASS_V
+    }
     #endif
     bool snow = cls > 1.5 && cls < 2.5;
     if (snow) cs = mix(vec3(0.95, 0.97, 1.0), vec3(0.80, 0.87, 0.98), rcm.x * 0.7);
@@ -881,7 +959,13 @@ void main() {
     xl += (r3.z - 0.5) * 0.25 * ${'${IMPJIT}'};
     xl = max(xl, mix(0.30 + 0.15 * r3.x, 0.18 + 0.12 * r3.x, ${'${FARCROWN}'}));
     if (cls > 2.5) xl = 0.2;
-    float lv = pcLevel(xl, 0.03);
+    #ifdef PC_MASS_V
+      float lv = mass ? 0.0 : pcLevel(xl, 0.03);      // (a crown under crown mass takes its light in whole steps below: this would be thrown away)
+      bool massV = mass;
+    #else
+      float lv = pcLevel(xl, 0.03);
+      bool massV = false;
+    #endif
     // (THE CROWNS UNDER A STORM, the look director's storm light, 24 Nov: under a storm the land steps a level down in
     //  pcLevel itself, and a crown's own light above goes through pcLevel too; but the crowns lit in WHOLE STEPS below
     //  (the small crowns and crown mass) take their cap as the level of one fixed light, which that step moves too
@@ -900,7 +984,7 @@ void main() {
     #else
       float stK = 0.0;
     #endif
-    if (small && cls < 2.5) {
+    if (small && cls < 2.5 && !massV) {
       // (the cap's level: a stroke of this crown facing the sun at 0.6, lit, with the crown's own light against the sun)
       float xc = max(0.80, vKB.y * 0.8 * (1.0 - twig));
       if (snow) xc = max(xc, 0.68);
@@ -915,12 +999,18 @@ void main() {
       //  noon is not near white. Under uMassK.w to uMassK.y px it fades to ONE TONE: the crown's mean, one level under
       //  its cap raised by the share of its seen face its sunward side lights (the gust's one tone is the same block).)
       if (mass) {
-        float xcm = max(0.80, vKB.y * 0.8 * (1.0 - twig));
-        if (snow) xcm = max(xcm, 0.68);
-        // (the autumn drop by the crown's own warmth, red over blue, as well as its run's autumn weight: one far kind is
-        //  yellow without a family run, and by the run alone it kept the full sunlit cap, MEASURED V 0.85 at 150 m)
-        float warm = max(vMass.z, smoothstep(0.25, 0.55, cs.r - cs.b));
-        float lcm = max(floor(pcLevel(xcm, 0.002) + 0.5) - uMassK.x * warm - stK, 0.0);
+        float lcm;
+        #ifdef PC_MASS_V
+        if (!snow) lcm = vMassC.w; else      // (the cap's level worked out once a crown, in the vertex shader; a snowy stroke its own)
+        #endif
+        {
+          float xcm = max(0.80, vKB.y * 0.8 * (1.0 - twig));
+          if (snow) xcm = max(xcm, 0.68);
+          // (the autumn drop by the crown's own warmth, red over blue, as well as its run's autumn weight: one far kind is
+          //  yellow without a family run, and by the run alone it kept the full sunlit cap, MEASURED V 0.85 at 150 m)
+          float warm = max(vMass.z, smoothstep(0.25, 0.55, cs.r - cs.b));
+          lcm = max(floor(pcLevel(xcm, 0.002) + 0.5) - uMassK.x * warm - stK, 0.0);
+        }
         float fm = 0.5 + 0.5 * ms;
         if (small) lv = fm > mix(0.05, 0.585, canopy) ? lcm : max(lcm - 1.0, 0.0);
         else lv = fm > mix(0.60, 0.75, canopy) ? lcm : (fm > mix(0.35, 0.55, canopy) ? max(lcm - 1.0, 0.0) : max(lcm - 2.0, 0.0));
@@ -998,12 +1088,16 @@ export function makeImpostorMaterial(bodyU, atlas, farMat, farcrown = FARCROWN) 
     defines: Object.assign({ PC_IMPOSTOR: 1, PC_IMP_NV: Math.max(1, atlas.n), PC_NFAR: fu.uFarA.value.length }, _q && _q.get('impdebug') === '1' ? { PC_IMP_DEBUG: 1 } : null, wind ? { PC_PHYS: 1 } : null, gust ? { PC_GUST: 1 } : null, CROWNMASS ? { PC_MASS: 1 } : null,
       fu.uFarFam.value.findIndex((v) => v.x + v.y + v.z > 0.01) >= 0 ? { MASS_FAMK: fu.uFarFam.value.findIndex((v) => v.x + v.y + v.z > 0.01) } : null,
       IMP.small > 0 ? { PC_IMP_SMALL: 1, IMPS_T: IMP.small.toFixed(1) } : null,
+      CROWNMASS && MASSV ? { PC_MASS_V: 1 } : null,
       // (the crowns under a storm: only once the look director's chunks declare uLookS and the oil look is on)
       LOOK.oil && /uniform\s+vec4\s+uLookS\b/.test(FRAG_PARS) && /uniform\s+float\s+uStorm\b/.test(FRAG_PARS) ? { PC_IMP_STORM: 1 } : null),
     uniforms: makePaintUniforms(bodyU, own),
     vertexShader: IMP_VERT,
     fragmentShader: IMP_FRAG.split('${FARCROWN}').join(fc).split('${IMPJIT}').join((+IMP.jit).toFixed(4))
-      .split('${IMPSHADE}').join(/vec3\s+pcShadeLeaf\s*\(/.test(FRAG_PARS) ? 'mix(pcShadeLeaf(cs), pcTone(cs, lv), max(smoothstep(1.2, 2.0, lv), stK))' : 'pcTone(cs, lv)')
+      // (only the tone a stroke needs: the shade alone under level 1.2, the tone alone from 2, both only between; the
+      //  same picture, as mix() with 0 or 1 is either end exactly)
+      .split('${IMPSHADE}').join(/vec3\s+pcShadeLeaf\s*\(/.test(FRAG_PARS) ? 'pcImpShade(cs, lv, max(smoothstep(1.2, 2.0, lv), stK))' : 'pcTone(cs, lv)')
+      .split('${IMPSHADE_FN}').join(/vec3\s+pcShadeLeaf\s*\(/.test(FRAG_PARS) ? 'vec3 pcImpShade(vec3 c, float lv, float w) { if (w >= 1.0) return pcTone(c, lv); if (w <= 0.0) return pcShadeLeaf(c); return mix(pcShadeLeaf(c), pcTone(c, lv), w); }' : '')
       + (_q && _q.get('impfail') === 'compile' ? '\n#error forced by impfail compile\n' : ''),
     side: THREE.DoubleSide,
   });
