@@ -456,3 +456,30 @@ the owner first. Not started.
   reads as cream sand; fan wedges mid-reach): W3 narrows the path to about a third of the width. The sea (?wsea) stays
   v37 until the overlapping rows and the white bits are fixed (E-W2 and W3).
 - My open lane: the light's design. Not started.
+
+## State at 23:25, 24 Nov
+
+- R3.9 AMENDED (88eb8ce) after the coordinator's review: look thresholds are in real pixels of the DEVICE'S OWN
+  full-quality picture (dynres at 1), not of a 480-line one, so the desktop keeps its finer far crowns. The coordinator
+  reverted A1's f8989353 (the 480 anchor) in v39.6; the amended anchor goes into v39.7.
+- A1's far-crown paint cut (trees-far aedfc01, 44d0a96, 711ba48): PASS for the look (sheet opened: 150 m, 400 m and on
+  foot the same; 0 to 2 px). NOT to be taken as it stands: trees-far still carries f898935 (the 480 anchor) and the
+  cut's 7 to 30 px gates sit on it. A1 moves it onto the device's lines; proofs asked: 0 px against v39.5 at 1024x480
+  AND 1920x1080, and one dynres step holding the crowns' state. Keep or drop: the phone's bench rows massV, massT.
+- C's glades ON at 1.12 (farview 31c3577): PASS, record opened (150 m noon and the landing on foot). Seen on the way and
+  taken by C: the floor between the trees from the air is a bright lime (the wood recipe's grassLight wash); C makes a
+  pair with it a step deeper and less acid, the glades unchanged.
+- MY LANE, THE LIGHT'S DESIGN, step 1 BUILT, NOT YET SEEN (de85f54, OFF by default, ?midlight=1): the lit middle
+  distance on foot (below). Stills rendering.
+
+### The lit middle distance (?midlight, chunks.js pcAtmosV, OIL.uLookS.y z w)
+
+- WHY (measured in audit 2's stills, green wood on foot): the middle distance (the wood 60 to 200 m off) stood at
+  V 0.43 to 0.49, no lighter than the lit floor in front of it (V 0.44 at 16.8, 0.60 at noon); grey at noon (S 0.03 to
+  0.09), khaki at 16.8 (hue 44, S 0.38). The references are built the other way: a dark frame of shade round a bright,
+  warm, misty middle distance.
+- WHAT: on foot only (1 - uLookN.w; from the air L5 has its own split), by day in fair weather, the far air takes the
+  light's own colour toward the sun (pcOilSunC: pale gold at a golden hour) and the sky's air away from it, at a
+  lightness of 0.74 away and 0.88 toward (uLookS.z, w): a step over the near shade. Only the air's COLOUR moves, so a
+  far thing keeps the same share of its own paint and its detail steps keep their size; no edge moves.
+- Cost: one branch on a uniform and a few mixes in the air function, per pixel of air-touched paint. No texture read.
