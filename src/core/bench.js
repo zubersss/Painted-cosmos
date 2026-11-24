@@ -537,6 +537,10 @@ export function attachBench(pc) {
       ['near grass one flat colour', () => B({ flat: 8 }), () => B({ flat: 0 })],
     ];
     const WX0 = { ...WX2 };      // (group D: its switches as the address set them, put back after each of its rows)
+    const WX_ALL = ['windmap', 'nearmap', 'farwind', 'cloudmap', 'stormland', 'rainlook', 'rainshaft', 'bolts', 'rainmap'];   // (group D, the flip: the new weather's switches, for the row 'the old weather')
+    // (lane W1 CLOUDS: whether the 3D clouds are on, and a switch that puts the sky's own flat cloud back in their place)
+    const CLOUDS3D = (() => { try { const a = new URLSearchParams(location.search); if (a.has('clouds3d')) return +a.get('clouds3d') > 0; return a.get('look') === 'oil' && a.get('weather') !== 'old'; } catch { return false; } })();
+    const clouds3d = (on) => { const c = pc.world && pc.world.clouds; if (c) c.enabled = on; };
     const holdStorm = (on) => { const P = pc.sim && pc.sim.physics; if (P && P.forceWeather) P.forceWeather(on ? { kind: 'storm' } : null); };
     const steps = [
       [AS, null, null],
@@ -631,11 +635,41 @@ export function attachBench(pc) {
       ...((WX2.rainshaft || WX2.bolts) ? [
         ['storm: no rain shafts or bolts', () => show(/^pc-storm-/, false), () => show(/^pc-storm-/, true)],
       ] : []),
+      // (group D, ?gustbands=1: the gust bands seen from the air. Off, the physics hands the shaders a zero strength and
+      //  pcGustBand returns before its noise read: the gap is its cost, one texture read a pixel of growth ground.)
+      ...(WX2.gustbands ? [
+        ['weather: no gust bands seen from the air', () => { WX2.gustbands = false; }, () => { WX2.gustbands = WX0.gustbands; }],
+      ] : []),
+      // (group D, the flip: THE NEW WEATHER AS A WHOLE against the old one (?weather=old), switched live -- the physics
+      //  reads its switches every frame; the 3D clouds go too, the sky taking its own flat cloud back (W1's switch). What
+      //  is fixed when the page is made stays: the rain streak's pale (kitmat.js) and the thunder's shape (audio.js),
+      //  neither of which costs anything measurable.)
+      ...(WX2.windmap ? [
+        ['weather: the old weather (?weather=old)', () => { for (const k of WX_ALL) WX2[k] = false; show(/^pc-storm-/, false); clouds3d(false); }, () => { for (const k of WX_ALL) WX2[k] = WX0[k]; show(/^pc-storm-/, true); clouds3d(CLOUDS3D); }],
+      ] : []),
       // (TENTH FORM) THE AIR: no row had ever timed it. The same spot, from 150 m and 400 m up.
       ...airAt(150, 30, [T0.noFar, T0.blob, T0.imp]),
       ...airAt(400, 45, [T0.noFar, T0.imp]),
       onFoot,
       // (the water's rows come LAST, after the final as-set row: see THE WATER'S ROWS LAST below)
+      // (GROUP D, LANE W1 CLOUDS: docs/lead/WEATHER-DESIGN.md 4.5 and 7. Asked only while the 3D clouds are on
+      //  (?clouds3d=1, world/clouds.js). "no clouds drawn" hides every cloud mesh (the lobes, the deck, the valley
+      //  cloud) in the weather of the moment; "clouds as before" puts back the sky's own flat cloud alone, so its gap to
+      //  the row before is what the 3D clouds cost against today's sky. The storm rows hold a storm overhead as the
+      //  weather group's row does, and take the clouds, then their shadows, out of it.)
+      ...(CLOUDS3D ? [
+        [AS, null, null],
+        ['weather: no clouds drawn (fair)', () => show(/^pc-cloud/, false), () => show(/^pc-cloud/, true)],
+        ['weather: clouds as before', () => clouds3d(false), () => clouds3d(true)],
+        // (the unseen 3D field laid into the cloud shadow map from the ground in the hybrid: its cost is this row's gap)
+        ['weather: no unseen cloud shadow field (fair)', () => { const c = pc.world && pc.world.clouds; if (c) c.shadowField = false; },
+          () => { const c = pc.world && pc.world.clouds; if (c) c.shadowField = true; }],
+        ...(WX2.cloudmap ? [
+          ['storm: no clouds drawn', () => { holdStorm(true); show(/^pc-cloud/, false); }, () => { show(/^pc-cloud/, true); holdStorm(false); }],
+          ['storm: no cloud shadows', () => { holdStorm(true); const c = pc.world && pc.world.clouds; if (c) c.shadowK = 0; },
+            () => { const c = pc.world && pc.world.clouds; if (c) c.shadowK = 1; holdStorm(false); }],
+        ] : []),
+      ] : []),
       // (back to the size the device really draws, so the four rows below are measured from IT and not from
       //  whatever sharper size the questions above had to be asked at: see MK at the top of this file)
       [AS, () => sharpen(1), null],

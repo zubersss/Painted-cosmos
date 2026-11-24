@@ -173,6 +173,7 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
   const _dirv = { x: 0, y: 0, z: 0 };
   const _d3 = new Float64Array(3);
   const _g = {}, _g2 = {}, _cov = {}, _menv = {}, _m2 = {}, _wenv = {}, _cmo = {}, _wmo = {};
+  const _rcd = [0, 0, 0], _rce = { altitude: 0 }, _rco = {};     // (?rainmap=1: the box's corners)
   const _splash = new Float32Array(MATERIAL_IDS.length);   // (P21) a raindrop's splash on each ground, as it is now
   let sampleBody = 'earth';
   const sampleActive = (dir) => sampleSurface(sampleBody, dir);
@@ -524,6 +525,17 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
     // ground and is lifted from it, so it takes the air there: rhoGround)
     // (the last argument, the powers' space and time: every drop and flake steps at the pace of the place it is in,
     //  as every loose grain already does on the line below. Null with no bubble open, and then it costs one comparison.)
+    // (group D, ?rainmap=1, W3.3's last part: the rain map read at the rain box's four corners and at its middle, so at a
+    //  shower's edge more of the box's drops fall on its wetter side; null with the switch off, and nothing is asked)
+    if (WX2.rainmap && cloudMap.ready && cloudMap.bodyId === bodyId && here.weather.precipitation.type !== 'none') {
+      const Rr = PARTICLES.radius, RC = particles.rainCorners || (particles.rainCorners = new Float64Array(5));
+      _rce.altitude = here.groundHeight || 0;
+      for (let q = 0; q < 5; q++) {
+        frame.dir(q < 4 ? fx + (q & 1 ? Rr : -Rr) : fx, q < 4 ? fz + (q & 2 ? Rr : -Rr) : fz, _rcd);
+        rainAt(bodyId, _rcd[0], _rcd[1], _rcd[2], time, seed, _rce, _rco);
+        RC[q] = _rco.rate + _rco.snow;
+      }
+    } else particles.rainCorners = null;
     particles.update(dt, frame, airGrid, near, fx, fy, fz, wh, here.weather, here.air.density, cover, bodyId, body.gravity, time, ecx, ecz, TIMEHOLD.rain ? times : null);
     loose.update(dt, frame, airGrid, near, fx, fy, fz, wh, here.weather, rhoGround, cover, bodyId, body.gravity, time, dist, here.air.turbulence, moist.wetness01, moist.snowDepth, devils, winds, times);
     // drifts: what lies loose on level ground here, how hard the wind moves it, and what stands in its way
