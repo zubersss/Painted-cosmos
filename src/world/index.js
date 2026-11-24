@@ -273,7 +273,7 @@ export function createWorld(scene) {
       if (q) { const p = q.split(',').map(Number); if (p.length === 2 && p.every(isFinite) && p[1] > p[0] && p[0] >= 0) return { given: p }; }
       if (q === '1') return { k: [3.5, 7.5] };
     } catch { /* no address */ }
-    return LOOK.lightNew ? { k: [3.5, 7.5] } : null;      // (off unless ?light=new: render/shared.js, the master switch)
+    return LOOK.lightNew ? { k: [3.5, 7.5] } : null;      // (on; off with ?light=old: render/shared.js, the look director's switch)
   })();
   function skyCeiling(body, look) {
     if (SKYCEIL.given) return SKYCEIL.given;
@@ -301,13 +301,12 @@ export function createWorld(scene) {
   // The sky's own bands are also laid from the TRUE horizon from the air (uSkyAir.z, sky.js): from a mile up the
   // horizon stands 44 degrees below level, and everything between it and level was one flat band of haze -- the
   // coordinator's flat grey-blue sky at 1 to 3 km. Now the zenith deepens to blue, the band low down is the pale
-  // warm air, and the brush strokes run down to the limb. That turn is eased in from a dip of 10 to 28 degrees
-  // (Earth 62 m to 530 m: the coordinator's ruling, so the sky over the wood is painted from 150 m too -- no view
+  // warm air, and the brush strokes run down to the limb. That turn is eased in from a dip of 10 to 17 degrees
+  // (Earth 62 m to 180 m: the coordinator's ruling, so the sky over the wood is painted from 150 m too -- no view
   // between 62 m and 420 m had been approved by the owner); on foot, where the approved views are, nothing moves.
   // `?airtop=0` is T1 exactly as it was committed (fixed heights, no FV1, no remapped bands); the watercolour game
-  // never reads any of it. (Since the master switch: ALL of this, and T1's ceiling itself, is off unless ?light=new,
-  // or ?airtop=1 / ?skyceil=1 alone.)
-  const AIRTOP = (() => { if (!LOOK.oil) return 0; try { const q = new URLSearchParams(location.search).get('airtop'); if (q != null && isFinite(+q)) return +q ? 1 : 0; } catch { /* no address */ } return LOOK.lightNew ? 1 : 0; })();      // (off unless ?light=new)
+  // never reads any of it. (`?light=old` turns all of this, and T1's ceiling itself, off together: render/shared.js.)
+  const AIRTOP = (() => { if (!LOOK.oil) return 0; try { const q = new URLSearchParams(location.search).get('airtop'); if (q != null && isFinite(+q)) return +q ? 1 : 0; } catch { /* no address */ } return LOOK.lightNew ? 1 : 0; })();      // (on; off with ?light=old)
   const DEG = 180 / Math.PI;
   const dipOf = (h, R) => (h > 0 ? Math.acos(R / (R + h)) * DEG : 0);
   const airTopOn = (look) => AIRTOP && look && look.oil && look.oil.airTop;
@@ -728,8 +727,8 @@ export function createWorld(scene) {
         if (AIRTOP && !SKYCEIL.given && !(look.weather && look.weather.ceiling)) return THREE.MathUtils.smoothstep(dip, 52, 66);
         const c = skyCeiling(body, look); return THREE.MathUtils.smoothstep(alt, c[0], c[1]);
       })() : space01;
-      // (the sky's bands from the true horizon: its dot(view, up), eased in from a dip of 10 to 28 degrees; sky.js)
-      if (skyU.uSkyAir) skyU.uSkyAir.value.z = AIRTOP && body.atmosphereHeight > 0 ? -Math.sin(dip / DEG) * THREE.MathUtils.smoothstep(dip, 10, 28) : 0;
+      // (the sky's bands from the true horizon: its dot(view, up), eased in from a dip of 10 to 17 degrees; sky.js)
+      if (skyU.uSkyAir) skyU.uSkyAir.value.z = AIRTOP && body.atmosphereHeight > 0 ? -Math.sin(dip / DEG) * THREE.MathUtils.smoothstep(dip, 10, 17) : 0;
       const e = bu.uSunDirL.value.dot(_up);
       _east.crossVectors(Y, _up).normalize();
       const am = bu.uSunDirL.value.dot(_east) > 0;

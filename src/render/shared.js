@@ -79,15 +79,16 @@ export const G = {
 // by every material; `&stroke=` (a multiple of the stroke's size) and painter.setLook({ oil: {...} }) turn them.
 const _qs = (() => { try { return new URLSearchParams(location.search); } catch (e) { return null; } })();
 const _qn = (k, d) => (_qs && _qs.has(k) && isFinite(+_qs.get(k)) ? +_qs.get(k) : d);
-// THE LOOK DIRECTOR'S MASTER SWITCH (2026-11-24, the coordinator, for the owner to judge on waking): `?light=new` turns
-// on, together, the night key (L1), the one foliage shade and the quiet darks (L2 + L7), one light (L3), the sky's
-// ceiling with the air's top (T1 reworked, FV1) and the air from the air (L5). WITHOUT IT EVERY ONE OF THEM IS OFF and
-// the oil look is exactly what it was (pixel-identical, docs/lead/LOOK-BUILD.md). Inside it each part keeps its own
-// switch (`?light=new&nightkey=0` and so on); each part's own switch set to 1 turns that part on without it.
-const _LN = !!(_qs && _qs.get('look') === 'oil' && _qs.get('light') === 'new') ? 1 : 0;
+// THE LOOK DIRECTOR'S SWITCH (2026-11-24; the owner: "No do make it look different"). The night key (L1), the one
+// foliage shade and the quiet darks (L2 + L7), one light (L3) and the sky's ceiling with the air's top (T1 reworked,
+// FV1) are ON. `?light=old` turns all of them off together: the oil look exactly as it was before them (pixel-identical,
+// docs/lead/LOOK-BUILD.md), for the owner to compare. Each part keeps its own switch either way
+// (`?nightkey=0`, `?light=old&nightkey=1` and so on). The air from the air (L5) is not in it yet: off unless `?airfar=1`.
+const _LO = !!(_qs && _qs.get('look') === 'oil' && _qs.get('light') === 'old');
+const _LN = _LO ? 0 : 1;
 export const LOOK = {
   oil: !!(_qs && _qs.get('look') === 'oil'),
-  lightNew: _LN,
+  lightNew: _LN,      // (1 unless ?light=old)
   // HOW MANY BANDS THE AIR IS LAID IN (world/index.js, uFog.y; chunks.js pcFogAmount quantises the haze to this many
   // steps). The watercolour keeps its six. The oil look takes ten, because the oil air is thicker and the ceiling
   // below holds it to about three quarters: over a long hillside six steps of a sixth each were six ruled terraces,
@@ -96,9 +97,9 @@ export const LOOK = {
   // same, the steps are finer, and the near air wobbles by at most 0.034 either way. `?bands=` turns it.
   oilBands: _qn('bands', 10),
   // THE AIR FROM THE AIR (L5, LOOK-AUDIT F2 and F6; chunks.js pcFogAmount and pcAtmosV, sky.js pcSkyAir): 1 on, 0 the
-  // far air exactly as it was (`?airfar=0`). world/index.js turns it into OIL.uLookN.w each frame: 0 on foot, rising to
+  // far air exactly as it was. OFF until it has passed the coordinator's eye: `?airfar=1` turns it on. world/index.js turns it into OIL.uLookN.w each frame: 0 on foot, rising to
   // 1 as the air's reach grows from the ground's to the air's.
-  airFar: _qn('airfar', _LN),
+  airFar: _qn('airfar', 0),
 };
 MODE.oil = LOOK.oil;      // (for the look data and the surface, which do not load this module: data/mode.js)
 MODE.calm = LOOK.oil && !!(_qs && _qs.get('floor') === 'calm');      // (a calmer forest floor, to compare: data/looks/earth.js)

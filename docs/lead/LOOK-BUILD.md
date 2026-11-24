@@ -21,21 +21,23 @@ HELD: L5 and L6 (until the far-view group's design is in), L4 (the morning: the 
 Also: review requests from the other groups' builders (the 15 checks; a group fails only where its B is worse than
 its A).
 
-## THE MASTER SWITCH `?light=new` (24 Nov, for the owner to judge on waking)
+## THE SWITCH `?light=old` (24 Nov; the owner: "No do make it look different")
 
-Every part of this lane after L0 is OFF unless the address has `?look=oil&light=new` (render/shared.js `LOOK.lightNew`;
-world/index.js `SKYCEIL`, `AIRTOP`). Without it the oil look is today's (the proof: the six standard stills against
-look-proto, pixel by pixel, below). Inside it each part keeps its own switch; each part's own switch at 1 turns it
-on alone. L0 (bit-identical) stays on; L6 stays off (seen to move almost nothing).
+The night key (L1), the foliage shade and quiet darks (L2 + L7), one light (L3) and the sky's ceiling with the air's
+top and FV1 (T1 reworked) are ON by default. `?look=oil&light=old` turns all of them off together: the oil look
+exactly as it was before them (the proof: the six standard stills against look-proto, pixel by pixel, below), for
+the owner to compare. Each part keeps its own switch either way. L0 (bit-identical) is always on. L5 (the air from
+the air) is OFF until it passes the coordinator's eye (`?airfar=1`). L6 is off (`?shadehue=1`). (An opt-in
+`?light=new` was built first and replaced the same hour by the owner's word.)
 
-| what | on (with `light=new`) | its "before" inside `light=new` |
+| what | the new look | the "before" |
 | --- | --- | --- |
-| everything | `?look=oil&light=new` | `?look=oil` |
+| everything | `?look=oil` | `?look=oil&light=old` |
 | L1 the night key | on | `&nightkey=0` |
 | L2 + L7 the foliage shade and quiet darks | on | `&leafshade=0&postdark=0` |
 | L3 one light (figure, creatures, bark, rock) | on | `&onelight=0` |
 | T1 + the air's top + FV1 (the sky from the air) | on | `&skyceil=0&airtop=0` |
-| L5 the air from the air | on | `&airfar=0` |
+| L5 the air from the air (not yet in) | `&airfar=1` | off |
 
 ## How the stills are taken (so a later session can repeat them exactly)
 
