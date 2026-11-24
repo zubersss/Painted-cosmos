@@ -36,9 +36,9 @@
 import { MODE } from '../data/mode.js';
 import { SEASON } from '../data/season.js';
 
-// THE SWITCHES (the oil look only; 1 by default, 0 gives the picture back as it was, to the bit):
-//   ?flora=0     THE WHOLE FLORA LANE OFF: the grass package and the flowers, the picture as it was before the lane (one
-//                switch for the owner's comparison; it is ?grass2=0&bloom=0)
+// THE SWITCHES (the oil look only). THE MASTER SWITCH IS OPT-IN: ?flora=new turns the whole lane on (the grass package
+// and the flowers); without it the picture is as it was before the lane, to the bit. Inside it each of these is 1 by
+// default and 0 gives that part back as it was:
 //   ?bloom=0     no flowers from this map at all (the near rings lay their flowers as before, the ground is not tinted)
 //   ?bloomair=0  the flowers, but not their colour in the ground (A1)
 //   ?bloomyear=0 the flowers, but not following the year (every kind in flower all the year, as before the year came)
@@ -47,14 +47,15 @@ import { SEASON } from '../data/season.js';
 let SW = null;
 export function bloomSwitches() {
   if (SW) return SW;
-  const f = { bloom: 1, air: 1, grass2: 1, year: 1 };
+  const f = { bloom: 0, air: 0, grass2: 0, year: 0 };
   try {
     const q = new URLSearchParams(location.search), on = (k) => !q.has(k) || (q.get(k) !== '0' && q.get(k) !== 'false');
-    f.grass2 = on('grass2') && on('flora') ? 1 : 0;
-    f.bloom = on('bloom') && on('flora') ? 1 : 0;
+    const isNew = q.get('flora') === 'new' || q.get('flora') === '1';      // (the master switch: world/nearground.js FLORA)
+    f.grass2 = isNew && on('grass2') ? 1 : 0;
+    f.bloom = isNew && on('bloom') ? 1 : 0;
     f.air = f.bloom && on('bloomair') ? 1 : 0;
     f.year = f.bloom && on('bloomyear') ? 1 : 0;
-  } catch { /* no address to read (Node): everything on, if the look is */ }
+  } catch { f.bloom = 1; f.air = 1; f.grass2 = 1; f.year = 1; /* no address to read (Node, the tests): everything on, if the look is */ }
   if (!MODE.oil) { f.bloom = 0; f.air = 0; f.grass2 = 0; f.year = 0; }
   SW = f;
   return f;
