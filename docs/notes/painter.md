@@ -150,8 +150,11 @@ water), the river still a little over the band; E5 0.12 to 0.37 saturation, valu
 note still water is the calmest thing: a step deeper, less mirror, strokes 10:1 and in close values, white only on the sun's
 path. NIGHT (F's ask): the light strokes keep a step of light over the pulled body, the moon's marks are left out of the
 pull (`s2-E1-night-23h-wpaint2-crest-ab.jpg`: water V 0.45, land 0.22).
-**THE DEFAULT since 24 Nov** (the owner's leave, the coordinator's word, F passed step 1): `?wpaint=1` -- the strokes of
-step 1 -- is the default; `?wpaint=2` adds the colour of step 3 (under review); `?wpaint=0` is v37's water, PROVEN: by day
+**THE DEFAULT went back to `?wpaint=0` (v37's water) on 24 Nov, afternoon** (the coordinator's ruling: the look director
+found the open sea from 150 m a checker of pale stair-stepped blocks at `?wpaint=1` and an electric blue, S 0.78, at
+`?wpaint=2`; E-W2's branch water-sea 9525b16 has a first fix). Next: tell rivers and ponds from the sea and wide open water
+so the strokes can be the default there. Before that it was: `?wpaint=1` -- the strokes of
+step 1 -- the default; `?wpaint=2` adds the colour of step 3 (under review); `?wpaint=0` is v37's water, PROVEN: by day
 at the bank view (936 x 372, `&t=5`) 0 pixels differ from the build before steps 2 and 3. `uWPaint` holds the level.
 **E-W2's blue curtain** (the coordinator's request): patchgen's water index loop drops a cell whose four corners hold
 liquid but whose levels spread over 2 m and over half the cell (a face steeper than 1 in 2), only with a water world
