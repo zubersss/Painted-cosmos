@@ -83,6 +83,10 @@ const TREESWAY = typeof location !== 'undefined' && /[?&]treesway=whole\b/.test(
 // ?pines=0 is the old way, exactly as before. The speed test swaps it (setNeedles).
 const PINES = !(typeof location !== 'undefined' && /[?&]pines=0\b/.test(location.search || ''));
 const NEEDLE_KITS = new Set(['tallpine', 'spruce']), NEEDLE_PX = 3.0;
+// ?nearleaf=1 (24 Nov, the look director's audit 2: near leaves read as big flat shards): a tree's leaves within 4 m of
+// the eye shrink about their centres, to half at 1.2 m (materials.js PROP_VERT, uNearLeaf); from 4 m out nothing changes.
+// OFF until the look director passes it.
+const NEARLEAF = typeof location !== 'undefined' && /[?&]nearleaf=1\b/.test(location.search || '');
 // (only a kind whose crown is leaves one by one, and nothing else, can be split: parts 0 bark, 5 leaf, 6 snow on a
 //  bough. A kind with crowns of washes (part 1: the green wood's conifer) keeps the one program.)
 function splittable(geos) {
@@ -278,7 +282,7 @@ export class Flora {
     const TALL = L.tall.map((sp) => (LOOK.oil ? Object.assign({}, sp, { oilLook: 1 }, sp.kit === 'broadleaf' || sp.kit === 'maple' || sp.kit === 'aspen' ? { leafy: 1, double: 1 } : null, sp.kit === 'roundmaple' || sp.kit === 'poplar' || sp.kit === 'oak' || sp.kit === 'birch' || sp.kit === 'willow' || sp.kit === 'sapling' ? { double: 1 } : null, sp.oil, PINES && sp.kit === 'spruce' ? { needleTop: 1 } : null) : sp));      // (?pines: the spruce's needles budgeted by bough, kits/spruce.js)
     this.tall = TALL;
     this.species = TALL.map((sp, i) => {
-      const mo = { needle: PINES && NEEDLE_KITS.has(sp.kit) ? NEEDLE_PX : 0, name: 'tall-' + sp.kit + i, barkA: sp.bark[0], barkB: sp.bark[1], leafA: sp.leaf[0], leafB: sp.leaf[1], leafC: sp.leaf[2], barkP: sp.barkP, leafP: sp.leafP, accent: sp.accent, oilDark: sp.dark || null, oilFam: sp.fam || null, oilKind: sp.snowy ? 1 : sp.bare ? 2 : 0, wind: sp.wind == null ? 0.03 : sp.wind, doubleSide: !!sp.double, phys: sp.kit === 'vine' ? null : 'lite', branch: BRANCHY.has(sp.kit), stiff: sp.kit === 'kelp' ? 0.1 : 1, plantHeight: (FAR_DIMS[sp.kit] || [0, 10])[1], gem: sp.kit === 'crystal',
+      const mo = { needle: PINES && NEEDLE_KITS.has(sp.kit) ? NEEDLE_PX : 0, nearLeaf: NEARLEAF ? 1 : 0, name: 'tall-' + sp.kit + i, barkA: sp.bark[0], barkB: sp.bark[1], leafA: sp.leaf[0], leafB: sp.leaf[1], leafC: sp.leaf[2], barkP: sp.barkP, leafP: sp.leafP, accent: sp.accent, oilDark: sp.dark || null, oilFam: sp.fam || null, oilKind: sp.snowy ? 1 : sp.bare ? 2 : 0, wind: sp.wind == null ? 0.03 : sp.wind, doubleSide: !!sp.double, phys: sp.kit === 'vine' ? null : 'lite', branch: BRANCHY.has(sp.kit), stiff: sp.kit === 'kelp' ? 0.1 : 1, plantHeight: (FAR_DIMS[sp.kit] || [0, 10])[1], gem: sp.kit === 'crystal',
         // (the last fixes: a spire parts round an eye inside it; its girth at the foot, height and lean, florakit.js spireGeometry)
         hollow: sp.kit === 'spire' ? (sp.slim ? [1.3, 10.5, 0.3] : [2.0, 12, 0]) : null };
       const mat = makePropMaterial(bodyUniforms, mo);

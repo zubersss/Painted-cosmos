@@ -1683,6 +1683,7 @@ uniform vec4 uOilB;
 uniform vec4 uOilD;
 uniform vec4 uOilG;
 uniform float uNeedle;    // (?pines: a conifer's needles never narrower on the screen than this many pixels; 0 off, as before)
+uniform float uNearLeaf;  // (?nearleaf: 1 the leaves within arm's length shrink about their centres; 0 off, as before)
 uniform vec4 uOilPx;      // (x: the angle one pixel of the scene pass takes, radians: shared.js)
 uniform mat4 uShM;
 uniform highp sampler2D uShTex;
@@ -1795,6 +1796,15 @@ void main() {
       float dN = max(distance((im * vec4(aCard, 1.0)).xyz, uCamLocal), 0.1);
       cardO *= mix(1.0, ${NEEDLE_FILL.toFixed(2)}, smoothstep(10.0, 30.0, dN));
       if (abs(uv.y) > 0.5) cardO *= clamp(0.5 * uNeedle * dN * uOilPx.x / max(length(mat3(im) * cardO), 1e-4), 1.0, 5.0);
+      lp = aCard + cardO;
+    }
+    // NO SHARDS UNDER THE NOSE (?nearleaf, 24 Nov; the look director's audit 2, R3.6 'nothing reads as a polygon'): a
+    // leaf a metre or two from the eye is a hand-sized flat kite filling a tenth of the picture, straight-edged, where
+    // the references' near leaves are small dabs with the sky between them. So within 4 m of the eye each leaf shrinks
+    // about its own centre, to half its size at 1.2 m; from 4 m out nothing changes (the owner approved the near trees
+    // at 5 to 15 m as they are). Its place and its paint are its own. 0: as before.
+    if (uNearLeaf > 0.0 && aData.y > 4.5 && aData.y < 6.5) {
+      cardO *= mix(0.5, 1.0, smoothstep(1.2, 4.0, distance((im * vec4(aCard, 1.0)).xyz, uCamLocal)));
       lp = aCard + cardO;
     }
   #endif
@@ -2977,6 +2987,7 @@ export function makePropMaterial(bodyU, opts = {}) {
     uLeafFam: { value: new THREE.Vector4().fromArray(opts.oilFam || [0, 0, 0, 0]) },
     uOilDark: { value: new THREE.Vector4(opts.oilDark ? opts.oilDark[0] : 0, 0, 0, 0) },
     uNeedle: { value: opts.needle || 0 },      // (?pines: flora.js; 0 for every plant but a conifer with the switch on)
+    uNearLeaf: { value: opts.nearLeaf || 0 },  // (?nearleaf: flora.js; 0 for every plant but a tree with the switch on)
     uOilDarkA: v3(opts.oilDark && opts.oilDark[1], [0.5, 0.4, 0.4]), uOilDarkB: v3(opts.oilDark && opts.oilDark[2], [0.2, 0.15, 0.2]),
   };
   const defines = {};
