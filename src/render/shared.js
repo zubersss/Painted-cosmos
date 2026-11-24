@@ -229,7 +229,8 @@ export const OIL = {
   //     (1 unless ?light=old; ?goldsky=0 alone is the wash as it was)
   //   y each summer tree its own green (chunks.js pcSummerTree): world/index.js sets it each frame to LOOK.treeVar times
   //     one less the season (0 in autumn); ?treevar=0 alone, or ?light=old, is every tree of a kind in the same greens
-  uLookG: { value: new THREE.Vector4(_qn('goldsky', _LN), 0, 0, 0) },
+  // z: the cloud shell's limb seen from above thins away whole (sky.js; ?skylimb=0 the sky as v39.2 drew it)
+  uLookG: { value: new THREE.Vector4(_qn('goldsky', _LN), 0, _qn('skylimb', _LN), 0) },
 };
 
 // WHERE THE FIRE HAS BEEN, FOR THE GROUND'S OWN PAINT (the powers, fire; the paint itself is materials.js TERRAIN_FRAG).
@@ -542,6 +543,9 @@ export const PHYS = {
   uPhysBranchClock: { value: new THREE.Vector4() },
   // (group D, ?farwind=1) the far field of the plants (physics flora.js FloraField.far) and where it lies; w = 0: off, never read
   uPhysFar: { value: blank() }, uPhysFarMap: { value: new THREE.Vector4(0, 0, 1, 0) },
+  // (group D, ?gustbands=1) the gust bands seen from the air (physics flora.js GUSTBAND): xyz direction x strength
+  // (body axes), w m run. syncPhysFlora copies it from F.uniforms like the others; no material reads it unless PC_GUST.
+  uPhysGust: { value: new THREE.Vector4(0, 0, 0, 0) },
 };
 let _physV = -1, _physP = -1, _physF = null, _physFV = -1;
 export function syncPhysFlora(F) {
