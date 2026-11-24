@@ -209,7 +209,14 @@ vec3 pcAuroraLight(float az, float e, float e0, float hgt, float fold, float wob
 void main() {
   vec3 d = normalize(vDirL);
   vec3 up = normalize(uCamL);
-  float e = dot(d, up);
+  float e = dot(d, up), eR = e;      // (eR: the true dot(view, up), for what is placed by geometry -- the cloud sea, the aurora's and the rain's directions)
+  #ifdef PC_OIL
+    // (THE AIR'S TOP, world/index.js AIRTOP: from the air the bands, the strokes and the low air band are laid from the
+    // TRUE horizon, which stands uSkyAir.z below level (as dot(view, up); 0 on foot and over the wood, where nothing
+    // changes). From a mile up on Earth it is 44 degrees down, and everything between it and level was one flat band
+    // of haze. Mapped so the true horizon reads 0 and the zenith still 1.)
+    if (uSkyAir.z < -1e-4) e = (e - uSkyAir.z) / (1.0 - uSkyAir.z);
+  #endif
   float sd = dot(d, uSunDirL);
   float sunE = dot(uSunDirL, up);
 
@@ -333,7 +340,7 @@ void main() {
   // pale line lifted out of the wash, rays running up from it and fading into violet; folded along the horizon
   // (anchored to the planet, drifting slowly). By day a pale ghost in the blue, by night the palest thing low down.
   if (uAurora.x > 0.001) {
-    vec3 ha = normalize(d - up * e + up * 1e-4);
+    vec3 ha = normalize(d - up * eR + up * 1e-4);
     vec4 fa = texture(uNoise3D, ha * 1.25 + vec3(0.7, 0.2, uTime * 0.0015));
     vec4 fb = texture(uNoise3D, ha * 3.4 + vec3(0.1, uTime * 0.002, 0.4));
     float fold = smoothstep(0.38, 0.62, fa.r * 0.7 + fb.g * 0.3);                    // where along the horizon a curtain hangs
@@ -367,11 +374,11 @@ void main() {
     // where the top of the far cloud lies for this eye: below eye level (its own horizon) from above it,
     // above eye level from a bench lower than the cloud tops (the islands then stand in a bank of it)
     float et = rc0 > rs ? -sqrt(max(0.0, 1.0 - (rs * rs) / (rc0 * rc0))) : sin(atan((rs - rc0) / 450.0));
-    vec3 hz2 = normalize(d - up * e + up * 1e-4);
+    vec3 hz2 = normalize(d - up * eR + up * 1e-4);
     vec4 h1 = texture(uNoise3D, hz2 * 2.2 + 0.31);
     vec4 h2 = texture(uNoise3D, hz2 * 7.0);
     float head = (0.016 + 0.085 * smoothstep(0.30, 0.78, h1.r) + 0.020 * h2.g) * uSeaC.z;       // heads of cumulus stand up along it
-    float above = e - et;
+    float above = eR - et;
     float deck = 0.0, hollow = 0.0;
     if (above < head) {
       deck = 1.0 - smoothstep(head * 0.80, head, above);                              // a crisp upper edge
@@ -528,7 +535,7 @@ void main() {
   // strongest low in the sky (anchored to the planet: they do not turn with the camera)
   float veil = max(uWxSky.z, uWxSky.w);
   if (veil > 0.01) {
-    vec3 hz = normalize(d - up * e + up * 1e-4);
+    vec3 hz = normalize(d - up * eR + up * 1e-4);
     vec3 side = cross(up, hz);
     vec3 vq = hz * 1.7 + side * (e * 1.1) + up * (e * 0.30) + vec3(uTime * 0.004, 0.0, 0.0);
     float drag = texture(uNoise3D, vq).r * 0.75 + texture(uNoise3D, vq * 2.3 + 0.3).g * 0.25;
@@ -729,7 +736,8 @@ export function makeSkyUniforms() {
     // ONE AIR FOR THE LAND AND THE SKY (see pcSkyAir in the shader above). x: how far the sky's lowest band is the
     // same air the far land ends in (?skyair=; 0 is the sky exactly as it was, which is the other half of the pair
     // to show the owner). y: how high that band stands, as dot(view, up) -- 0.075 is about four degrees over the
-    // horizon, which is a painter's band low down and not a wall of one colour (?skyairtop=).
+    // horizon, which is a painter's band low down and not a wall of one colour (?skyairtop=). z: where the TRUE
+    // horizon stands from the air, as dot(view, up), set each frame by world/index.js (AIRTOP); 0 on the ground.
     uSkyAir: { value: new THREE.Vector4(_qn('skyair', 1), _qn('skyairtop', 0.075), 0, 0) },
     ...OIL,
   };
