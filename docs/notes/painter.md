@@ -963,9 +963,10 @@ tier 2, rows 'sharper, rung 1 (1.20x each way)' and 'tier 1 (the tier under the 
 independent review): a rung lost after its 5 s trial did not count, so a borderline view cycled every 6-7 s; reproduced
 in Node (31 steps in five minutes over three runs), now at most 2 (3 when reached later). MODELLED, tier 2 never timed on
 the phone and taken as tier 1 + 15 per cent: on foot tier 2 + rung 1 16.7 ms, 0 per cent held twice at the gentler
-wobble; at the harsher one tier 2 alone 23.8 ms and no rung is climbed. OPEN (told the coordinator): rung 2 models at
-26.1 ms with 57 per cent of frames held twice, just under the 27 ms line: cap at rung 1 or lower the line to about 21 ms
-if smoothness rules.
+wobble; at the harsher one tier 2 alone 23.8 ms and no rung is climbed. SHARPER AND SMOOTHER (the coordinator, after
+rung 2 modelled at 26.1 ms with 57 per cent of frames held twice): 82b2f6c caps touch at ONE rung (SHARP_TOUCH_RUNGS 1)
+and gives it back over 21 ms for half a second, climbing only after 6 s under 18.6 ms (frames mostly at sixty): the
+sharpness stays only while the phone is smooth; anywhere heavier it looks exactly as v39.5. In v39.7.
 
 **THE NEAR LEAVES AND THE BUSH (F, 24 Nov late: the near bush in u2cells-am02 'in the old leaf-card look'; 93080eb,
 three switches, all OFF).** F's reading: mostly (a) the NEAR-BLACK PIECES (a shaded leaf takes the
