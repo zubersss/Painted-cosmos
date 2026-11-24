@@ -9,6 +9,7 @@ import { buildPatchData, beginPatch, stepPatch, patchIndices, PATCH_N } from './
 import { faceToDir, nodeSize, FACES } from './cubesphere.js';
 import { makeTerrainMaterial, makeWaterMaterial } from '../render/materials.js';
 import { QUALITY, LOOK, SCREEN } from '../render/shared.js';
+import { syncCanopy } from '../render/farground.js';
 
 // (?waterbound=0 puts the water's bounding sphere back to the whole patch's, for an A and a B of the draw calls.)
 const WATER_BOUND = (() => {
@@ -341,6 +342,8 @@ export class PlanetTerrain {
     // the low tier's own rule. In steps of a twentieth, so that the mesh is not rebuilt as a window is dragged.)
     if (LOOK.oil) this.splitK = Math.max(SPLIT_BY_QUALITY[0], this.splitK * Math.min(1, Math.max(0.7, Math.round(SCREEN.outH / 1080 * 20) / 20 + 0.25)));
     this.boostK = QUALITY.level === 0 ? 0.15 : 1;     // the low tier spends little on cliffs
+    // (the far view's painted canopy: the season's crowns into the ground's uniforms, render/farground.js; a few numbers)
+    syncCanopy(this.material, this.S);
     this.camLocal.copy(camLocal);
     this.camDir.copy(camLocal).normalize();
     this.leadOn = !!lead;

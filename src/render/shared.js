@@ -79,8 +79,16 @@ export const G = {
 // by every material; `&stroke=` (a multiple of the stroke's size) and painter.setLook({ oil: {...} }) turn them.
 const _qs = (() => { try { return new URLSearchParams(location.search); } catch (e) { return null; } })();
 const _qn = (k, d) => (_qs && _qs.has(k) && isFinite(+_qs.get(k)) ? +_qs.get(k) : d);
+// THE LOOK DIRECTOR'S SWITCH (2026-11-24; the owner: "No do make it look different"). The night key (L1), the one
+// foliage shade and the quiet darks (L2 + L7), one light (L3) and the sky's ceiling with the air's top (T1 reworked,
+// FV1) are ON. `?light=old` turns all of them off together: the oil look exactly as it was before them (pixel-identical,
+// docs/lead/LOOK-BUILD.md), for the owner to compare. Each part keeps its own switch either way
+// (`?nightkey=0`, `?light=old&nightkey=1` and so on). The air from the air (L5) is not in it yet: off unless `?airfar=1`.
+const _LO = !!(_qs && _qs.get('look') === 'oil' && _qs.get('light') === 'old');
+const _LN = _LO ? 0 : 1;
 export const LOOK = {
   oil: !!(_qs && _qs.get('look') === 'oil'),
+  lightNew: _LN,      // (1 unless ?light=old)
   // HOW MANY BANDS THE AIR IS LAID IN (world/index.js, uFog.y; chunks.js pcFogAmount quantises the haze to this many
   // steps). The watercolour keeps its six. The oil look takes ten, because the oil air is thicker and the ceiling
   // below holds it to about three quarters: over a long hillside six steps of a sixth each were six ruled terraces,
@@ -88,6 +96,10 @@ export const LOOK = {
   // haze at 10 m goes 0.005 to 0.024, at 30 m 0.167 to 0.200, at 60 m 0.468 to 0.434 -- the mean of the curve is the
   // same, the steps are finer, and the near air wobbles by at most 0.034 either way. `?bands=` turns it.
   oilBands: _qn('bands', 10),
+  // THE AIR FROM THE AIR (L5, LOOK-AUDIT F2 and F6; chunks.js pcFogAmount and pcAtmosV, sky.js pcSkyAir): 1 on, 0 the
+  // far air exactly as it was. OFF until it has passed the coordinator's eye: `?airfar=1` turns it on. world/index.js turns it into OIL.uLookN.w each frame: 0 on foot, rising to
+  // 1 as the air's reach grows from the ground's to the air's.
+  airFar: _qn('airfar', 0),
 };
 MODE.oil = LOOK.oil;      // (for the look data and the surface, which do not load this module: data/mode.js)
 MODE.calm = LOOK.oil && !!(_qs && _qs.get('floor') === 'calm');      // (a calmer forest floor, to compare: data/looks/earth.js)
@@ -185,6 +197,27 @@ export const OIL = {
   // pattern's features, which is what stops the floor at 275 m being light-and-dark confetti that flickers as the
   // eye moves: chunks.js pcDappleS. (w held 0.085 and was read nowhere.)
   uOilPx: { value: new THREE.Vector4(0.0015, 720, 0.027 * _qn('stroke', 1), _qn('masses', 1)) },
+  // THE LOOK DIRECTOR'S SWITCHES (docs/lead/LOOK-BUILD.md; 2026-11-24). Uniforms, not defines, so that A and B of one
+  // still come from one page and the speed test can turn each off while it runs. 1 on, 0 the picture as it was.
+  //   x THE NIGHT KEY (L1, `?nightkey=`): by the moon a colour goes part of the way to its own value in the night
+  //     key's hue and the moonlit paint is laid at the night's own strength (chunks.js pcTone); the last pass excuses
+  //     from the night's grade only what the lantern lights and what is itself a light, not every warm pixel (post.js)
+  //   y ONE FOLIAGE SHADE (L2, `?leafshade=`): the shade of leaves, blades, far crowns and green floor dabs from one
+  //     function, quieted to its own value (chunks.js pcShadeLeaf)
+  //   z kept for L3 (one light)
+  //   w QUIET DARKS (L7, `?postdark=`): the last pass's S laid on the value only, and its colour push faded out under
+  //     a value of 0.30 and measured by the real saturation (post.js OIL_FRAG)
+  uLookF: { value: new THREE.Vector4(_qn('nightkey', _LN), _qn('leafshade', _LN), _qn('onelight', _LN), _qn('postdark', _LN)) },
+  // THE NIGHT'S TWO NUMBERS for the world the eye is on (world/index.js sets them each frame from the world's look):
+  //   x how strong the moonlit paint is against the sunlit (a look's oil.night.v; 0.60, or 0.85 where the world has a
+  //     night key of its own, as Neptune's, which the owner liked as it was)
+  //   y how far a colour goes toward its own value in the night key's hue (oil.night.c; 0.45, or 0.20 likewise)
+  //   z THE SHADE FOLLOWS THE BODY (L6, LOOK-AUDIT F8; chunks.js pcTone): how far a green or grey thing's shade turns
+  //     from the plum of the clip's orange floor toward the key with its green kept. OFF by default (seen to move almost
+  //     nothing: chunks.js); ?shadehue=1 turns it on.
+  //   w THE AIR FROM THE AIR (L5): how far the far air is laid as from the air -- 0 on foot, 1 from the air; set each
+  //     frame by world/index.js from LOOK.airFar and the air's reach.
+  uLookN: { value: new THREE.Vector4(0.60, 0.45, _qn('shadehue', 0), 0) },
 };
 
 // WHERE THE FIRE HAS BEEN, FOR THE GROUND'S OWN PAINT (the powers, fire; the paint itself is materials.js TERRAIN_FRAG).

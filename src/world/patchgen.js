@@ -5,6 +5,7 @@ import { faceToDir } from './cubesphere.js';
 import { makeSample, NOLQ } from './surface.js';
 import { MODE } from '../data/mode.js';
 import { BODIES } from '../data/bodies.js';
+import { canopyOn, standAt } from './farstand.js';
 
 export const PATCH_N = 32;                 // cells per patch edge (even, for geomorphing)
 const N = PATCH_N, V = N + 1, E = N + 3;   // E: sample grid with a one-vertex apron for normals
@@ -39,8 +40,9 @@ export const PATCH_VERTS = V * V + 4 * V;
 const _d = [0, 0, 0];
 const _px = new Float64Array(E * E), _py = new Float64Array(E * E), _pz = new Float64Array(E * E);
 const _hh = new Float32Array(E * E), _lq = new Float32Array(E * E);
-const CS = 21;   // floats kept per sample: wash, far wash, parameters, liquid look, strata, the current, the fall
+const CS = 23;   // floats kept per sample: wash, far wash, parameters, liquid look, strata, the current, the fall, the stand
 const _col = new Float32Array(E * E * CS);
+const _fs = [0, 0];     // (the stand and its needle share at a sample: world/farstand.js)
 let _s = null;
 
 function b8(v) { v = v * 255 + 0.5; return v < 0 ? 0 : v > 255 ? 255 : v | 0; }
@@ -93,6 +95,10 @@ export function stepPatch(job, deadline) {
   const span = 2 / (1 << level);
   const u0 = -1 + ix * span, v0 = -1 + iy * span, du = span / N;
   let minH = job.minH, maxH = job.maxH, anyWater = job.anyWater;
+  // (THE PAINTED CANOPY, group C: on a world whose wood is painted as a roof of crowns from the air, each vertex is
+  // told how many trees the placer keeps there and how many are needle trees -- world/farstand.js, render/farground.js.
+  // Off, or on any other world, nothing is computed and the bytes are the ones they always were.)
+  const can = canopyOn(S.id);
   // 1. sample the surface on the apron grid, a row at a time
   // (S.foot: how far apart this patch's samples lie, in metres, while they are taken: the oil look's surface draws a
   // river into the far colour as wide as that, so that a river is still a line on the land from high up, where the
@@ -118,6 +124,7 @@ export function stepPatch(job, deadline) {
         _col[c + 10] = s.qr; _col[c + 11] = s.qg; _col[c + 12] = s.qb; _col[c + 13] = s.qk; _col[c + 14] = s.qglow; _col[c + 15] = s.qcloud; _col[c + 16] = s.strata;
         _col[c + 17] = s.fu || 0; _col[c + 18] = s.fv || 0;      // (the oil look's rivers: the current, surface.js; 0 everywhere else)
         _col[c + 19] = s.fspd || 0; _col[c + 20] = s.turb || 0;  // (the drainage field's own speed and churn, where a surface gives them; 0 otherwise)
+        if (can) { standAt(S, _d[0], _d[1], _d[2], s, _fs); _col[c + 21] = _fs[0]; _col[c + 22] = _fs[1]; }
       }
     }
   }
@@ -158,8 +165,10 @@ export function stepPatch(job, deadline) {
       }
       const c = k * CS, q = (j * V + i) * 4;
       col[q] = b8(_col[c]); col[q + 1] = b8(_col[c + 1]); col[q + 2] = b8(_col[c + 2]); col[q + 3] = b8(1 - _col[c + 16]);
-      col2[q] = b8(_col[c + 3]); col2[q + 1] = b8(_col[c + 4]); col2[q + 2] = b8(_col[c + 5]); col2[q + 3] = 255;
-      par[q] = b8(_col[c + 6]); par[q + 1] = b8(_col[c + 7]); par[q + 2] = b8(_col[c + 8]); par[q + 3] = b8(_col[c + 9]);
+      // (the painted canopy, where it is on: the far wash's spare byte carries the stand, and the parameters' fourth -- a
+      // crack's depth, which the oil look's ground never paints -- the needle share; world/farstand.js)
+      col2[q] = b8(_col[c + 3]); col2[q + 1] = b8(_col[c + 4]); col2[q + 2] = b8(_col[c + 5]); col2[q + 3] = can ? b8(_col[c + 21]) : 255;
+      par[q] = b8(_col[c + 6]); par[q + 1] = b8(_col[c + 7]); par[q + 2] = b8(_col[c + 8]); par[q + 3] = b8(_col[c + (can ? 22 : 9)]);
       if (!io && !jo) {
         // the parent's own normal here: its grid is twice as wide (at the border the apron is one cell deep)
         const il2 = i > 0 ? k - 2 : k - 1, ir2 = i < N ? k + 2 : k + 1, jl2 = j > 0 ? k - 2 * E : k - E, jr2 = j < N ? k + 2 * E : k + E;
