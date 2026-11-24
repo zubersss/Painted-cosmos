@@ -92,6 +92,16 @@ Commit code with `tools/commit.sh painter`; docs/shots/clouds/ is not in that sc
 plain `git add docs/shots/clouds && git commit` naming the path.
 
 **State (24 Nov, late afternoon): MERGE-READY for v39.2** -- the look director ACCEPTED rework 3 (storm edges, the flash, the noon form as far as it goes, the near cloud by whole strokes, the shadow field) and asked for no further rework of the clouds for v39.2; the coordinator's hybrid, shadow field, land storm in the game and storm from afar are in. Branch head after merging design-weather df68c45 (the 10 m/s drift cap, thunder, wxguard): suites 328 / 107 / 443; the merged tree's 1 km golden hour identical to the pixel with the one before the merge. PROOF STILLS: docs/shots/clouds/rework2 (ground stations A/B, 1 km golden hour rows, the shadow map K vs K0, the game storm at 3690 s and 3745 s) and docs/shots/clouds/rework3 (the shadow field from 150 m, smooth storm edges and the two-step flash, 600 m noon, the storm from the coast at 3.3 km). Known weak, said plainly: front-lit noon from the air (the look director: stop here for now), a mountain-caught cloud reads as a flat cap, the anvil not yet apart from the tower's top, the land under a storm deck still lit like fair noon (the look director's, in the shared light). Off by default: the cirrus (`?cirrus=1`) and the sky strokes from the air (dropped).
+**After d6f4fa4 (the merge point stays d6f4fa4):** every cloud program behind the weather group's guard (world/wxguard.js
+watchPrograms: the lobes' program failing switches the module off, `world.clouds.failed`, and the sky takes its own
+painted cloud back; a sheet's hides that sheet; the shadow pass's programs looked at in renderShadow, a failure turns the
+shadows off; tested in clouds.test.mjs with a faked failed program). THE FLIP for the release (the coordinator: the 3D
+clouds the oil look's default, `?clouds3d=0` the opt-out, `?weather=old` takes them out with the rest):
+docs/shots/clouds/CLOUDS3D_FLIP.patch, two lines -- world/index.js CLOUDS3D (the look director's file) and core/bench.js
+CLOUDS3D (this lane's block); clouds.js and wx2.js need nothing (clouds.js's own default is already 1; the weather
+group's flip turns the maps on). Checked in a scratch copy with the patch applied: no switch in the address, the 3D
+clouds draw (180 at 1 km); `?clouds3d=0`, the module is never fetched. Given to the weather group for their
+weather-release branch.
 
 | step | state | what was done, seen, measured |
 | --- | --- | --- |

@@ -41,6 +41,7 @@
 import * as THREE from 'three';
 import { G, OIL, LOOK, QUALITY, register, ensureGlobals } from '../render/shared.js';
 import * as SHARED from '../render/shared.js';
+import { watchPrograms } from './wxguard.js';
 import { WX } from './wxfield.js';
 import { makePaintUniforms, defaultBodyUniforms } from '../render/materials.js';
 import { VERT_PARS, VERT_END, FRAG_PARS } from '../render/chunks.js';
@@ -1164,7 +1165,7 @@ export function createClouds(scene) {
     for (const M of [...meshes, shadowOnly]) {
       for (const k of ['iA', 'iB', 'iC', 'iD']) { const a = M.g.attributes[k]; a.clearUpdateRanges(); a.addUpdateRange(0, M.n * 4); a.needsUpdate = true; }
       M.g.instanceCount = M.n;
-      if (M.mesh) M.mesh.visible = M.n > 0;
+      if (M.mesh) M.mesh.visible = M.n > 0 && !M.mesh.userData.pcGuardOff;
     }
     self.stats.shadowLobes = shadowOnly.n;
     group.position.set(0, 0, 0);
@@ -1204,7 +1205,7 @@ export function createClouds(scene) {
         sh.anchor.copy(camD);
         sh.fill(fn, sh.anchor, camD, R);
         sh.u.uAnchorD.value.copy(sh.anchor);
-        if (sh.mesh) { sh.mesh.position.copy(sh.anchor); sh.mesh.visible = sh.any; }
+        if (sh.mesh) { sh.mesh.position.copy(sh.anchor); sh.mesh.visible = sh.any && !sh.mesh.userData.pcGuardOff; }
       }
       // the deck at the eye (the eye inside it whites out, below)
       deckFn(upx, upy, upz, _cOut3);
@@ -1242,7 +1243,7 @@ export function createClouds(scene) {
   // row 'storm: no cloud shadows' (WX.uCloudShadowK 0): the map then reads no shadow anywhere.
   self.renderShadow = function renderShadow(renderer, scene0) {
     const root = group.parent;
-    const live = root && group.visible && mat && shState.has && self.shadowK > 0 && shState.sun.dot(shState.centre) > 0.02 * shState.centre.length();
+    const live = root && group.visible && mat && shState.has && !shState.failed && self.shadowK > 0 && shState.sun.dot(shState.centre) > 0.02 * shState.centre.length();
     if (!live) { if (shState.on) { WX.uCloudShadowM.value.copy(NO_SHADOW); WX.uCloudShadowV.value.copy(NO_SHADOW); shState.on = false; } WX.uCloudShadowK.value = 0; return; }
     if ((shState.frame++ & 1) && shState.on) return;
     const sc = scene0 || scene;
@@ -1282,6 +1283,18 @@ export function createClouds(scene) {
       for (let i = 0; i < swapped.length; i += 2) swapped[i].material = swapped[i + 1];
       renderer.setRenderTarget(prevT); renderer.autoClear = prevAuto; renderer.setClearColor(_cc, prevA);
     }
+    // (the guard's rule for the shadow pass's own programs: once compiled, looked at once; one that failed turns the
+    // clouds' shadows off for good and the picture goes on without them)
+    if (!shState.checked && renderer.properties) {
+      let pending = false, bad = false;
+      for (const m of new Set(shState.mats.values())) {
+        const p = renderer.properties.get(m).currentProgram;
+        if (!p) { pending = true; continue; }
+        if (p.diagnostics && p.diagnostics.runnable === false) bad = true;
+      }
+      if (bad) { shState.failed = true; if (typeof console !== 'undefined') console.warn('weather guard: clouds: the shadow pass did not compile; the clouds\' shadows are off'); }
+      else if (!pending) shState.checked = true;
+    }
     WX.uCloudShadow.value = shadowRT.texture;
     WX.uCloudShadowM.value.copy(shM);
     WX.uCloudShadowK.value = self.shadowK;
@@ -1309,7 +1322,7 @@ export function createClouds(scene) {
   self.update = function update(dt, camL, root, sunL, fields, skyU) {
     if (!LOOK.oil || !CLOUDS.mode) return;
     // (the speed test's row 'weather: clouds as before': the sky's own flat cloud back in their place)
-    if (self.enabled === false) { group.visible = false; if (skyU && skyU.uCloud3D) { skyU.uCloud3D.value.x = 0; skyU.uCloud3D.value.w = 0; } if (skyU && skyU.uRainbow) skyU.uRainbow.value.x = 0; if (skyU && skyU.uSkyFix) skyU.uSkyFix.value.set(0, 0, 0, 0); return; }
+    if (self.enabled === false || self.failed) { group.visible = false; if (skyU && skyU.uCloud3D) { skyU.uCloud3D.value.x = 0; skyU.uCloud3D.value.w = 0; } if (skyU && skyU.uRainbow) skyU.uRainbow.value.x = 0; if (skyU && skyU.uSkyFix) skyU.uSkyFix.value.set(0, 0, 0, 0); return; }
     const id = root && root.name && root.name.startsWith('body-') ? root.name.slice(5) : null;
     if (!id || !BODIES[id]) return;
     const look = getLook(id);
@@ -1338,11 +1351,20 @@ export function createClouds(scene) {
         M.mesh.visible = false;
         group.add(M.mesh);
       }
+      // THE WEATHER'S GUARD (world/wxguard.js, the coordinator for the day the clouds are the default): a cloud program
+      // that does not compile on a device takes nothing with it. The lobes' program failing switches the whole module
+      // off (self.failed: the sky goes back to its own painted cloud); a sheet's hides that sheet alone. The shadow
+      // pass's programs are looked at in renderShadow below (the guard watches the first program a mesh is drawn with).
+      const lobeMeshes = meshes.map((M) => M.mesh);
+      for (const M of meshes) watchPrograms(M.mesh, 'clouds: the lobes', () => { self.failed = true; }, lobeMeshes);
+      watchPrograms(deck.mesh, 'clouds: the deck');
+      watchPrograms(valley.mesh, 'clouds: the valley cloud');
       shadowOnly.mesh = new THREE.Mesh(shadowOnly.g, mat);
       shadowOnly.mesh.name = 'pc-cloud-shadowfield';
       shadowOnly.mesh.frustumCulled = false;
       shadowOnly.mesh.layers.set(CLOUD_LAYER);      // (the shadow's layer ONLY: never in the picture)
       shadowOnly.mesh.visible = false;
+      watchPrograms(shadowOnly.mesh, 'clouds: the shadow field', () => { shState.failed = true; });
       group.add(shadowOnly.mesh);
     }
     // THE DRIFT: the whole field turns about the planet's centre with the wind aloft at the eye, on the painter's clock

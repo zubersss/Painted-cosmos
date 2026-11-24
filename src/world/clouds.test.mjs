@@ -142,3 +142,26 @@ test('the script\'s cost: a rebuild (CLOUDS.rebuild apart) and a frame without o
   console.log(`  rebuild ${reb.toFixed(3)} ms (${perS} a second), a frame without one ${frame.toFixed(4)} ms (Node, this machine): ${(reb * perS / 30 + frame).toFixed(3)} ms a frame on average at 30 a second`);
   assert.ok(reb * perS / 30 + frame < 0.2, 'inside the lane\'s 0.2 ms of script here');
 });
+
+test('the weather guard: a lobe program that does not compile switches the clouds off and the sky back to its own cloud', () => {
+  OIL.uOilPx.value.x = PHONE_RAD;
+  G.uTime.value = 30;
+  const { root, skyU, sun } = rig();
+  const { cam } = station('autumn_woodland', 1000);
+  const cl = createClouds(null);
+  cl.update(0.016, cam, root, sun, null, skyU);
+  assert.equal(skyU.uCloud3D.value.x, 1);
+  const M = cl.meshes.find((m) => m.n > 0);
+  // (three.js hands onBeforeRender the renderer; a failed program carries diagnostics.runnable === false)
+  const failed = { properties: { get: () => ({ currentProgram: { diagnostics: { runnable: false, fragmentShader: { log: 'test' } } } }) } };
+  const warn = console.warn; console.warn = () => {};
+  M.mesh.onBeforeRender(failed, null, null, M.g, M.mesh.material, null);
+  console.warn = warn;
+  assert.equal(cl.failed, true);
+  for (const m of cl.meshes) assert.equal(m.mesh.visible, false, 'every lobe mesh hidden');
+  cl.update(0.6, cam, root, sun, null, skyU);
+  assert.equal(cl.group.visible, false);
+  assert.equal(skyU.uCloud3D.value.x, 0, 'the sky takes its own painted cloud back');
+  // a later rebuild does not show a guarded mesh again
+  for (const m of cl.meshes) assert.equal(m.mesh.visible, false);
+});
