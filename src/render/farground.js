@@ -590,10 +590,14 @@ float pcRockPlanes(float lvl, vec3 nV, float sunny) {
   float dh = dot(nh, sh) / max(length(nh) * length(sh), 1e-4);
   float b = mix(dh, 1.0, smoothstep(0.30, 0.12, length(nh)));      // (a gentle face has no side: its bearing does not count)
   b = min(b, smoothstep(0.02, 0.16, d) * 2.0 - 1.0);               // (turned from a low sun: shade)
-  float dq = mix(mix(-0.20, 0.12, smoothstep(-0.30, -0.20, b)), 0.50, smoothstep(0.30, 0.40, b));
-  // (the shade side the shared shade level less 0.7, a gully on it to the deepest paint: less 0.45 left the shade at V 0.37
-  // to 0.45 and none of a mountain under 0.3, MEASURED at the audit's views)
-  float lp = pcLevel(0.5 + 0.5 * dq, 0.02) - 0.7 * (1.0 - smoothstep(-0.30, -0.20, b)) - 0.5 * gGully * (1.0 - smoothstep(0.30, 0.40, b));
+  // (the planes sit BELOW the light the oil look gives a lit thing: toward the sun the rock's local colour with half a
+  // step of light (base - 0.5), side on the cool shade (base - 1.6), turned away the deep shade (base - 2.4), a gully on
+  // the shaded side the deepest paint. base is the full light as the shared pcLevel gives it now, so at night or under
+  // cloud every plane goes down with it. A first form put the lit plane at full light and the side at the local colour:
+  // on a light grey family the two were nearly one value, and a range seen with the sun behind the eye had no dark side
+  // at all, SEEN at 150 m at noon; the references' rock is mid-value.)
+  float s1 = smoothstep(-0.30, -0.20, b), s2 = smoothstep(0.30, 0.40, b);
+  float lp = max(pcLevel(0.75, 0.02) - mix(mix(2.4, 1.6, s1), 0.5, s2) - 0.5 * gGully * (1.0 - s2), 0.0);
   lp = mix(min(lp, 1.0), lp, sunny);
   return mix(lvl, lp, gRock);
 }
