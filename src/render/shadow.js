@@ -62,12 +62,14 @@ const NO_GROUPS = Object.freeze([]);
 // the list). The ground already asks the map for each stroke (chunks.js pcSunAtSoft): a stroke on a crown's shadow side
 // lies in the shade whole, one light level down -- a pool cut along the strokes, never a darkening laid over them. What
 // is NOT reached: the canopy painted into the ground (render/farground.js) lights its own dabs. ?farshadow=1 on (OFF by
-// default until the look director passes it); ?farshr= the square's half-size in metres.
+// default until the look director passes it); ?farshr= the square's half-size in metres; ?farshlen= how long the far
+// crowns' shadows are against the true length (1; render/impostor.js, the shadow twin).
 export const FAR_SHADOW = (() => {
   try {
     const q = new URLSearchParams(location.search), v = q.get('farshadow'), r = +q.get('farshr');
-    return { on: v === '1' || v === 'true', R: isFinite(r) && r >= 200 && r <= 3000 ? r : 860, cache: q.get('farshcache') !== '0' };
-  } catch (e) { return { on: false, R: 860, cache: true }; }
+    const l = q.has('farshlen') ? +q.get('farshlen') : 1;
+    return { on: v === '1' || v === 'true', R: isFinite(r) && r >= 200 && r <= 3000 ? r : 860, cache: q.get('farshcache') !== '0', len: isFinite(l) && l > 0.1 ? Math.min(l, 1) : 1 };
+  } catch (e) { return { on: false, R: 860, cache: true, len: 1 }; }
 })();
 const FAR_AHEAD = 0.75;      // (the square's middle this many of its half-sizes ahead of the eye: from 0.25 behind to 1.75 ahead)
 // (the kept far map: how far the square's middle may drift, in texels, before it is drawn whole again (64: 54 m with the

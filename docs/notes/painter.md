@@ -532,7 +532,15 @@ FV7 of `docs/lead/FARVIEW-DESIGN.md`. A second session (A2, branch `trees-near`)
 the same time: this lane touches only the far parts of `flora.js`, `florakit.js`, the plant material's far branch,
 `render/impostor.js`, `render/shadow.js` and new rows in `core/bench.js`.
 
-**State (update this line every step):** (24 Nov, about 21:45) v39.5 LIVE (look-proto 1cb697c) with the far spruce, the storm
+**State (update this line every step):** (24 Nov, about 22:30) C SET THE HOOK'S LEVEL TO 0.40 (farview 5b9400e). RENDERED on a
+scratch merge with it, 16 h (sun 25 deg up: a 14 m tree's shadow 30 m long), 150 m: land under V 0.3 off 10.7, at 0.33
+16.5, at 0.40 13.4 percent; near-black 0.94 / 1.34 / 1.02; the pools lighter umber-grey (A1_farshadow_16h_150m_zoom_040).
+BUT the open lime clearing in that zoom is GROUND, not the painted canopy (seen with ?candebug=1), so 0.40 does not reach
+it: its lit share 44 percent off, 22 at true length. A shadow-length dial ?farshlen= (default 1, the twin's crown height
+scaled; 3cf... this commit) at 0.75 / 0.6 lifts it only to 23 / 27 percent (A1_farshadow_16h_150m_zoom_len): the clearing
+is narrower than the shadows. Asked F: accept (a low sun shades a small clearing), or a lighter ground shade under far
+shadows (C's / F's ground code).
+Before: v39.5 LIVE (look-proto 1cb697c) with the far spruce, the storm
 crowns and ?farshadow (09e929d, 9267b3b: WITHOUT the fixes of ee22d1f -- told the coordinator: in flight with ?farshadow=1
 the world would stand still between whole draws; the bench row's number is a little too good). THE AIR VIEW'S COST (the
 coordinator's next job; C does the glades): (1) caadb47, ON, no picture change: a far tree out of range, behind the eye or

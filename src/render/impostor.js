@@ -1035,6 +1035,7 @@ uniform vec4 uImpH[PC_IMP_NV];
 uniform vec4 uShK;
 uniform float uImpMinPx;
 uniform vec4 uOilPx;
+uniform float uImpShLen;  // how long a far crown's shadow is against the true one (FAR_SHADOW.len: the crown's height over its foot scaled)
 varying float vS;
 varying vec2 vQuad;
 flat varying vec4 vTile;
@@ -1066,6 +1067,10 @@ void main() {
   float sinE = clamp(dc.y, 0.0, 1.0);
   vec2 hwv = vec2(CR.w, HR.x * sqrt(1.0 - sinE * sinE) + CR.w * sinE);
   vec3 lp = CR.xyz + rt * (position.x * hwv.x) + up * (position.y * hwv.y);
+  // (a shorter shadow, FAR_SHADOW.len under 1: the crown drawn into the map as if its height over its foot were that much
+  //  less, so its shadow along the ground is that much shorter -- the look director, 24 Nov: at a low sun the sunlit side
+  //  of a clearing must stay bright)
+  lp.y *= uImpShLen;
   vec3 wp = (im * vec4(lp * vis, 1.0)).xyz;
   vec4 mv = modelViewMatrix * vec4(wp, 1.0);
   vS = -mv.z * uInv;
@@ -1112,7 +1117,7 @@ export function makeImpostorShadowMaterial(impMat, uInv) {
       uInv, uSunDirL: u.uSunDirL, uImpK: u.uImpK, uImpAtlas: u.uImpAtlas, uImpC: u.uImpC, uImpH: u.uImpH, uImpTex: u.uImpTex,
       // (with the far crowns' shadows, ?farshadow=1, the WHOLE crown casts: the ground reads the map taken down to a patch
       //  of some metres there, and a third of the strokes made a shade too thin to cross its threshold)
-      uShK: OIL.uShK, uThinLeaf: { get value() { return FAR_SHADOW.on ? 0 : 0.66; } }, uImpMinPx: u.uImpMinPx, uOilPx: OIL.uOilPx,
+      uShK: OIL.uShK, uThinLeaf: { get value() { return FAR_SHADOW.on ? 0 : 0.66; } }, uImpMinPx: u.uImpMinPx, uOilPx: OIL.uOilPx, uImpShLen: { get value() { return FAR_SHADOW.len; } },
     },
     vertexShader: IMP_SH_VERT, fragmentShader: IMP_SH_FRAG, side: THREE.DoubleSide,
   });
