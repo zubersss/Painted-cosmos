@@ -13,20 +13,28 @@ review before a step is called done, a short message to the coordinator (session
 The weather group lands the rain field (its section 9.3: `fields.rain` at 32 a face, mm/h, 2 Hz, `rainAt`,
 `rainBetween`, a GPU channel `pcRainAt`): use theirs for rain (the design's `uRainCells[8]` and `rainAt` are replaced).
 
-**STATE (24 Nov, 12:10), the short of it.** Pushed on design-water (01ec60c, ready for the coordinator's release): W1 rivers
-with S-bends (aeca809), the index fix, mountain streams behind ?mount=1 (1eed43a, dfbe555; F: keep behind the switch, the
-white water is the paint's), THE DEFAULT FLIP in the oil look (4873c6a: rivers of the tree, lakes, ponds, puddles, fjord on;
-falls held), the speed test's falls view and ?bench=water (597ab63), the landing's river (c229268: Earth's oil.springs and
-oil.keep, the save's nudge to 24 m; ACCEPTED by the coordinator from the stills 1ec1984), E-W2's puddle fix merged (110b43e:
-round the landing 1.39 % of the dry ground). THEN (a877068): water-paint merged (f05eee3) with THE FALLS FLIP (W.falls = n('falls', d), E-W2's line, F passed the falls with the paint's curtain fix; they ship with water-paint, never before). THEN (2d40220, THE v39.2 WATER, the coordinator's ruling): ?wpaint defaults to 0 (v37's strokes: the look director found the sea from the air a blocky checker with ?wpaint=1 and 2); the falls stay on; stills v392-*.jpg. NEXT: merge look-proto when the coordinator says v39.1 has landed; W3 will later make its strokes the default for rivers and ponds only. THEN (24 Nov 13:25): the runoff A/B in a storm and after
-(RUNOFF below): it works; the dry gully keeps a bed's blue (C), the brown is weak (F). THEN: the hydrograph mended (the
-streams fall back over tens of minutes, and it now keeps the weather's clock, 60 times the game's).
-The coordinator (13:11): v39.1 is live, design-water 2d40220 is in v39.2's gate; merge look-proto only once v39.2 lands there.
-Order next: W3 splits rivers and ponds from the sea (strokes default there), E-W2 and W3 fix the sea, then the mountain streams.
-OPEN: F's sand-bar notes (colour, grass,
-pebbles: C's recipe, queued after the cliff; the trees' line now reads c.barZone). The lead's sessions: coordinator session_01R5Bri1TV3HBTyuxNZZuhNw,
-F session_01R5Brhzz2JPPF6Ecz6XRQHx, E-W2 session_01R5Bri2xowNiwS1SnP3VG3f, E-W3/W4 session_01R5Bri2fSASVVvyrSG11UGF,
-C session_01R5Bri2AMBsFiRcxvUUZMvu, D (weather) session_01R5Bri2bBgFSfCmxpKKuURT (src/physics/index.js is now the water's).
+**STATE (24 Nov, 16:20), the short of it.** v39.2 shipped WITHOUT the water (the coordinator pulled it at its gate for two
+faults, both now answered); the water goes into v39.3 with the weather. design-water HEAD 792d1f1 = v39.2 (look-proto c7d8d9e)
+merged in (df7c3ba: the ground sample 25 floats, the water's still at 23, the far view's snow at 24; W3's runoff cap and swell
+to take 25, 26; THE LAYOUT FOR THE WATER LANES IS THIS SESSION'S, the coordinator's word) plus:
+- THE FIRST VIEW (05aa102): keep r 3 and Earth's oil.face [100, -6.9] (surface.js getSpawn reads a look's oil.face for the
+  landing it already picks): in the game, the river beside the explorer into the distance, the ship on the left, 8.5 % water
+  plus 2.8 % churn against v39.1's 6.4 % (first-view-3.jpg).
+- FROM THE AIR (792d1f1, "THE WATER FROM THE AIR" below): the old high frame has little water because the rivers run
+  elsewhere; the added gate frame at the landing's river (cam=high&yaw=145.6&pitch=-13.4) shows it and a lake; 150 m and
+  400 m read; at 1 km the 19 m river is lost in the far ground itself. ASKED the coordinator: a far water line (a distance
+  byte per vertex + C's far paint) now, or after v39.3.
+- Earlier today, all on this branch: W1 rivers with S-bends and point bars (the trees stand back from the bars, F passed);
+  mountain streams behind ?mount=1 (F: the white water is W3's paint, queued); THE DEFAULT FLIP in the oil look (rivers of the
+  tree, lakes, ponds, puddles, fjord, falls on; ?wpaint 0); the speed test's falls view, ?bench=water; the landing's river
+  (oil.springs, oil.keep, the save's nudge); RUNOFF behind ?runoff=1 (the hydrograph on the weather's clock, streams falling
+  within the hour; runnels 1-2 m, F passed; c.capOnly for C's dry bed; still OFF until W3's muddy colour and C's dry bed).
+- ORDER (the coordinator): W3 splits rivers and ponds from the sea (done, 05bfe0a on water-paint), E-W2 and W3 fix the sea,
+  then the mountain streams (W3's white water; nothing of this session's blocks them).
+OPEN: F's sand-bar colour (C, after the cliff); the runnel's mud colour (W3); the far water line (asked). The lead's sessions:
+coordinator session_01R5Bri1TV3HBTyuxNZZuhNw, F session_01R5Brhzz2JPPF6Ecz6XRQHx, E-W2 session_01R5Bri2xowNiwS1SnP3VG3f,
+E-W3/W4 session_01R5Bri2fSASVVvyrSG11UGF, C session_01R5Bri2AMBsFiRcxvUUZMvu, A1 (far trees) session_01R5Bri1GA9riShvfh4TrjW4,
+D (weather) session_01R5Bri2bBgFSfCmxpKKuURT (src/physics/index.js is now the water's).
 
 ### LANE 0 (built and pushed 24 Nov, commit b5924da): the hooks, the switches, the speed test's water views
 
