@@ -593,3 +593,16 @@ export function syncPhysWater(W) {
 // (PHYSICS' draw kits face the picture plane and size themselves in internal pixels):
 // each hook is called as hook(camera, painter.info) at the start of painter.render.
 export const FRAME_HOOKS = [];
+// (group D's touch T5, WEATHER-DESIGN 8.4, weather-clouds 6991bf6: passes drawn before the shadow pass and the scene,
+// each (renderer, scene, camera): world/clouds.js puts its cloud shadow map here. Empty, nothing runs.)
+export const PREPASSES = [];
+// (group D's touch T3, the CLOUDS' SHADOWS ON THE LAND, laid in the last pass, post.js OIL_FRAG. The three the clouds
+// write -- the map, view space to its uv, and its strength (0: none, the default and the speed test's row) -- live here
+// so render/ never imports world/; world/clouds.js and wxfield.js set these very uniform objects. C is the shade's own
+// hue for the glaze, luminance 1: world/index.js sets it each frame from the cool key, as pcOilShadeC lays it.)
+export const CLOUDSHADOW = {
+  uCloudShadow: { value: (() => { const t = new THREE.DataTexture(new Uint8Array(4), 1, 1, THREE.RGBAFormat); t.needsUpdate = true; return t; })() },
+  uCloudShadowV: { value: new THREE.Matrix4() },
+  uCloudShadowK: { value: 0 },
+  uCloudShadowC: { value: new THREE.Vector3(0.86, 0.90, 1.08) },
+};

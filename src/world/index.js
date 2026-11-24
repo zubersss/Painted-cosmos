@@ -17,7 +17,7 @@ import { makeSky, makeSkyUniforms, makeSkyGlaze } from './sky.js';
 import { Flora } from './flora.js';
 import { makeRing, makeCloudShell } from './orbit.js';
 import { isArrival } from './arrival.js';
-import { G, GLAZES, MOTION, makeBodyUniforms, SHEET, WX, PHYSW, QUALITY, FRAME_HOOKS, skyNow, syncPhysFlora, syncPhysWater , SHADOW, LOOK, OIL, syncBurnt } from '../render/shared.js';
+import { G, GLAZES, MOTION, makeBodyUniforms, SHEET, WX, PHYSW, QUALITY, FRAME_HOOKS, skyNow, syncPhysFlora, syncPhysWater , SHADOW, LOOK, OIL, syncBurnt, CLOUDSHADOW } from '../render/shared.js';
 import { makeLeafFall } from './leaffall.js';
 import { makeTimeFx } from './timefx.js';
 import { makeKitMaterial, biomeInks, KIT_INK, KIT_PALETTE, FIRE_MATS } from '../render/kitmat.js';
@@ -814,6 +814,11 @@ export function createWorld(scene) {
       SHEET.night = nightK; SHEET.nightNear = look.nightNear || 0;   // (PAINTER 19 re-fix: Mars only; post.js)
       if (nightK > 0.003) { const k = 0.40 * nightK; for (const c of [tmpKey.zenith, tmpKey.horizon, tmpKey.haze, _storm, tmpKey.cloudShade]) { c.x = undens(c.x, k); c.y = undens(c.y, k); c.z = undens(c.z, k); } }
       bu.uGlaze.value.copy(tmpKey.glaze);
+      if (LOOK.oil && CLOUDSHADOW.uCloudShadowK.value > 0) {      // (the clouds' shadow glaze takes the shade's own hue: post.js, T3)
+        const ka = OIL.uOilA.value.w, kg = tmpKey.glaze, c = CLOUDSHADOW.uCloudShadowC.value;
+        c.set(Math.pow(kg.x, ka), Math.pow(kg.y, ka) * OIL.uOilD.value.z, Math.pow(kg.z, ka));
+        c.multiplyScalar(1 / Math.max(0.3 * c.x + 0.5 * c.y + 0.2 * c.z, 1e-3)).lerp(_white, 0.4);
+      }
       bu.uLight.value.copy(tmpKey.light);
       bu.uHaze.value.copy(tmpKey.haze);
       // (under a closed sky the far air takes the sky's own wash high in the view: see pcHazeAt)
