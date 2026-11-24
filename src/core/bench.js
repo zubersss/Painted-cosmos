@@ -343,6 +343,19 @@ export function attachBench(pc) {
     // in the same minute. Only where the picture as set is the sharper one; asked at the probe's size like every row.
     const k0 = (() => { try { const dv = pc.game && pc.game.device; return dv && dv.sharp > 0 && dv.baseRatio > 0 && dv.ratio > 0 ? dv.baseRatio / dv.ratio : 1; } catch { return 1; } })();
     const SHARP0 = k0 < 0.999 ? [['the picture as before (?sharp=0 size)', () => sharpen(MK * k0), () => sharpen(MK)]] : [];
+    // (v39.7, the coordinator: THE TEST MEASURES WHAT THE OWNER PLAYS. A phone or a tablet in the oil look climbs to tier 2
+    //  within seconds of play, so main.js starts its test at tier 2, and these rows price what is on top and what is under:
+    //  the first rung of the touch device's sharpening (main.js SHARP_TOUCH: a quarter of a picture pixel more to the point,
+    //  1.2 times each way on a phone) and tier 1. On a desktop neither row is asked.)
+    const dv0 = (() => { try { return (pc.game && pc.game.device) || {}; } catch { return {}; } })();
+    const touch0 = dv0.preset === 'phone' || dv0.preset === 'tablet';
+    const kUp = dv0.ratio > 0 ? (dv0.ratio + 0.25) / dv0.ratio : 1.2;
+    const q0 = (() => { try { return (P.info && P.info.quality) != null ? P.info.quality : 1; } catch { return 1; } })();
+    const setQ = async (q) => { if (P.setQuality) P.setQuality(q); const ph = pc.sim && pc.sim.physics; if (ph && ph.setQuality) ph.setQuality(q); await calm(); };
+    const TOUCHROWS = touch0 ? [
+      ['sharper, rung 1 (' + kUp.toFixed(2) + 'x each way)', () => sharpen(MK * kUp), () => sharpen(MK)],
+      ...(q0 >= 2 ? [['tier 1 (the tier under the one played)', () => setQ(1), () => setQ(q0)]] : []),
+    ] : [];
     const T2ROWS = [
       [t2a ? 'trees in one program as before' : 'trees: two short programs', () => swapT2(t2a ? '' : 'split'), () => swapT2(t2a)],
       // (the leaves as clusters on cards, near and middle, and with a depth pass first: CLOSED, 24 Nov, after the owner's
@@ -582,7 +595,7 @@ export function attachBench(pc) {
     const holdStorm = (on) => { const P = pc.sim && pc.sim.physics; if (P && P.forceWeather) P.forceWeather(on ? { kind: 'storm' } : null); };
     const steps = [
       [AS, null, null],
-      ...SHARP0,
+      ...SHARP0, ...TOUCHROWS,
       // the far trees: their paint, their shapes, which pass, which place in the order of drawing, which form
       ['far trees one flat colour', () => B({ flat: 3 }), () => B({ flat: 0 })],
       ['no far trees', () => show(/^pc-prop-far/, false), () => show(/^pc-prop-far/, true)],
@@ -731,7 +744,7 @@ export function attachBench(pc) {
     // ?bench=trees: the tree questions alone, on foot and from the air (a shorter run: each row on a cooler phone)
     const treeSteps = [
       [AS, null, null],
-      ...SHARP0,
+      ...SHARP0, ...TOUCHROWS,
       T0.leaves, T0.wood, T0.bark, T0.wind,
       [AS, null, null],
       T0.side, T0.order, T0.a2c, T0.noNear,
@@ -752,7 +765,7 @@ export function attachBench(pc) {
     const airH = (() => { const m = /^air,(\d+)/.exec(MODE_B); const h = m ? +m[1] : 400; return Math.max(30, Math.min(1500, h)); })();
     const airSteps = [
       [AS + ', on foot', null, null],
-      ...SHARP0,
+      ...SHARP0, ...TOUCHROWS,
       ...airAt(airH, 45, [
         ['no ground drawn', () => ground(false), () => ground(true)],
         ['ground one flat colour', () => B({ flat: 1 }), () => B({ flat: 0 })],
@@ -777,7 +790,7 @@ export function attachBench(pc) {
     // measured), so these rows are asked off the cap, where they can be read: each against the "as set" row before it.
     const footSteps = [
       [AS, null, null],
-      ...SHARP0,
+      ...SHARP0, ...TOUCHROWS,
       ...GRASS,
       [AS, null, null],
       ['no small plants', () => show(/^pc-prop-(?!tall|far)/, false), () => show(/^pc-prop-(?!tall|far)/, true)],

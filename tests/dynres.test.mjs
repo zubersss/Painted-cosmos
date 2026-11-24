@@ -266,70 +266,91 @@ test('dynres: one rebuilt-targets hitch a rung does not send it back down', () =
   assert.ok(held >= c.sharp, 'it settled above what it can hold');
 });
 
-// ---- THE SHARPER PICTURE ON A TOUCH DEVICE (24 Nov, the owner's phone table v39.5; main.js SHARP_TOUCH) --------------
-// The phone starts on the first rung (1.2 times as sharp each way), may climb to the second (1.4 times), and gives the
-// rungs back first when the smoothed frame is over 27 ms for half a second; it climbs only after 6 s under 20 ms; it
-// keeps its preset's tier (1) as its top. The machine here: a 60 Hz phone whose work is (a + b x megapixels) with a
-// frame-to-frame wobble of +-J, each frame shown at the next refresh. Fitted to the owner's v39.5 foot table (held at
-// 56 a second at its own size; 23.9 ms at 1.5 times as sharp each way) and the bank (32.0 ms at 1.5 times). The table
-// does not pin the wobble, so two machines: J 0.15 (fit a 4.6, b 10.5 ms/MP: the slope of the v26 fit above) and the
-// harsher J 0.20 (a 12.1, b 4.0; the bank a 15.7).
+// ---- THE SHARPER PICTURE ON A TOUCH DEVICE (v39.7; main.js SHARP_TOUCH) -----------------------------------------------
+// A phone or a tablet in the oil look keeps everything it had in v39.5: it starts at its preset's tier 1, climbs to tier 2
+// within seconds of play (the top of everything), and only then may the ladder add sharpness, from rung 0, up to two
+// rungs (1.2 then 1.4 times as sharp each way). Its own guard: a rung is given back first when the smoothed frame is over
+// 27 ms for half a second; climbed only after 6 s under 20 ms; and a rung lost within 60 s of its climb ends the climbing
+// until the next rest. The machine here: a 60 Hz phone whose work is (a + b x megapixels x scale^2) at tier 1 with a
+// frame-to-frame wobble of +-J, each frame shown at the next refresh. Fitted to the owner's v39.5 foot table (held at 56 a
+// second at its own size; 23.9 ms at 1.5 times as sharp each way) and the bank (32.0 ms at 1.5 times). The table does not
+// pin the wobble, so two machines: J 0.15 (a 4.6, b 10.5 ms/MP: the slope of the v26 fit above) and the harsher J 0.20
+// (a 12.1, b 4.0). TIER 2 HAS NEVER BEEN TIMED ON THE PHONE: it is taken here as 15 per cent more work than tier 1 (an
+// assumption, to be replaced by the bench's new 'tier 1' row on the owner's next run).
 const TOUCH = { minScale: 0.85, targetMs: 33.3, highMs: 37, lowMs: 27, panicMs: 62, tierUpMs: 22, sharpHighMs: 27, sharpLowMs: 20, sharpDownAfter: 0.5, sharpFailWithin: 60, sharpGiveUp: 1 };
+const TIER2 = 1.15;
 function touchPhone({ a, b, J, css = 823 * 384, dpr0 = 1.25, seed = 11 }) {
   let s = seed;
   const rnd = () => { s = (s * 16807) % 2147483647; return s / 2147483647; };
   const T = 1000 / 60;
-  return (sharp) => {
-    const mp = css * (dpr0 + 0.25 * sharp) ** 2 / 1e6;
-    const w = (a + b * mp) * (1 + J * (2 * rnd() - 1));
+  return (c) => {
+    const mp = css * (dpr0 + 0.25 * c.sharp) ** 2 * c.scale * c.scale / 1e6;
+    const w = (a + b * mp) * (c.quality >= 2 ? TIER2 : 1) * (1 + J * (2 * rnd() - 1));
     return Math.max(T, Math.ceil(w / T) * T);
   };
 }
-const touchCtrl = () => new DynamicResolution({ scale: 1, quality: 1, maxQuality: 1, sharpTier: 1, sharpMax: 2, sharp: 1, tuning: TOUCH });
+const touchCtrl = (o = {}) => new DynamicResolution({ scale: 1, quality: 1, maxQuality: 2, sharpMax: 2, sharp: 0, tuning: TOUCH, ...o });
 function run(ctrl, cost, seconds) {
-  let t = 0, n = 0, twice = 0, worstSharp = ctrl.sharp, minScale = ctrl.scale, minQ = ctrl.quality;
-  while (t < seconds) { const ms = cost(ctrl.sharp); ctrl.frame(ms); t += ms / 1000; n++; if (ms > 25) twice++; worstSharp = Math.min(worstSharp, ctrl.sharp); minScale = Math.min(minScale, ctrl.scale); minQ = Math.min(minQ, ctrl.quality); }
-  return { twice: twice / n, worstSharp, minScale, minQ };
+  let t = 0, n = 0, twice = 0, minScale = ctrl.scale, steps = 0, last = ctrl.sharp, sum = 0;
+  while (t < seconds) { const ms = cost(ctrl); ctrl.frame(ms); t += ms / 1000; n++; sum += ms; if (ms > 25) twice++; if (ctrl.sharp !== last) { steps++; last = ctrl.sharp; } if (t > 20) minScale = Math.min(minScale, ctrl.scale); }
+  return { twice: twice / n, mean: sum / n, minScale, steps };
 }
 
 test('dynres touch: the defaults leave the ladder exactly as it was (?sharp=0 and the desktop)', () => {
-  assert.equal(DYNRES.sharpHighMs, 0); assert.equal(DYNRES.sharpLowMs, 0); assert.equal(DYNRES.sharpDownAfter, 0);
+  assert.equal(DYNRES.sharpHighMs, 0); assert.equal(DYNRES.sharpLowMs, 0); assert.equal(DYNRES.sharpDownAfter, 0); assert.equal(DYNRES.sharpFailWithin, 0);
   const c = new DynamicResolution({ scale: 1, quality: 2, maxQuality: 2, sharpMax: 10 });
   assert.equal(c.sharpTier, null, 'a device not asking for it has its ladder climb from the top tier, as before');
+  assert.equal(c.sinceClimb, Infinity, 'a ladder without sharpFailWithin does not time its climbs');
 });
 
-test('dynres touch: on foot the phone keeps the sharper picture, and its tier and scale, for a minute', () => {
-  for (const m of [{ a: 4.6, b: 10.5, J: 0.15 }, { a: 12.1, b: 4.0, J: 0.20 }]) {
-    const c = touchCtrl(), r = run(c, touchPhone(m), 60);
-    assert.ok(r.worstSharp >= 1, 'the first rung was given back on foot (J ' + m.J + ')');
-    assert.equal(r.minScale, 1, 'the picture was shrunk on foot (J ' + m.J + ')');
-    assert.equal(r.minQ, 1, 'the tier went on foot (J ' + m.J + ')');
+test('dynres touch: a 60 Hz phone on foot reaches tier 2 first, then the sharper rungs where its frames allow', () => {
+  const g = touchCtrl(); const rg = run(g, touchPhone({ a: 4.6, b: 10.5, J: 0.15 }), 180);
+  assert.equal(g.quality, 2, 'the phone did not reach tier 2, which it plays at: tier ' + g.quality);
+  assert.ok(g.sharp >= 1, 'with frames to spare at tier 2 it took no sharper rung: rung ' + g.sharp);
+  assert.equal(rg.minScale, 1, 'the picture was shrunk after the climb');
+  // the harsher machine: tier 2 all the same, and whatever rung its frames allow, never at the cost of the tier or the scale
+  const h = touchCtrl(); const rh = run(h, touchPhone({ a: 12.1, b: 4.0, J: 0.20 }), 180);
+  assert.equal(h.quality, 2, 'the harsher machine did not keep tier 2: tier ' + h.quality);
+  assert.equal(rh.minScale, 1, 'the harsher machine had its picture shrunk');
+});
+
+// THE BORDERLINE VIEW DOES NOT OSCILLATE (the independent review of v39.6). The worst borderline found by a search over
+// the rung-1 cost, its drift and the drift's period, at tier 2: rung 0 at 13 ms of work (held at 60), rung 1 at 16.5 ms
+// drifting +-4 per cent every few seconds with a +-10 per cent wobble -- so rung 1 holds past its trial window and then
+// crosses 27 ms. Without the fix the ladder took 31 steps in five minutes over three runs of it.
+function borderline(seed, lightFirst = 0) {
+  let s = seed, t = 0;
+  const rnd = () => { s = (s * 16807) % 2147483647; return s / 2147483647; };
+  const T = 1000 / 60;
+  return (c) => {
+    const heavy = t >= lightFirst;
+    const w = heavy ? (c.sharp ? 16.5 : 13) * (1 + 0.04 * Math.sin(t / 4)) * (1 + 0.10 * (2 * rnd() - 1)) : 12;
+    const ms = Math.max(T, Math.ceil(w / T) * T); t += ms / 1000; return ms;
+  };
+}
+test('dynres touch: at the bank the rung is given back once and the ladder stays down (at most two steps in five minutes)', () => {
+  for (const seed of [3, 7, 11]) {
+    const c = touchCtrl({ quality: 2, sharpMax: 1 });
+    const r = run(c, borderline(seed), 300);
+    assert.ok(r.steps <= 2, 'the ladder stepped ' + r.steps + ' times in five minutes at the borderline (seed ' + seed + ')');
+    assert.equal(c.sharp, 0, 'the ladder did not stay down at the borderline (seed ' + seed + ')');
+    assert.equal(c.quality, 2, 'the tier went at the borderline (seed ' + seed + ')');
   }
-  // with the gentler wobble the frames have room under 20 ms, so it climbs to the second rung and stays there
-  const g = touchCtrl(); run(g, touchPhone({ a: 4.6, b: 10.5, J: 0.15 }), 60);
-  assert.equal(g.sharp, 2, 'with room to spare it did not climb to 1.4 times: rung ' + g.sharp);
-  // with the harsher one it stays on the first: the frames are not under 20 ms long enough
-  const h = touchCtrl(); run(h, touchPhone({ a: 12.1, b: 4.0, J: 0.20 }), 60);
-  assert.equal(h.sharp, 1, 'with the harsher machine it moved off the first rung: ' + h.sharp);
-});
-
-test('dynres touch: at the bank the harsher machine gives the sharpness back first, and nothing else', () => {
-  const c = touchCtrl();
-  const r = run(c, touchPhone({ a: 15.7, b: 4.0, J: 0.20 }), 20);
-  assert.equal(c.sharp, 0, 'over 27 ms at the bank the first rung was kept: rung ' + c.sharp);
-  assert.equal(r.minScale, 1, 'the picture was shrunk at the bank');
-  assert.equal(r.minQ, 1, 'the tier went at the bank');
-  // and it does not climb back while the frames are not under 20 ms
-  run(c, touchPhone({ a: 15.7, b: 4.0, J: 0.20, seed: 5 }), 60);
-  assert.equal(c.sharp, 0, 'it climbed back at the bank: rung ' + c.sharp);
-  // the gentler machine keeps the first rung at the bank (about 18.7 ms there)
-  const g = touchCtrl(); const rg = run(g, touchPhone({ a: 7.5, b: 10.5, J: 0.15 }), 30);
-  assert.ok(rg.worstSharp >= 1, 'the gentler machine gave the first rung back at the bank');
+  // reached after a minute and a half in a light view, the rung held for a while: one more try at most, then it rests
+  for (const seed of [3, 7, 11]) {
+    const c = touchCtrl({ quality: 2, sharpMax: 1 }), cost = borderline(seed, 90);
+    run(c, cost, 90);                                    // (the light view: the rung is climbed here, which is not the question)
+    const r = run(c, cost, 300);                         // from the borderline on: given back, one more try, given back
+    assert.ok(r.steps <= 3, 'reached later, the borderline still cost ' + r.steps + ' steps (seed ' + seed + ')');
+    assert.equal(c.sharp, 0, 'reached later, the ladder did not stay down (seed ' + seed + ')');
+  }
+  // and without the fix the same view does oscillate (so this test can tell)
+  const c0 = touchCtrl({ quality: 2, sharpMax: 1, tuning: { ...TOUCH, sharpFailWithin: 0, sharpGiveUp: 3 } });
+  assert.ok(run(c0, borderline(3), 300).steps >= 6, 'the borderline did not oscillate without the fix: the test cannot tell');
 });
 
 test('dynres touch: a sudden heavy load empties the ladder before the picture or the tier is touched', () => {
-  const c = touchCtrl();
-  run(c, touchPhone({ a: 4.6, b: 10.5, J: 0.15 }), 10);
+  const c = touchCtrl({ quality: 2, sharp: 2 });
   const sharp0 = c.sharp, scale0 = c.scale, q0 = c.quality;
   let r = null;
   for (let i = 0; i < 200; i++) { r = c.frame(45); if (r.sharp === 0) break; }
@@ -338,57 +359,15 @@ test('dynres touch: a sudden heavy load empties the ladder before the picture or
   assert.equal(r.quality, q0, 'the tier went before the ladder was empty');
 });
 
-test('dynres touch: how often a frame is held twice on foot (judder on a 60 Hz display), reported', (t) => {
+test('dynres touch: the modelled frame on foot at tier 2 with and without the rungs, and the frames held twice, reported', (t) => {
   const rows = [];
   for (const m of [{ a: 4.6, b: 10.5, J: 0.15 }, { a: 12.1, b: 4.0, J: 0.20 }]) {
-    for (const rung of [0, 1, 2]) {
-      const cost = touchPhone({ ...m, seed: 3 }); let n = 0, twice = 0, sum = 0;
-      for (let i = 0; i < 20000; i++) { const ms = cost(rung); n++; sum += ms; if (ms > 25) twice++; }
-      rows.push('J ' + m.J + ' rung ' + rung + ': ' + (sum / n).toFixed(1) + ' ms, ' + (100 * twice / n).toFixed(0) + '% held twice');
+    for (const [q, rung] of [[1, 0], [2, 0], [2, 1], [2, 2]]) {
+      const cost = touchPhone({ ...m, seed: 3 }); const c = { quality: q, sharp: rung, scale: 1 }; let n = 0, twice = 0, sum = 0;
+      for (let i = 0; i < 20000; i++) { const ms = cost(c); n++; sum += ms; if (ms > 25) twice++; }
+      rows.push('J ' + m.J + ' tier ' + q + ' rung ' + rung + ': ' + (sum / n).toFixed(1) + ' ms, ' + (100 * twice / n).toFixed(0) + '% held twice');
     }
   }
   t.diagnostic(rows.join(' | '));
-  assert.ok(rows.length === 6);
-});
-
-// THE BORDERLINE VIEW DOES NOT OSCILLATE (24 Nov, the independent review of v39.6). The worst borderline found by a search
-// over the rung-1 cost, its drift and the drift's period: rung 0 at 13 ms of work (held at 60), rung 1 at 16.5 ms of work
-// drifting +-4 per cent every few seconds with a +-10 per cent wobble -- so rung 1 holds past its trial window and then
-// crosses 27 ms. Before the fix the touch ladder took 31 steps in five minutes over these three runs.
-function borderline(seed, lightFirst = 0) {
-  let s = seed, t = 0;
-  const rnd = () => { s = (s * 16807) % 2147483647; return s / 2147483647; };
-  const T = 1000 / 60;
-  return (sharp) => {
-    const heavy = t >= lightFirst;
-    const w = heavy ? (sharp ? 16.5 : 13) * (1 + 0.04 * Math.sin(t / 4)) * (1 + 0.10 * (2 * rnd() - 1)) : 12;
-    const ms = Math.max(T, Math.ceil(w / T) * T); t += ms / 1000; return ms;
-  };
-}
-function steps(ctrl, cost, seconds) {
-  let t = 0, n = 0, last = ctrl.sharp;
-  while (t < seconds) { const ms = cost(ctrl.sharp); ctrl.frame(ms); t += ms / 1000; if (ctrl.sharp !== last) { n++; last = ctrl.sharp; } }
-  return n;
-}
-test('dynres touch: a borderline view settles on the lower rung (at most two steps in five minutes)', () => {
-  for (const seed of [3, 7, 11]) {
-    const c = new DynamicResolution({ scale: 1, quality: 1, maxQuality: 1, sharpTier: 1, sharpMax: 1, sharp: 1, tuning: TOUCH });
-    const n = steps(c, borderline(seed), 300);
-    assert.ok(n <= 2, 'the ladder stepped ' + n + ' times in five minutes at the borderline (seed ' + seed + ')');
-  }
-  // reached after a minute and a half in a light view (the start rung no longer fresh): one retry at most, then it rests
-  for (const seed of [3, 7, 11]) {
-    const c = new DynamicResolution({ scale: 1, quality: 1, maxQuality: 1, sharpTier: 1, sharpMax: 1, sharp: 1, tuning: TOUCH });
-    const n = steps(c, borderline(seed, 90), 390);
-    assert.ok(n <= 3, 'reached later, the borderline still cost ' + n + ' steps (seed ' + seed + ')');
-  }
-  // and without the fix the same view does oscillate (so this test can tell)
-  const old = { ...TOUCH, sharpFailWithin: 0, sharpGiveUp: 3 };
-  const c0 = new DynamicResolution({ scale: 1, quality: 1, maxQuality: 1, sharpTier: 1, sharpMax: 1, sharp: 1, tuning: old });
-  assert.ok(steps(c0, borderline(3), 300) >= 6, 'the borderline did not oscillate without the fix: the test cannot tell');
-});
-test('dynres touch: the new keys leave the desktop and ?sharp=0 as they were', () => {
-  assert.equal(DYNRES.sharpFailWithin, 0);
-  const c = new DynamicResolution({ scale: 1, quality: 2, maxQuality: 2, sharpMax: 10 });
-  assert.equal(c.sinceClimb, Infinity, 'a ladder without sharpFailWithin does not time its climbs');
+  assert.ok(rows.length === 8);
 });

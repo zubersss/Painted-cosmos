@@ -99,13 +99,20 @@ const PRESET = (() => {
 const isUpright = () => PRESET.id === 'phone' && window.innerHeight > window.innerWidth;
 // THE SHARPER PICTURE ON A TOUCH DEVICE (24 Nov, the owner's phone table v39.5: held at 60 by its own display at the size
 // it is given -- 1028 x 480 stretched over 3086 x 1440, most of why it looks soft -- and still 42 to 52 a second drawn
-// 1.5 times as sharp each way; the owner's standing word: "give the room to SHARPNESS"). A phone or a tablet in the oil
-// look STARTS ON THE FIRST RUNG of the sharpening ladder (1.2 times as sharp each way: 1.5 picture pixels to the screen
-// point for 1.25), may climb to the second (1.4 times) when frames have room, and gives the rungs back first, before
-// anything else, when frames run slower than 27 ms for half a second (core/dynres.js sharpHighMs). Sharpness comes
-// before a higher tier: the device keeps its preset's tier as its top. ?sharp=0: the device exactly as before.
+// 1.5 times as sharp each way; the owner's standing word: "give the room to SHARPNESS"). REDONE for v39.7 (the
+// coordinator, after this lane's finding that a phone in play climbs to TIER 2 within seconds and stays there: the
+// owner has been playing at tier 2, and in the oil look a tier is reach and density). So a phone or a tablet in the oil
+// look keeps everything it had -- tier 2 as its top, the ladder climbing only from the top of everything, from rung 0 --
+// and the sharpening is ADDED ON TOP where frames allow, up to two rungs (1.2 then 1.4 times as sharp each way), never
+// instead of anything. What is new is the touch device's guard (core/dynres.js): a rung is given back first when the
+// smoothed frame is over 27 ms for half a second, climbed only after 6 s under 20 ms, and a rung lost within a minute of
+// being climbed ends the climbing until the next rest, so a borderline view settles instead of stepping up and down. The
+// worst case is v39.5 exactly (tier 2, the size it was given). ?sharp=0: no ladder guard of its own, as before.
 const SHARP_TOUCH = params.get('look') === 'oil' && (PRESET.id === 'phone' || PRESET.id === 'tablet') && params.get('sharp') !== '0';
 const SHARP_TOUCH_RUNGS = 2;      // the most rungs it may climb to (1.4 times as sharp each way)
+// (the speed test asks its questions at the tier the device reaches in play: a phone or a tablet in the oil look climbs
+//  to tier 2 within seconds of play, so its test starts there and prices tier 1 in a row of its own, core/bench.js)
+const TOUCH_OIL = params.get('look') === 'oil' && (PRESET.id === 'phone' || PRESET.id === 'tablet');
 let upright = false;
 const canvas = document.getElementById('pc-canvas');
 const loading = document.getElementById('pc-loading');
@@ -250,11 +257,9 @@ async function boot() {
     // ?dynres=0 pins both.
     scale: params.has('scale') ? Number(params.get('scale')) : 1,
     // (a phone starts a tier down: the preset; the controller may climb from there)
-    quality: params.has('quality') ? Number(params.get('quality')) : BEST_PIN ? 2 : PRESET.tier,
+    quality: params.has('quality') ? Number(params.get('quality')) : BEST_PIN || (TOUCH_OIL && params.has('bench')) ? 2 : PRESET.tier,
     minQuality: params.has('quality') ? Number(params.get('quality')) : 0,
-    maxQuality: params.has('quality') ? Number(params.get('quality')) : SHARP_TOUCH ? PRESET.tier : 2,
-    // (a touch device with the sharper picture: the ladder climbs from its own tier, not from tier 2 first)
-    sharpTier: SHARP_TOUCH && !params.has('quality') ? PRESET.tier : undefined,
+    maxQuality: params.has('quality') ? Number(params.get('quality')) : 2,
     // THE SHARPENING LADDER (the owner's speed table of 2026-11-19: their phone draws 1028 x 480 for a screen of
     // 3086 x 1440, holds 60 a second with room to spare, and looks soft). How many rungs this screen has in it is
     // worked out in resize() below, once the canvas has a size; 0 until then, which is the game as it was.
@@ -430,7 +435,6 @@ async function boot() {
     if (painter.setRenderScale) painter.setRenderScale(Math.min(1, (DPR_PIN * sc) / want));
   };
   if (SHARP_PIN > 0) dyn.sharp = Math.min(SHARP_PIN, dyn.sharpMax);
-  else if (SHARP_TOUCH) dyn.sharp = Math.min(1, dyn.sharpMax);      // (the touch device starts on the first rung)
   applyDynScale(dyn.scale, dyn.sharp);
   painter.setQuality(dyn.quality);
   // PHYSICS' particle counts and sampling follow the tier too (hardening review P8): a tier
