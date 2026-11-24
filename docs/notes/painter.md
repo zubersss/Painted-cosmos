@@ -87,7 +87,11 @@ FV7 of `docs/lead/FARVIEW-DESIGN.md`. A second session (A2, branch `trees-near`)
 the same time: this lane touches only the far parts of `flora.js`, `florakit.js`, the plant material's far branch,
 `render/impostor.js`, `render/shadow.js` and new rows in `core/bench.js`.
 
-**State (update this line every step):** (24 Nov, about 14:35) SMALL CROWNS ARE THE DEFAULT (`?impsmall=0` the old
+**State (update this line every step):** (24 Nov, about 14:50) the coordinator merged ea41746 into v39.3. NEXT: the
+far impostors' part of D's gust bands from the air (D: session_01R5Bri2bBgFSfCmxpKKuURT); my proposal sent to D (per
+tree, read once at its foot: a gust state that lifts the cap one light level, each tree at its own threshold, so a band is
+a patch of crowns flipped; the ?farwind lean stays), waiting for D's field, look and uniforms; then build behind a switch
+with a bench row. STAND BY for F's audit (may name the far trees). Before that: SMALL CROWNS ARE THE DEFAULT (`?impsmall=0` the old
 way), after F passed them with its colour fixes, and F signed off the real-branch pair (ea41746); look-director at 64f1742 merged into trees-far on the coordinator's
 word (8f3848d; the impostor.js conflict kept my azL line and added F's pcSummerTree line). SEEN on the real branch,
 phone settings, autumn wood 15.4 h, roof on (`A1_small_default_*`): 1 km, the impostor zone hue 92 S 0.36 V 0.56 with
