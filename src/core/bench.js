@@ -411,6 +411,9 @@ export function attachBench(pc) {
       // (the far trees in leaf under 4 px left to the canopy painted into the ground, ?impminpx=4; the row asks the other
       //  way from how the run started: flora.setImpMinPx)
       impMinPx: [mpx0 > 0 ? 'every far tree drawn, however small' : 'far trees in leaf under 4 px left to the canopy', () => { const f = flora(); if (f && f.setImpMinPx) f.setImpMinPx(mpx0 > 0 ? 0 : 4); }, () => { const f = flora(); if (f && f.setImpMinPx) f.setImpMinPx(mpx0); }],
+      // (the two together, the look director's request: the far shadows draw every impostor in view into the map, so fewer
+      //  impostors may make them cheaper; asked only when the run starts with both off)
+      farShMinPx: ['far crowns cast shadows, trees in leaf under 4 px left to the canopy', () => { const f = flora(); if (f && f.setFarShadow) f.setFarShadow(true); if (f && f.setImpMinPx) f.setImpMinPx(4); }, () => { const f = flora(); if (f && f.setFarShadow) f.setFarShadow(fsh0); if (f && f.setImpMinPx) f.setImpMinPx(mpx0); }],
       impGust: ['far crowns: no gust bands', () => { const f = flora(); if (f && f.setImpGust) f.setImpGust(false); }, () => { const f = flora(); if (f && f.setImpGust) f.setImpGust(true); }],
       shWhole: [shw0 ? 'split trees by part in shadow pass' : 'split trees whole in shadow pass',
         () => { const f = flora(); if (f && f.setShadowWhole) f.setShadowWhole(!shw0); }, () => { const f = flora(); if (f && f.setShadowWhole) f.setShadowWhole(shw0); }],
@@ -713,7 +716,7 @@ export function attachBench(pc) {
       [AS, null, null],
       T0.mid45, T0.hand, T0.pack,
       ...airAt(150, 30, [T0.noFar, T0.blob, T0.imp, T0.farFlat, T0.a2c, T0.farStill, T0.farShadow, ...(gust0 ? [T0.impGust] : [])]),
-      ...airAt(400, 45, [T0.noFar, T0.blob, T0.imp, T0.noSh, T0.crownMass, T0.farShadow, T0.impMinPx]),
+      ...airAt(400, 45, [T0.noFar, T0.blob, T0.imp, T0.noSh, T0.crownMass, T0.farShadow, T0.impMinPx, ...(!fsh0 && !(mpx0 > 0) ? [T0.farShMinPx] : [])]),
       onFoot,
       [AS + ', last', null, null],
     ];
