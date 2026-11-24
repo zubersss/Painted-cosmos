@@ -83,6 +83,14 @@ function glslFn(src, head) {
 }
 const MASSV_FNS = glslFn(FRAG_PARS, 'vec3 pcDabTint(vec3 c, vec3 rnd, float leafy) {') + glslFn(FRAG_PARS, 'vec3 pcWetWash(vec3 c, float amt) {');
 const MASSV = /pcDabTint/.test(MASSV_FNS) && /pcWetWash/.test(MASSV_FNS) && !(_q && _q.get('imppaint') === '0');
+// AND ITS THREE TONES ONCE A CROWN (step 2, MASST): a crown under crown mass takes its light in WHOLE levels (the cap, one
+// under it, two under it), and at a whole level the paint does not read which way a stroke faces the sky (pcUp): from
+// level 2 up pcTone is the lit and the local paint alone, and under 1.2 the impostor lays the foliage shade alone. So the
+// cap's, the body's and the shaded side's paint, floored as the fragment floors it, are worked out once a crown in the
+// vertex shader, and a stroke only picks one of the three by its facing -- the same picture. Only where it is exactly so:
+// a crown of 7 to 30 px (no one-tone blend, no bark left), in fair weather (no storm step), not in a gust band's one
+// tone; any other crown is painted as in step 1. ?imppaint=1: step 1 alone; flora.setMassT for the speed test.
+const MASST = MASSV && !(_q && _q.get('imppaint') === '1');
 // (THE CROWNS UNDER A STORM, IMP_FRAG: how far of a level the far crowns step down under a storm, beside the land's own
 //  step (the look director's ?stormlight, which scales both). 0.5: SEEN under wx=storm from 150 m, a full step made the
 //  wood one violet-maroon mass, crowns and floor alike; half keeps the crowns red against the storm's grey floor.
@@ -492,6 +500,9 @@ const IMP_VERT = /* glsl */`
 #ifndef PC_MASS
 #undef PC_MASS_V
 #endif
+#ifndef PC_MASS_V
+#undef PC_MASS_T
+#endif
 ${VERT_PARS}
 ${FOG_VERT}
 attribute vec4 aInst;     // per instance: x hue, y value, z seed, w canopy shade at its foot
@@ -574,6 +585,7 @@ uniform float uImpStorm;
 #endif
 ${PAINT}
 ${MASSV_FNS}
+${'${IMPSHADE_FN}'}
 flat varying vec4 vMassC;  // the crown's colour under crown mass (xyz) and its cap's light level (w)
 #endif
 void main() {
@@ -749,6 +761,33 @@ void main() {
       vMassC = vec4(csV, max(floor(pcLevel(xcV, 0.002) + 0.5) - uMassK.x * warmV - stKV, 0.0));
     }
   #endif
+  #ifdef PC_MASS_T
+    // (ITS THREE TONES ONCE A CROWN, MASST: where the paint does not read pcUp, exactly the fragment's paint and floor for
+    //  the cap, the body and the shaded side; the bark's two washes and vMassC carry them, and vMassC.w -1 says so)
+    {
+      vec3 cs = vMassC.rgb;
+      float L0 = vMassC.w, stK = 0.0;
+      #ifdef PC_IMP_STORM
+        stK = smoothstep(0.15, 0.6, uStorm) * uLookS.x * uImpStorm;
+      #endif
+      bool fastT = vMass.x < uMassK.z && vMass.x < uMassK2.w && vMass.x >= uMassK.y && stK <= 0.0 && L0 == floor(L0);
+      #ifdef PC_GUST
+        fastT = fastT && vGust.y <= 0.0;
+      #endif
+      if (fastT) {
+        float vfl = max(0.18, vVF);
+        vec3 cT0, cT1, cT2;
+        for (int i = 0; i < 3; i++) {
+          float lv = max(L0 - float(i), 0.0);
+          vec3 c = ${'${IMPSHADE}'};
+          float vmx = max(c.r, max(c.g, c.b));
+          if (vmx < vfl) c *= vfl / max(vmx, 1e-3);
+          if (i == 0) cT0 = c; else if (i == 1) cT1 = c; else cT2 = c;
+        }
+        vBA = cT0; vBB = cT1; vMassC = vec4(cT2, -1.0);
+      }
+    }
+  #endif
   vFog = pcFogAmountV(di * pcFogBank(vBody));
   gl_Position = projectionMatrix * mv;
   ${VERT_END}
@@ -758,6 +797,9 @@ void main() {
 const IMP_FRAG = /* glsl */`
 #ifndef PC_MASS
 #undef PC_MASS_V
+#endif
+#ifndef PC_MASS_V
+#undef PC_MASS_T
 #endif
 ${FRAG_PARS}
 ${'${IMPSHADE_FN}'}
@@ -872,6 +914,24 @@ void main() {
   // (the speed test's flat plants, 2 and 3: every far tree one flat colour, its outline kept; the cover as the paint's
   //  alpha, as below, or alpha to coverage on a multisampled picture would lay none of it)
   if (uOilL.y > 1.5 && uOilL.y < 3.5) { pcWrite(cls < 0.5 ? vBB : vLA * 0.7, clamp(cover, 0.0, 1.0), vec3(0.0, 0.0, 1.0), -vView.z, 3.0); return; }
+  #ifdef PC_MASS_T
+    // (A CROWN WHOSE THREE TONES WERE WORKED OUT ONCE, MASST: a leaf stroke picks the cap, the body or the shaded side by
+    //  its facing, exactly as the crown-mass block below picks the level, and is laid. Nothing else of the paint is run.)
+    if (vMassC.w < -0.5 && cls > 0.5 && cls < 1.5) {
+      float fmT = 0.5 + 0.5 * dot(n, vSunK);
+      float canopyT = vInst.w * uCanopy * 0.4;
+      bool smallT = false;
+      #ifdef PC_IMP_SMALL
+        smallT = uImpK.z * exp2(-vLod) < float(IMPS_T) + 0.5;
+      #endif
+      int bT = smallT ? (fmT > mix(0.05, 0.585, canopyT) ? 0 : 1) : (fmT > mix(0.60, 0.75, canopyT) ? 0 : (fmT > mix(0.35, 0.55, canopyT) ? 1 : 2));
+      if (fill) bT = max(bT, 1);      // (a filled gap: the crown's shaded tone, min(lv, the cap less one))
+      vec3 cT = bT == 0 ? vBA : (bT == 1 ? vBB : vMassC.rgb);
+      if (!(uOilL.y > 5.5 && uOilL.y < 6.5)) cT = pcAtmosV(cT, vFog, vView);
+      pcWrite(cT, clamp(cover, 0.0, 1.0), vec3(0.0, 0.0, 1.0), -vView.z, 4.0 + fract(vInst.z * 7.0) * 0.9);
+      return;
+    }
+  #endif
   vec3 r3 = vec3(id, fract(id * 13.7), fract(id * 5.1));
   float ms = dot(n, vSunK);
   ${SKYUP('dot(n, vUpK)')}
@@ -1089,10 +1149,12 @@ export function makeImpostorMaterial(bodyU, atlas, farMat, farcrown = FARCROWN) 
       fu.uFarFam.value.findIndex((v) => v.x + v.y + v.z > 0.01) >= 0 ? { MASS_FAMK: fu.uFarFam.value.findIndex((v) => v.x + v.y + v.z > 0.01) } : null,
       IMP.small > 0 ? { PC_IMP_SMALL: 1, IMPS_T: IMP.small.toFixed(1) } : null,
       CROWNMASS && MASSV ? { PC_MASS_V: 1 } : null,
+      CROWNMASS && MASST ? { PC_MASS_T: 1 } : null,
       // (the crowns under a storm: only once the look director's chunks declare uLookS and the oil look is on)
       LOOK.oil && /uniform\s+vec4\s+uLookS\b/.test(FRAG_PARS) && /uniform\s+float\s+uStorm\b/.test(FRAG_PARS) ? { PC_IMP_STORM: 1 } : null),
     uniforms: makePaintUniforms(bodyU, own),
-    vertexShader: IMP_VERT,
+    vertexShader: IMP_VERT.split('${IMPSHADE}').join(/vec3\s+pcShadeLeaf\s*\(/.test(FRAG_PARS) ? 'pcImpShade(cs, lv, max(smoothstep(1.2, 2.0, lv), stK))' : 'pcTone(cs, lv)')
+      .split('${IMPSHADE_FN}').join(/vec3\s+pcShadeLeaf\s*\(/.test(FRAG_PARS) ? 'vec3 pcImpShade(vec3 c, float lv, float w) { if (w >= 1.0) return pcTone(c, lv); if (w <= 0.0) return pcShadeLeaf(c); return mix(pcShadeLeaf(c), pcTone(c, lv), w); }' : ''),
     fragmentShader: IMP_FRAG.split('${FARCROWN}').join(fc).split('${IMPJIT}').join((+IMP.jit).toFixed(4))
       // (only the tone a stroke needs: the shade alone under level 1.2, the tone alone from 2, both only between; the
       //  same picture, as mix() with 0 or 1 is either end exactly)
