@@ -143,6 +143,15 @@ at 5 m and at 10 m (was 2.0 at 5 m with the side off). Stills: `A2_default_*`, a
 `A2_default_autumn-phone-5m-trunk-x3_*` (today | the default now | the first split). The wood program also lays the
 two layers as the big program did, each at its own light (it made a small difference, about 9,000 pixels, 0.08 of 255).
 
+**MERGED v39 (look-proto, 24 Nov): the new light.** The split's leaves follow the look director's L2 shade with no line
+of their own (their paint is made in `PROP_VERT`, shared with the one program; `LEAF_SUN`'s `pcLeafDeep` is now
+`pcShadeLeaf`). The WOOD program needed one change: v39 lights the big program's bark by the ONE LIGHT (L3, `pcLit`,
+picked by `uLookF.z`, on by default; `?light=old` turns it off), so `pcWoodLevel` and the wash under the layers now take
+it the same way. SEEN at the phone's settings, autumn wood 16.8 h: under v39's light the default against `?trees2=0`
+is 0.30 of 255 at 5 m and at 10 m (0.31 with `?light=old`, as before the merge); the new light itself moves the
+picture by 1.7, so the wood follows it; `?light=old&trees2=0` is pixel-identical to the still before the merge. Stills
+`A2_*-v39_*`. (The cards' own program, `CARD_FRAG`, does not take the one light: cards are dropped.)
+
 **What is built (the oil look only; `?trees2=0` puts every tree back as it was):**
 - THE DEFAULT (was `?trees2=1`): the near AND middle trees drawn by TWO SHORT PROGRAMS (`materials.js` `WOOD_FRAG`,
   `LEAF_FRAG`, chosen by `makePropMaterial(..., { tree: 'wood' | 'leaf' })`), over two groups of one index (wood, then
