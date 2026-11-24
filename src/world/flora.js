@@ -76,6 +76,13 @@ const TREES2 = (() => {
 // physics/flora.glsl.js pcPhysCrown). With the two short programs only; the speed test prices it (setTreeSway). How it
 // looks IN MOTION is not known here: only the owner's phone can show that.
 const TREESWAY = typeof location !== 'undefined' && /[?&]treesway=whole\b/.test(location.search || '');
+// ?pines=1 (24 Nov, the coordinator: the tall pines 20 to 60 m off read as bare poles): the kinds whose foliage is thin
+// needles -- the tall pine and the spruce, needles 7.5 to 8 cm across -- keep each needle at least NEEDLE_PX pixels
+// across on the screen (materials.js PROP_VERT, uNeedle), so a pine at range is a dark needle mass on its bare lower
+// stem and not specks round a pole. Its length, its place, its paint and the triangles are as before. OFF until the
+// look director passes it (?pines=0 or no switch: exactly as before); the speed test swaps it (setNeedles).
+const PINES = typeof location !== 'undefined' && /[?&]pines=1\b/.test(location.search || '');
+const NEEDLE_KITS = new Set(['tallpine', 'spruce']), NEEDLE_PX = 3.0;
 // (only a kind whose crown is leaves one by one, and nothing else, can be split: parts 0 bark, 5 leaf, 6 snow on a
 //  bough. A kind with crowns of washes (part 1: the green wood's conifer) keeps the one program.)
 function splittable(geos) {
@@ -268,10 +275,10 @@ export class Flora {
     //  for. The broadleaf and the conifer are the live game's own trees, so anything their shape gains for the oil
     //  look -- boughs sampled off a curve rather than drawn as two straight bars -- must be behind it, or the
     //  watercolour game changes and the pixel gate says so.)
-    const TALL = L.tall.map((sp) => (LOOK.oil ? Object.assign({}, sp, { oilLook: 1 }, sp.kit === 'broadleaf' || sp.kit === 'maple' || sp.kit === 'aspen' ? { leafy: 1, double: 1 } : null, sp.kit === 'roundmaple' || sp.kit === 'poplar' || sp.kit === 'oak' || sp.kit === 'birch' || sp.kit === 'willow' || sp.kit === 'sapling' ? { double: 1 } : null, sp.oil) : sp));
+    const TALL = L.tall.map((sp) => (LOOK.oil ? Object.assign({}, sp, { oilLook: 1 }, sp.kit === 'broadleaf' || sp.kit === 'maple' || sp.kit === 'aspen' ? { leafy: 1, double: 1 } : null, sp.kit === 'roundmaple' || sp.kit === 'poplar' || sp.kit === 'oak' || sp.kit === 'birch' || sp.kit === 'willow' || sp.kit === 'sapling' ? { double: 1 } : null, sp.oil, PINES && sp.kit === 'spruce' ? { needleTop: 1 } : null) : sp));      // (?pines: the spruce's needles budgeted by bough, kits/spruce.js)
     this.tall = TALL;
     this.species = TALL.map((sp, i) => {
-      const mo = { name: 'tall-' + sp.kit + i, barkA: sp.bark[0], barkB: sp.bark[1], leafA: sp.leaf[0], leafB: sp.leaf[1], leafC: sp.leaf[2], barkP: sp.barkP, leafP: sp.leafP, accent: sp.accent, oilDark: sp.dark || null, oilFam: sp.fam || null, oilKind: sp.snowy ? 1 : sp.bare ? 2 : 0, wind: sp.wind == null ? 0.03 : sp.wind, doubleSide: !!sp.double, phys: sp.kit === 'vine' ? null : 'lite', branch: BRANCHY.has(sp.kit), stiff: sp.kit === 'kelp' ? 0.1 : 1, plantHeight: (FAR_DIMS[sp.kit] || [0, 10])[1], gem: sp.kit === 'crystal',
+      const mo = { needle: PINES && NEEDLE_KITS.has(sp.kit) ? NEEDLE_PX : 0, name: 'tall-' + sp.kit + i, barkA: sp.bark[0], barkB: sp.bark[1], leafA: sp.leaf[0], leafB: sp.leaf[1], leafC: sp.leaf[2], barkP: sp.barkP, leafP: sp.leafP, accent: sp.accent, oilDark: sp.dark || null, oilFam: sp.fam || null, oilKind: sp.snowy ? 1 : sp.bare ? 2 : 0, wind: sp.wind == null ? 0.03 : sp.wind, doubleSide: !!sp.double, phys: sp.kit === 'vine' ? null : 'lite', branch: BRANCHY.has(sp.kit), stiff: sp.kit === 'kelp' ? 0.1 : 1, plantHeight: (FAR_DIMS[sp.kit] || [0, 10])[1], gem: sp.kit === 'crystal',
         // (the last fixes: a spire parts round an eye inside it; its girth at the foot, height and lean, florakit.js spireGeometry)
         hollow: sp.kit === 'spire' ? (sp.slim ? [1.3, 10.5, 0.3] : [2.0, 12, 0]) : null };
       const mat = makePropMaterial(bodyUniforms, mo);
@@ -316,7 +323,7 @@ export class Flora {
       this._turn.push({ mat: this.species[i].mat, far: i, sum: sp.leafSum ? summerCanopy(sp.leafSum) : sp.leaf, aut: sp.leafAut || sp.leaf,
         famW: sp.fam ? (sp.fam[3] == null ? 1 : sp.fam[3]) : 0 });
     }
-    this.treeDepth = TREEDEPTH; TREE_DEPTH.on = TREEDEPTH; this.swayWhole = TREESWAY;
+    this.treeDepth = TREEDEPTH; TREE_DEPTH.on = TREEDEPTH; this.swayWhole = TREESWAY; this.needles = PINES;
     if (TREES2 && !TREE_GUARD.failed) this._useTrees2(TREES2);
     const U = L.under || { leaf: [[0.8, 0.85, 0.4], [0.55, 0.7, 0.3], [0.35, 0.5, 0.3]], accent: [0.86, 0.29, 0.17], bush: [[0.64, 0.77, 0.37], [0.45, 0.63, 0.36], [0.24, 0.41, 0.36]], rock: [[0.8, 0.79, 0.83], [0.47, 0.45, 0.55]] };
     this.U = U;
@@ -699,7 +706,7 @@ export class Flora {
     // groups: which trees can appear in which mesh
     const groups = {};
     const add = (key, i, geo, mat, far) => {
-      const g = groups[key] || (groups[key] = { list: [], geo, mat, far: !!far, imp: key === '4i', mesh: null, tierKey: key[0] });
+      const g = groups[key] || (groups[key] = { list: [], geo, mat, far: !!far, imp: key === '4i', mesh: null, tierKey: key[0], kind: far ? -1 : +key.split(':')[1] });
       g.list.push(i);
     };
     for (let i = 0; i < n; i++) {
@@ -802,7 +809,7 @@ export class Flora {
         // (the oil look's leaves by distance: a full tree keeps every leaf within about a quarter of its range and a fifth
         // of them at its end, where the middle tree, of fewer and larger leaves, takes over; the middle tree thins on from there)
         // (in units of the full tree's reach, flora.t0, read as it is drawn: the hand-over may move while the game runs)
-        if (LOOK.oil && !g.far && !TREES_FULL) g.mesh.userData.leafLod = g.tierKey === '0' ? [0.24, 0.2] : [1, 0.35];
+        if (LOOK.oil && !g.far && !TREES_FULL) g.mesh.userData.leafLod = this._leafLod(g);
         // (2026-11-18) THE FAR TREES ARE NOT THINNED BY DISTANCE, AND HERE IS THE MEASUREMENT THAT SAYS SO, because
         // on paper it is the biggest saving left in the game and the next session will want to try it again.
         // A study counted the far tier at 7,326,558 triangles of an 8,191,481-triangle frame from the air and
@@ -1009,6 +1016,33 @@ export class Flora {
     this._useTrees2(this.trees2);
     this._rebuildTrees();
     return whole;
+  }
+  // THE LEAVES BY DISTANCE OF ONE MESH OF TREES: a full tree keeps every leaf within about a quarter of its range and a
+  // fifth of them at its end, where the middle tree, of fewer and larger leaves, takes over; the middle tree thins on from
+  // there. (?pines: the needle kinds keep at least 45 and 60 per cent: their foliage is sparse to begin with, and thinned
+  // as a broadleaf is the tree at range was a pole; materials.js PROP_VERT grows their needles from 12 m as well.)
+  _leafLod(g) {
+    const needle = this.needles && g.kind >= 0 && this.tall[g.kind] && NEEDLE_KITS.has(this.tall[g.kind].kit);
+    return g.tierKey === '0' ? [0.24, needle ? 0.45 : 0.2] : [1, needle ? 0.6 : 0.35];      // (in units of flora.t0)
+  }
+  // (PILOT's speed test, core/bench.js) ?pines swapped while the game runs: the needle kinds' every tree program told
+  // to keep its needles a mass at range (on) or as they are (off), and their leaves by distance with it. Uniforms and
+  // numbers on the meshes, so nothing is rebuilt.
+  // Returns whether it is now on, or null where there is no needle kind.
+  setNeedles(on) {
+    const v = on ? NEEDLE_PX : 0;
+    let n = 0;
+    for (let i = 0; i < this.species.length; i++) {
+      const s = this.species[i];
+      if (!this.tall[i] || !NEEDLE_KITS.has(this.tall[i].kit)) continue;
+      const ms = [s.base && s.base.mat].concat(s.mats ? Object.values(s.mats) : []);
+      for (const m of ms) if (m && m.uniforms && m.uniforms.uNeedle) { m.uniforms.uNeedle.value = v; n++; }
+      if (s.mo) s.mo.needle = v;
+    }
+    this.needles = !!on;
+    // (and the needle kinds' leaves by distance, mesh by mesh, as _leafLod now says)
+    if (LOOK.oil && !TREES_FULL) for (const ch of this.treeChunks.values()) for (const g of (ch.groups || [])) if (g.mesh && !g.far && g.mesh.userData.leafLod) g.mesh.userData.leafLod = this._leafLod(g);
+    return n ? !!on : null;
   }
   // (every near and middle patch dropped, to be built again in its turn with the kinds' programs as they now are)
   _rebuildTrees() {
