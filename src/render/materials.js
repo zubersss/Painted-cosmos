@@ -2027,7 +2027,7 @@ uniform float uNeedle;    // (?pines: a conifer's needles never narrower on the 
 uniform float uNearLeaf;  // (?nearleaf: 1 the leaves within arm's length shrink about their centres; 0 off, as before)
 uniform float uLeafGrow;  // (?leafgrow: the most a thinned broadleaf's kept leaf grows within 15 m of the eye, e.g. 1.15; 0 off, as before)
 uniform float uStormLeaf; // (the share of the land's storm paint a crown takes at a full storm: 0.5 by default, ?stormleaf=0 off; flora.js)
-uniform float uNearShade; // (?nearshade: 1 a shaded leaf within 3 m of the eye takes the land's glaze, not the deep foliage shade; 0 off, as before)
+uniform float uNearShade; // (?nearshade: within 3 m of the eye, 1 a shaded leaf takes the land's glaze, 2 a leaf is held at V 0.26 or above, its colour kept; 0 off, as before)
 uniform float uLeafScale; // (?bushleaf: the size of this plant's leaves about their own centres; 1 or 0 as built)
 uniform vec4 uOilPx;      // (x: the angle one pixel of the scene pass takes, radians: shared.js)
 uniform mat4 uShM;
@@ -2405,8 +2405,11 @@ void main() {
       // lifts it, but at arm's length nothing does, and a bush or a low bough in full daylight showed the darkest pieces
       // in the picture. So within 3 m of the eye a shaded leaf takes the land's own glaze at the glaze level (pcTone, with
       // the sky's fill in it) in place of the deep shade, back to today's shade by 5 m. Trees and bushes. 0: as before.
-      if (uNearShade > 0.0) {
-        float kNe = (1.0 - smoothstep(3.0, 5.0, length(cV))) * uNearShade;
+      // (uNearShade 1: the look director's first form, the land's glaze. SEEN on the meadow bush, 24 Nov: it greyed the
+      //  deep-green shaded leaves -- V 0.28 to 0.26, S 0.56 to 0.24 -- and left the near-black pieces where they were;
+      //  the land's glaze is a shade for ground, grey-olive, not for a leaf. So uNearShade 2, below, is the other form.)
+      if (uNearShade > 0.0 && uNearShade < 1.5) {
+        float kNe = 1.0 - smoothstep(3.0, 5.0, length(cV));
         if (kNe > 0.0) deepL = mix(deepL, pcTone(cs, max(lvL, 1.0)), kNe);
       }
       // THE CROWNS UNDER A STORM (?stormleaf, 24 Nov, the coordinator after the look director's storm light, LOOK-BUILD.md
@@ -2435,6 +2438,15 @@ void main() {
       if (uNeedle > 0.0 && aData.y < 5.5) {
         float vN = max(max(vLeafC.r, vLeafC.g), vLeafC.b), tN = 0.24 * smoothstep(12.0, 20.0, length(cV));
         if (vN < tN) vLeafC.rgb *= tN / max(vN, 0.02);
+      }
+      // (?nearshade=2, uNearShade 2: NO NEAR-BLACK LEAF, ITS OWN COLOUR KEPT. Within 3 m of the eye a leaf darker than
+      //  V 0.26 -- the references' deep green, the value the look director set for the needle mass -- is lifted to it, its
+      //  hue and saturation kept, back to today by 5 m; a lighter leaf is left alone. The darkest values stay the trunks'
+      //  in shade (0.08 to 0.18, R1.2c). Trees and bushes.)
+      if (uNearShade > 1.5) {
+        float kNe = 1.0 - smoothstep(3.0, 5.0, length(cV));
+        float vNe = max(max(vLeafC.r, vLeafC.g), vLeafC.b), tNe = 0.26 * kNe;
+        if (vNe < tNe) vLeafC.rgb *= tNe / max(vNe, 0.02);
       }
       vLeafK.rgb = cs;
       #ifdef PC_FIRE

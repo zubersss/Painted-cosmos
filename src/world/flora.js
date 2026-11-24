@@ -99,7 +99,7 @@ const NEARLEAF = typeof location !== 'undefined' && /[?&]nearleaf=1\b/.test(loca
 // ?bushleaf=1 -- the bush's leaves at 0.65 of their size about their centres, with the sky between them (uLeafScale);
 // ?bushpaint=1 -- the bush takes the trees' storm step and their colour family (its biome's first kind with one), so it
 //   agrees with the trees in every weather and season.
-const NEARSHADE = typeof location !== 'undefined' && /[?&]nearshade=1\b/.test(location.search || '') ? 1 : 0;
+const NEARSHADE = (() => { try { const v = new URLSearchParams(location.search).get('nearshade'); return v === '1' ? 1 : v === '2' ? 2 : 0; } catch { return 0; } })();      // (1 the land's glaze, 2 a value floor with the leaf's own colour: materials.js)
 const BUSHLEAF = typeof location !== 'undefined' && /[?&]bushleaf=1\b/.test(location.search || '') ? 0.65 : 1;
 const BUSHPAINT = typeof location !== 'undefined' && /[?&]bushpaint=1\b/.test(location.search || '');
 const TREES_AFTER_GROUND = typeof location === 'undefined' || !/[?&]treeorder=0\b/.test(location.search || '');
