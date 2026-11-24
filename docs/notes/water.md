@@ -13,7 +13,7 @@ review before a step is called done, a short message to the coordinator (session
 The weather group lands the rain field (its section 9.3: `fields.rain` at 32 a face, mm/h, 2 Hz, `rainAt`,
 `rainBetween`, a GPU channel `pcRainAt`): use theirs for rain (the design's `uRainCells[8]` and `rainAt` are replaced).
 
-**STATE (24 Nov, 17:35), the short of it.** v39.2 shipped WITHOUT the water (the coordinator pulled it at its gate for two
+**STATE (24 Nov, 18:45), the short of it.** THE WATER IS LIVE in v39.3 (look-proto 87053ed; merged here 48f1809). Before that, v39.2 shipped WITHOUT the water (the coordinator pulled it at its gate for two
 faults, both now answered); the water goes into v39.3 with the weather. design-water HEAD 792d1f1 = v39.2 (look-proto c7d8d9e)
 merged in (df7c3ba: the ground sample 25 floats, the water's still at 23, the far view's snow at 24; W3's runoff cap and swell
 to take 25, 26; THE LAYOUT FOR THE WATER LANES IS THIS SESSION'S, the coordinator's word) plus:
@@ -23,8 +23,8 @@ to take 25, 26; THE LAYOUT FOR THE WATER LANES IS THIS SESSION'S, the coordinato
 - FROM THE AIR (792d1f1, "THE WATER FROM THE AIR" below): the old high frame has little water because the rivers run
   elsewhere; the added gate frame at the landing's river (cam=high&yaw=145.6&pitch=-13.4) shows it and a lake; 150 m and
   400 m read; at 1 km the 19 m river is lost in the far ground itself. v39.3 TOOK 792d1f1 (the water ships with the weather).
-- THE FAR WATER LINE (a1f12fd, ?farwater=1, off by default; C agreed): from 1 km and 1.6 km the rivers read as continuous
-  lines; A/B sent to F, awaiting F's word on its value and edge. The ground-sample layout is now CS 30 (27-29 the line's).
+- THE FAR WATER LINE (a1f12fd, then e01eea8 the lake's own colour by the angle; C agreed; F PASSED 18:22): DEFAULT in the oil
+  look (?farwater=0 opts out); waiting for the coordinator's next batch. The ground-sample layout is now CS 30 (27-29 the line's).
 - Earlier today, all on this branch: W1 rivers with S-bends and point bars (the trees stand back from the bars, F passed);
   mountain streams behind ?mount=1 (F: the white water is W3's paint, queued); THE DEFAULT FLIP in the oil look (rivers of the
   tree, lakes, ponds, puddles, fjord, falls on; ?wpaint 0); the speed test's falls view, ?bench=water; the landing's river
@@ -291,6 +291,11 @@ showed NO water with the water branch (`docs/shots/painter/water-air/gate-high-a
   same frames (the purest line pixels against the lake's water): 1 km line hue 208 S 0.20 V 0.75, lake 206 0.17 0.71; 1.6 km
   line 210 0.17 0.72, lake 222 0.15 0.72. SEEN (`farwater-lake-colour-1km-1600.jpg`, darker | the lake's colour): 1 km a blue
   line into the lake in the lake's own colour; 1.6 km subtler, a winding line of the same blue. Not yet: the gold toward a low sun.
+- F PASSED it (18:22): "right on"; DEFAULT in the oil look since then (mode.js W.farwater = n('farwater', d); ?farwater=0 the
+  opt-out; the watercolour game off). The gold toward a low sun comes after: take the sky along the reflected ray at a golden
+  hour as the water's mirror does (look director cbf7f41's wash and glow in the water's skyc), so line and lake turn together.
+  v39.3 (look-proto 87053ed, the water live) merged in (48f1809): C's flower drifts from the air (aBloom, ?bloomfar) beside the
+  line's aFarW; with both on 14 of the 16 attributes. Its 3D clouds now cover much of the 1 km views: later A/Bs with &wx=fair.
 
 ### THE SPEED TEST'S FALLS VIEW AND ?bench=water (24 Nov, this session; lane 0, the coordinator's order)
 

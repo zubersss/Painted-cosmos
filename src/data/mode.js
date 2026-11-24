@@ -64,9 +64,10 @@ export function waterFromSearch(search) {
   W.wpaint = n('wpaint', 0);      // (the coordinator, 24 Nov 12:40: v37's strokes stay the default for v39.2 -- the look director
                                   //  found the sea from the air a blocky checker with ?wpaint=1 and 2; ?wpaint=1 for the new strokes)
   W.wakes = n('wakes', 1); W.splash = n('splash', 0); W.runoff = n('runoff', 0); W.bends = n('bends', 1); W.mount = n('mount', 0);
-  // (?farwater=1: the rivers drawn into the far ground as a line from the signed distance to their centre, so that from
-  //  1 km up a river narrower than the ground's vertices lie apart still reads; a paint switch, it changes no ground)
-  W.farwater = n('farwater', 0);
+  // (the far view's water line: the rivers drawn into the far ground as a line from the signed distance to their centre, so
+  //  that from 1 km up a river narrower than the ground's vertices lie apart still reads; a paint switch, it changes no
+  //  ground. On by default in the oil look since the look director passed it, 24 Nov 18:22; ?farwater=0 the opt-out)
+  W.farwater = n('farwater', d);
   W.on = !!(W.rivers || W.lakes || W.ponds || W.puddles || W.swell || W.falls || W.fjord || W.runoff || W.mount);
   return W;
 }

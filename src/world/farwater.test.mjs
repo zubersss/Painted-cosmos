@@ -18,12 +18,14 @@ const f = dirToFace(sp.x, sp.y, sp.z, {});
 const patchAt = (level) => { const n = 1 << level; return buildPatchData(S, f.face, level, Math.min(n - 1, Math.floor((f.u * 0.5 + 0.5) * n)), Math.min(n - 1, Math.floor((f.v * 0.5 + 0.5) * n))); };
 const unpack = (d, v) => ({ sd: (d.farw[v * 4] / 255 - 0.5) * 96, dc: d.farw[v * 4 + 1] / 255 * 48, hw: d.farw[v * 4 + 2] / 255 * 24 });
 
-test('the switch: ?farwater=1 is a paint switch (it changes no ground); without it nothing is packed', () => {
-  assert.equal(waterFromSearch('?look=oil&farwater=1').farwater, 1);
-  assert.equal(waterFromSearch('?look=oil&farwater=1').on, waterFromSearch('?look=oil').on);
-  waterFromSearch('?look=oil');
+test('the switch: on by default in the oil look, off in the watercolour game, ?farwater=0 the opt-out; a paint switch (it changes no ground); off, nothing is packed', () => {
+  assert.equal(waterFromSearch('?look=oil').farwater, 1, 'the oil look\'s default since the look director passed it');
+  assert.equal(waterFromSearch('').farwater, 0, 'the watercolour game: off');
+  assert.equal(waterFromSearch('?look=oil&farwater=0').on, waterFromSearch('?look=oil').on);
+  waterFromSearch('?look=oil&farwater=0');
   assert.equal(MODE.water.farwater, 0);
-  assert.equal(patchAt(3).farw, null, 'no line data without the switch');
+  assert.equal(patchAt(3).farw, null, 'no line data with it off');
+  waterFromSearch('?look=oil');
 });
 
 test('with it, a coarse patch over the landing carries the signed distance: inside the river where the river is, and the size rules out far vertices', () => {
