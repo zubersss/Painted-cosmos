@@ -35,7 +35,7 @@ const FLORA_AW = {      // the autumn wood: violet against the gold and yellow-g
   // the old ramps, which ended at 0.5, the first place the owner sees had no flower in view, COUNTED 24 Nov)
   sward: { floor: 0.10 },
   blooms: [
-    { kind: 'Michaelmas aster', shape: 'rayed', c: M('cobaltViolet', 'ultramarine', 0.25), eye: M('quinGold', 'cadOrange', 0.2), head: [0.012, 0.019], stalk: [0.28, 0.55], heads: [2, 5], drift: 9, peak: 14, share: 0.9, hab: { canopy: [0.88, 0.35] }, edge: -0.2 },
+    { kind: 'Michaelmas aster', shape: 'rayed', c: M('cobaltViolet', 'ultramarine', 0.25), eye: M('quinGold', 'cadOrange', 0.2), head: [0.012, 0.019], stalk: [0.28, 0.55], heads: [2, 4], drift: 9, peak: 11, share: 0.9, hab: { canopy: [0.88, 0.35] }, edge: -0.2 },
     { kind: 'harebell', shape: 'bell', c: M('cobaltViolet', 'cobaltBlue', 0.3), head: [0.010, 0.015], stalk: [0.20, 0.36], heads: [1, 3], drift: 7, peak: 12, share: 0.6, hab: { canopy: [0.92, 0.4] }, edge: -0.2 },
     { kind: 'late hawkbit', shape: 'rayed', c: M('quinGold', 'lemonYellow', 0.4), eye: M('quinGold', 'cadOrange', 0.35), head: [0.014, 0.021], stalk: [0.14, 0.34], heads: [1, 2], drift: 11, peak: 14, share: 0.9, hab: { canopy: [0.8, 0.25] }, edge: -0.2 },
     { kind: 'goldenrod', shape: 'spike', c: M('quinGold', 'yellowOchre', 0.25), head: [0.12, 0.22], stalk: [0.45, 0.85], heads: [1, 1], drift: 13, peak: 4, share: 0.4, hab: { canopy: [0.8, 0.25] }, edge: -0.2 },

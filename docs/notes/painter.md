@@ -110,14 +110,50 @@ commit (the alpine meadow's easel, every change of this lane in).
    four times the blades; its cure is the look director's shared foliage shade (their build lane L2), not this lane's.
    A floor deepened as a glaze of its own colour (tried first) raised the meadow's darks to 0.52 from 60 m and was
    changed to the quieter step above.
+7. THE MEADOW FIXES (the coordinator on step 5: "the 'on' still is LESS striking than 'off' near the eye ... small violet
+   asters sprinkled evenly, like confetti"; asked: drifts clustered near the eye, heads bigger and bolder, the bold kinds
+   in every place's near mix). What was done, in the order it was SEEN:
+   - FIRST TRY, NOT GOOD (7fdc02e): one patch field shared by every kind. COUNTED with a Node script over 1,500 random
+     60 m squares of Earth (the scratch `bloomstats.mjs`, its method in the commit): it halved the ground in a drift
+     (meadow 29 -> 19 %, green wood 16 -> 8 %) and the landing had no flower in view.
+   - `bloom.js bloomAt`: the density is BIMODAL, ss(0.06, 0.28) of the product of the fields (a drift solid inside, a
+     short ragged step, almost nothing between: four soft fields multiplied had lain at a middling density everywhere,
+     which IS the confetti); a softer shared patch field (`PT`); drift hearts with a 0.30 step and edge 0.05; sprinkle
+     0.03. COUNTED: meadow 47 % of its ground in a drift (40 % dense), 2 % of 60 m views without one; green wood 25 %;
+     coast 36 %; autumn wood 15 % (its kinds now grow under its open crowns, ramps to 0.88-0.92, and `edge: -0.2`).
+   - THE LANDING always stands in a patch (`bloom.js`: full within 18 m of `S._spawn`, gone by 45 m): the patch field
+     happened to leave the first view's bank bare.
+   - HEADS: `BLOOM_HEAD` 2.0 -> 2.5, a cell's plants in one tuft; NEAR_VERT gives every head (kinds 7-12) a least size on
+     screen, half-width 2.6 px (bells 2.0, spikes and froth 1.4), the whole head grown, as a share per ring (`uNearK.w`:
+     middle 0.85, far 0.6). The middle and far rings lay the drift's own head kind where they laid 1-2 px round touches.
+   - THE BOLD KINDS: the alpine meadow led by the poppy, the ox-eye and a new meadow buttercup (the aster a sprinkle);
+     the green wood's buttercup in every glade (most in the damp) and an ox-eye in the open; the autumn wood's hawkbit
+     bigger.
+   - THE GROUND'S TINT for a flower far round the wheel from the grass (red, violet) is a third as strong (`hueNear`):
+     from 10 m the poppy drifts were rust-brown mud; such drifts are carried by their heads now.
+   - C6 (V > 0.90 at most 4 %): the dense meadow at 1.8 m measured 6.9 %, then 5.7, 3.1 (but the buttercups read as
+     orange marigolds), and 3.8 % with the yellow cups' gold a glaze of lemon over quinacridone gold mixed six tenths back
+     to lemon, their upper part four tenths, and the ox-eye D 0.75.
+   SEEN (`m-*-bloom-off-on.jpg`, `?bloom=0` against on, the f-* cameras): the meadow at 1.8 m is dense drifts of
+   buttercups, ox-eyes, asters and poppies, and from 10 m the drifts read as dots of their colours; the green wood a solid
+   bluebell drift; the landing drifts of violet asters on the bank, goldenrod and hawkbit at the water and the feet. From
+   150 m a few more red and white flecks, no drifts: that still waits for the far-view lane's channel (FV6 with C).
+   lookstats A -> B: meadow 1.8 m S(V<.3) 0.89 -> 0.88, V>.90 2.5 -> 3.8 %; 10 m 0.81 -> 0.77, 0.3 -> 1.3 %; 150 m 0.17
+   -> 0.19; green wood 0.47 -> 0.48; landing 0.47 -> 0.43, 2.4 -> 2.4 %.
+   COST (the scratch overdraw counter, 936 x 372 class, the level eye; the heads' least size replayed): the meadow's near
+   marks 149,344 -> 143,649 fragments (the new flowers replace the old ones); THE LANDING 279,137 -> 352,549 (+73k: +1.5 ms
+   at K2's 20 ns, 0.9-2.6, and about 1.4 times that at the phone's picture), of which the heads' least size is 13.7k. OVER
+   the design's F budget (+1, at most +1.8 ms). The dials: the least size (2.6 px), the landing's patch, a kind's `peak`.
 
 **Tests:** `tests/` 325 of 325, `src/world/` + `src/data/looks/` 65 of 65. `src/physics/` 415 of 416: the one failure is
 `loose.test.mjs` P25 ("under the closed wood the litter still puffs: 2"), which is FLAKY ON THE CLEAN COMMIT TOO (it
 failed 1 run in 5 there with none of this lane's changes): reported to the coordinator, not this lane's.
 
-**Next:** the look director's standard set (S1-S6 at 1024 x 480) with `lookstats.py` for the review; the year for
-the flowers (a uniform that lets a kind's heads go out of season in the vertex shader, no seam); O and F4 wait for the
-trees lane. ASKED OF THE FAR-VIEW LANE through the coordinator: a ground dab that takes a drift's colour WHOLE
+**Next:** the lime (F10, with the look director: the blades' own lit greens as data, after merging look-director's L2);
+the look director's standard set (S1-S6 at 1024 x 480) with `lookstats.py`; THE YEAR for the flowers (the coordinator's
+ruling: build it, behind its own switch, every place keeping a bold season-true kind in flower near the eye in every
+season; a first build is parked in a scratch worktree: windows in iTone's top bits, heads thinned in NEAR_VERT); then FV6
+(meadows from the air) with C. O and F4 wait for the trees lanes. ASKED OF THE FAR-VIEW LANE through the coordinator: a ground dab that takes a drift's colour WHOLE
 (pointillist) from `bloomAt`, the one thing that would make drifts read from 150 m and a mile.
 
 
