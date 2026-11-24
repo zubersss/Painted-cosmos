@@ -225,6 +225,15 @@ const UNDER2_SHIFT = (() => {
     if (n === 1) return 1; if (n === 2) return 2; } catch { /* no address */ }
   return 2;
 })();
+// THE OUTER UNDERGROWTH CELL'S OWN PLACEMENT CELLS (the flora lane, 24 Nov; `?u2cells=1`, OFF until the look director
+// and the coordinator rule on it). Since the cell grew to four placement cells a side above (UNDER2_SHIFT, ba27b30),
+// the two places that read its placement cells still read two a side at ix * 2 + a: a cell at level 6 read level-8
+// cells somewhere else on the face. COUNTED in Node (the autumn wood on foot): cells 17-182 m from the eye built their
+// ferns, bushes, flowers and boulders where those stand, 615-754 m away, past the 110 m reach, so none of them is drawn
+// near the eye in the oil look (and the obstacles, which read the right cells, are bushes and rocks one cannot see).
+// With it on, a cell reads its own (1 << shift) a side.
+const U2SPAN = (() => { let on = false; try { on = new URLSearchParams(location.search).get('u2cells') === '1'; } catch { /* no address */ }
+  return on && LOOK.oil ? 1 << UNDER2_SHIFT : 2; })();
 
 // WHICH KITS ARE DRAWN FAR OFF AS LEAF CARDS and not as the old lump (the oil look's far tree, v13). A kit left out
 // of this is silently given the lump, which is why it sits beside FAR_DIMS: both must name every tall kit there is.
@@ -909,7 +918,7 @@ export class Flora {
     let n = 0, d;
     if (chunk.kind === 'under2') {
       const parts = [];
-      for (let b = 0; b < 2; b++) for (let a = 0; a < 2; a++) { const t = underCell(this.S, chunk.face, chunk.ix * 2 + a, chunk.iy * 2 + b); parts.push(t); n += t.count; }
+      for (let b = 0; b < U2SPAN; b++) for (let a = 0; a < U2SPAN; a++) { const t = underCell(this.S, chunk.face, chunk.ix * U2SPAN + a, chunk.iy * U2SPAN + b); parts.push(t); n += t.count; }
       d = new Float32Array(n * INST_STRIDE);
       let o = 0;
       for (const t of parts) { d.set(t.data.subarray(0, t.count * INST_STRIDE), o); o += t.count * INST_STRIDE; }
@@ -1428,7 +1437,7 @@ export class Flora {
         // prepare one missing cell per step, so no single step is long
         if (ch.kind === 'far' || ch.kind === 'under2') {
           // (a far cell is farSpan placement cells to a side -- four in the oil look -- an undergrowth cell always two)
-          const ck = ch.kind === 'far' ? 't' : 'u', span = ch.kind === 'far' ? this.farSpan : 2;
+          const ck = ch.kind === 'far' ? 't' : 'u', span = ch.kind === 'far' ? this.farSpan : U2SPAN;
           let missing = false;
           for (let b = 0; b < span && !missing; b++) for (let a = 0; a < span && !missing; a++) {
             if (!hasCell(ck, this.S, ch.face, ch.ix * span + a, ch.iy * span + b)) {
