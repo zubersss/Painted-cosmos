@@ -19,7 +19,8 @@ white water is the paint's), THE DEFAULT FLIP in the oil look (4873c6a: rivers o
 falls held), the speed test's falls view and ?bench=water (597ab63), the landing's river (c229268: Earth's oil.springs and
 oil.keep, the save's nudge to 24 m; ACCEPTED by the coordinator from the stills 1ec1984), E-W2's puddle fix merged (110b43e:
 round the landing 1.39 % of the dry ground). THEN (a877068): water-paint merged (f05eee3) with THE FALLS FLIP (W.falls = n('falls', d), E-W2's line, F passed the falls with the paint's curtain fix; they ship with water-paint, never before). THEN (2d40220, THE v39.2 WATER, the coordinator's ruling): ?wpaint defaults to 0 (v37's strokes: the look director found the sea from the air a blocky checker with ?wpaint=1 and 2); the falls stay on; stills v392-*.jpg. NEXT: merge look-proto when the coordinator says v39.1 has landed; W3 will later make its strokes the default for rivers and ponds only. THEN (24 Nov 13:25): the runoff A/B in a storm and after
-(RUNOFF below): it works; the dry gully keeps a bed's blue (C), the streams stay up three hours (a fix offered), the brown is weak.
+(RUNOFF below): it works; the dry gully keeps a bed's blue (C), the brown is weak (F). THEN: the hydrograph mended (the
+streams fall back over tens of minutes, and it now keeps the weather's clock, 60 times the game's).
 The coordinator (13:11): v39.1 is live, design-water 2d40220 is in v39.2's gate; merge look-proto only once v39.2 lands there.
 Order next: W3 splits rivers and ponds from the sea (strokes default there), E-W2 and W3 fix the sea, then the mountain streams.
 OPEN: F's sand-bar notes (colour, grass,
@@ -124,8 +125,10 @@ DRAWING the water-paint lane's (E-W3/W4): the contract below was sent to it befo
 - `src/world/waterstate.js` (new): `WATERSTATE = { wet, rise, mud, rain, from }`, a hydrograph at the eye stepped once a
   frame (a WATER_PART): from the weather's rain field when the physics has it (`physics.fields.rain.rainBetween` over the
   last 30 min and 3 h, asked twice a second), else from the ground's wetness (the world's `uWx.y`). `RUNOFF` holds the
-  numbers: runnels full at 2 mm in half an hour, up in 60 s, down in 600 s; streams up to 0.4 m for 20 mm in three hours,
-  up in 300 s, down in 1,800 s; mud 0.7 of the rise.
+  numbers, all on THE WORLD'S CLOCK (an hour of weather is a game minute, WEATHER.timeScale 60; mended 24 Nov, see the A/B
+  below): runnels run at about 1 mm in ten minutes, up in 60 s, down in 300 s; streams from the last half hour's rain and
+  0.15 of the three hours' before it, 63 % of 0.4 m for 6 mm, up in 300 s, down in 1,200 s; mud 0.7 of the rise. The rain
+  field is asked over 10, 30 and 180 GAME seconds (the world's 10 min, 30 min, 3 h).
 - `src/world/waterhooks.js`: loads waterstate.js when `?runoff=1`; the frame's ctx now carries `physics` (world/index.js
   passes it).
 - THE PAINT'S SIDE (E-W3/W4): `depthNow = vDepth - (1 - WATERSTATE.wet) * cap`, discard where none is left; the water lifted
@@ -148,11 +151,20 @@ DRAWING the water-paint lane's (E-W3/W4): the contract below was sent to it befo
   in the storm (17,087 vs 16,881 water-blue pixels), a hint warmer; an hour after it reads GREYER, not brown (mud 0.28).
   PROBLEMS FOUND: (1) THE DRY GULLY KEEPS A RIVER BED'S BLUE: its sample's second colour is (0.45, 0.63, 0.84), the bed's
   colour under water, so the dry runnel reads as a ghost of painted water (`near-dry-vs-storm.jpg`, top). Where all the
-  water is cap water (cap >= depth) the bed wants the dry bed's colours: C's recipe, asked. (2) THE STREAMS STAY UP FOR
-  THREE HOURS: the rise's target comes from the rain of the last 3 h, so after a 20 min storm it holds 0.157 m until the
-  rain leaves that window (3 h 20 min), then falls over 30 min -- the header says it falls over tens of minutes. A fix
-  offered (waterstate.js is this session's): target from mm30 + 0.4 (mm180 - mm30) with riseMm 10 -- a peak of about
-  0.25 m at the storm's end, about 0.13 m within the hour, gone after three. (3) The swollen river's brown is too weak to
+  water is cap water (cap >= depth) the bed wants the dry bed's colours: C's recipe, asked. (2) THE STREAMS STAYED UP FOR
+  THREE HOURS: the rise's target came from the rain of the last 3 h, so after a 20 min storm it held until the rain left
+  that window, then fell over 30 min. FIXED (the coordinator, 13:27): the target is now the last half hour's rain and 0.15
+  of the older (quick and slow flow). AND A WORSE FAULT FOUND IN FIXING IT: the hydrograph ran on GAME seconds while the
+  weather runs 60 times faster (the game's day is 25 min; physics/weather.js WEATHER.timeScale; cloudfield.js rainBetween
+  lays a game second of 6 mm/h as 0.1 mm), so its "last half hour" was 30 hours of weather. Now every time in it is the
+  world's: a frame's game seconds times RUNOFF.clock (60, held equal to WEATHER.timeScale by the test), the rain field asked
+  over 10, 30 and 180 game seconds (also far cheaper: 2, 6 and 36 quadrature steps, where the old 10,800 s window took
+  2,160). A storm of 30 mm/h for 20 min, the hydrograph's own output (runoff.test.mjs asserts it): runnels 0.6 at 3 min,
+  full at 10, 0.10 twenty minutes after the storm; streams peak 0.32 m eleven minutes after it, 0.13 an hour after it,
+  0.09 at 3 h, 0.003 at 4 h 20; a 20 mm soaking over 3 h still gives 0.25 m as before. In the game: runnels within seconds
+  of a heavy shower and gone about twenty seconds after it; streams falling over the next minute or so. Also mended: the
+  rate at the eye is fields.rain.now (it read the per-texel array). The A/B stills were taken with the state pinned, so
+  they stand. (3) The swollen river's brown is too weak to
   read from 150 m (F's call). For W3: after v39.2 C's snow takes patchgen slot 24, where water-paint packs the runoff's cap
   (24, 25): they move to 25, 26 on water-paint's merge.
 

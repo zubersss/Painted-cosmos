@@ -17,35 +17,55 @@ test('the switch: ?runoff=1 is a part that changes the world, and it registers i
   assert.ok(WATER_PARTS.includes(RUNOFF_PART));
 });
 
-test('the hydrograph: runnels fill within minutes of a downpour and drain after it; the streams rise slower and fall slower', () => {
-  const st = { wet: 0, rise: 0, mud: 0, rain: 0, from: '', t: 0 };
-  // ten minutes of 30 mm/h: 5 mm in the half hour, 5 mm in the three hours
-  const storm = (min) => ({ mm30: Math.min(min, 30) / 60 * 30, mm180: min / 60 * 30, rain: 30 });
-  for (let s = 0; s < 600; s++) stepRunoff(st, 1, storm(s / 60), 0);
-  const wet10 = st.wet, rise10 = st.rise;
-  assert.ok(wet10 > 0.7, 'the runnels run after ten minutes of a downpour (' + wet10.toFixed(2) + ')');
-  assert.ok(rise10 > 0.03 && rise10 < RUNOFF.riseMax * 0.6, 'the streams have begun to rise (' + rise10.toFixed(3) + ' m)');
-  // the rain stops; half an hour on the runnels have mostly drained, the streams are still up
-  const dry = { mm30: 0, mm180: 5, rain: 0 };
-  for (let s = 0; s < 1800; s++) stepRunoff(st, 1, dry, 0);
-  assert.ok(st.wet < wet10 * 0.15, 'the runnels drain within half an hour (' + st.wet.toFixed(2) + ')');
-  assert.ok(st.rise > 0.03, 'the streams are still up half an hour on (' + st.rise.toFixed(3) + ' m)');
-  assert.ok(st.mud > 0 && st.mud <= RUNOFF.mudK);
+test('the hydrograph, on the world\'s clock: a storm fills the runnels within minutes and drains them within about twenty minutes of its end; the streams peak after it and fall back over tens of minutes; a long soaking raises them as much', async () => {
+  const { WEATHER } = await import('../physics/weather.js');
+  assert.equal(RUNOFF.clock, WEATHER.timeScale, 'the hydrograph keeps the weather\'s clock (an hour of weather is a game minute)');
+  // a rain history (mm/h by world second) through the three windows the rain field is asked over, stepped every 5 world s
+  const run = (rate) => {
+    const mmB = (a, b) => { let s = 0; for (let t = Math.max(0, a); t < b; t += 5) s += rate(t) * 5 / 3600; return s; };
+    const st = { wet: 0, rise: 0, mud: 0, rain: 0, from: '', t: 0 }, at = {};
+    let peak = 0, peakT = 0, mudMax = 0;
+    for (let t = 0; t <= 6 * 3600; t += 5) {
+      if (t % 60 === 0) at[t / 60] = { wet: st.wet, rise: st.rise };
+      if (st.rise > peak) { peak = st.rise; peakT = t / 60; }
+      mudMax = Math.max(mudMax, st.mud);
+      stepRunoff(st, 5, { mm10: mmB(t - RUNOFF.win[0], t), mm30: mmB(t - RUNOFF.win[1], t), mm180: mmB(t - RUNOFF.win[2], t), rain: rate(t) }, 0);
+    }
+    assert.equal(st.from, 'rain');
+    return { at, peak, peakT, mudMax };
+  };
+  // a storm: 30 mm/h for 20 minutes, then dry
+  const s = run((t) => (t < 1200 ? 30 : 0));
+  assert.ok(s.at[3].wet > 0.5 && s.at[10].wet > 0.95, 'the runnels run within minutes (' + s.at[3].wet.toFixed(2) + ' at 3 min)');
+  assert.ok(s.at[40].wet < 0.15, 'and are drained twenty minutes after the storm (' + s.at[40].wet.toFixed(2) + ')');
+  assert.ok(s.peakT > 22 && s.peakT < 45 && s.peak > 0.2 && s.peak < RUNOFF.riseMax, 'the streams peak after the storm (' + s.peak.toFixed(3) + ' m at ' + s.peakT.toFixed(0) + ' min)');
+  assert.ok(s.at[50].rise > s.peak * 0.6, 'they are still high half an hour after it (' + s.at[50].rise.toFixed(3) + ' m)');
+  assert.ok(s.at[80].rise < s.peak * 0.5, 'and down to half within the hour after it (' + s.at[80].rise.toFixed(3) + ' m)');
+  assert.ok(s.at[180].rise > 0.03, 'a little slow flow for some hours (' + s.at[180].rise.toFixed(3) + ' m at 3 h)');
+  assert.ok(s.at[260].rise < 0.02, 'and quiet again some four hours on (' + s.at[260].rise.toFixed(3) + ' m)');
+  assert.ok(s.mudMax > 0.3 && s.mudMax <= RUNOFF.mudK, 'brown at the rise (' + s.mudMax.toFixed(2) + ')');
+  // a long soaking: 20 mm over three hours raises them as much as before the clock was mended (0.25 m)
+  const k = run((t) => (t < 10800 ? 20 / 3 : 0));
+  assert.ok(k.at[180].rise > 0.2 && k.at[180].rise < 0.3, 'a long soaking: ' + k.at[180].rise.toFixed(3) + ' m');
+  assert.ok(k.at[90].wet > 0.5, 'the runnels run in a steady rain of 6.7 mm/h (' + k.at[90].wet.toFixed(2) + ')');
   // and with no rain field, the ground's wetness stands in
   const st2 = { wet: 0, rise: 0, mud: 0, rain: 0, from: '', t: 0 };
-  for (let s = 0; s < 1200; s++) stepRunoff(st2, 1, null, 0.95);
+  for (let i = 0; i < 1200; i++) stepRunoff(st2, 1, null, 0.95);
   assert.equal(st2.from, 'wetness'); assert.ok(st2.wet > 0.8 && st2.rise > 0.2);
-  for (let s = 0; s < 1200; s++) stepRunoff(st2, 1, null, 0.0);
+  for (let i = 0; i < 1200; i++) stepRunoff(st2, 1, null, 0.0);
   assert.ok(st2.wet < 0.2);
 });
 
 test('the frame part reads the rain field when the physics has one, and the ground\'s wetness when not', () => {
   const calls = [];
-  const physics = { fields: { rain: { t: 5000, rate: 12, rainBetween: (b, x, y, z, t0, t1) => { calls.push(t1 - t0); return { mm: (t1 - t0) / 3600 * 12 }; } } } };
+  // (12 mm/h on the weather's clock: a game second lays 12 x 60 / 3600 mm, physics/cloudfield.js rainBetween)
+  const physics = { fields: { rain: { t: 5000, now: 12, rainBetween: (b, x, y, z, t0, t1) => { calls.push(Math.round(t1 - t0)); return { mm: (t1 - t0) * 60 / 3600 * 12 }; } } } };
   WATERSTATE.wet = 0; WATERSTATE.rise = 0;
   for (let i = 0; i < 200; i++) RUNOFF_PART.update({ dt: 0.25, physics, camL: { x: 0.2, y: 0.6, z: 0.76 }, bodyId: 'earth', st: null });
-  assert.ok(calls.includes(1800) && calls.includes(10800), 'asked the last half hour and the last three hours');
-  assert.equal(WATERSTATE.from, 'rain'); assert.ok(WATERSTATE.wet > 0.4, 'wet ' + WATERSTATE.wet.toFixed(2));
+  // (the world's last ten minutes, half hour and three hours: ten, thirty and 180 game seconds)
+  assert.ok(calls.includes(10) && calls.includes(30) && calls.includes(180), 'asked the world\'s windows in game seconds: ' + [...new Set(calls)]);
+  assert.equal(WATERSTATE.from, 'rain'); assert.ok(WATERSTATE.wet > 0.8, 'wet after 50 game s of steady rain: ' + WATERSTATE.wet.toFixed(2));
+  assert.equal(WATERSTATE.rain, 12, 'the rate at the eye (fields.rain.now)');
   assert.ok(calls.length < 200 * 2, 'not asked every frame (' + calls.length + ' asks in 200 frames)');
 });
 
