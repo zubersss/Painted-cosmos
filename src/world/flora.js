@@ -94,11 +94,11 @@ const NEARLEAF = typeof location !== 'undefined' && /[?&]nearleaf=1\b/.test(loca
 // them; the needle kinds untouched. It changes the near trees the owner approved: OFF, never default without the owner.
 // ?stormleaf=1 (24 Nov, the coordinator after the look director's storm light): under a storm a tree's crown is painted
 // as the land is, nothing lit and the land's own glaze and deep wash in place of the fair-weather foliage shade
-// (materials.js PROP_VERT, uStormLeaf); with no storm nothing changes. At 0.6 of the land's paint at a full storm: the
-// look director's ruling (24 Nov: all of it made every crown one plum-maroon, the oranges gone; a painter keeps a little
-// of the local colour in a storm, warm crowns about S 0.40-0.45). ?stormleaf=<0.3 to 1> another share. OFF until
+// (materials.js PROP_VERT, uStormLeaf); with no storm nothing changes. At HALF the land's paint at a full storm: PASSED
+// by the look director at half (24 Nov, seen: half keeps the reds and the rust and amber told apart, quieter and in
+// the storm's light; all of it made every crown one plum-maroon). ?stormleaf=<0.3 to 1> another share. OFF until
 // look-director's ?stormlight (uLookS.x) is in look-proto (v39.4); then it follows that one switch.
-const STORMLEAF = (() => { try { const v = new URLSearchParams(location.search).get('stormleaf'); if (v == null) return 0; const n = +v; return n === 1 ? 0.6 : n >= 0.3 && n < 1 ? n : 0; } catch { return 0; } })();
+const STORMLEAF = (() => { try { const v = new URLSearchParams(location.search).get('stormleaf'); if (v == null) return 0; const n = +v; return n === 1 ? 0.5 : n >= 0.3 && n < 1 ? n : 0; } catch { return 0; } })();
 const LEAFGROW = (() => { try { const v = new URLSearchParams(location.search).get('leafgrow'); if (v == null) return 0; const n = +v; return n === 1 ? 1.15 : n > 1 && n <= 2.4 ? n : 0; } catch { return 0; } })();
 // (only a kind whose crown is leaves one by one, and nothing else, can be split: parts 0 bark, 5 leaf, 6 snow on a
 //  bough. A kind with crowns of washes (part 1: the green wood's conifer) keeps the one program.)

@@ -742,7 +742,11 @@ muted plum-maroon in the storm's light, 31.9 per cent of the picture, the change
 trees in it) 0.8 per cent. Stills of the first try kept (`A2_stormleaf_first-try_*`). Fair weather NOT rendered on this
 build: unchanged by construction (uStorm 0 skips the step). OFF until F passes it. A HALF STRENGTH (`uStormLeaf` 0.5,
 not yet a switch of its own) for F to compare: the reds kept but quieter, 25.5 per cent changed, V 0.34 to 0.32, S
-0.46 to 0.43 (`A2_stormleaf_maple9m_storm_A_half_full.jpg`: today, half, full).
+0.46 to 0.43 (`A2_stormleaf_maple9m_storm_A_half_full.jpg`: today, half, full). On the same crown pixels: today S 0.53,
+half 0.45 (warm hue p90 18 deg: the oranges kept), full 0.34 (3 deg: gone). PASSED BY F AT HALF (24 Nov): half keeps the
+reds and the rust and amber told apart, quieter and in the storm's light. `?stormleaf=1` is now 0.5 of the land's paint
+at a full storm (`?stormleaf=<0.3 to 1>` another share). OFF behind its own switch until look-director e2b9c14 (F's
+`?stormlight`, uLookS.x) is in look-proto (v39.4); then it follows that one switch (ON by default with F's).
 
 **MERGED look-proto v39.3 (87053ed, pull request 46, the pines live) into trees-near: f281556**, clean, nothing
 doubled; unit 328, world 124, physics 449 pass.

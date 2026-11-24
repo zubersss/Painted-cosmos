@@ -1967,7 +1967,7 @@ uniform vec4 uOilG;
 uniform float uNeedle;    // (?pines: a conifer's needles never narrower on the screen than this many pixels; 0 off, as before)
 uniform float uNearLeaf;  // (?nearleaf: 1 the leaves within arm's length shrink about their centres; 0 off, as before)
 uniform float uLeafGrow;  // (?leafgrow: the most a thinned broadleaf's kept leaf grows within 15 m of the eye, e.g. 1.15; 0 off, as before)
-uniform float uStormLeaf; // (?stormleaf: the share of the land's storm paint a crown takes at a full storm, 0.6 with the switch; 0 off, as before)
+uniform float uStormLeaf; // (?stormleaf: the share of the land's storm paint a crown takes at a full storm, 0.5 with the switch; 0 off, as before)
 uniform vec4 uOilPx;      // (x: the angle one pixel of the scene pass takes, radians: shared.js)
 uniform mat4 uShM;
 uniform highp sampler2D uShTex;
@@ -2341,8 +2341,8 @@ void main() {
       // painted as the land is: nothing lit (a leaf's level held to the glaze, 1, at a full storm) and the shade the
       // land's own glaze and deep wash at the leaf's level instead of the foliage shade. A level and the land's own
       // paint, never a darkening multiplied on (R1.3b); with no storm (uStorm 0) the same picture to the bit. 0: as before.
-      // (uStormLeaf is the share of it at a full storm: 0.6, the look director's ruling, so the reds deepen and the oranges
-      //  dull but the colour families stay told apart; all of it made every crown one plum-maroon)
+      // (uStormLeaf is the share of it at a full storm: 0.5, PASSED by the look director at half, so the reds deepen and
+      //  the oranges dull but the colour families stay told apart; all of it made every crown one plum-maroon)
       float kSt = clamp(uStorm * uStormLeaf / 0.9, 0.0, 1.0);      // (uStorm is at most 0.9 by day: world/index.js)
       if (kSt > 0.0) {
         lvL = mix(lvL, min(lvL, 1.0), kSt);
