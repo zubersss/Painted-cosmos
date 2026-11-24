@@ -100,6 +100,7 @@ class Surface {
     // `hydro` lakes, ponds and puddles in _forest and a river's mouth in the coast (world/hydro.js). Both null: the game as it was.
     this.rivers = null;
     this.hydro = null;
+    this.mount = null;    // ?mount=1: the alpine recipe's mountain streams (world/mountain.js prepareMountain). Null: as it was.
     this._dw = null;      // scratch biome weights for waterBaseAt (made on first use: only drainage asks)
   }
 
@@ -470,6 +471,10 @@ class Surface {
     // (THE WATER, ?lakes= ?ponds= ?puddles=: a basin's hills lowered under its lake, a pond carved, a hollow's puddle. It is
     //  handed the parts b.h was made of, so it can make b.h again, and may set b.lq, c.still, c.bank, c.cap. world/hydro.js.)
     if (this.hydro) { const H = this._hyd || (this._hyd = {}); H.L = L; H.hb = hb; H.hill = hill * 24 + mid * 4.5; H.rise = rise; H.sm = sm; H.mi = mi; H.rock = rockBump; H.s = s; H.w0 = w0; this.hydro.forest(this, c, b, H); }
+    // (?runoff=1, the water group's lead: the water here is RAIN-ONLY -- all of its depth is the runoff's cap (world/rivers.js
+    //  runnels and stream heads, hydro.js), so in the dry the bed is bare and wants the dry bed's colours: c.capOnly 1, else
+    //  0, written every call; c.cap is 0 without the switch. For C's recipe, 24 Nov)
+    c.capOnly = c.cap > 0 && c.cap >= b.lq - b.h ? 1 : 0;
     if (!full) return;
     const fg = R / 125, fp = R / 270, fv = R / 26;
     // (the oil look may open a wood: the biome's oil.glade = [from, to] in place of 0.24, 0.62: more and wider glades of
@@ -502,7 +507,10 @@ class Surface {
     b.dry = clamp(0.34 + 0.5 * rk + 0.3 * glade - bedm * 0.4, 0, 1);
     b.wet = clamp(0.18 + 0.5 * bedm, 0, 1);
     const open = smoothstep(w0 + 0.6, w0 + 3.6, s);
-    b.trees = clamp((1 - (gWhole ? 1.0 : 0.82) * glade) * (1 - rk) * open * (1 - bar), 0, 1);
+    // (the rivers of the tree's point bars: the trees stand back from the bar and 6 m beyond it, so their crowns do not hide
+    //  it from the air -- F, 24 Nov; c.barZone, world/rivers.js, written every call there and read only when it is attached)
+    const bz = this.rivers ? c.barZone || 0 : 0;
+    b.trees = clamp((1 - (gWhole ? 1.0 : 0.82) * glade) * (1 - rk) * open * (1 - Math.max(bar, bz)), 0, 1);
     b.canopy = clamp(b.trees * 1.05 + (1 - open) * 0.35, 0, 1);
     b.birch = clamp(0.74 - pz * 0.72 + 0.3 * (1 - smoothstep(6, 18, s)), 0.06, 1);
     // (the oil look may set a wood's mix of kinds: the biome's oil.tallMix. A number: the share of the first kind, everywhere.
@@ -655,6 +663,9 @@ class Surface {
       const sl = T.snow || 190;
       snow = smoothstep(sl, sl + 60, h + (crag - 0.5) * 90 + C.n3(X / 60, Y / 60, Z / 60) * 30);
       shade = up * (1 - snow) * 0.18;
+      // (THE WATER, ?mount=1: the mountain stream nearest the point -- its gully cut into the slope, its bed, its water's level
+      //  -- and a tarn's still water; nothing unless that part is attached. world/mountain.js.)
+      if (this.mount) { h = this.mount.alpine(this, c, h, T); if (c.lqA === c.lqA) lq = c.lqA; bed = Math.max(bed, c.bedA); grow *= c.growA; meadow *= 1 - c.bedA; wet = Math.max(wet, c.wetA); }
     } else if (k === 'coast') {
       const f = R / 780;
       const n = A.fbm(x * f - 9.0, y * f + 2.0, z * f + 14.0, 4, 2.0, 0.5);
@@ -988,7 +999,7 @@ class Surface {
     o.top = top;
     const c = this._ctx; c.x = x; c.y = y; c.z = z; c.baseReady = false;
     c.fu = 0; c.fv = 0; c.dr = null;
-    c.still = 0; c.bank = 0; c.cap = 0; c.swell = 0; c.lvR = NaN; c.turbW = NaN; c.fspdW = 0;
+    c.still = 0; c.bank = 0; c.cap = 0; c.capOnly = 0; c.swell = 0; c.lvR = NaN; c.turbW = NaN; c.fspdW = 0; c.rsd = 1e9; c.rhw = 0;
     const b = this._b;
     let h = 0;
     const gw = this._gw, gl = this._gl;
@@ -1063,6 +1074,7 @@ class Surface {
     o.fu = c.fu; o.fv = c.fv;
     // (the water's own fields: written EVERY time -- the sample object is shared by every call, docs/lead/WATER-DESIGN.md)
     o.still = c.still; o.bank = c.bank; o.cap = c.cap; o.swell = c.swell;
+    if (this.rivers) { o.rsd = c.rsd; o.rhw = c.rhw; }   // (the far view's water line, world/rivers.js; only while the rivers are attached)
     // WHERE THE WATER FALLS, IT IS WHITE. (The owner, 23 Nov: waterfalls. The drainage field already knows how
     // steeply the water SURFACE drops here and how much country drains through, and patchgen.js was built with a
     // socket for exactly these two and nothing has ever filled it -- see its own note at :60.)
@@ -1280,6 +1292,10 @@ class Surface {
     if (!best && cands.length) best = at(cands[0].i, cands[0].j, [0, 0, 0]);
     if (!best) best = [s0.x, s0.y, s0.z];
     this._spawn = { x: best[0], y: best[1], z: best[2] };
+    // (the oil look may give the first view's facing at the landing chosen here, without fixing the spot: a look's oil.face =
+    //  [yaw from north toward east, pitch], degrees; the game's camera takes it as it takes a fixed spawn's)
+    const fc = MODE.oil && this.look.oil && this.look.oil.face;
+    if (fc) { this._spawn.yaw = fc[0] * D2R; this._spawn.pitch = (fc[1] || 0) * D2R; }
     if (isForest) this.clearings.push({ x: best[0], y: best[1], z: best[2], r: 11 });
     // (a stand of kelp or crystal is opened round the first landing too: the first view is not a wall a metre from the eye)
     else if (this.biomes[s0.b].tall) this.clearings.push({ x: best[0], y: best[1], z: best[2], r: 15 });

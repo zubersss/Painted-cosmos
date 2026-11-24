@@ -233,6 +233,105 @@ Branch: `cosmos` (shared with PILOT and PHYSICS, one working tree). Commits: `to
 This file was rewritten by the second PAINTER agent (the first ran out of working context). The
 first agent's record of M1 is kept at the end ("Earlier answers").
 
+## Hand-over of THE WATER'S PAINT and THE PLAYER AND THE WORLD (water group, lanes W3 and W4; branch `water-paint`)
+
+A helper session of the coordinator, kept current after every step (the container can restart). The design is
+`docs/lead/WATER-DESIGN.md` (3.4, 3.6, 3.7, 5.3, 5.4 are these lanes; 6 the speed-test rows). Everything is behind
+`?wpaint=2` / `?wakes=2` / `?splash=1` with the oil look; without them the game is v37 exactly (checked: the bank view
+at 936 x 372 with `&t=5`, before and after, 0 pixels differ).
+
+**The order** (the coordinator's brief): 1 still water and the stroke octaves; 2 the night (the water through the look
+director's night pull); 3 colour, far shine and water from the air (FV5, with group C); 4 the player's wakes and
+splashes; 5 rain on water.
+
+**Step 1, DONE (24 Nov), `?wpaint=2`:**
+- `src/render/waterchunk.js` (new; its `pcWStrokes(ch, wdx, wdy, d, spd, w0, asp, oc, out rnd, out rndN, out own)` is
+  the interface the falls' material may include): the water's strokes in TWO octaves, each stroke of the finer one
+  there or not by its own number, asked at its centre (no size jump: the circle at E12 and the line across the river at
+  E2 are gone); and cells (26 m, or 66 strokes' widths when the strokes are larger) each with its own way and pace, a
+  stroke belonging to the cell its centre lies in or just past the edge of, two cells' strokes overlapping by their
+  numbers along an edge (no edge drawn, no stroke cut: the wood grain at E4 is gone). Nothing in it takes a
+  derivative, so it runs inside a branch. One uniform `uWPaint` (1 new, 0 v37) for the speed test; its rows
+  ("v37 water paint" at the bank and the shore) register themselves in `WATER_BENCH`.
+- `WATER_FRAG` (materials.js): the new branch under `#ifdef PC_WPAINT` + `uWPaint`; still water's strokes lie along
+  the crests of PHYSICS' waves (`pcPhysWaterDir(pcPhysSeaDir)`; in the gallery, which runs no physics, that is a fixed
+  way), do not run; a current's run with it as v33 made them. Strokes 6 times as long as wide (11 was a river-length
+  streak from the air); laid larger where the rows are squeezed on the screen (up to 3x), from the angle, not from a
+  derivative. `WATER_VERT`: `vStill = aTurb.w`.
+- `patchgen.js` water section: the still byte `aTurb.w` (only with the switch): the sample's own `still`, 1 where there
+  is no current, and 1 where water reaches 27 m to BOTH sides across its current (two surface samples on a 6 m grid):
+  v37's river is at most about 44 m wide, so that is a pool. This is what found the junction pond (E3) that v37 painted
+  as a whorl; measured in Node, a turn of the current or its coherence over 8 to 14 m could not tell it from the river.
+  One new float per sample in the sampling loop (`_col` slot 21, `s.still`).
+- SEEN (A/B, opened): E3, E4, E12, E2 at the phone's settings (936 x 372, tier 1, lighter paint) and E3, E12, E2 at
+  desktop top tier (1280 x 720, tier 2); stills in `docs/shots/painter/water-paint/s1-*`.
+- MEASURED (software, this machine; phone DERIVED by the design's method, 14 ns a water pixel): bank view (water 24 %
+  of the picture) the new paint adds 23 % of the water's own cost: about +0.27 ms on the phone (0.13 to 0.55); the sea
+  from above (all water) +2 to +6 %: about +0.1 to +0.2 ms at a shore. No draw call, no memory; patch build no
+  measurable change (4.8 against 4.3 ms a patch, 16 patches, after warm-up).
+- NOT fixed, and now plainly visible where the whorl was: thin pale contour lines in the pond and the wide water (E3,
+  E4), the BED showing through where the water is under 0.42 m deep round submerged bumps (`WATER_FRAG` "the bed shows
+  through"); v37 has them too, masked by the whorl. It is the water's colour: step 3 (body by depth).
+- Tools (scratch, not committed): `tools/lab.mjs` with the design's camera helper (its appendix A) and a script that
+  opens a page once and grabs each station with `uWPaint` 1 and 0 (no recompile between A and B).
+
+**Step 2, DONE (24 Nov): the night.** Merged `origin/look-director` (its night key L1: `pcNight`, `uLookF`, `uLookN`;
+its master switch is `?light=old`). At the end of `WATER_FRAG`, before the air: by the moon the water takes the same pull
+and strength as the land's lit paint (`c = mix(c, pcNight(c) * mix(1.0, uLookN.x, uMoon * uLookF.x), liq)`; lava and a
+sea of cloud keep their own colour). Not behind `?wpaint`: it is the look director's switch (`?nightkey=0`, or
+`?light=old`, is the night water as it was); by day `uMoon` is 0 and nothing moves. SEEN (E1 at 23:00, phone settings,
+`s2-E1-night-23h-phone-ab.jpg`): the stream from the brightest thing in the wood (median V 0.71 against the land's
+0.22) to V 0.43, in the night's blue; saturation unchanged (0.61). Phone cost: nil by day, a few instructions a water
+pixel by night. Waiting on the look director's word on the exact line (asked 24 Nov). Not done: the aurora's green on
+Neptune's lake (every other dash: LOOK-AUDIT) -- its share is `wau` in `WATER_FRAG`, for the look director to rule.
+
+**Step 3, DONE (24 Nov), `?wpaint=2`: the water's colour and its far shine (design 3.4; FARVIEW FV5 in part).** Why water
+from the air was grey, found in `WATER_FRAG`: (1) seen from above v37 laid 42 % of the bed's SAND colour over every water
+however deep; (2) the mirrored sky was mixed with 30 % white; (3) a blue body and a cream golden-hour sky MIXED pixel by
+pixel make grey; (4) the haze. The new paint: the bed shows by depth (`exp(-depth / 0.6)` from above; the shallows' 0.42 m
+band let go from 30 to 150 m, it drew contour lines round submerged bumps); the sky as it is (the keys'; LOOK-AUDIT L9's
+`pcSkyAt` not in yet); the body laid heavier the deeper and the farther (`wBodyD` 1.45 to 2.15 by depth, + 0.9 from 80 to
+450 m); from 40 m out (all by 220 m) the strokes are BROKEN COLOUR -- the deep ones the body, the light ones the mirror
+(three quarters, a quarter body), the middle ones the two by the angle (mirror share 0.12 + 0.45 x fresnel), more light
+strokes the lower the angle; near the eye v37's strokes (the bank view reads as before: E2); the sun's lobe widened with
+the distance (56 near, 22 from a kilometre: a path of broken light); the haze on water a third less from 450 m (a
+water-only factor on `pcAtmosV`'s amount: TO BE AGREED with the look director); the waterline's dark band let go beyond
+20 to 80 m (it was an outline). `waterchunk.js` gained `WATERCHUNK_FAR_GLSL` (`pcWaterFar`, `pcWaterFarC`,
+`pcWaterShine`) for group C's far ground: interface sent to C, the byte for `frac` asked of C, not wired yet.
+SEEN and MEASURED (phone settings; `s3-E3/E4/E5-phone-ab.jpg`, median of the water's pixels): E4 saturation 0.21 to
+0.60, value 0.68 to 0.58 (the band 0.45-0.70); E3 the pond a step darker than the river (0.69 against 0.75 for the whole
+water), the river still a little over the band; E5 0.12 to 0.37 saturation, value 0.56. After the look director's step-1
+note still water is the calmest thing: a step deeper, less mirror, strokes 10:1 and in close values, white only on the sun's
+path. NIGHT (F's ask): the light strokes keep a step of light over the pulled body, the moon's marks are left out of the
+pull (`s2-E1-night-23h-wpaint2-crest-ab.jpg`: water V 0.45, land 0.22).
+**THE DEFAULT since 24 Nov** (the owner's leave, the coordinator's word, F passed step 1): `?wpaint=1` -- the strokes of
+step 1 -- is the default; `?wpaint=2` adds the colour of step 3 (under review); `?wpaint=0` is v37's water, PROVEN: by day
+at the bank view (936 x 372, `&t=5`) 0 pixels differ from the build before steps 2 and 3. `uWPaint` holds the level.
+**E-W2's blue curtain** (the coordinator's request): patchgen's water index loop drops a cell whose four corners hold
+liquid but whose levels spread over 2 m and over half the cell (a face steeper than 1 in 2), only with a water world
+switch (`MODE.water.on`). MEASURED over all 30,720 patches of levels 5 and 6 and 800 of 7 and 8: 0 dropped in today's
+world, with or without the drainage.
+
+**Step 4 (24 Nov), `?wakes=2` and `?splash=1`: the player and the water.** PHYSICS (1cca92d): `physics/water.js` WAKES2, 32
+per-pixel sources with a kind (bow, footfall, stroke, press) kept apart from the 16 per-vertex wakes; `physics/splash.js`
+`stepWaterPlay` (rings at each footfall in water over 3 cm, two at the hands each arm stroke, a furrow under a low fast
+flight, a crown of spray going in at speed, flecks at footfalls, a trail low over water; `wet01`; `here.water` for the
+audio); `index.js` single points (the explorer's call in the wake block, `_dEx.phys`, `here.water`). PAINT: `WAKE2_GLSL`
+summed per pixel within 30 m in `WATER_FRAG` (`PC_WWAKE`), the ring's steep faces taking the light step; `waterchunk.js`
+`wakesOn` turns physics' switches on with the material. SEEN IN THE REAL GAME (headless, 936 x 372, the explorer put on the
+landing brook's bank and walked in with synthetic W key events on the document; then dropped 3.5 m into the brook):
+`s4-game-wading-in-3-frames.jpg` (footfall rings counted 1 to 6, wet01 0 to 0.98, the wading spray), `s4-game-dropped-in-
+splash-and-rings.jpg` (entry at 3.9 m/s: splash 0.58, 70 spray drops, crisp rings spreading round the figure),
+`s4-game-wading-rings-crop-ab.jpg`. NOT SEEN: the swimmer's stroke V (the brook is waist deep: no swimming there), the
+low flight's furrow, the gust and tornado. The script is in the scratch (lab: open the game, `bank.js` puts the explorer,
+`walk.sh` presses W and steps `__pc.step(0.1, 2)`, reads WAKES2 and `here.water`). For PILOT: `physics.here.water`
+{ near, submerged, wet01, splash, speed, fallD, fallDrop, rainOn } -- the audio's voices; the figure's paint can read
+`wet01`. Phone cost DERIVED (not measured): the ring sum is about 30 instructions a source a pixel, only within 30 m
+and only while a ring lives; a wader keeps 10 to 16 alive.
+
+NOT done of FV5: shore-tangent dashes (they would bring the whorl back; the design lays still water along the wind)
+and the shore hairline (the owner's rule: no outlines) -- both said to C; the current made visible from 400 m.
+
 ## Hand-over of THE FLORA LANE, branch `design-flora` (kept current after every step; read with the oil look's below)
 
 Built by a painter helper session at the coordinator's word (24 Nov), after its design `docs/lead/FLORA-DESIGN.md` was
@@ -248,6 +347,39 @@ on branch `look-director`: READ, and followed; its R3.1 took out this lane's roo
 `world/bloom.js` `bloomSwitches`: `?bloom=0` the flowers from the map (the rings lay their old flowers, no tint);
 `?bloomair=0` the drifts' colour in the ground alone. The watercolour game: SEEN pixel for pixel the same as the clean
 commit (the alpine meadow's easel, every change of this lane in).
+
+**AUDIT 2, THE NEAR GROUND (24 Nov, late; the look director's audit-2 note; ALL THREE PASSED AS DEFAULTS; for v39.4 the
+coordinator was given design-flora 4411130 = look-proto v39.3 merged + these):** `?tuft=0` off: a tuft takes one of the
+three blade greens (or is a dark accent tuft, one in seven), its blades differ by value only; in the middle band seven
+touches in ten take their 1.9 m cell's green (`nearground.js bladeTone`, `layBroad`). `?comb=0` off: the middle band's
+touches lean 0.16-0.28 with the meadow's comb (`combUV`, the same slow west wind as `grassTurn`). `?driftpatch=0` off:
+THE DRIFT AS ONE PATCH: where a COLOURED drift is thick (cover > 0.22) a middle-ring cell lays 1-3 round flat touches of
+its colour (half-width 0.09-0.14 m, height 1.5-1.9 of it) gathered round one centre (far ring 1-2, 0.20-0.38 m, a
+little squat), with 2 heads (far 1) over them; a WHITE drift keeps its heads (a plain disc loses the daisy's eye: it read
+as pebbles); its own mark code `PATCH` = dab + 0.4, which `NEAR_VERT` brings in only past 11-16 m (the oil branch of `NEAR_FRAG`
+paints every near mark as one flat colour already; a26dd20's "flat colour" edit sat in the watercolour path, never acted,
+and was taken back out; on touches over ~6 px a 1.3 px dot of the flower's second colour, the poppy's centre); PIXEL-NEUTRAL by the look director's condition: the cell's
+freed room is NOT given to grass (COUNTED in Node, scratch overdraw counter taught the patch's fade, 1024x480: the meadow
+on foot 265,452 -> 267,321 near-ground pixels, +0.7 per cent; the landing -0.4). `?patchfloor=1` lowers the heads'
+floor in the middle and far rings (0.85 -> 0.55, 0.6 -> 0.4): never judged. History, SEEN: the first patch was thin
+horizontal lines (height set against half-width); round ones made white pebbles; a stronger ground tint in a drift's
+heart made pools from 10 m but the bare ground between strokes read it per pixel, a milky veil, the blur (taken out,
+a494aee; the whites' grey was not the loaded brush, as first written: the oil branch has none). The look director's rulings: NO change to the ground's own strokes (the clip's floor is just that; the 6-10 px
+pattern aim withdrawn for the near ground); the POOL is to come from whole strokes: C's FV6 dab channel, with the bare
+ground taking none of the drift under 150 m (C did it, farview 1ed9553). The poppy's dark centre (the look director's
+"for later"): built, see above, not yet seen. Numbers barely move with all three (meadow 10 m colour pattern 4.6 -> 4.9
+px, edge 23.7 -> 23.6 per cent); the look director judged by eye.
+**THE SNOW LINE (passed for v39.5, landed in v39.4's commit):** `bloomAt` fades a drift by the sample's `snowK` (C's line,
+dd86fb3): no flower stands in snow; with C's clamp (farview 6cf9c7a) it clears the dark red smudges on the alpine ridges.
+**FV6 WITH THE FAR VIEW (C):** `bloomTint` writes `o.fd` (cover), `o.fi` (the drift's kind, palette index), and with
+`?bloomfar=1` only `o.fi2` (the SLOPE's kind: the strongest of the kinds that can grow there on its own ~600 m field;
+COUNTED along 5 km: fi changes 154 times, fi2 23); a white's far colour is cream (a fifth of its eyes' colour, top 0.80).
+C packs them (aBloom) and takes fi2 from 250-400 m, fades the cover on steep ground from 30 degrees (gone by 45), and
+gives the bare ground none of the drift under 150 m, 0.45 by 250 m, 0.2 by 400 m. SEEN: with C's 21cb6fe the cliffs were
+clear and the drifts lay in regions of one or two colours (`fv6b-*`); a whole hillside in one red at 1 km and red on a
+peak were fixed by C in d4cab64, BUT d4cab64 also put patchgen.js's two index writes after a `//` comment (every dab
+palette 0: violet near the eye, `fv6c-am02-off-on-index-bug.jpg`); sent to C twice; the pair to re-render when C fixes it.
+`?bloomfar` stays 0 until the look director judges that pair.
 
 **Done:**
 1. Speed-test rows (`core/bench.js`, after 'no small plants'): 'no near grass', 'near grass: the blades only (the fine
@@ -431,9 +563,77 @@ still of the set inside C6 but the landing at 10 m in autumn, 4.2 % (4.9 % in th
 the old: its cliffs and sea). A2 (trees near) counted the lane at the landing: 26,928 marks against 12,967, 357k fragments
 against 272k (the rebuilt middle band halves today's 176k to 92k); its rows in ?bench=foot price it on the phone. A2's hooks
 (NEAR_VERT uNearCut, NEAR_FRAG flat mode 8) are to be kept when they reach look-proto.
+**THE FINAL SET PASSED** (24 Nov): batch 1 ACCEPTED by the coordinator and PASS by the look director (live in v39.1); batch 2
+PASS by the look director after its three data notes (ceb7f3a: the green wood's darkest blades olive, the thrift grey-green
+with its flowers on top, the near rings' stones light). The coast's and wetland's S(V<.3) rose only because their darks
+all but went (the share under V 0.30, 0.87 -> 0.52 % and 2.97 -> 1.28 %); the remainder, cushions in shade, is taken by the
+look director in the shared shade (pcShadeLeaf now also quiets dark saturated yellow-greens, on look-director): it reaches
+this lane through look-proto. FV6 (meadows from the air), THE FLORA HALF DONE (f7b710a, 3783688; behind ?bloomfar=1, 0 by default): bloomTint writes
+into every full sample o.fd (the drift's cover, 0..1) and o.fi (its colour as an index 0..15 into bloomPalette(S).colours,
+16 colours built once a world from its flower kinds, whites held to 0.80; o.fc, RGB565, also written), and with the switch
+on stops mixing the drift into the far colour (o.r2..b2). AGREED WITH C: C adds one 4-byte attribute plus its parent in
+patchgen.js (cover, index / 15, two bytes spare), hands the palette to TERRAIN_FRAG as a uniform vec3[16], and lays a dab
+whose hash is under cover x 0.9 in the flower colour whole; C starts it after the coast cliff is reviewed. THEN: A/B stills
+at 150 m, 400 m and 1 km (the meadow, the autumn wood's glades), ?bloomfar=0 against 1, to C and F; flip it on together.
 A lesson recorded: af83f25 copied data/looks/earth.js from a scratch copy older than a merge and dropped the look director's
 `airTop` (found by the 420 m proof, fixed in 2f779d8); never copy a whole shared file over a merge, apply the lane's diff. ASKED OF THE FAR-VIEW LANE through the coordinator: a ground dab that takes a drift's colour WHOLE
 (pointillist) from `bloomAt`, the one thing that would make drifts read from 150 m and a mile.
+
+## Hand-over of LANE W1 CLOUDS, branch `weather-clouds` (group D; READ THIS FIRST if you are the clouds session)
+
+Helper session for group D's clouds lane (coordinator `session_01R5Bri1TV3HBTyuxNZZuhNw`; look director, who reviews
+every still and owns world/index.js, chunks.js, post.js, shared.js, render/index.js: `session_01R5Brhzz2JPPF6Ecz6XRQHx`;
+the weather group, who owns src/physics/: `session_01R5Bri2bBgFSfCmxpKKuURT`). The design is
+`docs/lead/WEATHER-DESIGN.md` section 4 (A1 already built by the look director) with the budget in 7, the files in 8
+and the contracts in 9. Branch = look-proto v37.1 + design-weather 03c3f1c + look-director fff5694. Files this lane
+owns: src/world/clouds.js, src/world/wxfield.js (new), src/world/sky.js, src/world/orbit.js (makeCloudShell only), the
+`weather:` rows of src/data/looks/*.js, its own block at the END of src/core/bench.js's rows, docs/shots/clouds/.
+Commit code with `tools/commit.sh painter`; docs/shots/clouds/ is not in that script's paths, so stills go up with a
+plain `git add docs/shots/clouds && git commit` naming the path.
+
+**State (24 Nov, late afternoon): MERGE-READY for v39.2** -- the look director ACCEPTED rework 3 (storm edges, the flash, the noon form as far as it goes, the near cloud by whole strokes, the shadow field) and asked for no further rework of the clouds for v39.2; the coordinator's hybrid, shadow field, land storm in the game and storm from afar are in. Branch head after merging design-weather df68c45 (the 10 m/s drift cap, thunder, wxguard): suites 328 / 107 / 443; the merged tree's 1 km golden hour identical to the pixel with the one before the merge. PROOF STILLS: docs/shots/clouds/rework2 (ground stations A/B, 1 km golden hour rows, the shadow map K vs K0, the game storm at 3690 s and 3745 s) and docs/shots/clouds/rework3 (the shadow field from 150 m, smooth storm edges and the two-step flash, 600 m noon, the storm from the coast at 3.3 km). Known weak, said plainly: front-lit noon from the air (the look director: stop here for now), a mountain-caught cloud reads as a flat cap, the anvil not yet apart from the tower's top, the land under a storm deck still lit like fair noon (the look director's, in the shared light). Off by default: the cirrus (`?cirrus=1`) and the sky strokes from the air (dropped).
+**After d6f4fa4 (the merge point stays d6f4fa4):** every cloud program behind the weather group's guard (world/wxguard.js
+watchPrograms: the lobes' program failing switches the module off, `world.clouds.failed`, and the sky takes its own
+painted cloud back; a sheet's hides that sheet; the shadow pass's programs looked at in renderShadow, a failure turns the
+shadows off; tested in clouds.test.mjs with a faked failed program). THE FLIP for the release (the coordinator: the 3D
+clouds the oil look's default, `?clouds3d=0` the opt-out, `?weather=old` takes them out with the rest):
+docs/shots/clouds/CLOUDS3D_FLIP.patch, two lines -- world/index.js CLOUDS3D (the look director's file) and core/bench.js
+CLOUDS3D (this lane's block); clouds.js and wx2.js need nothing (clouds.js's own default is already 1; the weather
+group's flip turns the maps on). Checked in a scratch copy with the patch applied: no switch in the address, the 3D
+clouds draw (180 at 1 km); `?clouds3d=0`, the module is never fetched. Given to the weather group for their
+weather-release branch; the look director gave leave for their world/index.js line (24 Nov, 15:10) and will not land it
+themselves: the weather group carries the patch as written. THE RELEASE (weather group, 24 Nov 16:29): weather-release was
+built with weather-clouds at 1aad10e (the guard and the flip); their row 'weather: the old weather' also turns the 3D
+clouds off and on. fdd3775 (the anvil shelf) waits for the look director's pass before it is merged there.
+A TIP for stills on v39.2 and later (from the weather group): in the gallery the far trees' painted stand-ins never finish
+baking in this software browser, so the page never says ready -- add `&impfail=bake` to both sides of a comparison.
+
+| step | state | what was done, seen, measured |
+| --- | --- | --- |
+| 1. wxfield.js | DONE | `WX` (uWxField, uWxField2, uWxN, uWxOn, uCloudShadow, uCloudShadowM, uCloudShadowK) and `WXFIELD_GLSL` (pcWxField, pcWxField2, pcRainAt, pcWindAt, pcCloudBase, pcCloudTop, pcCloudShadow), the contract of design 9.4; `createWxField().update(fields)` rebuilds the atlases when a map's version moves, at most twice a second. MEASURED: 6 tests (src/world/wxfield.test.mjs: seams and corners, wind vectors, zeros when off, the 2 Hz gate, Earth's real cloud map); rebuild 0.09 ms (cloud) + 0.16 ms (wind) warm in Node here. The GLSL COMPILED AND RAN in headless Chromium, vertex and fragment, and matches the CPU twin to half an 8-bit step (docs/shots/clouds/wxfield-glsl-check/RESULT.txt). Nothing in the picture changes: nothing reads it yet. |
+| 2. clouds.js A2, A3, A5 | FIRST FORM IN, for review; second pass in step 3's commit (the sky's golden wash on the clouds, a storm a step lighter, broader deck gaps, the tones made real value steps: half-tone, belly, deep about 0.68 / 0.60 / 0.48 under a 0.78 top, the clouds' air lighter; MEASURED with masks: W150 building 18.6 % of the frame in cloud, two value peaks 0.67 and 0.80 (criterion 2 wants 3-4: from below a cloud is mostly belly, a still from the side is needed); storm overhead 73 % of the frame, i.e. above 90 % of the sky (criterion 1); V over 0.85 in 0.5 % of cloud pixels at noon, 5.6 % at 16:30 (the gold wash); A5 the valley cloud SEEN at dawn, forced: step3/W1_A5_*; the sea of cloud from 1.6 km SEEN as a field of puffs and deck below with the peak through it: step3/W1_A1K6_* (the puffs still read as cotton balls). C7: the watercolour and the oil look with ?clouds3d=0 at W-G render 0 pixels different from the lane's base d059e6a) | `src/world/clouds.js` (behind `?clouds3d=1`, oil look only; the look director's hook in world/index.js fetches it). A2: cumulus as clusters of lobes (icosphere levels 1-3 chosen by how far the outline would stand off the round on the screen), slots ~220 m apart in a frame that turns with the wind aloft, life cycles on the painter's clock, cover from the cloud map (`fields.cloud`) plus the world's fair share, base and thickness from the map (towers in a storm's area, capped 900 m), thunderstorms from the map's storm cells (a column and an anvil fanned downwind). Painted: normals bent toward the cloud's centre (`?cloudlobes=`, 0.72), FOUR FLAT TONES from the world's keys (as sky.js's cloud) chosen once per thin stroke at its centre (pcThinLayerUV on each lobe's own sphere), the outline never the deepest tone, flecks of half-tone in the belly, the planet's shadow (tops lit after the land's sunset), its own stepped air, the sky cap. A3: the deck, a 32x32 sheet round the eye at the map's base, its cover per vertex, gaps from a broad field, rolls in three tones from below, heaps from above; under a closed deck the cumulus are not drawn. A5: the valley cloud, the same sheet low (H2 - 40 m), carrying the map's `valley` channel (zero until the weather group's W3.2; `?valleycloud=1.6` forces 0.6 for looking). sky.js: `uCloud3D` (the sky's shell lifted to the altocumulus at 1 km over the land, 0.45 of its cover, the horizon fade down to ~3 degrees, the night streaks kept to clear sky: A10). Earth's `weather:` row (values = the defaults). MEASURED (Node, `src/world/clouds.test.mjs`, 4 tests): at the phone's pixel angle 86k / 108k / 112k triangles from the ground / 150 m / 1 km (design ~120k); the rebuild 0.31-0.54 ms here, 0.06-0.08 ms a frame on average; from the lobes themselves the world's fair 0.45 covers 17 % of the open sky, 0.55 27 %, 0.75 48 % (criterion 1). SEEN (docs/shots/clouds/step2, A = `?clouds3d=0`, B = 1, 960 x 540): fair cumulus over the wood, the alpine flanks (a cloud lying in front of a slope) and the coast, receding in perspective; a storm 0.9 km off now SEEN (A: nothing); a storm overhead as a ceiling of rolls (A: the old mottled wash); the night and dusk clouds flat shapes a step lighter than the sky. NOT RIGHT YET, said plainly: bellies seen from below are mostly lilac and far clouds can read as lilac pills; at 16:30 the clouds were lilac against a gold sky (fixed in the next commit: the sky's golden wash laid on them); the storm ceiling too dark (L median 0.41 against the old 0.59; lightened next); the deck's gaps at a storm's edge were slivers (broader next); the sea of cloud from 1 km (A1K, forced rain) did not show as a sea: puffs only, and the land's haze at 1 km (not this lane's) hides it. Not measured: edge width, value steps per cloud (the next set has masks). |
+| 3c. THE REWORK after the reviews of 24 Nov (look director: "NOT YET a pass ... lilac pills ... stickers"; coordinator: "a cauliflower on a shelf, not a bunch of grapes"; lit warm tops, flat darker bases, today's painted high clouds kept, a slate storm tower with a sunlit flank, a storm ceiling of big masses) | DONE, stills sent | Merged origin/look-proto (0d5533b: the plant-wind binding; the near plants draw again, SEEN) and origin/design-weather (95d2317: ?clouds3d implies the maps; W3.2-W3.6). Clouds: slots 380 m apart, a cumulus 110-240 m across its shelf (fewer, bigger: fair 16 % of the open sky, building 38 %); the template a SHELF of wide squashed lobes centred on the base plane, a body, a heap building upward, a cap (shelf first: a far cloud is its shelf); normals bent from just over the BASE (the heap faces the light); the flat base told in the fragment by its height (pressing vertices onto it had bent every shelf side down: grey saucers); far clouds painted as their lit shape over a thin base; a silver lining on backlit edges as a tone, no rim line. Palette (F's): lit top in the light's own colour (warm at the golden hours, 0.9 of the sky's gold on the lit top), half-tone the sky's blue-grey a step under, belly a further step in the zenith key's hue, a deep tone only in a storm (slate, indigo). Deck from below: big masses from the gap field with lighter seams even when closed, rolls only move a stroke. The sky's own flat cloud kept as today's painted high cloud (altoShare 0.75). Sky audit items (uSkyFix, on with the clouds, ?skyfix=0 off): aurora a night light only, the storm's mass and the far rain veil in flat steps, the sky's own cloud one shade step, the edge of space crisp, the sky laid in strokes from the air. MEASURED (Node): 102k / 116k / 93k triangles at the phone's pixel angle from the ground / 150 m / 1 km; script 0.04 ms a frame here. With masks: W150 front-lit 18 % of the frame in cloud, 3-4 value peaks. The shadow uniforms are ready to be F's (wxfield.js takes render/shared.js CLOUDSHADOW, the look director's name; K 0 by default, set by clouds.js); F's lines, second form: docs/shots/clouds/T3_T5_look_director_v2.txt. |
+| 3d. REWORK 2 after the coordinator's verdict on rework1 (24 Nov: "NOT YET ... grey saucers ... the gap is the value, not the form"; two directions: lift the shade to a soft lavender-grey a step or two under the sky's horizon value with near-white lit edges, flat tones broken only at the edges, irregular outlines; and a HYBRID: today's painted sky from the ground, 3D clouds where depth matters) | DONE, stills sent (docs/shots/clouds/rework2) | Merged origin/look-proto (v39 d9d9ed7), the look director's T5 + T3 (look-director a40647e: `PREPASSES` and `CLOUDSHADOW` in render/shared.js; wxfield.js `WX` points at those very uniform objects, clouds.js pushes its shadow pass onto `PREPASSES`) and design-weather c359e12. THE HYBRID (`CLOUDS.hybrid`, on; `?cloudhybrid=0` the 3D cumulus from the ground too): the 3D cumulus come in with the eye's height between 250 and 700 m over the land under it (`CLOUDS.airH`); sky.js `uCloud3D.x` is that share (0 on the ground: the sky's own painted cloud exactly as it was; the first half thins the painted shell, about 400 m up, away as the eye climbs to it, the second brings it back lifted as the altocumulus with masses twice the size), `uCloud3D.w` 1 while the module draws. Storm cells drawn from anywhere. A cumulus whose land stands 120-320 m and more over the land under the eye is drawn in 3D from the ground: CAUGHT ON A MOUNTAIN, its base set from the highest land in 180 m round it (-50..+40 m), the range holding 0.22 more cover (Earth's range: 444 m within 4 km of the landing, 409 m over the wood: measured). VALUES (lobes and sheets): built from the painted sky cloud's own tones (sky.js: lit top `mix(0.78, horizon, 0.18)`, half-tone `dens(uCloudShade, 1.85)`): a near-white light for the most lit strokes, the lit top a quarter in the light's colour, the half-tone that lavender a third toward the horizon, the belly `dens(half, 1.25)`; stroke jitter 0.04 (was 0.10); belly flecks only near its edge. The golden wash now reads the SKY'S OWN WARMTH (its horizon key's red over blue), not the sun's height: on this small world the sun at 13:00 is low enough that the old wash laid cream on every cloud under a blue sky. FORM: lobe bend 0.62 (was 0.85), each head's own turned-away side and the creases between heads in the half-tone, the far lift only for a cloud seen from below. SHAPES: each shelf drawn out along its own way, uneven lobes, one sometimes left out, the heap off the middle. STORMS: anvil along the cell's own drift (`anvilE` / `anvilN`), growing with its `stage`. LIGHTNING: the four brightest of `fields.cloud.flashes`, a light 280 m (cloud to ground) or 650 m (in cloud) over the map's base, light the cloud within 150-600 m in WHOLES (a lobe by its number, a ceiling mass by its thickness) to a pale cool flat tone; `world.clouds.flashTest` stands in for the list in a still. OFF by default, said plainly: A4 the cirrus (`?cirrus=1`; seen from the ground and from 1 km as pale ghost shapes, not mare's tails) and the audit's sky strokes from the air (`?skystrokes=1`; from 1 km dark blue blotches, seen against `?skyfix=0`). MEASURED (Node): with the hybrid 8 clouds (mountain) from the ground at the autumn wood, 91 at 450 m (share 0.42), 181 at 1 km; worst case (`cloudhybrid=0`) 89k / 101k / 83k triangles at the phone's pixel angle; script 0.03 ms a frame; suites 325 / 107 / 441. SEEN (A = `clouds3d=0`, B = 1, 960 x 540): W150 sun behind, W-G 16:30 building and the coast: B is today's painted sky with the audit's lighter cloud shade (3.2 / 1.7 / 1.8 % of pixels differ, all sky). From 600 m and 1 km at 13:00: light grey-white cumulus with irregular bumpy outlines and lavender undersides (2 value peaks 0.77 / 0.86), the altocumulus as larger masses; front-lit, the near clouds are still mostly one light tone (the creases are faint). From 1 km at 16:30: warm lit tops, lavender turned-away sides, cauliflower heads, their shadows across the peak (the best of the set). The shadow map through F's binding: K vs K0 4.4 % of the frame, all land. The far storm (16:30, 2.5 km): a tower with a sunlit flank behind the range, lighter than the asked slate, its base hidden by the range. The flash: a broad patch of the storm ceiling to a flat pale tone with an edge along the masses (17 % of the frame against the twin without it). A cloud caught on the left peak from 150 m, its shadow on the slope: it reads as a flat white cap, a bit of a lid. NOT YET: the game's own storm at 3750 s (the weather group's test case), the K 0 pixel check against F's tree (F said they would). |
+| 3e. after the look director's review of rework 1 (fair weather: "saucers ... macarons"; a thin base, a light half-tone one step under the top, clouds crowding into rows toward the horizon, fewer near-identical sizes) and the naming ruling | DONE, stills in rework2/*_rows | wxfield.js takes only render/shared.js `CLOUDSHADOW` (one name, as committed by the look director). A cumulus' size skewed (95 + 230 h^2.2 m: a few large among many smaller); a far cloud 1.5-6 km off up to 1.7 times wider and 0.7 as thick, so toward the horizon they overlap into rows; the creases a little wider. SEEN (1 km at 13:00 and 16:30, 600 m at 13:00): the far clouds on the right now a band of overlapping rows; the near front-lit ones still mostly one light tone. MEASURED (Node, triangles): at the phone's pixel angle a fair sky (0.36) from 600 / 1000 / 1600 m 82k / 71k / 61k, a building sky (0.55) 190k / 184k / 159k -- OVER the design's ~120k: a phone setting (a coarser level of detail) is needed before the owner's phone tries a building sky from the air. At the gallery's 960 x 540 angle 213-232k fair, 506-527k building. |
+| 3f. the weather group's land storm IN THE GAME (their test case: a new game's land storm over the spawn at 3750 s) and the phone's triangle budget | DONE, stills in rework2/W1_game_* | The game (index.html) in the lab, `?look=oil&card=0&audio=0&save=0&fresh=1&dynres=0&quality=1&stormland=1&nearmap=1&farwind=1&rainlook=1&rainshaft=1&bolts=1&clouds3d=1`, 960 x 540: `__pc.hold()`, the painter's render swapped for a no-op, `setClock(T - 20)`, 300 steps of 1/15 s, the render back, the foot camera's `viewFwd` turned to the nearest land cell, `hold(false)`, grab. FOUND: with the hybrid, a storm in its early stage (still a `cloud`-kind cell, a towering cumulus in the map) was not drawn from the ground at all -- now a cumulus of the map 350-800 m thick and convective (conv 0.25-0.6) is drawn from the ground too. FOUND: the deck at the storm's front, the map's storm field still low there, came as a huge pale lavender bank -- now a deck 250-600 m thick goes a step deeper beneath, toward the storm's slate. SEEN: 3690 s, 980 m: a dark slate-violet ceiling with lighter seams coming in, the tower's lit top over it, fair sky beside (the weather group's A at the same moment: fair sky, nothing coming); 3745 s overhead: slate masses with lighter seams and rain; 3530 s: no storm in view (the nearest land cell then a dying one 4.5 km off; the one that passes is born later and grows on its way, so the 3.7 km sight could not be tested on this storm). PHONE BUDGET (`CLOUDS.budget` 95k, `?cloudtris=`, quality levels under 2 only): once the nearest clouds have spent it the rest take the coarsest lobe, past 1.25 times it a far cloud keeps three lobes. MEASURED at the phone's pixel angle: building sky from the air 133k-137k (was 159k-190k), fair unchanged 61k-82k; the desktop (level 2) unaffected. Suites 325 / 107 / 441. |
+| 3g. the coordinator's yes to an unseen shadow field, and the look director's review of rework 2 (shadows PASS, golden hour from 1 km PASS, sky strokes off right; NOT YET: noon form from the air, a near cloud as a flat sheet, storm mass edges stair-stepped, the flash one flat block) | DONE, stills in docs/shots/clouds/rework3 | THE UNSEEN SHADOW FIELD (`CLOUDS.shadowField`, `?cloudshadow=0` off; `world.clouds.shadowField`; bench row 'weather: no unseen cloud shadow field (fair)'): from the ground in the hybrid, every cumulus the air would show and the hybrid does not is laid, at the air's size, into a mesh of the coarsest lobe on the shadow's layer only (never in the picture), up to 8 lobes a cloud within 4.5 km, so the shadows sweep the land and are the clouds the player rises into. MEASURED (Node, phone angle): 336 unseen lobes on foot, 624 at 150 m (80 triangles each, into the 256 x 256 map every second frame); the seen clouds unchanged (8 on foot); a rebuild about 1.3 ms here (twice a second). FOUND on the way: a slot with nothing to keep still slipped through the share's soft window when its own number was under 0.12 -- fixed. Storm masses (deck from below): the tone told from the continuous fields with a one-pixel edge from fwidth, as the sky's bands, not stroke by stroke. The flash: two value steps falling off from the light, by the sheet's mass (a half step, then the pale flash tone), edges a pixel wide; on lobes by a lobe's number. Noon form: the half-tone a clear step under the top (lavender only 0.20 toward the horizon), each head's turned-away side and the creases over more of each head. A cloud the eye is within 280 m of thins by whole strokes (from 450 m a cloud at 600 m read as lace: W1_W600_13_fair_B_fade450_lace). SEEN: from 150 m the shadow field lays cool patches on the left hill and the far wood (2.8 % of the frame, nothing else moves); on foot at the landing no shadow fell in view at that moment (62 pixels); the storm masses smooth-edged; the flash a pale core with a half-step ring along the masses (22 % of the frame lighter against its twin); 600 m noon: modest lavender half-tone along the heads' lower edges, still mostly light; 1 km noon about as before. Suites 325 / 107 / 441. |
+| 3h. front-lit form at noon, and a storm seen from 3.3 km (the coordinator's next two) | DONE, stills in rework3 | NOON: each head its own lit cap while the sun stands high (the lower half of every head by its own normal in the half-tone, weighted by the sun's height, so the golden hour, passed, is untouched). SEEN from 600 m and 1 km at 13:00: a little more lavender low on the heads; still mostly light -- front-lit noon remains the weak case. PHONE BUDGET: the three-lobe cap on far clouds removed (at the golden hour from 1 km the far heads went: W1_W1K_165_bld_B_lobecap3_lostheads); past the budget the rest only take the coarsest lobe. MEASURED at the phone's angle: building sky from the air 137k-142k, fair 61k-82k. STORM FROM AFAR: found from the coast at 150 m (biome sea_coast) a storm cell 3.3 km off at weather time 5580 s (a sea storm, w 0.98); A shows nothing there. First B: a thin column of stacked balls under a puffy top, a MUSHROOM CLOUD (W1_CG150_15_storm3300m_B1_mushroom). Now: the tower's radius from the cell's own size (0.55 of r, 300-800 m) and never under 0.45 of its height; tiers that barely narrow, 4-7 lobes each; the anvil a flat shelf of 18 smaller lobes squashed to 0.2, streaming out downwind. SEEN: a massive storm tower with a cauliflower top rising off the horizon, its shadow darkening the sea; front-lit, so white rather than slate; the anvil does not yet read apart from the top; big round towering cumulus of the map beside it read as cotton balls. Suites 325 / 107 / 441. |
+| 3i. the anvil and the mountain cap (after the merge point) | PARTLY BETTER, stills in rework3 | The anvil sits on the tower's top (1.02 of its height) and spreads past it, a little upwind and mostly downwind, lobes larger and squashed to 0.34 over a flat shaded underside. SEEN from the coast at 3.3 km (W1_CG150_15_storm3300m_B_anvil): the storm's top now spreads downwind past the tower with shaded undersides -- still lumpy puffs, not a crisp flat shelf. THEN: the anvil's lobes found to be there (18, 250-360 m) but swallowed by the tower's top domes and only some 400 m past the tower; now the anvil is at least 2.5 tower radii long, thirty overlapping lobes, each flat on top (the squash given negative: the vertex shaders clamp an anvil lobe under a top plane 0.22 of its radius over its centre) over the anvil's own flat underside at the tower's top, and the tower's top tiers lower and narrower under it. SEEN (W1_CG150_15_storm3300m_B_anvilshelf; side view 2.5 km along the coast, W1_CG_storm_side_anvilshelf against _before): one continuous shelf with a flat shaded underside spreading downwind over the tower -- the cumulonimbus' T; from the side it still recalls a mushroom a little, which is that cloud's own outline. A cloud caught on a mountain: its base 60-140 m under the highest land round it, a smaller, taller heap. SEEN from 150 m (W1_MT150_13_B_mountaincloud_lowered against _lid): it sits down on the flank instead of on the summit like a lid, but its flat base still shows sideways off the slope. Suites 328 / 108 / 443. |
+| 3j. the look director's next step for the anvil and the mountain cloud (fdd3775 ACCEPTED for weather-release as a step) | BUILT, stills in rework3 | THE ANVIL: mostly downwind (from 0.08 upwind to 0.96 of its length downwind, narrow by the tower and fanning out), at least 4 tower radii long, a WEDGE (each lobe's top plane, in the cloud's height over the shelf's flat underside, from 0.10 by the tower to 0.035 at the end; lobes smaller downwind) whose far end frays into five small flat lobes; ONE top plane for the shelf at each lobe's place rather than each lobe's own cap (an anvil lobe carries iD.x = -(10 + 100 top), decoded in the lobe and shadow vertex shaders). SEEN from the coast at 3.3 km (W1_CG150_15_storm3300m_B_anvilwedge): a broad asymmetric shelf streaming far downwind from the tower's top, fraying at its end. From 2.5 km along the coast (W1_CG_storm_side_anvilwedge, _up) the camera looks up into its underside at some 30 degrees: the straight top edge CANNOT be judged from there (a level side view of a 1.9 km shelf needs a farther eye than this world's horizon gives). THE MOUNTAIN CLOUD: base 100-180 m under the highest land round it and no flat base at all (its lobes round below). SEEN from 150 m (W1_MT150_13_B_mountaincloud_nobase): two rounded lobes on the flank, no ruled line. FOUND: a backtick in a shader comment closed the template string (the suite caught it). Suites 328 / 108 / 443. |
+| 3b. refinements after step 3 | DONE (see git log) | Over a closed deck seen from above, a cumulus is one of the deck's heaps (wide, low, a third sunk in the sheet): the sea of cloud from 1.6 km now reads as one rolling floor with the peak through it (step3b/W1_A1K6_*; was a field of cotton balls). The base seen from below in three values: a deep core where the cloud is thickest, a belly ring, the half-tone edge: MEASURED W-G noon fair 3 value peaks (0.45, 0.67, 0.83), 12 % of the frame in cloud; 16:30 building 2 peaks (0.52, 0.67). The dark core's strokes may read busy: the look director's call. |
+| 3. A6 shadow map, T5/T3 lines to the look director | BUILT; draws only once the look director lands T5 | `clouds.js`: the lobes and the deck drawn along the sun into 256 x 256 every second frame (layer 7, their own simple materials swapped in), `WX.uCloudShadow`, `uCloudShadowM` (body -> uv) and `uCloudShadowV` (view -> uv, set by a frame hook), nothing at night or with `uCloudShadowK` 0; `world.clouds.renderShadow(renderer)` or any `PREPASSES` list in shared.js runs it. THE LOOK DIRECTOR'S LINES (not committed here): `docs/shots/clouds/T3_T5_look_director.patch.txt` (T5: `PREPASSES` in shared.js, run in render/index.js before the shadow pass; T3: a cool glaze in post.js OIL_FRAG reading `uCloudShadowV`, crisp at the map's half-way line, weaker past 2 km, never on region 0). SEEN with the lines applied locally (step3/W1_A6_*): cloud shapes as cool patches on the alpine flank, the hill and the lake; 13 % of the frame changed, 26 % of its lower half, against about a third of the sky in cloud (criterion 5: 50-100 % of the cover). |
+| 4. A4, A9, A10 in sky.js; A8 orbit shell; earth weather row | BUILT, SEEN once each | A4 cirrus: wind-aligned tapered strokes, the map's `high` at 2.2 km along the view or the world's `weather.cirrus` (0.25), gold and rose at a low sun (seen as white wisps, step3 W150). A9 the rainbow: four flat bands 40.5-42.5 degrees from the antisolar point and a faint second at 50.5-53, where the map has rain 1.5 km along the view, the sun up and under 42 degrees and no overcast at the eye (SEEN: step3/W1_A9_*, staged with a rain cell set 1.7 km antisolar through weather.js setForcedCell). A10 in step 2. A8 orbit.js makeCloudShell reads the map's low cover and comes in from the sky's ceiling to 1.6 times it (`uWx3D`, set by clouds.js), the fair cumulus going out one by one from 0.8 to 1.4 times the ceiling (SEEN at 4 km before that fade was added: the shell and the 3D clouds together, a storm tower standing over the limb, a scatter of far puffs along the limb that read as specks -- the fade answers that, not yet seen). Earth's row: `cirrus: 0.25, rainbow: 1`. |
+| 5. bench rows | DONE in step 2's commit | `src/core/bench.js`, own block after the weather group's: 'weather: no clouds drawn (fair)', 'weather: clouds as before' (world.clouds.enabled), 'storm: no clouds drawn', 'storm: no cloud shadows' (the storm rows only with ?cloudmap=1). |
+
+**How the stills were taken** (scratch tools, lost on a restart; what they do): `node tools/lab.mjs serve`, then for each
+station `open` the gallery at 960 x 540 with `body=earth&look=oil&ui=0&t=30&season=1&` + the station + `clouds3d=0|1`,
+wait for `world.clouds.stats.ms > 0`, `grab out.png 3`. Storms: `physics=1&cloudmap=1&windmap=1&pre=12`, then by
+`eval` either `physics.forceWeather({ kind: 'storm', radius: 1400, strength: 1 })` and `fields.cloud.refresh(...)`, or
+at `wtime=1590` aim `state.yaw` at the strongest storm cell (0.9 km from the autumn wood then). A forced sky
+(`sky=cloud:0.55`) moves only the sky numbers, which the clouds read only when the cloud map is off.
+
+**Needed from others.** `?clouds3d=1` alone does not switch the maps on (`?cloudmap=1` / `?windmap=1` are the
+weather group's switches in src/physics/wx2.js); asked the weather group to make clouds3d imply both.
 
 ## Hand-over of THE FAR TREES (trees lane A1, branch `trees-far`; kept current by that session)
 
@@ -443,8 +643,88 @@ FV7 of `docs/lead/FARVIEW-DESIGN.md`. A second session (A2, branch `trees-near`)
 the same time: this lane touches only the far parts of `flora.js`, `florakit.js`, the plant material's far branch,
 `render/impostor.js`, `render/shadow.js` and new rows in `core/bench.js`.
 
-**State (update this line every step):** (24 Nov, about 14:35) SMALL CROWNS ARE THE DEFAULT (`?impsmall=0` the old
-way), after F passed them with its colour fixes; look-director at 64f1742 merged into trees-far on the coordinator's
+**State (update this line every step):** (24 Nov, about 20:10) F CHOSE C (the far shadows WITH the canopy hook) on two
+conditions: (1) OFF by default until the owner's speed test has a number from the bench row OR the far crowns' part of the
+map is cached; (2) a 16 h pair at 150 m and 420 m. BOTH DONE: (1) THE FAR MAP KEPT (shadow.js FAR_SHADOW.cache, default on
+with ?farshadow; ?farshcache=0 draws it every frame): the square keeps its place, axes and depth while its middle drifts
+under 64 texels (54 m), the sun under 0.25 deg and no far crown comes or goes (the last two wait 30 frames), at most 120
+frames; between whole draws only what moves (figures, other crowds) is drawn, over its last patch put back from the kept
+copy (a second 2048 float target, made only when asked). MEASURED, 150 m: kept frames 141-144 calls (137 with no far
+shadows, 203-206 drawn every frame), the picture the same (0.003 of 255); a whole draw +130 calls once; moving 10 m a
+frame, one whole draw every 6 frames. The default picture unchanged to the bit (checked after the pass's rework). (2) 16 h
+pair SEEN (A1_farshadow_16h_*_AC, with the hook in a local copy): long umber-plum pools on the floor between the crowns,
+the crowns still lit and apart; land under V 0.3 150 m 10.8 -> 16.5 percent, 420 m 1.5 -> 1.8; V median of the land
+0.643 -> 0.565 at 150 m. The hook: C to put it in (C's file, F asked C for its yes), behind ?farshadow.
+Before: THE FAR CROWNS' SHADOWS ON THE GROUND (the coordinator's new
+job, F's audit finding 1, taken from C's list; C told, C keeps the glades): BUILT AND SEEN, OFF BY DEFAULT, ?farshadow=1
+(render/shadow.js FAR_SHADOW; ?farshr= the square's half-size, 860). From the air (eye over 60 m) the shadow square grows
+to 860 m a side-half and lies 0.75 of it ahead of the eye (the impostors reach 1,500 m), its depth stretched for a low
+sun; every far impostor in view (+60 m) casts its WHOLE crown into it (the twin's uThinLeaf 0 with the switch); the ground
+reads it already (pcSunAtSoft), so a stroke beside a crown on its shadow side lies a level down, whole. Bench row
+farShadow at 150 m and 400 m (bench.js). MEASURED one frame, calls / triangles off -> on: 150 m 137 -> 203, 420 m 162 ->
+260, 1 km 128 -> 200 (+140k to +220k triangles); the view cull cut 98-129 extra calls to 66-98. SEEN (F's views, autumn
+noon): the pools show only on the OPEN ground (land under V 0.3 at 150 m 9.7 -> 11.0 percent; 420 m and 1 km nearly
+nothing), because the canopy painted into the ground (farground.js pcCanopyAt, C's) lights its own dabs and never reads
+the map. A PROTOTYPE hook there (never committed; the patch is in the message to C: a canopy dab in the map's shadow takes
+a neighbour's-shadow level, min(gCanL, pcLevel(0.33))) gives the pools in the wood: 150 m 9.7 -> 14.6 percent, 420 m
+0.9 -> 1.25, 1 km 1.56 -> 1.67 (the impostors reach only the bottom of the 1 km view; past them the roof has its own
+shade). Sheets A1_farshadow_{150m,420m,1km}_ABC (+ zooms). ASKED C for the hook; sent F the A/B/C. Next if F wants it
+and the bench says the calls matter: cache the far crowns' part of the map (they do not move).
+Before: THE FAR SPRUCE 'near' IS THE DEFAULT (F chose D: today's near-tree
+bake floored at V 0.24, deep green not near-black; ?farspruce=0 the old, ?farspruce=bough the by-bough tree; ?pines=0 the
+old whatever). RENDERED on trees-far at F's 150 m autumn view: dark-green pixels V median 0.251 -> 0.282, their share 9.7
+-> 9.9 percent, land under V 0.3 10.7 -> 9.7; the spruces' shapes the same. F TAKES THE 1 KM DARKS (the air's, its lane).
+A2 will take my storm ramp for its near crowns at v39.4 (stK = smoothstep(0.15, 0.6, uStorm) * uLookS.x * 0.5).
+THE STORM CROWNS PASSED BY F at half (uImpStorm 0.5, the default since c5ef26a; dormant until F's uLookS lands).
+Before: look-proto v39.3 (87053ed) merged into trees-far (a6e46ca,
+given to the coordinator for v39.4: it carries fad660f, F's passed weighted stands and bark at 30 px, default). THE CROWNS
+UNDER A STORM (F's storm light, look-director ce1701f): BUILT, SEEN in a scratch merge of trees-far + look-director
+cb6267b, DORMANT on trees-far (PC_IMP_STORM is defined only when FRAG_PARS declares uLookS; 0 pixels change here,
+checked). Under uStorm the crowns lit in whole steps (small crowns, crown mass) step their cap down by
+smoothstep(0.15, 0.6, uStorm) * uLookS.x * uImpStorm levels, and a level under 1.2 is painted by that much in pcTone's
+glazes rather than the foliage shade (the shade was the floor: the step alone moved the warm crowns V 0.450 to 0.445).
+uImpStorm 0.5 (?impstorm=): a full step made the wood one violet-maroon mass. MEASURED wx=storm 150 m, warm crowns V/S:
+stormlight=0 0.450/0.40, F's land step alone 0.445/0.39, half 0.421/0.32, full 0.385/0.22. Sheets
+A1_stormcrowns_150m_ACEB (+ _zoom). Sent to F.
+Before: THE FAR SPRUCE BUILT AND SEEN, OFF BY DEFAULT, then waiting for
+F's ruling between two ways (flora.js FAR_SPRUCE; both act only with A2's ?pines, which is on trees-near and reaches
+trees-far with v39.3): `?farspruce=near` (today's near-tree bake, its crown floored at V 0.24: SEEN, the clean dense cones
+kept, deep green not near-black; MY RECOMMENDATION) or `?farspruce=bough` (F's order: the by-bough middle tree; at A2's 2.2
+growth the spruces all but vanish from the air, at 4, ?farsprucek=4, the density rule's growth, big flat green shards).
+Sheets `docs/shots/painter/trees-far/A1_farspruce_{150m,close,side}_ABCD` (A today, B bough x4, C bough x2.2, D near +
+floor), rendered in a scratch merge of trees-far + trees-near 067535f. When F rules: flip the default in FAR_SPRUCE.
+F'S 1 KM DARKS (asked after the spruce), MEASURED at the 1 km audit view (autumn noon, cam=high dy=600 = my fview dy 870),
+crown mass + weighted stands + any far spruce: land under V 0.3 = 0.02 percent (A, B, C and D the same to four places),
+under 0.35 = 0.75, under 0.4 = 4.4; the land's V 5th percentile 0.40. At 420 m under V 0.3: A 1.85, B-D about 0.6.
+Before: CROWN MASS IS THE DEFAULT (f230b40, row c7abccd; in v39.3).
+F's decisions after it, on trees-far (fad660f): bark as shaded leaves up to 30 px (uMassK2.w), and a stand's place on the
+run weighted by the references' canopy (20 yellow, 50 amber, 25 orange, 5 red); MEASURED 150 m bright yellow 15.5 -> 11.2
+percent (25.2 without crown mass), near-black 0.99 -> 0.49; F PASSED both (with crown mass into v39.4). Also on: the yellow kind borrows the wood's run,
+a tree strays 0.35 in its stand, gaps in crowns under 8 px filled. The gust crowns: accepted, dormant until the binding.
+Tuning handles live in the page: uMassK (x cap drop, y/w one tone px, z crown mass px), uMassK2 (x stand share, y warm
+paint, z stray in a stand, w bark-as-leaf px). Before that: look-proto v39.2 (c7d8d9e: my small crowns and the
+shadow saving live) merged into trees-far (e85dabd), rendered, pushed. THE GUST ON THE FAR CROWNS ACCEPTED BY F at
+150 m and 600 m (11738e6: a small turned crown's one tone at its cap, two-thirds step); dormant until F's binding
+(look-director 43540c5) reaches look-proto, with D's physics (design-weather d2f4277). READY, NOT BUILT: F's audit finding
+1 (the wood as confetti from the air). THE COORDINATOR'S PLAN, on F's ?canopy=0 verdict: if it names the impostors,
+build behind ONE switch (a) crowns under 4-6 px as one tone lit on the sunward side (the gust block without the band;
+vGust.z's lit share is there for it), (b) crowns of 15-30 px at 150 m with fewer, bigger strokes so each tree is one
+mass with a lit and a shaded side (first idea: read a coarser atlas level there, which doubles a stroke on the screen,
+with the two light steps; the silhouette stays smooth by its cover), (c) a glade or two where the stand thins; if it
+names C's canopy dabs, give C the one-tone rule. Scratch worktrees removed, lab closed. Before that: THE GUST BANDS ON THE FAR CROWNS: F accepted 150 m;
+for 600 m F picked (a): under a band a crown under about 4-6 px is ONE tone (the tree's colour stepped paler, at the
+crown's mean light), fading in over 4-10 px of crown width. BUILT and pushed (dormant until F's binding PHYS.uPhysGust,
+look-director 43540c5, is merged here). SEEN in the scratch merge `gw` (trees-far + design-weather d2f4277 + D's two
+patches, never pushed): 600 m patches quieter and unified, not paler on the mean (V 0.67 -> 0.66); asked F how far to
+raise the tone toward the cap. F's audit finding 1 (the whole wood confetti from the air: one tone for EVERY crown under
+4-6 px) is proposed to the coordinator; the code is shaped for it (the band is one input) but NOT built until the
+coordinator gives it a lane. Before that: THE FAR CROWNS IN D'S GUST BANDS built and pushed,
+DORMANT until F's binding (render/shared.js PHYS.uPhysGust): render/impostor.js GUST (per tree, read once at its foot,
+each tree at its own threshold 0.15 + 0.45 seed, the ground's pale cooler step; ?gustbands=1 or ?wx2=1 from the address),
+flora.setImpGust, row 'far crowns: no gust bands' at 150 m. SEEN in a scratch merge with design-weather d2f4277 and D's
+two patches (gust held at 1.0): about 9 percent of the picture changes at 150 m and 600 m, turned crowns V +0.04 S -0.15
+(`A1_gust_*`); sent to F and D; not judged in motion. Waiting: F on the step's strength; F's audit. Before that: SMALL CROWNS ARE THE DEFAULT (`?impsmall=0` the old
+way), after F passed them with its colour fixes, and F signed off the real-branch pair (ea41746); look-director at 64f1742 merged into trees-far on the coordinator's
 word (8f3848d; the impostor.js conflict kept my azL line and added F's pcSummerTree line). SEEN on the real branch,
 phone settings, autumn wood 15.4 h, roof on (`A1_small_default_*`): 1 km, the impostor zone hue 92 S 0.36 V 0.56 with
 ?impsmall=0, hue 85 S 0.46 V 0.68 by default, C's roof past the reach hue 77 S 0.46 V 0.74; 150 m V 0.48 -> 0.51,
@@ -565,6 +845,99 @@ it the same way. SEEN at the phone's settings, autumn wood 16.8 h: under v39's l
 is 0.30 of 255 at 5 m and at 10 m (0.31 with `?light=old`, as before the merge); the new light itself moves the
 picture by 1.7, so the wood follows it; `?light=old&trees2=0` is pixel-identical to the still before the merge. Stills
 `A2_*-v39_*`. (The cards' own program, `CARD_FRAG`, does not take the one light: cards are dropped.)
+
+**THE PINES: PASSED BY THE LOOK DIRECTOR ('pines2', 24 Nov) AND NOW THE DEFAULT; `?pines=0` is the old way.** After the
+ruling: the spruce budgeted by bough ONLY in its middle form (the near spruce as approved), the 2.2 growth from 10 m and
+the 3 px floor, the needle mass held at V >= 0.24 from 20 m (median 0.231 against 0.169 at 20 m, seen); 3.0 refused.
+Stills `A2_pines2_*`. +2,934 triangles at the landing. A denser far spruce (baked from a by-bough tree) is for A1, after
+A1's crown masses; F raises it. Both needle blocks of PROP_VERT sit inside `#ifdef PC_OIL`: the watercolour game is
+untouched. (24 Nov, late: A1 asked what that bake needs; told: the middle form spruceGeometry(seed, 1, needleTop) with
+its needles grown 2.2 and floored at V 0.24, as the middle spruce is at 30 m.)
+
+**NEAR LEAVES AS SHARDS (`?nearleaf=1`, OFF by default; the look director's audit 2, R3.6, `crop_leafcards_foot.jpg`).**
+BUILT on F's terms: a tall tree's leaf within 3.5 m of the eye shrinks about its own centre, to 0.55 at 1.0 m on a
+smoothstep from 3.5 m, whole and crisp, no fade; from 3.5 m out nothing changes (materials.js PROP_VERT `uNearLeaf`,
+flora.js `NEARLEAF`, set on the tall materials only; the uniform can be flipped live). In motion a leaf shrinks as the
+eye comes near: to be watched on the owner's device. SEEN (phone settings 1024 x 480 and 936 x 372): to the eye the
+pairs are the same; under a maple's crown from 1.5, 3 and 6 m the switch changes 490, 114 and 33 pixels (a handful of
+dark leaves nearest the eye), and in the stream views, autumn and summer, nothing beyond the frame-to-frame motion of
+the water (stills `A2_nearleaf_*`). WHY SO LITTLE: F's crop is the TOP LEFT OF THE SUMMER STILL `sum_foot_12.jpg`
+(300 x 140 at x2: matched to 4 of 255), a maple whose trunk is some 11 m off and whose crown reaches over the eye; F's
+build had design-water in it, which moved the river, and in this branch's world no tree stands within 11.5 m of that
+camera, so the view cannot be made again here. From the leaves' size in F's still (a maple's near leaf is built
+0.33 x 0.22 m, x 1.2 for the kind, x 0.7 to 1.3; fov 55 at 480 lines is 461 px to the radian): the few biggest pieces,
+50-85 px, are leaves 3 to 4.5 m off; most, 20-30 px, are leaves 7 to 15 m off that the THINNING has grown. The leaf
+thinning's start follows the picture's height (flora.js: ts = range scale x picture height / 1080, never under half):
+at 480 lines, the audit's size, a near tree thins from 6.5 m (0.24 x 90 x 0.3) and grows each kept leaf 1.3 times at
+10 m and 1.65 at 15 m; on a picture 720 to 1440 lines tall it would thin from about 8.6 to 13 m (worked out from the
+code, not rendered). So the audit's near leaves at 7-15 m are larger than a phone at full size shows them. The maple's
+near leaves already have six corners (kitbuild.js leafCards `round`): F's option (2) is in place for it.
+F'S RULING (24 Nov, late): the owner's phone DRAWS 1028 x 480 or 936 x 372 in the oil look (LOOK-AUDIT.md), so the
+480-line picture, thinning growth included, IS what the owner sees and approved ("crisp flat leaf pieces"); the shards
+finding is F's, not the owner's, and is not pushed over the owner's word. Done on that ruling (9b778fd): (B) ?nearleaf
+reaches 5 m (0.55 at 1.0 m, smoothstep to 1.0 at 5 m); (C) `?leafgrow=1`, AN OPTION FOR THE OWNER: a thinned
+broadleaf's kept leaf grows at most 1.15 times within 15 m of the eye (today up to 1.65 at 15 m), back to today's by
+25 m, before the near tree hands over at 27 m (`uLeafGrow`; the needle kinds untouched; `?leafgrow=<1 to 2.4>` another
+most). SEEN, the shader compiles (103 tree materials, no program failed), one page, the switches flipped live, a maple
+from 8 m with its crown over the eye, summer noon, 1024 x 480 (`A2_nearleaf_leafgrow_maple8m_*`, A none, B nearleaf,
+C leafgrow): C clearly smaller leaves with more sky and branches between them across the crowns 6 to 12 m off
+(114,140 pixels, mean 7.6 of 255); B close to A, the nearest overhead pieces a little smaller (13,227 pixels, mean
+0.85, within the 64,382 / 2.1 that two grabs of the same state differ by as the leaves move in the wind). Neither
+goes default without the owner; the coordinator can put C to the owner on a phone check. F'S VERDICT (24 Nov):
+B no visible gain, keep it off and stop there; C a clear gain ("small separate dabs with the sky between them"), F
+recommends it to the coordinator, who sends it to the owner for a side-by-side phone check; OFF until the owner says.
+
+**THE CROWNS UNDER A STORM (`?stormleaf=1`, OFF; the coordinator after F's storm light, look-director e2b9c14, which
+steps the land a level down under a storm and leaves the crowns glowing).** MEASURED in the gallery under `wx=storm`
+(autumn stream, 1024 x 480): uStorm 0.9, overcast (uWx.x) 1.0, the light curve (uOilAir.z) 1. A FIRST TRY (the
+leaf's level taken a whole step down, 758824a) changed 10,204 pixels by at most 24 of 255, nothing to the eye: under
+that storm a lit leaf's level is already about 1.4, so it is painted almost wholly in the foliage shade
+(`pcShadeLeaf`), and that shade is the fair-weather one, a saturated red for an autumn leaf that does not know the
+weather; the land at the same levels takes pcTone's glaze and deep wash, a cool grey. (The first commit's reason,
+"a lit leaf stays at the local level", was wrong.) NOW: under a storm a crown is painted as the land is, a leaf's
+level held to the glaze (1) at a full storm and its shade the land's glaze and deep wash at its level instead of the
+foliage shade (`materials.js PROP_VERT uStormLeaf`, `flora.js STORMLEAF`); no storm, the same picture to the bit.
+The bark already goes through the land's paint (pcLit, pcLevel, pcTone). Its own switch, so it does not hang on F's
+uLookS (not in look-proto yet). SEEN on the merged branch (f281556; the shader compiles, 85 tree materials, no
+program failed), one page under `wx=storm`, autumn noon, 1024 x 480, the switch flipped live, two grabs of one state
+identical: a maple from 9 m (`A2_stormleaf_maple9m_storm_A_over_B.jpg`): the crowns from glowing red and orange to a
+muted plum-maroon in the storm's light, 31.9 per cent of the picture, the changed pixels' V median 0.32 to 0.28 and S
+0.53 to 0.34 (mean colour 0.33, 0.19, 0.18 to 0.28, 0.20, 0.23); the stream view (the merge moved the river: only far
+trees in it) 0.8 per cent. Stills of the first try kept (`A2_stormleaf_first-try_*`). Fair weather NOT rendered on this
+build: unchanged by construction (uStorm 0 skips the step). OFF until F passes it. A HALF STRENGTH (`uStormLeaf` 0.5,
+not yet a switch of its own) for F to compare: the reds kept but quieter, 25.5 per cent changed, V 0.34 to 0.32, S
+0.46 to 0.43 (`A2_stormleaf_maple9m_storm_A_half_full.jpg`: today, half, full). On the same crown pixels: today S 0.53,
+half 0.45 (warm hue p90 18 deg: the oranges kept), full 0.34 (3 deg: gone). PASSED BY F AT HALF (24 Nov): half keeps the
+reds and the rust and amber told apart, quieter and in the storm's light. `?stormleaf=1` is now 0.5 of the land's paint
+at a full storm (`?stormleaf=<0.3 to 1>` another share). OFF behind its own switch until look-director e2b9c14 (F's
+`?stormlight`, uLookS.x) is in look-proto (v39.4); then it follows that one switch (ON by default with F's).
+The address switch SEEN to work (a page opened with `&wx=storm&stormleaf=1`, before the value went from 0.6 to 0.5):
+the 38 tall-tree materials took the value, no other material, no program failed, no console error.
+FOR v39.4 (when tying to uLookS.x): take A1's ramp for the far crowns (trees-far c5ef26a, impostor.js stK =
+smoothstep(0.15, 0.6, uStorm) * uLookS.x * 0.5), so near and far crowns step down together at the hand-over in a
+middling storm (today's kSt = uStorm * 0.5 / 0.9 is 0.33 at uStorm 0.6 where A1's is 0.5; both 0.5 at a full storm). A1
+AGREED (24 Nov); A1's far side has ?impstorm= (0 to 1, default 0.5) and A1 will say if F moves it, so ours follows.
+THE FAR SPRUCE: F chose A1's D, the NEAR spruce baked with the V 0.24 floor (default on trees-far 2729f6a); spruce.js
+needs no needleTop: 2.
+
+**MERGED look-proto v39.3 (87053ed, pull request 46, the pines live) into trees-near: f281556**, clean, nothing
+doubled; unit 328, world 124, physics 449 pass.
+
+**THE PINES AS POLES (24 Nov, the coordinator's urgent check and the first cure, `?pines=1`).**
+Not the split: on v39.1 the poles are the same with the one program (0.2 of 255; stills `A2_pines-v391_*`), and every
+leaf of every kit is identical with and without trees2 (Node). In the autumn wood the 'tall pines' near the camera are
+SPRUCES (no tall pine within the loaded patches): the spruce kit shares its needle budget out by limb length, so 685 of
+its 880 cards are in its lower half and its top is sparse (the middle form has whole tenths empty); behind the maples
+only that top shows. THE CURE (materials.js PROP_VERT `uNeedle`, flora.js `NEEDLE_KITS` tallpine and spruce,
+`_leafLod`, `setNeedles`; row 'pines: needles kept wide at range' in bench=trees): from 10 m out a needle card grows
+about its centre up to NEEDLE_FILL (2.2; `?needlefill=` to judge another) at 30 m; a needle is kept at least 3 px across;
+the needle kinds are thinned to at least 45 / 60 per cent (near / middle) instead of 20 / 35. SEEN (gallery, autumn wood,
+936 x 372 tier 1, the same spruce at 20, 40, 60 m, the switch flipped on one page): the spruces gain dark needle
+sprays up their stems and tufts at their tips; at 40 m still a pole with tufts rather than a mass (the kit's top is
+sparse); with ?needlefill=3 the tops read darker, but the low whorls seen between the maples' trunks become big dark
+spiky shapes. Triangles +2,834 at the landing (Node). The default is the picture before to the pixel. For F: stills
+`A2_pines_*` (A off, B on) and `A2_pines-fill3_*`. If a true needle mass is wanted at 40-60 m, the spruce kit's budget
+by limb COUNT rather than length (a denser top) is the next step: it changes the near spruce too.
 
 **ON FOOT TO UNDER 33 ms (the coordinator's job, 24 Nov, after the ground from the air was found to hold no 30 ms:
 the v38.2 table had the whole 400 m frame at 17.9 ms with impostors, ground included).** DERIVED from the phone's own

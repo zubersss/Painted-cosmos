@@ -63,6 +63,7 @@ uniform vec4 uOilAir;
 uniform vec4 uLookF;   // the look director's switches and the night's two numbers (shared.js; also declared in FRAG_PARS)
 uniform vec4 uLookN;
 uniform vec4 uLookG;   // x the golden hour's sky (sky.js), y how far summer crowns vary tree by tree (shared.js)
+uniform vec4 uLookS;   // x a storm takes the land's light down a step (shared.js OIL.uLookS)
 #endif
 `;
 
@@ -141,6 +142,14 @@ float pcLevel(float x, float soft) {
   // (PAINTER 16/17: it was 0.17 + 0.26 x, every form in the two deepest washes; the lit side keeps the local wash now,
   // so a wood in the rain is still a wood in three values)
   x = mix(x, 0.25 + x * 0.36, uStorm);
+  #ifdef PC_OIL
+    // (THE LAND UNDER A STORM, the oil look, 24 Nov: with the storm over the eye -- uStorm 0.63, overcast 0.81, MEASURED
+    // by group D in the gallery -- the land still stood at the LOCAL level, and the oil look's local colour of grass and
+    // leaves is light, so a meadow under a thunderhead read as a fair noon. Here the storm takes every form a further
+    // step down, toward the cool glaze: a lit face to the turn between local and glaze, a turned one into the glaze.
+    // Still a level, never a darkening multiplied on (R1.3b). ?stormlight=0 (uLookS.x) is the light as it was.)
+    x = mix(x, 0.20 + x * 0.38, uStorm * uLookS.x);
+  #endif
   return smoothstep(0.26 - soft, 0.26 + soft, x)
        + smoothstep(0.50 - soft, 0.50 + soft, x)
        + smoothstep(0.76 - soft, 0.76 + soft, x);
@@ -202,6 +211,17 @@ vec3 pcShadeLeaf(vec3 c) {
   // (how green: with green the largest channel, how far red falls under it -- 0 at hue 60, 0.5 at 90, 1 from 120 on)
   float gr = d.g >= mx ? clamp((d.g - d.r) / max(ch, 1e-4), 0.0, 1.0) : 0.0;
   float w = smoothstep(0.15, 0.40, gr) * smoothstep(0.50, 0.75, s);
+  // (and the OLIVE DARKS, 24 Nov, found by B on the coast: a grey-green body, S 0.26, comes out of the recipe's density
+  // as a dark olive (0.24, 0.26, 0.11), S 0.60 at V 0.26 -- hue about 67, under the greens above, so it slipped through.
+  // R2.2 wants a dark under V 0.30 at S 0.50 or under; so a yellow-green to blue-green that comes out DARK (V under
+  // about 0.32) and saturated is quieted the same way. The warm crowns are reds, oranges and golds under hue 45 and
+  // their shade is far lighter than this, so they are untouched.)
+  {
+    float ic = 1.0 / max(ch, 1e-4);
+    float h = mx == d.r ? 60.0 * (d.g - d.b) * ic : mx == d.g ? 60.0 * (2.0 + (d.b - d.r) * ic) : 60.0 * (4.0 + (d.r - d.g) * ic);
+    h = h < 0.0 ? h + 360.0 : h;
+    w = max(w, smoothstep(44.0, 54.0, h) * (1.0 - smoothstep(180.0, 200.0, h)) * (1.0 - smoothstep(0.28, 0.34, mx)) * smoothstep(0.50, 0.70, s));
+  }
   // (the share of the way to grey that leaves saturation 0.55: (ch - 0.55 mx) / (ch - 0.55 (mx - L)))
   float L = dot(d, vec3(0.3, 0.5, 0.2));
   float k = w * clamp((ch - 0.55 * mx) / max(ch - 0.55 * (mx - L), 1e-4), 0.0, 1.0);
@@ -547,6 +567,7 @@ uniform vec4 uOilAir;  // the air's ceiling and the light's four values (shared.
 uniform vec4 uLookF;   // the look director's switches (shared.js OIL.uLookF; also declared in VERT_PARS)
 uniform vec4 uLookN;   // the night's two numbers for the world the eye is on (shared.js OIL.uLookN)
 uniform vec4 uLookG;   // x the golden hour's sky, y summer crowns tree by tree (shared.js OIL.uLookG)
+uniform vec4 uLookS;   // x a storm takes the land's light down a step (shared.js OIL.uLookS)
 uniform vec4 uOilL;    // x 1: the lighter paint (phones); y the speed test's flat modes (shared.js)
 uniform vec4 uOilPx;
 uniform mat4 uShM;
@@ -660,7 +681,18 @@ vec3 pcAtmosV(vec3 c, float f, vec3 viewPos) {
   }
   float toward = pow(max(dot(normalize(viewPos), sunV), 0.0), 3.0) * uDayness * (1.0 - uMoon) * (1.0 - uWx.x);
   h = mix(h, min(mix(pcOilSunC(), vec3(1.0), 0.5) * 1.05, vec3(1.0)), toward * uOilC.y);
-  return mix(c, ${_far('c', 'h')}, f);      // (where ?farlight= is on, the thing's own light is carried into the air it stands in here: pcFarLight above. It is laid on the haze AFTER the sun's glow, so toward the sun, where the air goes to white, the gain can only be 1 or under and nothing burns out.)
+  // THE DARKS KEPT FROM THE AIR (fresh-eyes audit 2, docs/lead/LOOK-AUDIT-2.md, finding 1: from about 1 km up the wood
+  // had NO pixel under value 0.3, where the owner's aerial references keep their dark conifers to the horizon, bluer
+  // and paler but still the darks). A painter's distance compresses the values; it does not swap their order or wash
+  // the darks out first. So HIGH UP a dark stroke takes less of the air than a light one: down to 0.6 of it at the
+  // darkest, all of it from about 0.40 of lightness up. HIGH UP is by the horizon's dip (uLookG.w, world/index.js, where
+  // the air's top is on): from a dip of about 27 degrees (Earth: about 500 m) to 35 (about 900 m), so the low views
+  // keep their depth: a first laying from every height (down to 0.35, from 150 m) made the far wood at 150 m as dark
+  // as the near and lifted its saturation 0.61 to 0.74 (SEEN, rejected). The stroke's own colour is one flat colour,
+  // so this is one flat amount for the whole stroke and no edge moves. ?airdark=0 (uLookG.w) is the air as it was.
+  float fk = f;
+  if (uLookG.w > 0.0) fk = f * mix(1.0, mix(0.60, 1.0, smoothstep(0.08, 0.40, dot(c, vec3(0.3, 0.5, 0.2)))), uLookG.w * uLookN.w);
+  return mix(c, ${_far('c', 'h')}, fk);      // (where ?farlight= is on, the thing's own light is carried into the air it stands in here: pcFarLight above. It is laid on the haze AFTER the sun's glow, so toward the sun, where the air goes to white, the gain can only be 1 or under and nothing burns out.)
 }
 vec3 pcAtmosVWash(vec3 c, float f, vec3 viewPos) {
 #else

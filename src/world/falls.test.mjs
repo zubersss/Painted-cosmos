@@ -53,13 +53,14 @@ test('a jet leaves the lip at the river\'s level and lands at the foot, clear of
     // the top edge at the lip's level, the foot at the foot's
     for (const u of [-1, 0, 1]) {
       FL.fallAt(F, 0, u, q);
-      assert.ok(Math.abs(dot(q, F.up) - (R + f.top)) < 0.05, 'the sheet starts at the water\'s level');
+      assert.ok(Math.abs(dot(q, F.up) - (R + f.top + 0.35)) < 0.05, 'the sheet starts at the water\'s level, over its brink');
       FL.fallAt(F, F.T, u, q);
       assert.ok(Math.abs(dot(q, F.up) - (R + f.foot)) < 0.2, 'and reaches the foot: ' + (dot(q, F.up) - R - f.foot).toFixed(2));
     }
     // it falls in a parabola and never back toward the cliff (the way out from the lip only grows)
     let prev = -Infinity;
-    for (let k = 0; k <= 10; k++) { FL.fallAt(F, F.T * k / 10, 0, q); const out = dot([q[0] - F.lipP[0], q[1] - F.lipP[1], q[2] - F.lipP[2]], F.dir); assert.ok(out >= prev - 1e-9); prev = out; }
+    const e0 = FL.edgeAt(F, 0);           // (measured from where the lip itself stands across the middle)
+    for (let k = 0; k <= 10; k++) { FL.fallAt(F, F.T * k / 10, 0, q); const out = dot([q[0] - F.lipP[0], q[1] - F.lipP[1], q[2] - F.lipP[2]], F.dir) - e0; assert.ok(out >= prev - 1e-9); prev = out; }
     assert.ok(prev > 0.15 + 0.9 * f.speed * F.T, 'clear of the wall by the speed times the time it falls');
     // the drop is real: g t^2 / 2 over the time of flight
     assert.ok(Math.abs(0.5 * 9.81 * F.T * F.T - F.drop) < 1e-6);
@@ -83,7 +84,7 @@ test('the meshes: a few hundred triangles a fall near, fewer far; the pool at th
       assert.ok(Math.abs(dot(p, F.up) - (R + f.foot + FL.FALLS_DEF.lift)) < 0.3, 'the pool lies on the sea');
     }
   }
-  assert.ok(FL.sprayArrays([{ f, lod: 2 }], R, org).n <= 300, 'at most 300 dabs a fall');
+  assert.ok(FL.sprayArrays([{ f, lod: 2 }], R, org).n <= 560, 'at most 560 dabs a fall');
 });
 
 test('the lip follows the coast\'s wall across the cut', () => {

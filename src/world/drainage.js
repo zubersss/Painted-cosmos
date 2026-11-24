@@ -60,6 +60,8 @@ export const DRAIN_DEF = {
   keepTree: false, // keep `to` (each node's downstream node), `accF` (the catchment as a float) and `ordR` (the routing order)
   rough: 0,       // metres of routing roughness (0: none, and the routing is the levels' own flood)
   roughL: 450,    // its scale, metres
+  keepShare: null, // ?mount=1 (world/mountain.js): biome indices whose share of each node is kept (`share`), from the weights
+                   // the base field asks anyway, so the rivers need not ask them again
 };
 
 // ---- the grid ---------------------------------------------------------------------------------------
@@ -145,6 +147,7 @@ export class Drainage {
     this.cell = (Math.PI * 0.5 * this.R) / o.n;   // metres a cell at a face centre
     this.lakeNodes = 0; this.deepest = 0;   // kept for the log, not read by the game
     this.keepTree = !!o.keepTree || o.rough > 0; this.rough = +o.rough || 0; this.roughL = +o.roughL || 450;
+    this.keepShare = o.keepShare || null; this.share = this.keepShare ? new Float32Array(len) : null;
     this.to = null; this.accF = null; this.ordR = null; this.lvlR = null;
     this.ms = { base: 0, flood: 0, flow: 0, halo: 0 };
     this._o = this.out();
@@ -174,7 +177,9 @@ export class Drainage {
     const w = new Float32Array(S.nB);
     for (let f = 0; f < 6; f++) for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
       g.dirOf(f, i, j, d);
-      this.ter[g.pid(f, i, j)] = S.waterBaseAt(d[0], d[1], d[2], w, this.divide);
+      const p = g.pid(f, i, j);
+      this.ter[p] = S.waterBaseAt(d[0], d[1], d[2], w, this.divide);
+      if (this.share) { let a = 0; for (const k of this.keepShare) a += w[k]; this.share[p] = a; }
     }
     this.ms.base = now() - t0;
   }
@@ -436,7 +441,11 @@ export function ensureDrainage(bodyId, opts) {
   //  40,000 samples on Venus, Jupiter, Saturn, Uranus and Neptune).
   if (MODE.water && MODE.water.rivers && MODE.oil) {
     const S0 = getSurface(bodyId);
-    if (S0 && S0.biomes.some((b) => b.terrain === 'forest')) opts = Object.assign({ keepTree: true, rough: 2.5 }, opts || {});
+    if (S0 && S0.biomes.some((b) => b.terrain === 'forest')) {
+      opts = Object.assign({ keepTree: true, rough: 2.5 }, opts || {});
+      // (?mount=1: the mountains' share of each node kept for their own flow, world/rivers.js; the field is the same)
+      if (MODE.water.mount) { const k = []; S0.biomes.forEach((b, i) => { if (b.terrain === 'alpine') k.push(i); }); if (k.length) opts.keepShare = k; }
+    }
   }
   try { return attachDrainage(getSurface(bodyId), opts); } catch (e) { return null; }
 }
