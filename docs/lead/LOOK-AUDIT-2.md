@@ -96,7 +96,8 @@ nothing on the phone; the crown's cast shadow is one more read of the crown grid
 
 ## 2. The water is grain
 
-**Stills:** `audit2/aut_foot_12.jpg`, `aut_foot_16.8.jpg`, `sum_foot_12.jpg`; crop x3 `audit2/crop_water_foot.jpg`.
+**Stills:** `audit2/aut_foot_12.jpg`, `aut_foot_16.8.jpg`, `sum_foot_12.jpg`, `coast_16.8.jpg` (the sea from the
+shore); crop x3 `audit2/crop_water_foot.jpg`.
 
 **What is seen.** On foot the river is the busiest thing in the picture: a sheet of hair-thin streaks, pale blue,
 white and navy, packed tight like brushed metal or a bad video signal. In the crop the dashes are 1-2 pixels tall;
@@ -110,7 +111,9 @@ dashes of gold". Nowhere a texture of scratches.
 
 **Measured.** How busy each part of the picture is (share of pixels on a step of lightness over 0.08 to the next
 pixel; aut_foot_12): river 70 per cent, grass 38, far trees 36, near crown 17, sky 4. The river is twice as busy as
-the grass and four times as busy as the trees.
+the grass and four times as busy as the trees. The sea from the shore at 16.8 (`coast_16.8`): 72 per cent, the
+same grain; and it stays cold under the gold sky: the sea's mean colour (0.35, 0.49, 0.60), S 0.46, under a sky of
+(0.85, 0.72, 0.50), with no path of the low sun on it (the first audit's F9, still open).
 
 **Likely cause (not checked in the code; for E to confirm).** The dashes lie on the water's plane and are sized in
 octaves by distance, but seen at a grazing angle a dash 3 px wide on the plane is 1 px tall on the screen: the
@@ -121,7 +124,10 @@ not drawn") along its short side.
 may show only the fallback, so the missing reflection is NOT a finding of this audit. The grain is, because it is
 the water's own paint.
 
-**Which lane.** E (water paint, `WATER_FRAG`). What the fix must do: choose the dash's octave by its SHORT side on
+**Which lane.** W3 (water paint, `WATER_FRAG`; on water-paint 6fcd2ed W3 has already widened the low-angle
+strokes up to five times and replaced the per-pixel thinning, which cut the river on foot from about 70 to 46 per
+cent in its own stills: the right direction, not yet the target), with E-W2 for the sea's direction and F (me) for
+the sky's gold reaching the water. What the fix must do: choose the dash's octave by its SHORT side on
 the screen (never under about 3 px tall at 480 lines), so that at a grazing angle the river is a few long horizontal
 dashes, not a hundred scratches; fewer light dashes (a sparse glitter toward the sun, not every row). Cost: fewer,
 larger dashes cost the same or less.
@@ -132,7 +138,8 @@ larger dashes cost the same or less.
 
 **Stills:** `audit2/aut_150_12.jpg`, `sum_150_12.jpg` (top left), `aut_420_12.jpg`, `sum_420_12.jpg`,
 `aut_420_16.8.jpg`, `aut_1km_12.jpg`, `sum_1km_12.jpg`, `sum_1km_16.8.jpg` (at 1 km the mountains fill half the
-picture); crops `audit2/crop_mountains150.jpg` (x2), `crop_mount420.jpg`, `crop_teal420.jpg` (x3).
+picture), `coast_12.jpg` (the same on the coast's cliff from the shore: upright pastel leaves, lime, orange and
+lilac, on the lit face); crops `audit2/crop_mountains150.jpg` (x2), `crop_mount420.jpg`, `crop_teal420.jpg` (x3).
 
 **What is seen.** The mountains behind the wood are heaps of tall leaf-shaped patches in pastel rose, lime, lemon,
 lilac and grey, laid every way, with flat triangles showing through. Neither face of the mountain is in shade; the
