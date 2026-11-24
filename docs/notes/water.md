@@ -414,7 +414,24 @@ Branch `water-bodies` = lane 0 + look-proto v37.1 + `origin/design-water` (W1's 
   WATER_FRAG): asked the coordinator who does it.
 - design-water a877068 (the falls flip, with water-paint and its curtain fix) merged here (1dbc5ee); E's one line in
   hydro.test kept (every part switched off for 'no part asked for'). Suites 325 / 107 / 445.
-- NEXT: the coordinator's word on the shore direction; after the branches meet (the coordinator's call): the pool's pcThinLayer to W3's
+- **THE SEA'S SHORE AND CHOP (the coordinator gave it to W2, F's design; branch `water-sea`, da7baa7, a merge of W3's
+  water-paint 05bfe0a; all behind ?wsea=1, the default sea v37):** world/shore.js (new, with shore.test.mjs): the way toward
+  land times its nearness (by the share of rings at 120 / 250 / 450 m on land) and the narrowest crossing (land each side,
+  read to 700 m), on a 160 m lattice of the cube faces, measured once a node, read bilinearly from the nodes that ARE sea.
+  patchgen (only with ?wsea >= 1, sea found by W3's aTurb.z byte) hands it to the water mesh as aShore, four bytes, bound in
+  terrain.js; no ground-sample slot. WATER_FRAG: the wind's waves turned toward land by the nearness (left alone when they run
+  out to sea), the strokes along the turned crests; the fetch (the crossing over how squarely the wind crosses it) under
+  900 m (fully 300 m) makes the strokes short chop, 3.5 widths, fewer light ones. The deeper far body (079fcf3) is the sea's
+  only (vOpen), so ponds and lakes keep water-paint's values. SEEN at phone settings with ?physics=1
+  (`sea-shore-chop-strait150-strait400-coast150-coast400-v37-off-on.jpg` on water-sea): the falls strait short broken chop;
+  facing a coast with the wind along it the strokes bend along the coast. PROVEN: the default against water-paint 05bfe0a's
+  own files, at most 74 of 518400 pixels by 6 of 255. Cost: a sea node 0.1 ms in the browser, about 2,800 over three views,
+  once a world. NOT RIGHT YET: end-on up the strait the chop still lines up toward the horizon; the bent strokes may read as
+  current lines round headlands. With F. Slots: W3 go ahead, C agreed, B no reply. (Commit 521202e said "agreed" before the
+  replies came: left as it is.) Heads-up passed on: water-paint's runoff slots 24-25 against C's snow at 24 in v39.2.
+- C (far view) paints the coast's wall (?rockfield=1); agreed: no geometry change within 30 m of any fall, and C runs
+  hydro.test and falls.test on its merge.
+- NEXT: F's word on the sea's shore and chop; after the branches meet (the coordinator's call): the pool's pcThinLayer to W3's
   pcWStrokes, pcFallMilk and the FALL_ colours into waterchunk.js.
 - Camera places for the falls views: `fallsView(S)` and the scratch `fallcams.mjs` (sea60, sea150, air400, bank, E7).
 
