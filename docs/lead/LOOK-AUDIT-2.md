@@ -53,8 +53,9 @@ the storm leaves the land lit like a fair noon.
 
 ## 1. From the air the wood is confetti, not trees
 
-**Stills:** `audit2/aut_150_12.jpg`, `aut_150_16.8.jpg`, `sum_150_12.jpg`, `sum_150_16.8.jpg`; crops x3
-`audit2/crop_aut150.jpg`, `crop_sum150.jpg`. (PENDING: 420 m, 1 km.)
+**Stills:** `audit2/aut_150_12.jpg`, `aut_150_16.8.jpg`, `sum_150_12.jpg`, `sum_150_16.8.jpg`, `aut_420_12.jpg`,
+`aut_420_16.8.jpg`, `sum_420_12.jpg`, `sum_420_16.8.jpg`; crops x3 `audit2/crop_aut150.jpg`, `crop_sum150.jpg`.
+(PENDING: 1 km.)
 
 **What is seen.** At 150 m the autumn wood is a carpet of yellow, orange and red flecks, every fleck its own colour,
 with dark conifers dotted through it; the summer wood is the same carpet in green and lemon. You cannot point at a
@@ -69,7 +70,10 @@ lying on the grass beside it. Between the stands: glades of yellow-green grass".
 **Measured.** Pattern length at 150 m: colour 2-3 px, lightness 2 px, in both seasons and both hours. A crown 8 m
 across at 250 m from the eye is about 15-30 px on this screen, so a wood made of crowns would measure 8-15 px. Autumn
 roof at noon: warm families 69 per cent of the wood, V 0.90 S 0.78 (references V 0.68); at 16.8: V 0.74 S 0.86.
-Summer roof at noon: V 0.65 S 0.62 (fine).
+Summer roof at noon: V 0.65 S 0.62 (fine). At 420 m the same: pattern length 3 px (colour) and 2 px (lightness);
+autumn roof at noon V 0.89 S 0.66, at 16.8 V 0.74; summer V 0.64 S 0.48; and almost no darks in the wood (under V
+0.3: 4.9 per cent autumn, 6.4 summer), where the references' dark conifers and shaded meadow are about a sixth of
+the paint. At 16.8 a 15-degree sun throws no shadow across the wood and the hill has no shaded flank.
 
 **Why it matters most.** The owner's own words (24 Nov): "things should look good far before I get there like when
 im flying high in the sky up to a mile I want trees from a distance to look good." This is that view, and it is the
@@ -121,8 +125,9 @@ larger dashes cost the same or less.
 
 ## 3. Mountains are rainbow polygons
 
-**Stills:** `audit2/aut_150_12.jpg`, `sum_150_12.jpg` (top left), crop x2 `audit2/crop_mountains150.jpg`.
-(PENDING: 420 m, 1 km.)
+**Stills:** `audit2/aut_150_12.jpg`, `sum_150_12.jpg` (top left), `aut_420_12.jpg`, `sum_420_12.jpg`,
+`aut_420_16.8.jpg`; crops `audit2/crop_mountains150.jpg` (x2), `crop_mount420.jpg`, `crop_teal420.jpg` (x3).
+(PENDING: 1 km.)
 
 **What is seen.** The mountains behind the wood are heaps of tall leaf-shaped patches in pastel rose, lime, lemon,
 lilac and grey, laid every way, with flat triangles showing through. Neither face of the mountain is in shade; the
@@ -134,7 +139,9 @@ not gone; the smear has become big pastel leaves.
 snow". A mountain is a few big planes, lit and shaded, cool with distance.
 
 **Measured.** Top-left mountain at 150 m, noon: under V 0.3, 0.2 per cent of its pixels (autumn) and 0.3 (summer);
-V median 0.65-0.81; warm, green and blue families all present at once.
+V median 0.65-0.81; warm, green and blue families all present at once. At 420 m (crop x3, `crop_teal420.jpg`)
+the face is overlapping leaf shapes as big as a tree, lilac, olive, yellow and grey-violet, like stained glass; the
+conifers on its foot are frosted teal.
 
 **Which lane.** C. Its FV4 rock faces (`?rockfield=1`, compiled out of v39.2) are the fix that exists: at the coast
 cliff they turn the rainbow wall into a layered rock face with beds, seams and a lit lip (reviewed and accepted
