@@ -511,7 +511,7 @@ whether the performance work is one more version or a redesign.** Their own row 
 
 ## 3. State right now (update this before you stop)
 
-**STATE 24 Nov, 09:45 (first account): TWELVE HELPER SESSIONS BUILDING, EACH ON ITS OWN BRANCH. `main` is v38.1.**
+**STATE 24 Nov, 10:10 (first account): TWELVE HELPER SESSIONS BUILDING, EACH ON ITS OWN BRANCH. `main` is v38.2.**
 - The owner's direction (24 Nov): 30 a second on the S23 Ultra, the view from the air good to a mile, much denser
   grass, flowers and more plants, flora before fauna. The v37 speed test that drives it is in the log (24 Nov): as
   set about 89 ms (11 a second); near trees about 52 ms, far trees about 17-21, the plants' fragment work about 34;
@@ -526,6 +526,8 @@ whether the performance work is one more version or a redesign.** Their own row 
 - v38.1 is live (pull request #40): A2's split trees behind ?trees2=1 (the same picture), its rows in bench=trees.
   WAITING FOR THE OWNER: bench=trees once more, to price 'trees: two short programs'; if it saves what the wood costs,
   split becomes the default after the look director's review.
+- v38.2 is live (pull request #41): A1's far impostors behind ?fartree=impostor (not yet passed by F: speckle, jagged
+  edges; stays off) and the far colour-table fix (on). ONE bench=trees run now prices split, cards and impostors.
 - ALL DESIGNS IN, on these branches' docs/lead/: TREES-DESIGN.md and FARVIEW-DESIGN.md (on r2), FLORA-DESIGN.md
   (design-flora), WEATHER-DESIGN.md (design-weather), WATER-DESIGN.md (design-water), LOOK-RULES.md and
   LOOK-AUDIT.md (look-director).
