@@ -37,3 +37,6 @@ if (WX2.nearmap || WX2.farwind) WX2.windmap = true;
 // (storms born from the land need the map's sites, and the weather's own top needs the cloud map)
 if (WX2.stormland) { WX2.windmap = true; WX2.cloudmap = true; }
 if (WX2.rainshaft || WX2.bolts) WX2.cloudmap = true;
+// (the clouds lane, W1: the look director's ?clouds3d=1 draws the 3D clouds, which read the cloud map and the wind map,
+//  so the owner needs one switch, not three. Any value over 0 turns both maps on.)
+if (Q && Q.has('clouds3d') && +Q.get('clouds3d') > 0) { WX2.cloudmap = true; WX2.windmap = true; }
