@@ -150,7 +150,7 @@ function stoneC(c, gr, gg, gb, m, out) {
   const v = Math.max(r, g, b); if (v < 0.62) { const f = 0.62 / Math.max(v, 1e-3); r = Math.min(1, r * f); g = Math.min(1, g * f); b = Math.min(1, b * f); }
   out[0] = r; out[1] = g; out[2] = b; return out;
 }
-const _stc = [0, 0, 0], _cuv = [1, 0];
+const _stc = [0, 0, 0], _cuv = [1, 0], _pcol = [0, 0, 0];
 // A BLADE'S TONE (the look director's audit 2: "marks take their colour from the PIXEL, not the THING"; from 10 to 30 m
 // the sward was a speckle of three greens, blade by blade). With ?tuft on, a TUFT takes one of the three colours (or is a
 // dark accent tuft, one in seven) and its blades differ only by a value step; off, each blade picks its own as before.
@@ -791,22 +791,28 @@ class Ring {
         // to three touches in the drift's colour, standing in the sward and facing the eye, gathered round one centre so
         // that the cell's flowers are one pool, as many and as broad as the cell's COVER says (the thing, not the
         // pixel), with two heads (one in the far ring) left over them; where it is thin (its edge) the heads stay
-        // scattered as before. The touches are kept small (about 0.5-0.7 m across in the middle ring, 2-3 m in the far):
-        // MEASURED (Node, the meadow on foot) touches sized to fill the cell painted 36 per cent more of the picture
-        // and, at 10 m, were blobs some 70 px across. The cell's room the heads give up goes to its grass.
+        // scattered as before. The touches are kept small and ROUND (about 0.2-0.3 m across in the middle ring, 0.7-1.5 m
+        // in the far; as tall as they are wide, as a head is): MEASURED (Node, the meadow on foot) touches sized to fill
+        // the cell painted 36 per cent more of the picture and, at 10 m, were blobs some 70 px across; and SEEN, touches
+        // a quarter as tall as wide were thin horizontal lines of red and white from 1.8 m and 10 m, not pools.
         let nh = nf, patched = false, np0 = 0;
         if (FLORA.patch && nf >= 2) {
           const cov = Math.min(1, o.dens * (two2 ? 1.5 : 1));
           if (cov > 0.22) {
             const np = Math.min(nf - 1, far ? (cov > 0.5 ? 2 : 1) : (cov > 0.6 ? 3 : cov > 0.38 ? 2 : 1));
-            const pc = b1.c, wj = far && Math.max(pc[0], pc[1], pc[2]) - Math.min(pc[0], pc[1], pc[2]) < 0.25 * Math.max(pc[0], pc[1], pc[2]) ? 0.8 : 1;
+            // (a white drift seen whole takes a fifth of its eyes' colour: SEEN 24 Nov at 1.8 m, white patches alone read as pale
+            // blue-grey puddles, where a field of daisies reads cream)
+            const c1 = b1.c, pale = Math.max(c1[0], c1[1], c1[2]) - Math.min(c1[0], c1[1], c1[2]) < 0.25 * Math.max(c1[0], c1[1], c1[2]);
+            let pc = c1;
+            if (pale && b1.eye) { pc = _pcol; pc[0] = lerp(c1[0], b1.eye[0], 0.2); pc[1] = lerp(c1[1], b1.eye[1], 0.2); pc[2] = lerp(c1[2], b1.eye[2], 0.2); }
+            const wj = far && pale ? 0.8 : 1;
             const st0 = b1.stalk ? 0.5 * (b1.stalk[0] + b1.stalk[1]) : 0.2;
-            const c0 = at(0.3 + 0.4 * H(918 + ho), 0.3 + 0.4 * H(919 + ho)), dw0 = far ? 0.65 + 0.6 * cov : 0.17 + 0.10 * cov;
+            const c0 = at(0.3 + 0.4 * H(918 + ho), 0.3 + 0.4 * H(919 + ho)), dw0 = far ? 0.34 + 0.31 * cov : 0.09 + 0.05 * cov;
             for (let q = 0; q < np; q++, k++) {
               const q1 = H(900 + q + ho), q2 = H(906 + q + ho), q3 = H(912 + q + ho);
               const dw = dw0 * (0.85 + 0.3 * q3), jit = (0.94 + 0.12 * q2) * wj;
               const p = np === 1 ? c0 : [c0[0] + (q1 - 0.5) * 2.4 * dw0, c0[1] + (q2 - 0.5) * 1.8 * dw0];
-              this.put(p[0], p[1], 0, 0, 0, dw * (0.40 + 0.12 * q1) * kh, dw, PATCH, q3, born, pc[0] * jit, pc[1] * jit, pc[2] * jit, st0 * 0.3, flex * 0.5, tone1);
+              this.put(p[0], p[1], 0, 0, 0, dw * (1.5 + 0.4 * q1) * kh, dw, PATCH, q3, born, pc[0] * jit, pc[1] * jit, pc[2] * jit, st0 * 0.3, flex * 0.5, tone1);
             }
             left -= np; patched = true; np0 = np;
             nh = Math.min(nf - np, far ? 1 : 2);
