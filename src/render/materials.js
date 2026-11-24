@@ -1655,7 +1655,7 @@ vec3 pcWetWashV(vec3 c, float amt) {
 ${LEAF_SUN}
 uniform vec4 uLeafLod;    // the trees' leaves by distance (flora.js): x the distance within which every leaf is drawn (0: off), y the least share kept
 #endif
-#if defined(PC_TREE_LEAF) || defined(PC_TREE_CARD)
+#if defined(PC_TREE_LEAF) || defined(PC_TREE_CARD) || defined(PC_TREE_WOOD)
 uniform vec4 uFocus;      // (the trees' leaf program: the window round the explorer is cut here, whole leaves; flora.js _focus)
 #endif
 
@@ -1764,6 +1764,15 @@ void main() {
         keepT = smoothstep(mix(0.35, 0.9, twT), mix(1.6, 3.6, twT), cdT);
         float bnT = aBranchId < 0.0 ? 0.985 : fract(aBranchId * 7.31 + inst.z * 3.7) * 0.94 + 0.02;
         if (vWash < 0.999 && (vWash >= 0.0 ? bnT > vWash : bnT < 1.0 + vWash)) keepT = 0.0;
+        // (a trunk or a bough between the lens and the explorer is pinched in round the line of sight to the figure,
+        //  as the big program cut a ragged window through it: the figure is never lost behind a tree)
+        if (uFocus.w > 0.5) {
+          vec3 cvT = (modelViewMatrix * vec4(cwT + pcRound(io + uOrigin), 1.0)).xyz;
+          if (cvT.z > uFocus.z + 0.4) {
+            vec3 rdT = normalize(cvT);
+            keepT = min(keepT, smoothstep(0.5, 1.4, length(uFocus.xyz - rdT * dot(uFocus.xyz, rdT))));
+          }
+        }
       #endif
       if (keepT < 1.0) { cardO *= keepT; cardG *= keepT; lp = aCard + (lp - aCard) * keepT; }
     }
@@ -2608,8 +2617,17 @@ void main() {
   // (the speed test's cuts, shared.js uOilL.y, as the big program honours them: 4 written at once, 2 one flat colour)
   if (uOilL.y > 3.5 && uOilL.y < 4.5) { pcWrite(vec3(0.42, 0.40, 0.32), 0.0, vec3(0.0, 0.0, 1.0), -vView.z, 3.0); return; }
   pcDist = length(vView);
+  // (which way the face seen is turned. The wood is drawn BackSide (makePropMaterial), and three draws a BackSide
+  //  material by turning the winding over, so the faces seen report themselves front-facing; the big program, drawing
+  //  the same faces DoubleSide, saw them as back faces and turned their normals round. PC_WOOD_FLIP keeps that
+  //  exactly, so the bark is lit as it always was.)
+  #ifdef PC_WOOD_FLIP
+    bool seenFront = !gl_FrontFacing;
+  #else
+    bool seenFront = gl_FrontFacing;
+  #endif
   vec3 nV = normalize(vNV);
-  if (!gl_FrontFacing) nV = -nV;
+  if (!seenFront) nV = -nV;
   if (uOilL.y > 1.5 && uOilL.y < 2.5) { pcWrite(uBarkB, 0.0, nV, -vView.z, 3.0); return; }
   vec3 sunV = normalize((viewMatrix * vec4(uSunDirW, 0.0)).xyz);
   ${SKYUP('dot(nV, mat3(viewMatrix) * uUpW)')}
@@ -2649,7 +2667,7 @@ void main() {
   // the light, once, at the centre of the pixel's own streak: its facing, and the shadow map there
   vec3 Bc = vBody + bdx * dsA.x + bdy * dsA.y;
   vec3 nVc = normalize(vNV + nvdx * dsA.x + nvdy * dsA.y);
-  if (!gl_FrontFacing) nVc = -nVc;
+  if (!seenFront) nVc = -nVc;
   vec4 nA = uOilL.x > 0.5 ? vec4(0.5) : pcNoiseS(Bc, 9.0, wA);
   float xs = dot(nVc, sunV) * 0.5 + 0.5;
   xs *= mix(0.55 + 0.30 * pale, 1.0, pcSunAt(Bc, canopy * 0.8, 8.0 - vAbove, wA));
@@ -2838,6 +2856,7 @@ export function makePropMaterial(bodyU, opts = {}) {
   // (?treedepth=1, the cards only: opts.depth 'first' the depth pass, 'equal' the colour pass drawn after it)
   const dpass = tree === 'card' && (opts.depth === 'first' || opts.depth === 'equal') ? opts.depth : null;
   if (dpass) defines[dpass === 'first' ? 'PC_TREE_DEPTH' : 'PC_TREE_EQUAL'] = 1;
+  if (tree === 'wood' && opts.doubleSide) defines.PC_WOOD_FLIP = 1;      // (drawn BackSide: see WOOD_FRAG)
   const m = new THREE.ShaderMaterial({
     name: 'pc-prop-' + (opts.name || ''),
     defines,

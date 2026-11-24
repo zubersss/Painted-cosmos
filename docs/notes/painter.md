@@ -62,9 +62,25 @@ the phone prices both in one run.
 - NOT KNOWN: what the two short programs save on the phone (the design's reading: the bark's long program in every
   near-tree wave; only the bench can say), anything in motion, anything on a real graphics card.
 
-**Next:** A/B stills (5/10/18/30/45 m, autumn and green wood, phone and desktop) -> commit T2 split -> stills of cards
-and T5 (pixel-identical check) -> commit -> T3 (the middle tree) -> report each step to the coordinator and the look
-director (session_01R5Brhzz2JPPF6Ecz6XRQHx).
+- T5 SEEN: the cards with and without `?treedepth=1` are identical inside every leaf; with multisampling on (the
+  gallery's tier 1 in software) they differed at leaf edges only, because the painter's loop forced alpha to coverage
+  back on for the colour pass (fixed: `render/index.js` leaves the trees' programs alone). The check with no
+  multisampling, as the phone draws (`?aa=0`), is in the render queue.
+
+**How the stills are made** (the tools are scratch, not committed; recreate from this): `tools/lab.mjs serve`, then
+open `/gallery.html?body=earth&biome=autumn_woodland&season=1&cam=trees&time=16.8&look=oil&lite=1&quality=1&t=0&ui=0&fov=58`
+(+ `&trees2=...`) at 936 x 372; eval a helper that picks the tallest tree within 30 m of the first camera place
+(`world.sampleObstacles`) and sets `__pcGallery.state.pos/yaw/pitch` to stand d metres from it, eye 1.7 m, aimed at
+0.55 of its height; `resume`, wait for `world.busy === 0`, `grab out.png 3`. THE GREEN WOOD is not reachable by
+`?biome=temperate_forest` in the oil look (the first two sites swap: that address lands in the autumn wood); use the
+world's own `findBiome('earth', 'autumn_woodland')` stand, which in the oil look IS the green wood.
+Counts: a copy of `tools/overdraw.mjs` with `QUALITY.level` from the environment (1 is the phone's tier), material
+arrays counted group by group, part 7 thinned as a leaf, `where=spawn` (the spawn is the autumn wood of grove trees;
+its `where=autumn` stand is the green wood's broadleaves, where `?trees2` changes no geometry).
+
+**Next:** the green wood and desktop A/B (rendering), the back-face wood and denser-spray stills, then the look
+director's S1/S2 on the B side; report each to the coordinator and the look director
+(session_01R5Brhzz2JPPF6Ecz6XRQHx). Then: wait for the owner's bench run before tuning further.
 
 ## Hand-over of THE OIL LOOK, prototype on branch `look-proto` (READ THIS FIRST; kept current)
 
