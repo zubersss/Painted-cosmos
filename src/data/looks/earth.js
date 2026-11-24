@@ -124,12 +124,22 @@ export default {
   cloud: 0.45,
   // (group D, the weather, with ?stormland=1: HOW STORMY the land is. One number for the owner to turn; it sets how
   //  many storms grow on a stormy afternoon and how far they drift. MEASURED over 200 game days at the spawn:
-  //    1    storms on 71 % of days, one in sight of the wood on 65 %, one over the wood on 24 % (as tuned)
-  //    0.5  in sight on 43 %, over the wood on 11 %
-  //    1.5  in sight on 67 %, over the wood on 36 %
+  //    1    storms on 71 % of days, one in sight of the wood on 62 %, one over the wood on 22 % (as tuned)
+  //    0.5  in sight on 42 %, over the wood on 11 %
+  //    1.5  in sight on 68 %, over the wood on 27 %
+  //  (no storm drifts faster than 10 m/s times the dial: a storm takes about three minutes to pass)
   //    0    no storms born from the land at all.   physics/weather.js STORMLAND.)
   storms: 1,
   deck: { height: 560 },
+  // THE WEATHER'S OWN HEIGHTS AND SHARES (group D, lane W1 CLOUDS; docs/lead/WEATHER-DESIGN.md 3 and 4.3). Read only in the
+  // oil look: by world/clouds.js (the 3D clouds, ?clouds3d=) and world/index.js skyCeiling (the sky stays a sky to
+  // `ceiling[0]` m over the land and is space by `ceiling[1]`). A world without this row keeps the defaults.
+  //   fair: the share of slots a fair sky holds where the cloud map says nothing (0.8 of `cloud`); base: a fair
+  //   cumulus' base over the land, morning and evening (m, where the map does not give one); alto, altoShare: the sky's
+  //   own flat cloud lifted to the altocumulus this far over the land, keeping this share of its cover; cirrus: the high
+  //   cloud's share where the map has none (sky.js A4); rainbow: 0 never (A9); deck, valley,
+  //   towers, cumulus: switches and heights for the pieces as WEATHER-DESIGN 3 sets them (the map gives the deck's).
+  weather: { cumulus: 1, fair: 0.36, base: [300, 380], towers: 1, deck: [180, 260], valley: 1, alto: 1000, altoShare: 0.75, cirrus: 0.25, rainbow: 1, ceiling: [2800, 6000] },
   visibility: [185, 2600],   // metres at ground level, and from high up
   sky: EARTH_SKY,
   // (the oil look: Earth takes the look's golden hours whole: its wood is the owner's reference clip's)
