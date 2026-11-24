@@ -87,13 +87,18 @@ FV7 of `docs/lead/FARVIEW-DESIGN.md`. A second session (A2, branch `trees-near`)
 the same time: this lane touches only the far parts of `flora.js`, `florakit.js`, the plant material's far branch,
 `render/impostor.js`, `render/shadow.js` and new rows in `core/bench.js`.
 
-**State (update this line every step):** (24 Nov, about 13:10) WAITING: F on making the small-crown rule the
-default (A/B sent, phone and desktop 1080: `A1_small_*`; that also covers step (a), the desktop still); C on the seam
-(two options sent); the coordinator on whether a 1-2/255 difference from the bake fix is acceptable (MEASURED against
-1ecf744, phone settings: the speed-test alpha edits and the small-crown code switched off are byte-identical; the
-flora.js bake fix moves at most 2 levels of 255 on 1.1 percent of pixels on foot and 4.3 percent at 150 m, all impostor
-pixels; likely the instances' order or birth time in the impostor mesh after the swap, not proven), and on merging
-look-proto after v39.1. Scratch worktree `seam` (C's farview merged, never pushed) kept for more seam stills. URGENT FIX DONE for v39.1 (the coordinator): during
+**State (update this line every step):** (24 Nov, about 13:45) look-proto v39 (d9d9ed7) merged into trees-far and
+pushed (my far trees compile under the new light: guard not tripped, swap 21 ms). NEXT, ON THE COORDINATOR'S WORD
+"v39.2 is on look-proto" (it carries F's colour fixes, look-director up to 64f1742): merge origin/look-proto, make the
+small crowns the default (IMP.small 12, ?impsmall=0 the opt-out), run the 1 km seam check F asked for (hue and
+saturation of the impostor zone against C's roof), push, tell F and the coordinator. Do NOT merge look-director into
+trees-far (the coordinator). MEASURED under v39, phone settings, 1 km, roof on: rule off V 0.65 S 0.35 hue 80, rule on V
+0.75 S 0.42 hue 78, the roof past the reach V 0.68 S 0.37 hue 70 (the new air lifts the darks: no pixel under V 0.3
+either way). The same with F's colour fixes is being measured in a scratch copy (`ld`, never pushed). T6 extra (the
+coordinator): the split trees drawn whole in the shadow pass behind `?shwhole=1` (OFF), row 'split trees whole in
+shadow pass'; MEASURED on foot with ?trees2=1: 226 -> 207 draws (every visible casting split mesh), picture
+byte-identical; the default is the coordinator's call. The bake fix's 1-2/255 difference: accepted by the coordinator.
+Scratch worktrees `seam` and `ld` (never pushed). URGENT FIX DONE for v39.1 (the coordinator): during
 the bake over frames the far wood was gone; now today's far trees stand in until the bake is done and hand over in that
 frame (flora.js impWant / impOn, _impReady; impostor.js step(), onReady, bakeTick), the bake counts as busy from the
 frame it is asked for. SEEN, gallery autumn wood 16.8 h on foot, phone settings: mid-bake (step 5 of 78, not ready,
