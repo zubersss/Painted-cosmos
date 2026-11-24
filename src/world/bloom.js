@@ -40,15 +40,15 @@ import { SEASON } from '../data/season.js';
 // the picture back as it was before the lane, to the bit. Each of these is 1 by default and 0 gives that part back:
 //   ?bloom=0     no flowers from this map at all (the near rings lay their flowers as before, the ground is not tinted)
 //   ?bloomair=0  the flowers, but not their colour in the ground (A1)
-//   ?bloomfar=1  (FV6, with the far view) the drift's cover and colour as their own channel for the ground's far dabs
-//                (o.fd, o.fc below), and the drift no longer mixed into the far colour (o.r2..b2): off until C's half lands
+//   ?bloomfar=0  (FV6, with the far view) the drift's own channel for the ground's dabs off (o.fd, o.fi, o.fi2 below), and
+//                the drift mixed into the far colour (o.r2..b2) again; on by default since the look director passed it
 //   ?bloomyear=0 the flowers, but not following the year (every kind in flower all the year, as before the year came)
 //   ?grass2=0    (read here too for the floor under the sward; nearground.js FLORA reads it for everything else)
 // Read once, at the first call (MODE.oil is set by render/shared.js when it loads, which may be after this module is).
 let SW = null;
 export function bloomSwitches() {
   if (SW) return SW;
-  const f = { bloom: 1, air: 1, grass2: 1, year: 1, far: 0 };
+  const f = { bloom: 1, air: 1, grass2: 1, year: 1, far: 1 };
   try {
     const q = new URLSearchParams(location.search), on = (k) => !q.has(k) || (q.get(k) !== '0' && q.get(k) !== 'false');
     const isOld = q.get('flora') === 'old' || q.get('flora') === '0' || q.get('flora') === 'false';   // (the opt-out: nearground.js FLORA)
@@ -58,7 +58,8 @@ export function bloomSwitches() {
     f.year = f.bloom && on('bloomyear') ? 1 : 0;
     // (FV6 with the far view, C: the drift's cover and colour go to the ground's far dabs as their own channel, aFar.z/w in
     // patchgen.js; 0 by default until C's half lands, then on together after stills at 150 m, 400 m and 1 km)
-    f.far = f.air && q.get('bloomfar') === '1' ? 1 : 0;
+    // (ON by default since the look director passed it near the eye and from the air, 24 Nov; ?bloomfar=0 the opt-out)
+    f.far = f.air && on('bloomfar') ? 1 : 0;
   } catch { /* no address to read (Node, the tests): everything on, if the look is */ }
   if (!MODE.oil) { f.bloom = 0; f.air = 0; f.grass2 = 0; f.year = 0; f.far = 0; }
   SW = f;
@@ -188,12 +189,15 @@ export function unpackRGB565(v, out) {
 // count, index: Map(kind -> 0..15) }.
 // (a white or near-white flower's far colour takes a fifth of its eyes' colour, so a daisy drift laid in whole dabs reads
 // CREAM at its own value, not a grey-white: the look director on the pools, 24 Nov, "mixing white into green makes grey")
+// (and every far colour's top channel is held to 0.82, a white's to 0.80: SEEN 24 Nov, with the far view's dabs laying
+// whole strokes in these colours near the eye, sunlit lemon and cream strokes took the meadow's V over 0.90 from 0.5 to
+// 8.2 per cent at 10 m, where LOOK-RULES C6 allows 4; the near heads are held the same way, V 0.88 lit)
 function farColour(c, out, eye) {
   let r = c[0], g = c[1], b = c[2];
   const mx0 = Math.max(r, g, b), mn0 = Math.min(r, g, b);
   if (eye && mx0 - mn0 < 0.25 * mx0) { r += (eye[0] - r) * 0.2; g += (eye[1] - g) * 0.2; b += (eye[2] - b) * 0.2; }
-  const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
-  const f = (mx - mn < 0.25 * mx && mx > 0.80) ? 0.80 / mx : 1;
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b), top = mx - mn < 0.25 * mx ? 0.80 : 0.82;
+  const f = mx > top ? top / mx : 1;
   out[0] = r * f; out[1] = g * f; out[2] = b * f; return out;
 }
 const PAL = new WeakMap();

@@ -631,7 +631,7 @@ export function attachBench(pc) {
       //  on cards (?trees2=cards). Each against the "as set" row above, built afresh while the test runs.)
       ...T2ROWS,
       ['no trees', () => show(/^pc-prop-(tall|far)/, false), () => show(/^pc-prop-(tall|far)/, true)],
-      ['no small plants', () => show(/^pc-prop-(?!tall|far)/, false), () => show(/^pc-prop-(?!tall|far)/, true)],
+      ['no small plants', () => show(/^pc-prop-(?!tall|far|under2)/, false), () => show(/^pc-prop-(?!tall|far|under2)/, true)],
       // (the flora lane) what the near grass costs (all of it: GRASS's first row), and its finest ring alone. Its material's own `visible` is
       // the switch: the ring's update moves its mesh, never this.
       ['near grass: the blades only (the fine ring and the carpet)', () => nearRings((r) => { r.material.visible = r.cfg.name === 'fine' || !!r.cfg.carpet; }),
@@ -782,12 +782,31 @@ export function attachBench(pc) {
     // ?bench=foot: the frame on foot at the landing without the trees' questions (the owner's 33 ms, 24 Nov). With the
     // two short programs and the impostors as the default trees the frame is expected near 22 ms (derived, never
     // measured), so these rows are asked off the cap, where they can be read: each against the "as set" row before it.
+    const UNDER0 = (() => { try { return new URLSearchParams(location.search).get('under') === '1'; } catch (e) { return false; } })();
+    const U2C0 = (() => { const f = flora(); return !!(f && f.u2cells); })();
+    const standing = async () => { const t0 = performance.now(); while (performance.now() - t0 < 30000) { const f = flora(); if (!f || f.busy === 0) return; await wait(250); } };
+    // (the flora lane's denser near ground, world/nearground.js ?dense: asked the other way from how the run started; every
+    //  ring is built again from the other numbers, so the row waits for its marks to be laid before it is timed)
+    const nearG = () => pc.world && pc.world._near;
+    const DENSE0 = (() => { const n = nearG(); return !!(n && n.dense); })();
+    const nearLaid = async () => { const t0 = performance.now(); while (performance.now() - t0 < 20000) { const n = nearG(); if (!n || n.busy === 0) return; await wait(250); } };
+    const denseRow = [DENSE0 ? 'near grass as before 24 Nov (not dense)' : 'near grass and flowers denser',
+      async () => { const n = nearG(); if (n && n.setDense) { n.setDense(!DENSE0); await nearLaid(); } },
+      async () => { const n = nearG(); if (n && n.setDense) { n.setDense(DENSE0); await nearLaid(); } }];
     const footSteps = [
       [AS, null, null],
       ...SHARP0,
       ...GRASS,
+      denseRow,
       [AS, null, null],
-      ['no small plants', () => show(/^pc-prop-(?!tall|far)/, false), () => show(/^pc-prop-(?!tall|far)/, true)],
+      ['no small plants', () => show(/^pc-prop-(?!tall|far|under2)/, false), () => show(/^pc-prop-(?!tall|far|under2)/, true)],
+      // (the flora lane's undergrowth with a body, package O, world/underkit.js: in a speed test the kits are always placed,
+      //  shown only if the run started with ?under=1, and this row asks the other way; 'no small plants' leaves them alone)
+      [UNDER0 ? 'no undergrowth' : 'with the undergrowth', () => show(/^pc-prop-under2/, !UNDER0), () => show(/^pc-prop-under2/, UNDER0)],
+      // (the outer undergrowth cells from their own placement cells, the flora lane's ?u2cells: the row asks the other way
+      //  from how the run started; flora.setU2Cells lets every outer cell go and asks for it again, so each switch waits
+      //  for the plants to be standing before the row is timed)
+      [U2C0 ? 'outer undergrowth as before 24 Nov' : 'outer undergrowth from its own cells', async () => { const f = flora(); if (f && f.setU2Cells) { f.setU2Cells(!U2C0); await standing(); } }, async () => { const f = flora(); if (f && f.setU2Cells) { f.setU2Cells(U2C0); await standing(); } }],
       ['no ground drawn', () => ground(false), () => ground(true)],
       ['ground one flat colour', () => B({ flat: 1 }), () => B({ flat: 0 })],
       [AS, null, null],

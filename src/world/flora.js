@@ -15,7 +15,8 @@
 import * as THREE from 'three';
 import { getSurface } from './surface.js';
 import { dirToFace, faceToDir, nodeSize } from './cubesphere.js';
-import { INST_STRIDE, U_GRASS, U_FERN, U_BUSH, U_ROCK, U_FLOWER, U_STONE, U_REED, U_SHARD } from './floraplace.js';
+import { INST_STRIDE, U_GRASS, U_FERN, U_BUSH, U_ROCK, U_FLOWER, U_STONE, U_REED, U_SHARD, U_KIT0 } from './floraplace.js';
+import { underKit } from './underkit.js';      // (the flora lane's undergrowth with a body, ?under=1: world/underkit.js)
 import { SEASON, leafNow } from '../data/season.js';
 import { FLORA_PHYS, TALL_KITS, farCardGeometry, farBlobGeometry, sortLeafCards, leafDrawCount, farTreeGeometry, grassGeometry, grassPatchGeometry, reedGeometry, fernGeometry, bushGeometry, rockGeometry, flowerGeometry, shardGeometry } from './florakit.js';
 import { makePropMaterial, TREE_DEPTH, TREE_GUARD } from '../render/materials.js';
@@ -230,6 +231,15 @@ const UNDER2_SHIFT = (() => {
     if (n === 1) return 1; if (n === 2) return 2; } catch { /* no address */ }
   return 2;
 })();
+// THE OUTER UNDERGROWTH CELL'S OWN PLACEMENT CELLS (the flora lane, 24 Nov; `?u2cells=1`, OFF until the look director
+// and the coordinator rule on it). Since the cell grew to four placement cells a side above (UNDER2_SHIFT, ba27b30),
+// the two places that read its placement cells still read two a side at ix * 2 + a: a cell at level 6 read level-8
+// cells somewhere else on the face. COUNTED in Node (the autumn wood on foot): cells 17-182 m from the eye built their
+// ferns, bushes, flowers and boulders where those stand, 615-754 m away, past the 110 m reach, so none of them is drawn
+// near the eye in the oil look (and the obstacles, which read the right cells, are bushes and rocks one cannot see).
+// With it on, a cell reads its own (1 << shift) a side.
+let U2SPAN = (() => { let on = false; try { on = new URLSearchParams(location.search).get('u2cells') === '1'; } catch { /* no address */ }
+  return on && LOOK.oil ? 1 << UNDER2_SHIFT : 2; })();
 
 // WHICH KITS ARE DRAWN FAR OFF AS LEAF CARDS and not as the old lump (the oil look's far tree, v13). A kit left out
 // of this is silently given the lump, which is why it sits beside FAR_DIMS: both must name every tall kit there is.
@@ -915,7 +925,7 @@ export class Flora {
     let n = 0, d;
     if (chunk.kind === 'under2') {
       const parts = [];
-      for (let b = 0; b < 2; b++) for (let a = 0; a < 2; a++) { const t = underCell(this.S, chunk.face, chunk.ix * 2 + a, chunk.iy * 2 + b); parts.push(t); n += t.count; }
+      for (let b = 0; b < U2SPAN; b++) for (let a = 0; a < U2SPAN; a++) { const t = underCell(this.S, chunk.face, chunk.ix * U2SPAN + a, chunk.iy * U2SPAN + b); parts.push(t); n += t.count; }
       d = new Float32Array(n * INST_STRIDE);
       let o = 0;
       for (const t of parts) { d.set(t.data.subarray(0, t.count * INST_STRIDE), o); o += t.count * INST_STRIDE; }
@@ -931,6 +941,7 @@ export class Flora {
       const pk = biomes[d[o + 6]] && biomes[d[o + 6]].under ? d[o + 6] : -1;
       let lists = sets.get(pk);
       if (!lists) { lists = { gn: [], gf: [], fern: [], reed: [], flower: [], bush: [], rock: [], shard: [] }; sets.set(pk, lists); }
+      if (kind >= U_KIT0) { if (!grass) { const kl = lists.kits || (lists.kits = new Map()); (kl.get(kind) || kl.set(kind, []).get(kind)).push(i); } continue; }
       if (kind === U_GRASS) { if (grass) (d[o + 7] < 0.55 ? lists.gn : lists.gf).push(i); }
       else if (grass) continue;
       else if (kind === U_FERN) lists.fern.push(i);
@@ -986,6 +997,8 @@ export class Flora {
       make(lists.bush, this.kit.bush, M.bush, [0, UNDER_FAR, 0.3, 0.8], 0, true);
       make(lists.rock, this.kit.rock, M.rock, [0, UNDER_FAR, 0.3, 0.85], 0);
       make(lists.shard, this.kit.shard, M.shard, [0, UNDER_FAR, 0.3, 0.85], 0);
+      // (the undergrowth with a body, ?under=1 only: a list per kit, in the kit's own material for its biome)
+      if (lists.kits) for (const [kind, list] of lists.kits) { const K = underKit(this, kind, d[list[0] * INST_STRIDE + 6]); if (K) make(list, K.geo, K.mat, K.lod, 0, true); }
     }
   }
 
@@ -1115,6 +1128,19 @@ export class Flora {
   get shadowWhole() { return SHADOW_OPTS.whole; }
   // The far impostors' crown mass (render/impostor.js PC_MASS; the default, ?crownmass=0 the old way), switched while the
   // game runs for the speed test's row: only the impostor program is compiled again. Returns the setting before, or null.
+  // (the speed test, core/bench.js: the outer undergrowth cells built from their own placement cells, or as before;
+  //  every outer cell is let go and asked for again, so the row waits for `busy` to fall to 0. The flora lane's ?u2cells.)
+  get u2cells() { return U2SPAN !== 2; }
+  setU2Cells(on) {
+    const span = on && LOOK.oil ? 1 << UNDER2_SHIFT : 2;
+    if (span === U2SPAN) return;
+    U2SPAN = span;
+    for (const ch of this.under2Chunks.values()) {
+      if (ch.queued) { const qi = this.queue.indexOf(ch); if (qi >= 0) this.queue.splice(qi, 1); ch.queued = false; }
+      this._disposeChunk(ch);
+    }
+    this.under2Chunks.clear(); this.lastUnderEval.set(1e9, 0, 0);
+  }
   setCrownMass(on) { const m = this.mats && this.mats.imp; if (!m) return null; const was = !!m.defines.PC_MASS; if (on) m.defines.PC_MASS = 1; else delete m.defines.PC_MASS; m.needsUpdate = true; return was; }
   get crownMass() { const m = this.mats && this.mats.imp; return !!(m && m.defines.PC_MASS); }
   // The far crowns' shadows on the ground from the air (render/shadow.js FAR_SHADOW, ?farshadow=1), for the speed test's
@@ -1435,7 +1461,7 @@ export class Flora {
         // prepare one missing cell per step, so no single step is long
         if (ch.kind === 'far' || ch.kind === 'under2') {
           // (a far cell is farSpan placement cells to a side -- four in the oil look -- an undergrowth cell always two)
-          const ck = ch.kind === 'far' ? 't' : 'u', span = ch.kind === 'far' ? this.farSpan : 2;
+          const ck = ch.kind === 'far' ? 't' : 'u', span = ch.kind === 'far' ? this.farSpan : U2SPAN;
           let missing = false;
           for (let b = 0; b < span && !missing; b++) for (let a = 0; a < span && !missing; a++) {
             if (!hasCell(ck, this.S, ch.face, ch.ix * span + a, ch.iy * span + b)) {
