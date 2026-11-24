@@ -374,8 +374,19 @@ Branch `water-bodies` = lane 0 + look-proto v37.1 + `origin/design-water` (W1's 
   ground before, 1.0 to 2.7 % now; round the landing 3.3 to 1.2 %; the wood's uplands unchanged. The test holds the widest
   river's square under 4 % too. NOT run on top of E's commit by me (E runs it after the merge). E's own suggestion, no puddle
   within 30 m of any stream, was measured by E and works, but would take most of the wood's puddles (the streams are dense).
-- NEXT: E's landing river merged (then re-run the three water tests, and re-check the main fall, the fjord's choice and the
-  ponds near the landing); W3's curtain fix (then F looks at the falls, then the word to E for the falls flip).
+- **E's LANDING RIVER (c229268, in design-water 01ec60c with 110b43e; merged here d5b4437, suites 325 / 96 / 416):** round
+  the landing puddles on 1.39 % of the dry ground (7.73 % with the old rule); hydro, falls and tarns 18 of 18. Of the nine
+  falls eight are the same; the main one is 26.0 m wide (was 25.6), its lip 0.2 m over, the same 19.5 m drop: the landing's
+  river now carries more water to it. The 22 mouths are the same, so is the fjord's choice; ponds 84 to 85.
+- **THE FALLS WITHOUT THE CURTAIN (W3's fix, water-paint 7889acf, merged in a SCRATCH copy only with design-water):** SEEN
+  at phone settings, 68 m from the sea, 150 m, 400 m: `falls-nocurtain-68m-150m-400m-P1.jpg`, and the fall at 150 m before
+  and after: `falls-curtain-before-after-150m.jpg`. The blue strips beside the sheet are gone; the sheet meets the cliff
+  faces. Not mine but seen: the sheet reads paler and greyer than at F's PASS (its milk takes the water's wash, which W3's
+  new colour changed); asked F whether to raise the whites (fallmat.js, mine). Sent to F; when F passes, the falls line to E.
+  (The scratch merge of design-water and water-paint conflicts in data/mode.js and data/looks/earth.js, two lines each:
+  water-paint's wpaint default 1 against E's switches test, and earth.js oil needs E's keys and W3's airTop; told the
+  coordinator.)
+- NEXT: F's word on the falls (then `W.falls = n('falls', 1)` to E); the top tier's falls views (being taken).
 
 ## Stations and tools
 
