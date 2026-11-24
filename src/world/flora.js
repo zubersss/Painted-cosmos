@@ -94,8 +94,11 @@ const NEARLEAF = typeof location !== 'undefined' && /[?&]nearleaf=1\b/.test(loca
 // them; the needle kinds untouched. It changes the near trees the owner approved: OFF, never default without the owner.
 // ?stormleaf=1 (24 Nov, the coordinator after the look director's storm light): under a storm a tree's crown is painted
 // as the land is, nothing lit and the land's own glaze and deep wash in place of the fair-weather foliage shade
-// (materials.js PROP_VERT, uStormLeaf); with no storm nothing changes. OFF until the look director passes it.
-const STORMLEAF = typeof location !== 'undefined' && /[?&]stormleaf=1\b/.test(location.search || '');
+// (materials.js PROP_VERT, uStormLeaf); with no storm nothing changes. At 0.6 of the land's paint at a full storm: the
+// look director's ruling (24 Nov: all of it made every crown one plum-maroon, the oranges gone; a painter keeps a little
+// of the local colour in a storm, warm crowns about S 0.40-0.45). ?stormleaf=<0.3 to 1> another share. OFF until
+// look-director's ?stormlight (uLookS.x) is in look-proto (v39.4); then it follows that one switch.
+const STORMLEAF = (() => { try { const v = new URLSearchParams(location.search).get('stormleaf'); if (v == null) return 0; const n = +v; return n === 1 ? 0.6 : n >= 0.3 && n < 1 ? n : 0; } catch { return 0; } })();
 const LEAFGROW = (() => { try { const v = new URLSearchParams(location.search).get('leafgrow'); if (v == null) return 0; const n = +v; return n === 1 ? 1.15 : n > 1 && n <= 2.4 ? n : 0; } catch { return 0; } })();
 // (only a kind whose crown is leaves one by one, and nothing else, can be split: parts 0 bark, 5 leaf, 6 snow on a
 //  bough. A kind with crowns of washes (part 1: the green wood's conifer) keeps the one program.)
@@ -292,7 +295,7 @@ export class Flora {
     const TALL = L.tall.map((sp) => (LOOK.oil ? Object.assign({}, sp, { oilLook: 1 }, sp.kit === 'broadleaf' || sp.kit === 'maple' || sp.kit === 'aspen' ? { leafy: 1, double: 1 } : null, sp.kit === 'roundmaple' || sp.kit === 'poplar' || sp.kit === 'oak' || sp.kit === 'birch' || sp.kit === 'willow' || sp.kit === 'sapling' ? { double: 1 } : null, sp.oil, PINES && sp.kit === 'spruce' ? { needleTop: 1 } : null) : sp));      // (?pines: the spruce's needles budgeted by bough, kits/spruce.js)
     this.tall = TALL;
     this.species = TALL.map((sp, i) => {
-      const mo = { needle: PINES && NEEDLE_KITS.has(sp.kit) ? NEEDLE_PX : 0, nearLeaf: NEARLEAF ? 1 : 0, leafGrow: LEAFGROW, stormLeaf: STORMLEAF ? 1 : 0, name: 'tall-' + sp.kit + i, barkA: sp.bark[0], barkB: sp.bark[1], leafA: sp.leaf[0], leafB: sp.leaf[1], leafC: sp.leaf[2], barkP: sp.barkP, leafP: sp.leafP, accent: sp.accent, oilDark: sp.dark || null, oilFam: sp.fam || null, oilKind: sp.snowy ? 1 : sp.bare ? 2 : 0, wind: sp.wind == null ? 0.03 : sp.wind, doubleSide: !!sp.double, phys: sp.kit === 'vine' ? null : 'lite', branch: BRANCHY.has(sp.kit), stiff: sp.kit === 'kelp' ? 0.1 : 1, plantHeight: (FAR_DIMS[sp.kit] || [0, 10])[1], gem: sp.kit === 'crystal',
+      const mo = { needle: PINES && NEEDLE_KITS.has(sp.kit) ? NEEDLE_PX : 0, nearLeaf: NEARLEAF ? 1 : 0, leafGrow: LEAFGROW, stormLeaf: STORMLEAF, name: 'tall-' + sp.kit + i, barkA: sp.bark[0], barkB: sp.bark[1], leafA: sp.leaf[0], leafB: sp.leaf[1], leafC: sp.leaf[2], barkP: sp.barkP, leafP: sp.leafP, accent: sp.accent, oilDark: sp.dark || null, oilFam: sp.fam || null, oilKind: sp.snowy ? 1 : sp.bare ? 2 : 0, wind: sp.wind == null ? 0.03 : sp.wind, doubleSide: !!sp.double, phys: sp.kit === 'vine' ? null : 'lite', branch: BRANCHY.has(sp.kit), stiff: sp.kit === 'kelp' ? 0.1 : 1, plantHeight: (FAR_DIMS[sp.kit] || [0, 10])[1], gem: sp.kit === 'crystal',
         // (the last fixes: a spire parts round an eye inside it; its girth at the foot, height and lean, florakit.js spireGeometry)
         hollow: sp.kit === 'spire' ? (sp.slim ? [1.3, 10.5, 0.3] : [2.0, 12, 0]) : null };
       const mat = makePropMaterial(bodyUniforms, mo);
