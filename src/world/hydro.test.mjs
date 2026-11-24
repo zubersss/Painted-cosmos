@@ -146,6 +146,27 @@ test('ponds: each is held in by its rim, level, small, and none near a landing',
   assert.ok(checked > 5);
 });
 
+test('lakes: how wide each lake is, for the paint (the narrow axis of its core), read at load by a point', () => {
+  assert.ok(hy.lakeWidth && hy.lakeWidth.length === hy.lakeCores.length, 'a width for every lake');
+  const g = D.g, d = [0, 0, 0];
+  let checked = 0;
+  hy.lakeCores.forEach((L, id) => {
+    if (!(L.core > 0)) return;
+    const eq = 2 * Math.sqrt(L.core / Math.PI);
+    assert.ok(L.width > 0 && L.width <= eq + 1e-6, 'lake ' + id + ': width ' + L.width.toFixed(0) + ' m within its equivalent diameter ' + eq.toFixed(0));
+    // a node of this lake, asked by its place, answers this lake's width
+    for (let p = 0; p < hy.lakeComp.length; p++) {
+      if (hy.lakeComp[p] !== id) continue;
+      hy._pdir(p, d);
+      if (g.idOf(d[0], d[1], d[2]) !== p) continue;
+      assert.equal(hy.lakeWidthAt(d[0], d[1], d[2]), hy.lakeWidth[id]); checked++;
+      break;
+    }
+  });
+  assert.ok(checked > 0, 'lakes asked by a point: ' + checked);
+  assert.equal(hy.lakeWidthAt(spawn.x, spawn.y, spawn.z), 0, 'no lake at the landing');
+});
+
 test('puddles: shallow, few, only in hollows on near-level ground', () => {
   const k = HY.HYDRO_DEF;
   assert.equal(HY.puddleCap(-0.4, 0, 0.05, k, 1), 0, 'none on a 5 % slope');
