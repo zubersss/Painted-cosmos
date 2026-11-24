@@ -271,8 +271,9 @@ export function createWorld(scene) {
       const q = new URLSearchParams(location.search).get('skyceil');
       if (q === '0') return null;
       if (q) { const p = q.split(',').map(Number); if (p.length === 2 && p.every(isFinite) && p[1] > p[0] && p[0] >= 0) return { given: p }; }
+      if (q === '1') return { k: [3.5, 7.5] };
     } catch { /* no address */ }
-    return { k: [3.5, 7.5] };
+    return LOOK.lightNew ? { k: [3.5, 7.5] } : null;      // (off unless ?light=new: render/shared.js, the master switch)
   })();
   function skyCeiling(body, look) {
     if (SKYCEIL.given) return SKYCEIL.given;
@@ -304,8 +305,9 @@ export function createWorld(scene) {
   // (Earth 62 m to 530 m: the coordinator's ruling, so the sky over the wood is painted from 150 m too -- no view
   // between 62 m and 420 m had been approved by the owner); on foot, where the approved views are, nothing moves.
   // `?airtop=0` is T1 exactly as it was committed (fixed heights, no FV1, no remapped bands); the watercolour game
-  // never reads any of it.
-  const AIRTOP = (() => { if (!LOOK.oil) return 0; try { const q = new URLSearchParams(location.search).get('airtop'); if (q != null && isFinite(+q)) return +q ? 1 : 0; } catch { /* no address */ } return 1; })();
+  // never reads any of it. (Since the master switch: ALL of this, and T1's ceiling itself, is off unless ?light=new,
+  // or ?airtop=1 / ?skyceil=1 alone.)
+  const AIRTOP = (() => { if (!LOOK.oil) return 0; try { const q = new URLSearchParams(location.search).get('airtop'); if (q != null && isFinite(+q)) return +q ? 1 : 0; } catch { /* no address */ } return LOOK.lightNew ? 1 : 0; })();      // (off unless ?light=new)
   const DEG = 180 / Math.PI;
   const dipOf = (h, R) => (h > 0 ? Math.acos(R / (R + h)) * DEG : 0);
   const airTopOn = (look) => AIRTOP && look && look.oil && look.oil.airTop;

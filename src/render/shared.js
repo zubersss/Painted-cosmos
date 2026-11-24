@@ -79,8 +79,15 @@ export const G = {
 // by every material; `&stroke=` (a multiple of the stroke's size) and painter.setLook({ oil: {...} }) turn them.
 const _qs = (() => { try { return new URLSearchParams(location.search); } catch (e) { return null; } })();
 const _qn = (k, d) => (_qs && _qs.has(k) && isFinite(+_qs.get(k)) ? +_qs.get(k) : d);
+// THE LOOK DIRECTOR'S MASTER SWITCH (2026-11-24, the coordinator, for the owner to judge on waking): `?light=new` turns
+// on, together, the night key (L1), the one foliage shade and the quiet darks (L2 + L7), one light (L3), the sky's
+// ceiling with the air's top (T1 reworked, FV1) and the air from the air (L5). WITHOUT IT EVERY ONE OF THEM IS OFF and
+// the oil look is exactly what it was (pixel-identical, docs/lead/LOOK-BUILD.md). Inside it each part keeps its own
+// switch (`?light=new&nightkey=0` and so on); each part's own switch set to 1 turns that part on without it.
+const _LN = !!(_qs && _qs.get('look') === 'oil' && _qs.get('light') === 'new') ? 1 : 0;
 export const LOOK = {
   oil: !!(_qs && _qs.get('look') === 'oil'),
+  lightNew: _LN,
   // HOW MANY BANDS THE AIR IS LAID IN (world/index.js, uFog.y; chunks.js pcFogAmount quantises the haze to this many
   // steps). The watercolour keeps its six. The oil look takes ten, because the oil air is thicker and the ceiling
   // below holds it to about three quarters: over a long hillside six steps of a sixth each were six ruled terraces,
@@ -91,7 +98,7 @@ export const LOOK = {
   // THE AIR FROM THE AIR (L5, LOOK-AUDIT F2 and F6; chunks.js pcFogAmount and pcAtmosV, sky.js pcSkyAir): 1 on, 0 the
   // far air exactly as it was (`?airfar=0`). world/index.js turns it into OIL.uLookN.w each frame: 0 on foot, rising to
   // 1 as the air's reach grows from the ground's to the air's.
-  airFar: _qn('airfar', 1),
+  airFar: _qn('airfar', _LN),
 };
 MODE.oil = LOOK.oil;      // (for the look data and the surface, which do not load this module: data/mode.js)
 MODE.calm = LOOK.oil && !!(_qs && _qs.get('floor') === 'calm');      // (a calmer forest floor, to compare: data/looks/earth.js)
@@ -199,7 +206,7 @@ export const OIL = {
   //   z kept for L3 (one light)
   //   w QUIET DARKS (L7, `?postdark=`): the last pass's S laid on the value only, and its colour push faded out under
   //     a value of 0.30 and measured by the real saturation (post.js OIL_FRAG)
-  uLookF: { value: new THREE.Vector4(_qn('nightkey', 1), _qn('leafshade', 1), _qn('onelight', 1), _qn('postdark', 1)) },
+  uLookF: { value: new THREE.Vector4(_qn('nightkey', _LN), _qn('leafshade', _LN), _qn('onelight', _LN), _qn('postdark', _LN)) },
   // THE NIGHT'S TWO NUMBERS for the world the eye is on (world/index.js sets them each frame from the world's look):
   //   x how strong the moonlit paint is against the sunlit (a look's oil.night.v; 0.60, or 0.85 where the world has a
   //     night key of its own, as Neptune's, which the owner liked as it was)
