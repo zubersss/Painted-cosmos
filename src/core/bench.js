@@ -513,7 +513,7 @@ export function attachBench(pc) {
     const WX0 = { ...WX2 };      // (group D: its switches as the address set them, put back after each of its rows)
     const WX_ALL = ['windmap', 'nearmap', 'farwind', 'cloudmap', 'stormland', 'rainlook', 'rainshaft', 'bolts', 'rainmap'];   // (group D, the flip: the new weather's switches, for the row 'the old weather')
     // (lane W1 CLOUDS: whether the 3D clouds are on, and a switch that puts the sky's own flat cloud back in their place)
-    const CLOUDS3D = (() => { try { return +(new URLSearchParams(location.search).get('clouds3d') || 0) > 0; } catch { return false; } })();
+    const CLOUDS3D = (() => { try { const a = new URLSearchParams(location.search); if (a.has('clouds3d')) return +a.get('clouds3d') > 0; return a.get('look') === 'oil' && a.get('weather') !== 'old'; } catch { return false; } })();
     const clouds3d = (on) => { const c = pc.world && pc.world.clouds; if (c) c.enabled = on; };
     const holdStorm = (on) => { const P = pc.sim && pc.sim.physics; if (P && P.forceWeather) P.forceWeather(on ? { kind: 'storm' } : null); };
     const steps = [
