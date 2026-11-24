@@ -970,6 +970,11 @@ pin the frame-to-frame wobble, so two machines): on foot rung 1 about 16.7 ms an
 Frames held twice on a 60 Hz display read as judder: the owner judges sharpness against feel with ?sharp=0 as the A/B.
 Bench: a row 'the picture as before (?sharp=0 size)' after the first row of every table; each row remembers the size it
 was asked at and the header lists the runs (the stale 'Rows 24 on are back at that size' is gone).
+SEEN IN A BROWSER (the game, ?preset=phone, an 823 x 384 box at 3.75 pixels to the point): with the frame controller
+on, the ladder's ceiling was 2 rungs (only the touch path gives that; the old rules give 8 here), tier 1, scale 1, and
+the picture back at 1028 x 480 on rung 0, because in software drawing every frame takes seconds and the guard gave the
+rung back, and only the rung; with &dynres=0 the start itself: 1234 x 576 on rung 1, ceiling 2, tier 1, scale 1, no
+console error, the game drawn whole (`A2_sharp_phone_rung1_1234x576.jpg`). In v39.6 (the coordinator, 24 Nov).
 
 **READING THE OWNER'S `?bench=foot` TABLE (prepared 24 Nov, late, before it arrives; v39.5 merged, 2a4d2fb).** Each
 row is set against the "as set" row before it; first check the table agrees with itself (the "as set" rows within 25
