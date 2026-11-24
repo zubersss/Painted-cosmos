@@ -531,6 +531,7 @@ void main() {
     float hue = vInst.x + (id - 0.5) * 1.7;
     vec3 cs = mix(vLA, vLB, clamp(0.5 + hue * 0.5, 0.0, 1.0));
     cs = mix(cs, vLC, clamp(az * 0.55 + (r3.y - 0.5) * 0.6, 0.0, 1.0));
+    cs = pcSummerTree(cs, fract(vInst.z * 9.73 + 0.37), uLookG.y);      // (each summer tree its own green, as PROP_VERT and PROP_FRAG: chunks.js; the look director)
     cs = pcWetWash(pcDabTint(pcDensity(cs, 1.0 + vInst.y * 0.4), r3, 1.0 - twig), 0.7);
     bool snow = cls > 1.5 && cls < 2.5;
     if (snow) cs = mix(vec3(0.95, 0.97, 1.0), vec3(0.80, 0.87, 0.98), r3.x * 0.7);
