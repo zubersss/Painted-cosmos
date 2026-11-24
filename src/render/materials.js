@@ -1654,11 +1654,14 @@ void main() {
       // THE SEA FROM THE AIR (E-W2, F's note): with the new strokes and v37's colour, still water far off kept v37's three
       // steps in near equal shares, the deep one very deep: where strokes of two cells and two octaves lie over one another
       // that read as a checker of dark and light blocks. Far still water is laid as the calmest thing on the map, as the
-      // new colour already lays it: most strokes the body, few light ones, few deep ones, and those a closer step.
+      // new colour already lays it: most strokes the body, few light ones, few deep ones, and those a closer step. And
+      // its body a step deeper (the look director: v37's mid blue, value about 0.65 to 0.70, where the many light and
+      // deep strokes of v37 had held it; with them few the body alone has to).
       float sk = wStill * smoothstep(40.0, 220.0, dist) * liq;
-      wThL = mix(wThL, 0.74, sk); wThD = mix(wThD, 0.22, sk);
-      cdeep = mix(cdeep, pcDensity(c, 1.65) * vec3(0.92, 0.94, 1.0), sk);
-      clight = mix(clight, mix(c, wLightC, 0.40), sk);
+      c = mix(c, pcDensity(c, 1.45), sk);
+      wThL = mix(wThL, 0.80, sk); wThD = mix(wThD, 0.22, sk);
+      cdeep = mix(cdeep, pcDensity(c, 1.40) * vec3(0.93, 0.95, 1.0), sk);
+      clight = mix(clight, mix(c, wLightC, 0.36), sk);
     }
     #endif
     float wsp = pow(max(dot(reflect(-normalize(vToCam), up), uSunDirL), 0.0), wSunE) * wSunK * max(uDayness, uMoon) * (1.0 - uWx.x);
