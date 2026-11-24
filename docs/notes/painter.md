@@ -734,7 +734,13 @@ weather; the land at the same levels takes pcTone's glaze and deep wash, a cool 
 level held to the glaze (1) at a full storm and its shade the land's glaze and deep wash at its level instead of the
 foliage shade (`materials.js PROP_VERT uStormLeaf`, `flora.js STORMLEAF`); no storm, the same picture to the bit.
 The bark already goes through the land's paint (pcLit, pcLevel, pcTone). Its own switch, so it does not hang on F's
-uLookS (not in look-proto yet). A/B of the rebuilt step: rendering after the merge below.
+uLookS (not in look-proto yet). SEEN on the merged branch (f281556; the shader compiles, 85 tree materials, no
+program failed), one page under `wx=storm`, autumn noon, 1024 x 480, the switch flipped live, two grabs of one state
+identical: a maple from 9 m (`A2_stormleaf_maple9m_storm_A_over_B.jpg`): the crowns from glowing red and orange to a
+muted plum-maroon in the storm's light, 31.9 per cent of the picture, the changed pixels' V median 0.32 to 0.28 and S
+0.53 to 0.34 (mean colour 0.33, 0.19, 0.18 to 0.28, 0.20, 0.23); the stream view (the merge moved the river: only far
+trees in it) 0.8 per cent. Stills of the first try kept (`A2_stormleaf_first-try_*`). Fair weather NOT rendered on this
+build: unchanged by construction (uStorm 0 skips the step). OFF until F passes it.
 
 **MERGED look-proto v39.3 (87053ed, pull request 46, the pines live) into trees-near: f281556**, clean, nothing
 doubled; unit 328, world 124, physics 449 pass.
