@@ -31,6 +31,38 @@ const WATER_PX = (() => {
 })();
 const WATER_FOV_T = Math.tan(58 * Math.PI / 360);     // (the game's own vertical field on foot: core/game.js)
 
+// THE SHORT UNIFORM LIST (24 Nov; measured by the far view, priced with A2). Every patch's onBeforeRender sets its four
+// own uniforms and material.uniformsNeedUpdate, and three.js (setProgram) then re-sends the ground material's WHOLE
+// uniform list for that patch: 59 uniforms on Earth's oil-look ground, of which only those four change from patch to
+// patch. MEASURED in the lab: 4.7 microseconds a patch for the unchanged ones, 120 patch draws 150 m up, 0.6 ms a frame
+// of main-thread time on a cloud processor (perhaps 1 to 2 ms on the phone: derived, not measured there). So from the
+// SECOND patch of a render on, three is handed a SHORT LIST: the four per-patch values and the textures (a texture must
+// be bound to its unit again at every draw: the units are global state, reset by three each draw). The first patch of
+// every render call takes the full list, so whatever changed since the last frame is sent once, as before; a program
+// three has rebuilt (a quality or look switch) gets its lists made again, keyed on the program itself, and three throws
+// away a list of an old program on its own (getProgram sets uniformsList to null, and its getUniformList makes the full
+// one). The uniforms' values in a GL program persist between draws, so what is not re-sent is still what was sent.
+// ?uplist=0 (or UPLIST.on = false: the speed test's row) is the old way, every list whole.
+const PATCH_U = new Set(['uOrigin', 'uAnchor', 'uCamLocal', 'uMorph']);
+export const UPLIST = { on: (() => { try { const q = new URLSearchParams(location.search); return !(q.has('uplist') && q.get('uplist') === '0'); } catch (e) { return true; } })() };
+const _isTex = (v) => !!(v && (v.isTexture || (Array.isArray(v) && v[0] && v[0].isTexture)));
+// Which list three is to use for this patch's draw. st: the terrain's own record ({ prog, full, short, frame }).
+export function pickUniformList(renderer, material, st) {
+  const mp = renderer.properties.get(material);
+  const prog = mp && mp.currentProgram;
+  if (!prog || !mp.uniformsList) return;                       // (three's first draw of it makes its list itself)
+  if (st.prog !== prog) {
+    st.prog = prog;
+    const U = mp.uniforms || material.uniforms;      // (three's own: for a ShaderMaterial the material's)
+    st.full = prog.getUniforms().seq.filter((u) => u.id in U);  // (what three's seqWithValue makes)
+    st.short = st.full.filter((u) => PATCH_U.has(u.id) || _isTex(U[u.id].value));
+    st.frame = -1;
+  }
+  const f = renderer.info.render.frame;
+  if (!UPLIST.on || f !== st.frame) { mp.uniformsList = st.full; st.frame = f; }
+  else mp.uniformsList = st.short;
+}
+
 // The smallest ball this patch's WET vertices fit in, in the patch's own frame: the midpoint of their box, and
 // the farthest vertex from it. A quarter of a metre is added because a wave lifts the surface above the mesh.
 function waterSphere(pos, fallbackR) {
@@ -124,6 +156,7 @@ export class PlanetTerrain {
     this.detail = true;        // false: only the six root patches (far bodies)
     this.splitK = 1.12;
     this.boostK = 1;
+    this._upl = { prog: null, full: null, short: null, frame: -1 };      // (the short uniform list: pickUniformList)
     for (const n of this.roots) this._build(n);
   }
 
@@ -169,6 +202,7 @@ export class PlanetTerrain {
       if (node.level > 0) { const a = (terrain.now - node.shown) / EASE_T; if (a < 1) { const e = a < 0 ? 0 : a; worn = 1 - e * e * (3 - 2 * e); } }
       u.uMorph.value.set(mergeUnit * terrain.splitK * MORPH_A, mergeUnit * terrain.splitK * MORPH_B, worn);
       material.uniformsNeedUpdate = true;
+      pickUniformList(renderer, material, terrain._upl);
     };
     this.group.add(mesh);
     node.mesh = mesh;
