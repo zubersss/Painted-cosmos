@@ -402,6 +402,7 @@ float gCliff = 0.0;       // this dab is a cliff's rock (0 or 1: whole dabs), se
 float gGully = 0.0;       // how far into a gully the cliff dab lies: its light goes down (pcGroundAt)
 float gRockLw = 1.0;      // (main) the surface's metres per pixel here (lw): how many pixels a bed spans
 float gRockT = 0.0;       // the rock dab's temperature by its plane: +0.8 lit (warm) .. -1 turned away (cool), pcRockPlanes
+float gRockP = 0.0;       // how much the light planes rule this dab: bedded rock only (a cliff, a mountain's face), never snow
 float gFaceOn = 0.0;      // (main) this pixel is steep enough that the upright charts may lay its dabs
 float gFaceD = 0.0;       // (main) the dab being painted lies on an upright chart
 #ifdef PC_ROCKDEBUG
@@ -567,6 +568,9 @@ vec3 pcRockWash(vec3 c, float up, vec3 Bc, float strata, float dist, vec3 rnd, f
   float sn = smoothstep(0.70, 0.86, min(min(c.r, c.g), c.b));
   gCliff = step(fract(rnd.y * 7.7 + rnd.z * 3.1) * 0.6 + nr * 0.4, (cl * 1.1 - 0.05) * (1.0 - sn)) * uRockK;
   gRock = max(far * uRockK * (1.0 - sn), gCliff);
+  // (the planes only on BEDDED rock: a snow-laid place reports no beds (patchgen.js), and a snowfield turned from the sun
+  // was laid in the deep shade plane and went dark at 1 km, SEEN; snow keeps the ordinary light)
+  gRockP = max(gCliff, far * uRockK * (1.0 - sn) * smoothstep(0.05, 0.20, strata));
   gGully = 0.0;
   if (gRock <= 0.0) return c;
   if (gCliff > 0.5) return pcCliffC(Bc, hB, rnd, c, gRockLw);
@@ -610,7 +614,7 @@ float pcRockPlanes(float lvl, vec3 nV, float sunny) {
   float lp = max(pcLevel(0.75, 0.02) - mix(mix(2.4, 1.8, s1), 0.5, s2) - 0.5 * gGully * (1.0 - s2), 0.0);
   gRockT = mix(mix(-1.0, -0.75, s1), 0.8, s2);
   lp = mix(min(lp, 1.0), lp, sunny);
-  return mix(lvl, lp, gRock);
+  return mix(lvl, lp, gRockP);
 }
 // the rock dab's paint leaned warm or cool by its plane (pcRockPlanes' gRockT): toward the sun's own colour a little on
 // the lit plane, toward a cool violet on the shaded ones (the shade key's hue, as the references paint rock in shade)
@@ -618,11 +622,11 @@ float pcRockPlanes(float lvl, vec3 nV, float sunny) {
 // colour is near white at noon, so the first form leaned to almost nothing, rock S median 0.08 to 0.10 at noon, MEASURED)
 // strengthened 2.2 times, and the cool lean 1.25 blue)
 vec3 pcRockTemp(vec3 k) {
-  if (gRock <= 0.0) return k;
+  if (gRockP <= 0.0) return k;
   vec3 wC = uRockM3 / max(dot(uRockM3, vec3(0.3, 0.5, 0.2)), 1e-3);
   wC = vec3(1.0) + (wC - vec3(1.0)) * 2.2;
   vec3 t = gRockT > 0.0 ? mix(vec3(1.0), wC, gRockT) : mix(vec3(1.0), vec3(0.86, 0.84, 1.25), -gRockT);
-  return clamp(k * mix(vec3(1.0), t, gRock), 0.0, 1.0);
+  return clamp(k * mix(vec3(1.0), t, gRockP), 0.0, 1.0);
 }
 #endif`;
 
