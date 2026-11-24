@@ -102,7 +102,11 @@ CLOUDS3D (this lane's block); clouds.js and wx2.js need nothing (clouds.js's own
 group's flip turns the maps on). Checked in a scratch copy with the patch applied: no switch in the address, the 3D
 clouds draw (180 at 1 km); `?clouds3d=0`, the module is never fetched. Given to the weather group for their
 weather-release branch; the look director gave leave for their world/index.js line (24 Nov, 15:10) and will not land it
-themselves: the weather group carries the patch as written.
+themselves: the weather group carries the patch as written. THE RELEASE (weather group, 24 Nov 16:29): weather-release was
+built with weather-clouds at 1aad10e (the guard and the flip); their row 'weather: the old weather' also turns the 3D
+clouds off and on. fdd3775 (the anvil shelf) waits for the look director's pass before it is merged there.
+A TIP for stills on v39.2 and later (from the weather group): in the gallery the far trees' painted stand-ins never finish
+baking in this software browser, so the page never says ready -- add `&impfail=bake` to both sides of a comparison.
 
 | step | state | what was done, seen, measured |
 | --- | --- | --- |
