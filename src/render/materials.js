@@ -1984,7 +1984,7 @@ uniform vec4 uOilG;
 uniform float uNeedle;    // (?pines: a conifer's needles never narrower on the screen than this many pixels; 0 off, as before)
 uniform float uNearLeaf;  // (?nearleaf: 1 the leaves within arm's length shrink about their centres; 0 off, as before)
 uniform float uLeafGrow;  // (?leafgrow: the most a thinned broadleaf's kept leaf grows within 15 m of the eye, e.g. 1.15; 0 off, as before)
-uniform float uStormLeaf; // (?stormleaf: the share of the land's storm paint a crown takes at a full storm, 0.5 with the switch; 0 off, as before)
+uniform float uStormLeaf; // (the share of the land's storm paint a crown takes at a full storm: 0.5 by default, ?stormleaf=0 off; flora.js)
 uniform vec4 uOilPx;      // (x: the angle one pixel of the scene pass takes, radians: shared.js)
 uniform mat4 uShM;
 uniform highp sampler2D uShTex;
@@ -2359,8 +2359,10 @@ void main() {
       // land's own glaze and deep wash at the leaf's level instead of the foliage shade. A level and the land's own
       // paint, never a darkening multiplied on (R1.3b); with no storm (uStorm 0) the same picture to the bit. 0: as before.
       // (uStormLeaf is the share of it at a full storm: 0.5, PASSED by the look director at half, so the reds deepen and
-      //  the oranges dull but the colour families stay told apart; all of it made every crown one plum-maroon)
-      float kSt = clamp(uStorm * uStormLeaf / 0.9, 0.0, 1.0);      // (uStorm is at most 0.9 by day: world/index.js)
+      //  the oranges dull but the colour families stay told apart; all of it made every crown one plum-maroon. The ramp is
+      //  the far crowns' own, render/impostor.js stK, so near and far crowns step down together at the hand-over; and it
+      //  follows the look director's one storm-light switch, uLookS.x: ?stormlight=0 and the crowns are as before.)
+      float kSt = smoothstep(0.15, 0.6, uStorm) * uLookS.x * uStormLeaf;
       if (kSt > 0.0) {
         lvL = mix(lvL, min(lvL, 1.0), kSt);
         deepL = mix(deepL, pcTone(cs, lvL), kSt);
@@ -3318,7 +3320,7 @@ export function makePropMaterial(bodyU, opts = {}) {
     uNeedle: { value: opts.needle || 0 },      // (?pines: flora.js; 0 for every plant but a conifer with the switch on)
     uNearLeaf: { value: opts.nearLeaf || 0 },  // (?nearleaf: flora.js; 0 for every plant but a tree with the switch on)
     uLeafGrow: { value: opts.leafGrow || 0 },  // (?leafgrow: flora.js; 0 for every plant but a tree with the switch on)
-    uStormLeaf: { value: opts.stormLeaf || 0 },  // (?stormleaf: flora.js; 0 for every plant but a tree with the switch on)
+    uStormLeaf: { value: opts.stormLeaf || 0 },  // (flora.js: 0.5 for a tall tree by default, ?stormleaf=0 off; 0 for every other plant)
     uOilDarkA: v3(opts.oilDark && opts.oilDark[1], [0.5, 0.4, 0.4]), uOilDarkB: v3(opts.oilDark && opts.oilDark[2], [0.2, 0.15, 0.2]),
   };
   const defines = {};
