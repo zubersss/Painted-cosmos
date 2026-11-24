@@ -311,6 +311,11 @@ Stills (default against `?wpaint=0`): `s11-trees-ab.jpg` (cam=trees: v39.5's riv
 `s11-B10-ab.jpg` (10 m over the landing, B's view as near as I could set it), `s11-F1-ab.jpg` (on foot at the landing's
 river), `s11-HI-ab.jpg` (the river from 150 m), `s11-S150-ab.jpg` (the sea from 150 m: v37 in both, by design),
 `s11-game-first-view-ab.jpg`.
+**PAST A POINTED STROKE'S TIP, THE ROW'S NEXT STROKE** (F on the sea's near chop, by E-W2; the sea only, `?wsea`>=1): in
+pcWCand's lens taper the gap past a stroke's point shows the stroke the row continues with on that side (found as pcThinR
+finds the pixel's own, one column either way), so pointed strokes overlap end to end and no body shows between them.
+SEEN at 20 m and 60 m over the bay (`s12-overlap-C20.jpg`, `s12-overlap-C60.jpg`, 2x crops): the rows read continuous;
+a fine pixel step remains where two tips meet. Not looked at yet: E-W2's white jagged bits near the eye in the strait.
 **WHERE THIS LANE STOOD (24 Nov, late)** water-paint has v39.3 merged (d87f1e1). F PASSED the river on foot
 (2b869d8) on one condition, its cost; the coordinator: cut it to about +30 % of the water's cost at a bank (6 frames
 each, like for like), then ONE commit on v39.4 making the new paint the oil look's default (`?wpaint=0` the opt-out),

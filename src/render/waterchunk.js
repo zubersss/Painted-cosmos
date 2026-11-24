@@ -126,7 +126,18 @@ float pcWCand(vec2 ch, vec2 cell, float C, vec2 mC, vec2 d, vec2 n, vec2 tdx, ve
     // (the stroke's half-thickness, 1 along its body, to 0 at each end over 1.3 widths; the edge in pixels across the row)
     float hl = mix(1.0, clamp(min(uv.x, 1.0 - uv.x) * asp / 1.3, 0.0, 1.0), gWLens);
     float oL = clamp(0.5 + (hl - abs(2.0 * uv.y - 1.0)) * 0.5 / max(spx.y, 1e-6), 0.0, 1.0);
-    if (oL < own) { own = oL; rndN = vec3(0.5, 0.99, 0.99); }
+    if (oL < own) {
+      // PAST THE POINT, THE ROW'S NEXT STROKE (the look director on the sea's near chop, 24 Nov night: pointed strokes
+      // overlapping in rows along the crests, no body between them). The stroke the row continues with on that side is
+      // shown past the point, as if laid over it; it is found as pcThinR finds the pixel's own (chunks.js: the same row,
+      // lean and jitter), one column either way.
+      vec2 q = p; q.y += 0.27 * sin(1.7 * q.y + 0.9 * sin(0.21 * q.x));
+      float row = floor(q.y); vec3 hr = pcHash3(vec2(row, 7.31));
+      float xq = (q.x + (q.y - row - 0.5) * (hr.z - 0.5) * 2.6) / asp + hr.x * 17.0 + 0.5 * row, col = floor(xq);
+      if (xq < col + (pcHash3(vec2(col, row)).y - 0.5) * 0.6) col -= 1.0;
+      else if (xq > col + 1.0 + (pcHash3(vec2(col + 1.0, row)).y - 0.5) * 0.6) col += 1.0;
+      own = oL; rndN = pcHash3(vec2(col + (uv.x < 0.5 ? -1.0 : 1.0) + 0.37, row + 0.71));
+    }
   }
   pri = fract(rnd.x * 7.13 + rnd.z * 3.71);
   // where its centre lies on the water: pcThinR's own sway of the rows undone, then the bend above
