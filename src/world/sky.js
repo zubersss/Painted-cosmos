@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import { G, OIL, register, ensureGlobals } from '../render/shared.js';
 import { RING_PROFILE } from './orbit.js';
+import { WX as WXF, WXFIELD_GLSL } from './wxfield.js';
 
 // The oil sky's five dials, so that a still can be compared against the one before it without touching the code.
 // They do nothing at all in the watercolour game: the shader reads them only inside #ifdef PC_OIL.
@@ -65,12 +66,87 @@ uniform vec4 uOilG;
 uniform vec4 uOilS;         // x: how far the far air leans to the blue-violet of the owner's aerial references
 uniform vec4 uSkyOil;       // x cloud shaping, y the ceiling on the sky's value, z the cloud's lit side (the dials above)
 uniform vec4 uSkyAir;       // x: how far the lowest band is the land's own air   y: how high that band stands (dot(view, up))
+uniform vec4 uCloud3D;      // (the 3D clouds, world/clouds.js, set it) x how far they have taken over (0..1; 0 on the ground in the hybrid), y this shell's radius then (m), z its cover's share, w 1 while they are drawn
+uniform vec4 uCirrus;       // (world/clouds.js) xyz the wind aloft's way at the eye (unit, body-local), w the world's own cirrus share
+uniform vec4 uRainbow;      // (world/clouds.js) x 1 where a rainbow may stand, y how far along the view the rain is looked for (m)
+// (the look director's audit, LOOK-AUDIT.md "D", folded into lane W1 and on with the 3D clouds, ?skyfix=0 off; world/clouds.js
+//  sets it) x 1: the aurora a night light only, the storm's mass and the far rain veil in flat steps with clean edges, the
+//  sky's own cloud shaded in one flat step, the edge of space crisp; y: how strongly the sky is laid in brush strokes seen
+//  from the air (from the air it was one flat colour)
+uniform vec4 uSkyFix;
 uniform vec4 uLookN;        // w: the air from the air (L5; render/shared.js OIL.uLookN, set by world/index.js)
 uniform vec4 uLookG;        // x: the golden hour's sky painted by direction and in bands, z: the cloud shell's limb from above thins away (render/shared.js OIL.uLookG)
 #endif
 
 vec3 dens(vec3 c, float d) { return clamp(c - (c - c * c) * (d - 1.0), 0.0, 1.0); }
 #ifdef PC_OIL
+${WXFIELD_GLSL}
+// a value laid in n flat steps with an edge a pixel wide (the sky's own bands do the same)
+float pcSkySteps(float v, float n) { float t = v * n, i = floor(t), fw = max(fwidth(t), 1e-4); return (i + smoothstep(0.5 - fw, 0.5 + fw, t - i)) / n; }
+// HIGH CLOUD, CIRRUS (WEATHER-DESIGN A4, with the 3D clouds on): mare's tails, long tapered strokes lying the way the wind
+// aloft blows, laid in families that cross at shallow angles as the sky's own brush strokes do (pcSkyStrokes, the same
+// construction), lighter than the sky; at a low sun lit gold and rose from below while the low cloud is already in shade.
+// The amount is the cloud map's high cover along the view where it has one, else the world's own share (uCirrus.w).
+vec3 pcCirrus(vec3 sky, vec3 d, vec3 up, float k, vec4 wv, float sunE) {
+  if (k < 0.004) return sky;
+  vec3 w = normalize(uCirrus.xyz - up * dot(uCirrus.xyz, up) + vec3(1e-4, 0.0, 0.0));
+  vec3 a0 = normalize(cross(up, w));
+  vec3 col = sky;
+  float gold = (1.0 - smoothstep(0.10, 0.45, sunE)) * smoothstep(-0.10, 0.02, sunE);
+  vec3 lit = mix(mix(vec3(0.93, 0.93, 0.95), vec3(0.98, 0.80, 0.66), gold), sky, 0.25);
+  for (int L = 0; L < 2; L++) {
+    float fl = float(L);
+    vec3 ax = normalize(a0 + up * (L == 0 ? 0.10 : -0.16) + w * (L == 0 ? 0.06 : -0.09));
+    vec3 a1 = normalize(w - ax * dot(w, ax)), a2 = cross(ax, a1);
+    float fq = L == 0 ? 9.0 : 13.0;
+    float rowf = dot(d, ax) * fq + 0.8 * wv.g + fl * 0.37;
+    float row = floor(rowf);
+    float hx = fract(sin((row + fl * 31.0) * 77.7) * 43758.5453), hy = fract(sin((row + fl * 17.0) * 41.3) * 24634.63);
+    float along = atan(dot(d, a2), dot(d, a1)) * (1.5 + 2.5 * hx) + hy * 30.0;
+    float seg = floor(along), ft = along - seg;
+    float hs = fract(sin((seg + row * 53.0 + fl * 23.0) * 12.9898) * 43758.5453), hl = fract(hs * 5.31 + hx);
+    float a0e = 0.05 + 0.20 * hl, a1e = a0e + 0.40 + 0.50 * hs * (1.0 - a0e - 0.40);
+    float sp = (ft - a0e) / max(a1e - a0e, 1e-3);
+    float taper = smoothstep(0.0, 0.40, sp) * smoothstep(0.0, 0.25, 1.0 - sp);
+    float fwr = max(fwidth(rowf), 1e-4);
+    float wid = max((0.06 + 0.16 * hl) * taper, 0.0);
+    // (how many of the strokes are laid: the amount; the rest are left out whole, by their own number)
+    float on = step(hs, k * 1.6) * step(0.3, fract(hs * 3.7 + hy));
+    float cov = smoothstep(-0.5 * fwr, 0.5 * fwr, wid - abs(rowf - row - 0.5)) * step(0.0, sp) * step(sp, 1.0) * on;
+    col = mix(col, lit, cov * (0.55 + 0.30 * hl));
+  }
+  return col;
+}
+// THE RAINBOW (WEATHER-DESIGN A9): a flat-stroked arc 40.5 to 42.5 degrees from the point opposite the sun, red outside,
+// and a faint second one at 50 to 53 degrees with its colours the other way; four flat bands each, crisp, as light laid
+// on the sky. Only where the sun shines at the eye, stands under 42 degrees, and the cloud map has rain about a
+// kilometre and a half along the view.
+vec3 pcRainbow(vec3 col, vec3 d, float sd, float sunE) {
+  float ang = degrees(acos(clamp(-sd, -1.0, 1.0)));      // degrees from the antisolar point
+  if (ang < 39.5 || ang > 54.0) return col;
+  // (the sun up, under 42 degrees, shining at the eye: no overcast there)
+  float sunOK = smoothstep(0.0, 0.05, sunE) * (1.0 - smoothstep(0.62, 0.68, sunE)) * (1.0 - smoothstep(0.25, 0.6, uWxSky.x)) * uAtmo.y;
+  if (sunOK < 0.01) return col;
+  vec3 pr = normalize(uCamL + d * uRainbow.y);
+  float rain = smoothstep(0.3, 2.5, pcRainAt(pr)) * uWxOn.x;
+  if (rain < 0.01) return col;
+  float fw = max(fwidth(ang), 1e-4);
+  vec3 c = vec3(0.0); float a = 0.0;
+  // primary: four bands of half a degree, blue-violet inside to red outside
+  float t1 = (ang - 40.5) / 2.0;
+  if (t1 > -0.05 && t1 < 1.05) {
+    float b = clamp(floor(t1 * 4.0), 0.0, 3.0);
+    c = b < 0.5 ? vec3(0.42, 0.40, 0.86) : b < 1.5 ? vec3(0.36, 0.74, 0.42) : b < 2.5 ? vec3(0.98, 0.88, 0.34) : vec3(0.96, 0.42, 0.30);
+    a = 0.42 * smoothstep(-fw, fw, t1 * 2.0) * smoothstep(-fw, fw, (1.0 - t1) * 2.0);
+  }
+  float t2 = (ang - 50.5) / 2.5;
+  if (t2 > -0.05 && t2 < 1.05) {
+    float b = clamp(floor(t2 * 4.0), 0.0, 3.0);
+    c = b < 0.5 ? vec3(0.96, 0.42, 0.30) : b < 1.5 ? vec3(0.98, 0.88, 0.34) : b < 2.5 ? vec3(0.36, 0.74, 0.42) : vec3(0.42, 0.40, 0.86);
+    a = 0.16 * smoothstep(-fw, fw, t2 * 2.5) * smoothstep(-fw, fw, (1.0 - t2) * 2.5);
+  }
+  return mix(col, max(col, c), a * rain * uRainbow.x * sunOK);
+}
 // A SKY LAID IN BRUSH STROKES (the owner, twice: 2026-11-16 and again 2026-11-19, "the sky of the ice planets still
 // needs to be streaky and painted like"). The oil sky was laid in six broad bands with nothing inside them, and on
 // the ice worlds -- where there is no weather, no cloud and nothing else in the sky at all -- that left a smooth
@@ -274,7 +350,15 @@ void main() {
     // AND THE BRUSH'S OWN STROKES IN IT (the owner: the ice worlds' sky must be streaky and painted). Laid on the
     // bands and under everything else, so cloud, rings and the aurora still pass in front of them. Fading out close
     // to the horizon, where the air itself takes over, and gone under a closed sky, where there is cloud to look at.
-    sky = pcSkyStrokes(sky, d, up, uSkyOil.w * (1.0 - oc) * smoothstep(-0.02, 0.10, e) * (1.0 - uAtmo.x), n2);
+    sky = pcSkyStrokes(sky, d, up, max(uSkyOil.w, uSkyFix.y) * (1.0 - oc) * smoothstep(-0.02, 0.10, e) * (1.0 - uAtmo.x), n2);
+    // (A4: the high cloud, with the 3D clouds on: the map's high cover at the cirrus' height along the view, or the world's own)
+    // (only once the 3D clouds have taken over, from the air: seen from the ground in the hybrid, rework 2, they read as
+    // pale ghost shapes over the painted sky, not as mare's tails)
+    if (uCloud3D.x > 0.5 && uCirrus.w >= 0.0) {
+      vec3 hd = normalize(uCamL + d * 2200.0);
+      float hk = max(pcWxField2(hd).g * uWxOn.x, uCirrus.w);
+      sky = pcCirrus(sky, d, up, hk * (1.0 - oc) * smoothstep(0.02, 0.22, e) * uAtmo.y * (1.0 - uAtmo.x), n2, sunE);
+    }
   #else
   sky = dens(sky, 1.0 + turb * (1.0 - t * 0.7) * (1.0 + oc * 0.7) + back * 0.38 * (1.0 - t));
   sky = mix(sky, vec3(1.0), smoothstep(0.90, 0.97, bf) * 0.22 * (1.0 - t));
@@ -361,7 +445,7 @@ void main() {
     // one ribbon of hard-edged flames (stripes, the owner's word).)
     float az = atan(ha.z, ha.x);
     e0 = 0.105 + 0.11 * fa.g + 0.04 * (fb.r - 0.5);              // (its foot lower in the oil look: six to thirteen degrees up, in a level view's upper half)
-    float aStr = uAurora.x * (0.30 + 0.70 * (1.0 - uAtmo.y)) * (1.0 - oc) * (1.0 - uAtmo.x);
+    float aStr = uAurora.x * mix(0.30 + 0.70 * (1.0 - uAtmo.y), 1.0 - uAtmo.y, uSkyFix.x) * (1.0 - oc) * (1.0 - uAtmo.x);
     vec3 aL = clamp(pcAuroraLight(az, e, e0, hgt * 2.3, fold, fa.b * 3.0) * aStr * 1.45, 0.0, 1.0);      // (taller and brighter than its first laying as light, whose rays were short and dim beside the clip's)
     sky = 1.0 - (1.0 - sky) * (1.0 - aL);
   #else
@@ -409,15 +493,28 @@ void main() {
   }
 
   // ---- clouds: bare paper with soft violet undersides, on a shell around the planet
+  // (WITH THE 3D CLOUDS ON, world/clouds.js, WEATHER-DESIGN A4: the cumulus are real clouds over the land and this shell
+  // is the far background only, the altocumulus: it is lifted to their height and keeps a share of its cover. With them
+  // off the two numbers are the world's own, exactly as before.)
+  float cShellR = uCloud.x, cCover = uCloud.y;
+  #ifdef PC_OIL
+  // (THE HYBRID, the coordinator of 24 Nov: x is how far the 3D cumulus have taken over, by the eye's height over the land;
+  // 0 on the ground, where this shell's cloud is the sky exactly as it was. The first half thins it away as the eye climbs
+  // toward it -- it lies some 400 m over the land -- and the second brings it back lifted, as the altocumulus with its share)
+  if (uCloud3D.x > 0.0) {
+    if (uCloud3D.x < 0.5) cCover = uCloud.y * (1.0 - smoothstep(0.0, 0.5, uCloud3D.x));
+    else { cShellR = uCloud3D.y; cCover = uCloud.y * uCloud3D.z * smoothstep(0.5, 1.0, uCloud3D.x); }
+  }
+  #endif
   float rc = length(uCamL);
   float b = dot(uCamL, d);
-  float disc = b * b - (rc * rc - uCloud.x * uCloud.x);
+  float disc = b * b - (rc * rc - cShellR * cShellR);
   float cloud = 0.0, shade = 0.0, body = 0.0, belly = 0.5;
   #ifdef PC_OIL
     float oilS1 = 0.0, oilS2 = 0.0;      // the cloud's half-tone and its belly in shadow: set here, painted further down
   #endif
-  if (uCloud.y > 0.001 && disc > 0.0) {
-    float tt = rc < uCloud.x ? (-b + sqrt(disc)) : (-b - sqrt(disc));
+  if (cCover > 0.001 && disc > 0.0) {
+    float tt = rc < cShellR ? (-b + sqrt(disc)) : (-b - sqrt(disc));
     if (tt > 0.0) {
       vec3 hp = uCamL + d * tt;
       vec3 q = hp / uCloud.z + vec3(uTime * uCloud.w, 0.0, uTime * uCloud.w * 0.6);
@@ -452,10 +549,13 @@ void main() {
       //    wherever the shell is seen so nearly edge-on that a lobe would be smaller than a pixel, which is where
       //    grain and flicker come from.
       q *= mix(1.0, 5.0, uSkyOil.x);
+      // (lifted as the altocumulus behind the 3D clouds, its masses twice the size: at the sky's own size, seen from the air
+      // it was a confetti of small flakes over the whole sky, the 600 m stills of rework 2)
+      q *= mix(1.0, 0.5, step(0.5, uCloud3D.x));
       float c1 = texture(uNoise3D, q).r;
       float c2 = texture(uNoise3D, q * 2.7 + 0.31).g;
       float v = c1 * 0.82 + c2 * 0.18;
-      float th = 1.0 - uCloud.y;
+      float th = 1.0 - cCover;
       vec3 ql = q + normalize(uSunDirL + normalize(hp) * 0.85) * 0.14;
       float vl = texture(uNoise3D, ql).r * 0.82 + texture(uNoise3D, ql * 2.7 + 0.31).g * 0.18;
       // CLOUD LANES: the masses gather in broad lanes with clear sky between them, as theirs do. The lanes are waves
@@ -485,12 +585,12 @@ void main() {
       thO -= lobe * 0.055;
       float fwv = max(fwidth(v), 1e-4);
       // the silhouette, with an edge a pixel wide, as everything else in this look has
-      cloud = smoothstep(-fwv, fwv, v - (thO + 0.035)) * (rc < uCloud.x ? smoothstep(0.015, 0.20, e) : 1.0);
+      cloud = smoothstep(-fwv, fwv, v - (thO + 0.035)) * (rc < cShellR ? smoothstep(0.015, mix(0.20, 0.055, step(0.5, uCloud3D.x)), e) : 1.0);
       float deep = clamp((v - thO - 0.035) / 0.16, 0.0, 1.0);          // how far into the mass this pixel lies (0 at its edge)
       float sh = clamp(0.5 - (v - vl) * 5.0 * uSkyOil.z, 0.0, 1.0) * (0.40 + 0.60 * deep);
       float fws = max(fwidth(sh), 1e-4);
       oilS1 = smoothstep(-fws, fws, sh - 0.30);
-      oilS2 = smoothstep(-fws, fws, sh - 0.62);
+      oilS2 = smoothstep(-fws, fws, sh - 0.62) * (1.0 - uSkyFix.x);
       body = smoothstep(thO + 0.02, thO + 0.30, v);
       belly = smoothstep(thO + 0.06, thO + 0.50, v + (c2 - 0.5) * 0.25);
   #else
@@ -498,12 +598,12 @@ void main() {
       float c2 = texture(uNoise3D, q * 2.7 + 0.31).g;
       float c3 = texture(uNoise3D, q * 7.3).b;
       float v = c1 * 0.60 + c2 * 0.28 + c3 * 0.12;
-      float th = 1.0 - uCloud.y;
+      float th = 1.0 - cCover;
       // crisp on the upper edge, wet and soft on the lower
       cloud = smoothstep(th - 0.02, th + 0.09, v);
       float toSun = texture(uNoise3D, q + uSunDirL * 0.09).r * 0.60 + texture(uNoise3D, (q + uSunDirL * 0.09) * 2.7 + 0.31).g * 0.28 + c3 * 0.12;
       shade = smoothstep(0.0, 0.10, toSun - v + 0.02) * smoothstep(th + 0.02, th + 0.16, v);
-      float fade = rc < uCloud.x ? smoothstep(0.015, 0.20, e) : 1.0;
+      float fade = rc < cShellR ? smoothstep(0.015, 0.20, e) : 1.0;
       cloud *= fade;
       body = smoothstep(th + 0.02, th + 0.30, v);
       belly = smoothstep(th + 0.06, th + 0.50, v + (c2 - 0.5) * 0.25);
@@ -542,7 +642,12 @@ void main() {
   // (PAINTER 16/17, the M4 critique: under Earth's thunderstorm the closed sky was the darkest thing in the picture, its
   // darkest hundredth at L* 8, the crowns paler cut-outs against it. The sky is the light of a rain picture: the masses
   // are laid a little thinner and their bellies less deep, so that the sky's darks stay above the wood's)
-  vec3 mass = dens(mix(uStormWash, vec3(1.0), 0.12), 0.10 + 1.05 * belly + 0.22 * uWxSky.y + (n2.r - 0.5) * 0.4);
+  float massD = 0.10 + 1.05 * belly + 0.22 * uWxSky.y + (n2.r - 0.5) * 0.4;
+  #ifdef PC_OIL
+  // (the audit's fix, uSkyFix.x: the storm's mass in four flat steps with clean edges, not a soft mottle: R4.1)
+  massD = mix(massD, 0.10 + pcSkySteps(max(massD - 0.10, 0.0) / 1.6, 4.0) * 1.6, uSkyFix.x);
+  #endif
+  vec3 mass = dens(mix(uStormWash, vec3(1.0), 0.12), massD);
   cl = mix(cl, mass, oc * (0.30 + 0.70 * body));
   vec3 col = mix(sky, cl, cloud);
 
@@ -555,11 +660,18 @@ void main() {
     vec3 vq = hz * 1.7 + side * (e * 1.1) + up * (e * 0.30) + vec3(uTime * 0.004, 0.0, 0.0);
     float drag = texture(uNoise3D, vq).r * 0.75 + texture(uNoise3D, vq * 2.3 + 0.3).g * 0.25;
     float low = (1.0 - smoothstep(0.03, 0.62, e)) * smoothstep(-0.10, 0.03, e);
-    col = dens(col, 1.0 + (smoothstep(0.30, 0.78, drag) - 0.35) * low * uWxSky.z * 1.05);
+    float dragK = smoothstep(0.30, 0.78, drag);
+    #ifdef PC_OIL
+    dragK = mix(dragK, pcSkySteps(dragK, 2.0), uSkyFix.x);      // (the audit's fix: the far rain veil in two flat steps, not soft drags)
+    #endif
+    col = dens(col, 1.0 + (dragK - 0.35) * low * uWxSky.z * 1.05);
     // falling snow whitens the low sky instead: the far world goes to paper
     col = mix(col, vec3(0.985, 0.985, 0.99), uWxSky.w * low * (0.35 + 0.45 * smoothstep(0.35, 0.65, drag)));
   }
 
+  #ifdef PC_OIL
+  if (uRainbow.x > 0.004) col = pcRainbow(col, d, sd, sunE);
+  #endif
   // ---- the sun: bare paper with a warm halo
   float ang = acos(clamp(sd, -1.0, 1.0));
   float halo = exp(-ang * 7.0) * 0.75 + exp(-ang * 28.0) * 0.6;
@@ -626,6 +738,10 @@ void main() {
     float spWob = (s1.r - 0.5) * 0.34 + (s2.g - 0.5) * 0.14;
     float spEdge = mix(1.30, -0.60, smoothstep(0.04, 1.0, spA));
     float inSp = spA >= 0.999 ? 1.0 : smoothstep(spEdge - 0.06, spEdge + 0.20, e + spWob);
+    #ifdef PC_OIL
+    // (the audit's fix: the edge where the sky gives way to space, a pixel wide and not a fifth of the sky: R4.1)
+    { float ez = e + spWob - spEdge - 0.07, fwz = max(fwidth(ez), 1e-4); inSp = mix(inSp, spA >= 0.999 ? 1.0 : smoothstep(-fwz, fwz, ez), uSkyFix.x); }
+    #endif
     float spBloom = (1.0 - smoothstep(0.0, 0.22, abs(e + spWob - spEdge + 0.06))) * (1.0 - inSp) * spA;
   #ifdef PC_OIL
     col = mix(thin, sp, inSp);      // (the oil look lays no pale bloom where space's wash stops: nothing in opaque paint blots)
@@ -701,6 +817,9 @@ void main() {
       vec3 ta = normalize(cross(up, vec3(0.31, 0.74, 0.59))), tb = cross(up, ta);
       vec4 wv4 = texture(uNoise3D, d * 0.7 + 0.37);
       float nightK = (1.0 - uAtmo.y) * (1.0 - uAtmo.x) * smoothstep(0.02, 0.10, e);
+      // (WEATHER-DESIGN A10: the streaks are the clear night's; under an overcast or a cloud they were painted over the
+      // storm deck at dusk, design still 17. With the 3D clouds on they keep to the clear sky.)
+      nightK *= mix(1.0, (1.0 - oc) * (1.0 - cloud), step(0.5, uCloud3D.x));
       if (nightK > 0.004) {
         for (int L = 0; L < 4; L++) {
           float fl = float(L);
@@ -792,6 +911,14 @@ export function makeSkyUniforms() {
     // horizon stands from the air, as dot(view, up), set each frame by world/index.js (AIRTOP); 0 on the ground.
     // w: how far the eye is up for the sky's air-only paint (the golden hour's rings), 0 on the ground, 1 from 180 m.
     uSkyAir: { value: new THREE.Vector4(_qn('skyair', 1), _qn('skyairtop', 0.075), 0, 0) },
+    // (the 3D clouds, world/clouds.js: x 1 while they are drawn, y the shell's radius then, z its cover's share; all 0:
+    // the sky as it was. Only the oil sky reads it.)
+    uCloud3D: { value: new THREE.Vector4(0, 0, 0, 0) },
+    uCirrus: { value: new THREE.Vector4(1, 0, 0, 0) }, uRainbow: { value: new THREE.Vector4(0, 1500, 0, 0) },
+    uSkyFix: { value: new THREE.Vector4(0, 0, 0, 0) },
+    // (the weather field's textures, world/wxfield.js: the cirrus' and the rainbow's look-ups; only the oil sky declares them)
+    uWxField: WXF.uWxField, uWxField2: WXF.uWxField2, uWxN: WXF.uWxN, uWxOn: WXF.uWxOn,
+    uCloudShadow: WXF.uCloudShadow, uCloudShadowM: WXF.uCloudShadowM, uCloudShadowK: WXF.uCloudShadowK,
     ...OIL,
   };
 }

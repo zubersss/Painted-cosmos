@@ -36,6 +36,8 @@ import { setForcedCell, forcedCell, setLandStorms, landStorms, setStormDial } fr
 import { LOOKS } from '../data/looks.js';
 import { WaterField, WATER_GLSL, WATER, windSea, seaGrown, fetchOf, wakeLength, foamCover, whiteWind, surf01, FetchGauge, FETCH_GAUGE, SEA_TEX } from './water.js';
 import { SeaMap, SEA_MAP, FetchRose } from './seamap.js';
+import { WAKES2 } from './water.js';
+import { makeWaterPlay, stepWaterPlay, dryWaterPlay, SPLASHES } from './splash.js';      // (the water group, W4: ?wakes=2, ?splash=1)
 import { DeformField, DEFORM, MARK, MARK_STRIDE } from './deform.js';
 import { stepExplorerBody, EXPLORER_BODY, jumpSpeedFor, explorerTerminal, sustainableSpeed, gaitOf, strideBob } from './explorer.js';
 import {
@@ -122,6 +124,7 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
   const _fill = { snow: 0, sand: 0 };
   const water = new WaterField();
   const _wk = [];            // per-disturber wake state: where and when it last left a ring
+  const _wp = makeWaterPlay();   // (W4) the explorer in the water: its own rings, splashes, how wet (splash.js; nothing while off)
   const _frame0 = { ox: 0, oy: 0, oz: 0, ex: 1, ey: 0, ez: 0, nx: 0, ny: 0, nz: 1 };   // (P20) the frame before a re-anchor
   let liqLevel = -1e9, liqDepth = 0, liqScan = 0;
   // (P16) the fetch measured upwind over the water there (water.js FetchGauge), from the water point: the focus where it
@@ -162,6 +165,7 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
     // sand hopping in streamers, snow blowing along the ground (a ground blizzard at 1), spume torn off the
     // sea's breaking crests, surf on a shore within the particle box
     blown: { sand: 0, snow: 0, spume: 0, surf: 0, leaves: 0, litter: 0, leafStock01: 1 },   // (P15) leaves, litter: a second, torn off the crowns and lifted off the floor in the box; leafStock01: the loose leaves still on the trees
+    water: _wp.here,          // (W4, ?wakes=2 / ?splash=1: the explorer and the water, for the audio and the figure's paint; splash.js)
   };
   // Small weather near the focus, refreshed by update(): dust devils (features.js).
   const features = { devils };
@@ -169,6 +173,7 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
   const _dirv = { x: 0, y: 0, z: 0 };
   const _d3 = new Float64Array(3);
   const _g = {}, _g2 = {}, _cov = {}, _menv = {}, _m2 = {}, _wenv = {}, _cmo = {}, _wmo = {};
+  const _rcd = [0, 0, 0], _rce = { altitude: 0 }, _rco = {};     // (?rainmap=1: the box's corners)
   const _splash = new Float32Array(MATERIAL_IDS.length);   // (P21) a raindrop's splash on each ground, as it is now
   let sampleBody = 'earth';
   const sampleActive = (dir) => sampleSurface(sampleBody, dir);
@@ -520,6 +525,17 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
     // ground and is lifted from it, so it takes the air there: rhoGround)
     // (the last argument, the powers' space and time: every drop and flake steps at the pace of the place it is in,
     //  as every loose grain already does on the line below. Null with no bubble open, and then it costs one comparison.)
+    // (group D, ?rainmap=1, W3.3's last part: the rain map read at the rain box's four corners and at its middle, so at a
+    //  shower's edge more of the box's drops fall on its wetter side; null with the switch off, and nothing is asked)
+    if (WX2.rainmap && cloudMap.ready && cloudMap.bodyId === bodyId && here.weather.precipitation.type !== 'none') {
+      const Rr = PARTICLES.radius, RC = particles.rainCorners || (particles.rainCorners = new Float64Array(5));
+      _rce.altitude = here.groundHeight || 0;
+      for (let q = 0; q < 5; q++) {
+        frame.dir(q < 4 ? fx + (q & 1 ? Rr : -Rr) : fx, q < 4 ? fz + (q & 2 ? Rr : -Rr) : fz, _rcd);
+        rainAt(bodyId, _rcd[0], _rcd[1], _rcd[2], time, seed, _rce, _rco);
+        RC[q] = _rco.rate + _rco.snow;
+      }
+    } else particles.rainCorners = null;
     particles.update(dt, frame, airGrid, near, fx, fy, fz, wh, here.weather, here.air.density, cover, bodyId, body.gravity, time, ecx, ecz, TIMEHOLD.rain ? times : null);
     loose.update(dt, frame, airGrid, near, fx, fy, fz, wh, here.weather, rhoGround, cover, bodyId, body.gravity, time, dist, here.air.turbulence, moist.wetness01, moist.snowDepth, devils, winds, times);
     // drifts: what lies loose on level ground here, how hard the wind moves it, and what stands in its way
@@ -590,6 +606,9 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
         if (!(lq > -1e8)) continue;                                       // dry ground under it (or not known yet)
         const hgt = Math.hypot(D.p.x, D.p.y, D.p.z) - frame.r0 - lq;     // above the liquid surface
         let amp = 0;
+        // (W4: the explorer's own rings, splashes and wetness, splash.js; with ?wakes=2 its bow wave goes to the rings drawn
+        // per pixel, not to these 16)
+        if (D.kind === 'explorer' && (WAKES2.on || SPLASHES.on)) { stepWaterPlay(_wp, water, loose, D, frame, x, z, hgt, lq, time, dt); if (WAKES2.on) continue; }
         if (D.kind === 'explorer') {
           // wading or swimming: the body's bow wave, a few centimetres, growing with speed
           if (hgt < 0.2 && hgt > -2.5) { const sp = D.v ? Math.hypot(D.v.x, D.v.y, D.v.z) : 0; amp = Math.min(0.06, 0.012 * sp); }
@@ -603,6 +622,7 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
         if (Math.hypot(x - S.x, z - S.z) >= WATER.wakeEvery * L || time - S.t >= WATER.wakeEvery || time < S.t) { water.addWake(x, z, amp); S.x = x; S.z = z; S.t = time; }
       }
     }
+    if (!(water.present && dist) && (WAKES2.on || SPLASHES.on)) dryWaterPlay(_wp, dt);
     // (P22) arriving, the sea is what the wind's history at the place has raised (water.js seaGrown): the large-scale
     // wind there over the last 4 swell times, at the reference wind's strength now; found again once the sea has been
     // measured (its fetch known) and if the fetch then moves by a fifth
@@ -809,7 +829,7 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
   // Disturbers for physics.update from PILOT's states. Appends to `out` (clear it each frame with
   // out.length = 0); the entries are four objects owned by physics and reused, so nothing is
   // allocated per frame.
-  const _dEx = { kind: 'explorer', p: null, v: null, radius: EXPLORER_BODY.radius, strength: 1, grounded: true, kick: undefined, impact: 0 };
+  const _dEx = { kind: 'explorer', p: null, v: null, radius: EXPLORER_BODY.radius, strength: 1, grounded: true, kick: undefined, impact: 0, phys: null };
   const _dJet = { kind: 'jet', p: null, v: null, radius: 0.15, strength: 0 };
   const _dShip = { kind: 'ship', p: null, v: null, radius: 4.2, strength: 1, q: null, legContact: null };
   const _dWash = { kind: 'downwash', p: null, v: null, radius: 2.2, strength: 0 };
@@ -818,6 +838,7 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
     const B = st.phys;
     _dEx.p = st.p; _dEx.v = st.v; _dEx.grounded = !!st.grounded;
     _dEx.kick = B ? B.dust : undefined; _dEx.impact = B ? B.puff : 0;
+    _dEx.phys = B || null;      // (W4: its footfalls and strokes, for the rings: splash.js)
     out.push(_dEx);
     if (B && B.jetThrottle > 0.02) { _dJet.p = st.p; _dJet.v = st.v; _dJet.strength = EXPLORER_BODY.jetThrust * B.jetThrottle; out.push(_dJet); }
     return out;

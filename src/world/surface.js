@@ -15,11 +15,12 @@ import { MODE } from '../data/mode.js';
 import { makeNoise, hashString, hash3i, smoothstep, clamp } from './noise.js';
 import { dirToFace } from './cubesphere.js';
 import { EASELS, STANDS } from '../art/easels.js';
+import { bloomTint } from './bloom.js';
 
 const _cf = {};
 
 const NOT = {};
-const SNOW = [0.97, 0.98, 1.0];
+export const SNOW = [0.97, 0.98, 1.0];
 const CHAR = [0.16, 0.14, 0.19];     // cooled lava: indigo and sepia, the darkest wash of a lava plain
 const EMBER = [0.98, 0.55, 0.24];    // the glow of lava on its banks: cadmium orange run thin
 
@@ -95,6 +96,7 @@ class Surface {
     // `hydro` lakes, ponds and puddles in _forest and a river's mouth in the coast (world/hydro.js). Both null: the game as it was.
     this.rivers = null;
     this.hydro = null;
+    this.mount = null;    // ?mount=1: the alpine recipe's mountain streams (world/mountain.js prepareMountain). Null: as it was.
     this._dw = null;      // scratch biome weights for waterBaseAt (made on first use: only drainage asks)
   }
 
@@ -465,6 +467,10 @@ class Surface {
     // (THE WATER, ?lakes= ?ponds= ?puddles=: a basin's hills lowered under its lake, a pond carved, a hollow's puddle. It is
     //  handed the parts b.h was made of, so it can make b.h again, and may set b.lq, c.still, c.bank, c.cap. world/hydro.js.)
     if (this.hydro) { const H = this._hyd || (this._hyd = {}); H.L = L; H.hb = hb; H.hill = hill * 24 + mid * 4.5; H.rise = rise; H.sm = sm; H.mi = mi; H.rock = rockBump; H.s = s; H.w0 = w0; this.hydro.forest(this, c, b, H); }
+    // (?runoff=1, the water group's lead: the water here is RAIN-ONLY -- all of its depth is the runoff's cap (world/rivers.js
+    //  runnels and stream heads, hydro.js), so in the dry the bed is bare and wants the dry bed's colours: c.capOnly 1, else
+    //  0, written every call; c.cap is 0 without the switch. For C's recipe, 24 Nov)
+    c.capOnly = c.cap > 0 && c.cap >= b.lq - b.h ? 1 : 0;
     if (!full) return;
     const fg = R / 125, fp = R / 270, fv = R / 26;
     // (the oil look may open a wood: the biome's oil.glade = [from, to] in place of 0.24, 0.62: more and wider glades of
@@ -487,7 +493,10 @@ class Surface {
     b.dry = clamp(0.34 + 0.5 * rk + 0.3 * glade - bedm * 0.4, 0, 1);
     b.wet = clamp(0.18 + 0.5 * bedm, 0, 1);
     const open = smoothstep(w0 + 0.6, w0 + 3.6, s);
-    b.trees = clamp((1 - 0.82 * glade) * (1 - rk) * open * (1 - bar), 0, 1);
+    // (the rivers of the tree's point bars: the trees stand back from the bar and 6 m beyond it, so their crowns do not hide
+    //  it from the air -- F, 24 Nov; c.barZone, world/rivers.js, written every call there and read only when it is attached)
+    const bz = this.rivers ? c.barZone || 0 : 0;
+    b.trees = clamp((1 - 0.82 * glade) * (1 - rk) * open * (1 - Math.max(bar, bz)), 0, 1);
     b.canopy = clamp(b.trees * 1.05 + (1 - open) * 0.35, 0, 1);
     b.birch = clamp(0.74 - pz * 0.72 + 0.3 * (1 - smoothstep(6, 18, s)), 0.06, 1);
     // (the oil look may set a wood's mix of kinds: the biome's oil.tallMix. A number: the share of the first kind, everywhere.
@@ -495,7 +504,7 @@ class Surface {
     // and never as a whole stand: dark conifers among the autumn crowns, the owner's references of 2026-11-16)
     if (MODE.oil && bi.oil && bi.oil.tallMix != null) { const tm = bi.oil.tallMix; b.birch = typeof tm === 'number' ? tm : clamp(tm[0] - pz * tm[1], 0.04, 1.5); }
     b.under = clamp((0.45 + 0.55 * glade) * (1 - rk * 0.7) * smoothstep(w0 + 0.1, w0 + 1.2, s) * (1 - 0.85 * bar), 0, 1);
-    b.rock = rk; b.s = s; b.glade = glade; b.aux = 0; b.strata = 0; b.lip = 0;
+    b.rock = rk; b.s = s; b.glade = glade; b.aux = 0; b.strata = 0; b.lip = 0; b.snowK = 0;
     // far colour: the canopy seen from outside (pines cooler and darker), streams as pale lines
     const cz = clamp(b.trees * 1.15, 0, 1);
     const ca = pal.canopyA, cb = pal.canopyB, k = clamp(pz * 1.1, 0, 1), dv = 1 + v1 * 0.25;
@@ -640,6 +649,9 @@ class Surface {
       const sl = T.snow || 190;
       snow = smoothstep(sl, sl + 60, h + (crag - 0.5) * 90 + C.n3(X / 60, Y / 60, Z / 60) * 30);
       shade = up * (1 - snow) * 0.18;
+      // (THE WATER, ?mount=1: the mountain stream nearest the point -- its gully cut into the slope, its bed, its water's level
+      //  -- and a tarn's still water; nothing unless that part is attached. world/mountain.js.)
+      if (this.mount) { h = this.mount.alpine(this, c, h, T); if (c.lqA === c.lqA) lq = c.lqA; bed = Math.max(bed, c.bedA); grow *= c.growA; meadow *= 1 - c.bedA; wet = Math.max(wet, c.wetA); }
     } else if (k === 'coast') {
       const f = R / 780;
       const n = A.fbm(x * f - 9.0, y * f + 2.0, z * f + 14.0, 4, 2.0, 0.5);
@@ -940,6 +952,7 @@ class Surface {
     if (shade > 0) { const kd = shade * 0.9, kg = Math.min(1, shade * 1.7); b.r -= (b.r - b.r * b.r) * kd; b.g -= (b.g - b.g * b.g) * kd; b.b -= (b.b - b.b * b.b) * kd * 0.6; b.r *= 1 - 0.26 * kg; b.g *= 1 - 0.28 * kg; b.b *= 1 - 0.08 * kg; }
     if (crown > 0) { b.r += (0.93 - b.r) * crown; b.g += (0.92 - b.g) * crown; b.b += (0.90 - b.b) * crown; }
     if (snow > 0) mix3(b, SNOW, clamp(snow, 0, 0.94));
+    b.snowK = snow > 0 ? clamp(snow, 0, 0.94) : 0;      // (how much snow was laid over the wash: the far view's FV4 sheds it off steep faces, patchgen.js)
     if (T.frost && k !== 'crater' && k !== 'basin') mix3(b, SNOW, clamp(T.frost * (0.45 + v * 1.6 + 0.3 * tt), 0, 0.92));
     // (`t.bedC`, PAINTER 14: a bed laid in its own wash: the Moon's rilles are winding dark cuts, and with the plain's
     // palest wash in their beds they stood as pale shallow dips)
@@ -972,13 +985,13 @@ class Surface {
     o.top = top;
     const c = this._ctx; c.x = x; c.y = y; c.z = z; c.baseReady = false;
     c.fu = 0; c.fv = 0; c.dr = null;
-    c.still = 0; c.bank = 0; c.cap = 0; c.swell = 0; c.lvR = NaN; c.turbW = NaN; c.fspdW = 0;
+    c.still = 0; c.bank = 0; c.cap = 0; c.capOnly = 0; c.swell = 0; c.lvR = NaN; c.turbW = NaN; c.fspdW = 0;
     const b = this._b;
     let h = 0;
     const gw = this._gw, gl = this._gl;
     gw[0] = gw[1] = gw[2] = gw[3] = 0; gl[0] = gl[1] = gl[2] = gl[3] = 0;
     let qw = 0, qr = 0, qg = 0, qb = 0, qk = 0, qglow = 0, qcloud = 0;
-    if (full) { o.r = o.g = o.b = 0; o.r2 = o.g2 = o.b2 = 0; o.dry = o.wet = o.canopy = o.aux = 0; o.trees = o.birch = o.under = o.rock = 0; o.glade = 0; o.s = 1e9; o.strata = 0; o.lip = 0; }
+    if (full) { o.r = o.g = o.b = 0; o.r2 = o.g2 = o.b2 = 0; o.dry = o.wet = o.canopy = o.aux = 0; o.trees = o.birch = o.under = o.rock = 0; o.glade = 0; o.s = 1e9; o.strata = 0; o.lip = 0; o.canS = 0; o.canA = 0; o.snowK = 0; }
     for (let i = 0; i < nb; i++) {
       const wi = w[i];
       if (wi < 0.0015) continue;
@@ -995,6 +1008,12 @@ class Surface {
         o.r += wi * b.r; o.g += wi * b.g; o.b += wi * b.b;
         o.r2 += wi * b.r2; o.g2 += wi * b.g2; o.b2 += wi * b.b2;
         o.dry += wi * b.dry; o.wet += wi * b.wet; o.canopy += wi * b.canopy; o.aux += wi * b.aux;
+        // (the trees here, as two shares: those of woods whose far colour was painted in a SUMMER palette -- every wood but
+        // one whose look says autumn: 1 -- and those painted in an AUTUMN one; for the far view's FV3, render/farground.js:
+        // the first is turned to the trees' colour in autumn, the second in summer. Trees and not the canopy: the canopy
+        // also counts a stream bank's shade, and the stream drawn blue into the far colour went turquoise)
+        if (bi.autumn) o.canA += wi * (b.trees || 0); else o.canS += wi * (b.trees || 0);
+        o.snowK += wi * (b.snowK || 0);
         o.rock += wi * b.rock; o.glade += wi * b.glade; o.strata += wi * b.strata;
         if (i === top) { o.trees = b.trees * smoothstep(0.5, 0.8, wi); o.birch = b.birch; o.under = b.under * smoothstep(0.5, 0.8, wi); o.s = b.s; o.lip = b.lip * smoothstep(0.5, 0.8, wi); }
       }
@@ -1086,6 +1105,9 @@ class Surface {
         }
       }
     }
+    // (the flora lane, the oil look only: a flower drift's colour in the ground, and the sward's own shade at its roots;
+    // world/bloom.js. With the look off, ?bloom=0 and ?grass2=0, or no data, it returns at once and writes nothing.)
+    if (full) bloomTint(this, o, x, y, z, top);
     return o;
   }
 
@@ -1255,6 +1277,10 @@ class Surface {
     if (!best && cands.length) best = at(cands[0].i, cands[0].j, [0, 0, 0]);
     if (!best) best = [s0.x, s0.y, s0.z];
     this._spawn = { x: best[0], y: best[1], z: best[2] };
+    // (the oil look may give the first view's facing at the landing chosen here, without fixing the spot: a look's oil.face =
+    //  [yaw from north toward east, pitch], degrees; the game's camera takes it as it takes a fixed spawn's)
+    const fc = MODE.oil && this.look.oil && this.look.oil.face;
+    if (fc) { this._spawn.yaw = fc[0] * D2R; this._spawn.pitch = (fc[1] || 0) * D2R; }
     if (isForest) this.clearings.push({ x: best[0], y: best[1], z: best[2], r: 11 });
     // (a stand of kelp or crystal is opened round the first landing too: the first view is not a wall a metre from the eye)
     else if (this.biomes[s0.b].tall) this.clearings.push({ x: best[0], y: best[1], z: best[2], r: 15 });

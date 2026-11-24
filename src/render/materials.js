@@ -3,12 +3,18 @@
 // value-stepped light, cool glaze shadows, dry-brush sparkle, banded aerial perspective. The
 // post passes (post.js) then treat the result as wet paint on paper.
 import * as THREE from 'three';
+// THE GROUND SEEN FROM THE AIR (group C, the far view): the canopy painted into the ground. Its shader text, its uniforms
+// and its switch (?canopy=) live in render/farground.js; the hooks in the ground's shaders are all inside #ifdef PC_CANOPY, which is set
+// only in the oil look with the switch on.
+import { CANOPY, CANOPY_DEBUG, CANOPY_DAB, CANOPY_FLOOR, CANOPY_VERT_DECL, CANOPY_VERT_MAIN, CANOPY_FRAG, canopyUniforms, GROUND_SEASON, SEASON_VERT, SEASON_VERT_MAIN, SEASON_FRAG, seasonUniforms, ROCKFIELD, ROCK_FRAG, rockUniforms, ROCK_DEBUG, BLOOM_FAR, BLOOM_VERT_DECL, BLOOM_VERT_MAIN, BLOOM_FRAG, bloomUniforms } from './farground.js';
 import { G, PHYS, PHYSW, PREV, OIL, LOOK, BURNPAINT, register, ensureGlobals, makeBodyUniforms } from './shared.js';
 import { MODE } from '../data/mode.js';
 import { FLORA_GLSL } from '../physics/flora.glsl.js';
 import { WATER_GLSL } from '../physics/water.js';
 import { VERT_PARS, VERT_END, FRAG_PARS, FOG_BANK, PAINT, AIR_FN } from './chunks.js';
 import { SPRAY_GLSL } from './dabtex.js';
+import { WATERCHUNK_GLSL, WPAINT, wpaintOn, benchWPaint, wakesOn, WAKE_U } from './waterchunk.js';      // (the water's new paint, ?wpaint=2, and the player's rings, ?wakes=2: lanes W3, W4)
+import { WAKE2_GLSL } from '../physics/water.js';
 
 // THE LOOK AT THREE HUNDRED YARDS (the owner, 2026-11-22: "better lighting ... i want things to look high quality and
 // fully rendered even from 300 yards away" -- 275 m). What this file does for that is on three dials, read once from
@@ -25,6 +31,8 @@ const _gf = (v) => (+v).toFixed(4);      // a number as GLSL must read it: a bar
 const SKYFACE = _d22('skyface', 1), FLOORVAR = _gf(_d22('floorvar', 1)), FARCROWN = _gf(_d22('farcrown', 1));
 // (?farfix=0: the far trees' tables at eight kinds, as before 2026-11-24; see makePropMaterial)
 const FARFIX = (() => { try { return new URLSearchParams(location.search).get('farfix') !== '0'; } catch { return true; } })();
+// (?pines: how many times a needle card is grown at 30 m and beyond, PROP_VERT; ?needlefill= to judge another)
+const NEEDLE_FILL = (() => { try { const v = +new URLSearchParams(location.search).get('needlefill'); return v > 0 ? Math.min(4, v) : 2.2; } catch { return 2.2; } })();
 // THE WATER'S PAINT KNOWS THE FALL, AND WHITE WATER WHERE IT CHURNS (the owner, 2026-11-23: the water should be
 // "constantly moving the way water would be naturally", with "airration"). Until now every dash on every river ran
 // at one fixed rate whatever the slope, and the only foam in the game was the sea's, raised by the wind. The mesher
@@ -259,6 +267,9 @@ varying vec3 vUpV;
 #ifdef PC_OIL
 varying vec3 vRel;        // the place measured from the eye, in the body's axes: small numbers, so its screen derivatives are exact (chunks.js pcGroundChartD)
 #endif
+${CANOPY_VERT_DECL}
+${SEASON_VERT}
+${BLOOM_VERT_DECL}
 void main() {
   float d = distance(position, uCamLocal);
   float m = max(clamp((d - uMorph.x) / (uMorph.y - uMorph.x), 0.0, 1.0), uMorph.z);
@@ -275,6 +286,9 @@ void main() {
   vec4 mv = modelViewMatrix * vec4(p + pcRound(vBody), 1.0);
   vView = mv.xyz;
   vCol = mix(aColor, aColorP, m); vCol2 = mix(aColor2.rgb, aColor2P.rgb, m); vPar = mix(aParams, aParamsP, m);
+${CANOPY_VERT_MAIN}
+${SEASON_VERT_MAIN}
+${BLOOM_VERT_MAIN}
   gl_Position = projectionMatrix * mv;
   ${VERT_END}
 }
@@ -408,6 +422,10 @@ vec3 pcSoot(vec3 paint, float stray, float ash) {
 }
 ${FIRE_GLOW}
 #endif
+${CANOPY_FRAG}
+${SEASON_FRAG}
+${ROCK_FRAG}
+${BLOOM_FRAG}
 // The ground where a stroke lies (ds: the pixels from here to its centre; w: its width, m): its wash, the light's
 // level, the snow's cover, the canopy's colour and its cover there.
 void pcGroundAt(vec2 ds, float w, vec3 rnd, out vec3 c, out float lvl, out float snowC, out vec3 leaf, out float canopy) {
@@ -417,10 +435,16 @@ void pcGroundAt(vec2 ds, float w, vec3 rnd, out vec3 c, out float lvl, out float
   // facet, what was carried that far was nonsense: strokes of cyan, black and white on Pluto's lilac mountains, the
   // survey of the worlds)
   vec2 dsA = ds * min(1.0, 24.0 / max(length(ds), 1e-3));
+  #ifdef PC_ROCKF
+    if (gFaceD > 0.5) dsA = vec2(0.0);      // (a dab of an upright chart takes the pixel's own washes and facing: carried, they jumped at every facet of a staircase wall, render/farground.js gFaceK)
+  #endif
   vec4 colC = clamp(vCol + gCdx * dsA.x + gCdy * dsA.y, 0.0, 1.0);
   vec3 col2C = clamp(vCol2 + gC2dx * dsA.x + gC2dy * dsA.y, 0.0, 1.0);
   vec4 parC = vPar + gPdx * dsA.x + gPdy * dsA.y;
   vec3 nVc = normalize(vNV + gNvdx * dsA.x + gNvdy * dsA.y), nLc = normalize(vNL + gNldx * dsA.x + gNldy * dsA.y);
+  #ifdef PC_ROCKF
+    if (gFaceD > 0.5) nVc = gFaceNV;        // (a dab of an upright chart is lit as a plane along the strike, render/farground.js pcFaceLight)
+  #endif
   c = mix(col2C, colC.rgb, gMid);                  // (far away the forest floor is its canopy)
   // (the lighter paint looks up no noise for a dab: its hue and weight vary by the dab's own numbers alone, pcGroundPaint)
   vec4 n1 = vec4(0.5), n2 = vec4(0.5);
@@ -437,6 +461,11 @@ void pcGroundAt(vec2 ds, float w, vec3 rnd, out vec3 c, out float lvl, out float
   // cover is already taken from, so it costs nothing -- and being the dab's and not the pixel's, a dab is lit whole,
   // as everything else here is.
   float upN = dot(nLc, normalize(Bc));
+  #ifdef PC_ROCKF
+    if (gFaceD > 0.5) upN = gFaceP.x;
+    c = pcRockWash(c, upN, Bc, 1.0 - colC.a, length(vView), rnd, w);      // (the far view, FV4: a rock face in its own value and beds, a cliff in the world's rock, render/farground.js)
+    parC.z *= 1.0 - gRock;      // (no leaf shadow on a rock face: its pattern is laid flat and ran down a cliff in dark blocks, SEEN)
+  #endif
   ${SKYUP('upN')}
   snowC = pcSnowCover(upN, rnd.z * 0.5 + n2.b * 0.3 + n1.a * 0.2, parC.z);
   #ifdef PC_FIRE
@@ -464,25 +493,71 @@ void pcGroundAt(vec2 ds, float w, vec3 rnd, out vec3 c, out float lvl, out float
   float x = dot(nVc, gSunV) * 0.5 + 0.5;
   float sunny = min(pcSunAtSoft(Bc, parC.z * mix(0.82, 1.0, gMid), 8.0, w, fract(rnd.y * 5.7)), 1.0 - pcCast(Bc, (rnd.x - 0.5) * 0.3));
   lvl = pcLevel(mix(min(x, 0.44) - 0.10 * parC.z, x + (rnd.z - 0.5) * 0.10, sunny), 0.03);
+  #ifdef PC_ROCKF
+    lvl = pcRockPlanes(lvl, nVc, sunny);        // (a rock face lit in three planes by its slope's own facing, a gully in shade deeper: render/farground.js)
+  #endif
   #ifdef PC_FIRE
     // AND A HOLE IS IN ITS OWN SHADOW. Nothing else in the picture tells the eye that a dark patch on flat ground
     // is a hole and not a stain; the light going out of it, as it does down a well, is what makes it one.
     lvl -= sqrt(gMark.z) * 0.95 + gMark.y * 0.35;
   #endif
+  #ifdef PC_CANOPY
+    // (the far view: is this dab a crown of the wood's roof seen from above, render/farground.js; asked at the dab's own
+    // centre with the stand and the needle share carried there, the floor's own wash and the land's own light)
+    pcCanopyAt(Bc, gCtrCh, clamp(vFarS + gSdx * dsA.x + gSdy * dsA.y, 0.0, 1.0), clamp(parC.w, 0.0, 1.0), colC.rgb, x, w, rnd, false);
+    #ifdef PC_FIRE
+      if (gMark.x > 0.3) gCan = 0.0;      // (no crown stands where the fire has been)
+    #endif
+  #endif
+  #ifdef PC_BLOOMF
+    pcBloomAt(dsA, rnd);                     // (the far view, FV6(b): is this dab a flower of a drift, render/farground.js)
+    #ifdef PC_CANOPY
+      if (gCan > 0.5) gBloom = 0.0;
+    #endif
+    #ifdef PC_ROCKF
+      if (gRock > 0.0) gBloom = 0.0;
+    #endif
+    if (snowC > 0.5) gBloom = 0.0;
+  #endif
   leaf = pcDensity(col2C, 1.15);
+  #ifdef PC_SEASONG
+    leaf = pcSeasonLeaf(leaf, colC.rgb);     // (in summer a fallen leaf is last year's, brown)
+  #endif
   canopy = parC.z;
   gBc = Bc;
 }
 // One stroke's paint from that: its own colour (a fallen leaf's, for the share fk of the strokes), the snow, the light.
 vec3 pcGroundPaint(vec3 c, vec3 leaf, float fk, vec3 rnd, float snowC, float lvl) {
+  #ifdef PC_ROCKDEBUG
+    // (?rockdebug=1, for looking only: a dab of an upright chart red (a cliff's rock) or orange; a dab of the ground's
+    // chart on steep land blue (rock) or cyan)
+    if (uRockDbg > 3.5 && gFaceD > 0.5) { float hq = (length(gBc) - uBodyR) / 5.5; float fq = fract(hq); return fq < 0.11 ? vec3(0.0) : fq > 0.88 ? vec3(1.0) : mod(floor(hq), 2.0) < 0.5 ? vec3(1.0, 0.3, 0.2) : vec3(0.2, 0.4, 1.0); }
+    if (uRockDbg > 1.5 && uRockDbg < 3.5) { float uq = dot(normalize(vNL), normalize(vBody)); vec3 nF = normalize(cross(gBdx, gBdy)); float uf = abs(dot(nF, normalize(vBody))); float q = uRockDbg > 2.5 ? uf : uq; return q < 0.3 ? vec3(0.5, 0.0, 0.0) : q < 0.5 ? vec3(1.0, 0.1, 0.1) : q < 0.64 ? vec3(1.0, 0.6, 0.1) : q < 0.8 ? vec3(1.0, 1.0, 0.2) : q < 0.86 ? vec3(0.2, 0.9, 0.2) : vec3(0.3); }
+    if (gFaceOn > 0.5) return (gFaceD > 0.5 ? (gCliff > 0.5 ? vec3(1.0, 0.15, 0.1) : vec3(1.0, 0.7, 0.1)) : (gCliff > 0.5 ? vec3(0.1, 0.25, 1.0) : vec3(0.1, 0.9, 1.0))) * (0.55 + 0.45 * rnd.x);
+  #endif
+  #ifdef PC_CANOPY
+    // (a dab of the painted canopy: the crown's own wash in the crown's own light, one flat colour, render/farground.js)
+    if (gCan > 0.5) return pcTone(pcDabTint(gCanC, rnd, gCanLf), gCanL);
+  #endif
+  #ifdef PC_BLOOMF
+    if (gBloom > 0.5) return pcTone(pcDabTint(gBloomC, rnd, 0.2), lvl);      // (a flower of a drift, whole, in its own light: render/farground.js)
+  #endif
   float f = step(1.0 - fk, fract(rnd.z * 13.7));
   // (bare ground and grass, where no leaf has fallen: a dab is the ground's colour or one of its two neighbouring
   // pigments, and a share of the dabs are laid a step deeper; lit grass all of one colour was a flat lemon patch,
   // in a clearing and from the air: the stills after overhauls 3 to 5)
   float gq = fract(rnd.y * 23.3);
   vec3 cg = gq > 0.72 ? c * uHueA : gq < 0.24 ? c * uHueB : c;
+  #ifdef PC_ROCKF
+    // (the far view, FV4: on a rock face no dab is laid a step darker by its own number, and its pigment and stray
+    // are halved, so the face reads in lit and shaded planes by its own facing, render/farground.js)
+    cg = mix(cg, c, max(0.5 * gRock, gCliff));      // (a cliff's dab keeps its bed's tone: no stray pigment)
+    lvl -= (1.0 - f) * step(0.58, fract(rnd.x * 11.1)) * 0.9 * step(1.5, lvl) * (1.0 - gRock);
+    vec3 k = pcDabTint(mix(cg, leaf, f), mix(rnd, vec3(0.5), 0.5 * gRock), f);
+  #else
   lvl -= (1.0 - f) * step(0.58, fract(rnd.x * 11.1)) * 0.9 * step(1.5, lvl);
   vec3 k = pcDabTint(mix(cg, leaf, f), rnd, f);
+  #endif
   k = mix(pcWetWash(k, 1.0 - snowC), mix(vec3(0.94, 0.955, 1.0), vec3(0.86, 0.90, 1.0), rnd.x * 0.6), snowC);
   // (GRASS in the shade is a deep green, its own colour laid heavier with half the cool key over it, as a leaf's shade
   // is; under the key whole a shaded meadow was a violet-brown floor: the owner's references of 2026-11-16 have the
@@ -627,6 +702,12 @@ void main() {
   gC2dx = dFdx(vCol2); gC2dy = dFdy(vCol2);
   gPdx = dFdx(vPar); gPdy = dFdy(vPar);
   gNvdx = dFdx(vNV); gNvdy = dFdy(vNV); gNldx = dFdx(vNL); gNldy = dFdy(vNL);
+  #ifdef PC_CANOPY
+    gSdx = dFdx(vFarS); gSdy = dFdy(vFarS);
+  #endif
+  #ifdef PC_BLOOMF
+    gBkdx = dFdx(vBloomK); gBkdy = dFdy(vBloomK);
+  #endif
   float wpx = uOilA.x * uOilPx.y / 720.0;
   vec3 c, leaf; float lvl, snowC, canopy;
   vec3 acc;
@@ -717,24 +798,79 @@ void main() {
   float dabPx = 0.50 * uOilS.w * uOilA.x * uOilPx.y / 720.0;
   gVar = max(gMid, ${FLOORVAR} * smoothstep(2.6, 4.2, dabPx));
   float lw = max(length(gBdx), length(gBdy));
+  #ifdef PC_ROCKF
+    gRockLw = lw;
+  #endif
   // (a dab's own place: where its centre's chart lies on the sphere, at the ground's height carried there)
   float rB = length(vBody);
   vec3 upB = vBody / rB;
   float rdx = dot(upB, gBdx), rdy = dot(upB, gBdy);
   acc = vec3(0.0);
   float rem = 1.0;
+  #ifdef PC_CANOPY
+    // (the far view's canopy is carried by these dabs only: render/farground.js. The eye on the body, and the sun's way
+    // along the ground's chart and its height, once a pixel)
+    // (on a world with no painted canopy, and wherever the eye is not well above this place -- on foot nearly
+    // everywhere -- it is off for the whole pixel at one comparison: the dabs never ask)
+    gCanOn = uCanK.w * step(10.0, -dot(vRel, upB));
+    if (gCanOn > 0.5) {
+      gEye = vBody - vRel;
+      gSunE = dot(upB, uSunDirL);
+      vec2 scCan = pcGroundChartD(vBody, uSunDirL - upB * gSunE, uBodyR);
+      gSunCh = scCan / max(length(scCan), 1e-6);
+    }
+  #endif
+  #ifdef PC_ROCKF
+    // (the far view, FV4: on steep land the dabs are laid on upright charts, render/farground.js pcFaceLayer; a pixel
+    // under about 31 degrees never asks)
+    // (the facing is the STEEPER of the smoothed one and the triangle's own: on the coast's staircase wall every
+    // triangle is upright, and the smoothed facing had gentle columns every few metres, SEEN in ?rockdebug=2 and 3)
+    vec3 nP = normalize(vNL);
+    float upSm = dot(nP, upB);
+    gFaceP = vec2(min(upSm, abs(dot(normalize(cross(gBdx, gBdy)), upB))), 0.5);
+    gFaceOn = uRockK * step(gFaceP.x, 0.86);
+    if (gFaceOn > 0.5) {
+      gFaceP.y = pcStrikeWay(nP, upB, upSm);
+      gFaceK = vec2(smoothstep(0.80, 0.64, gFaceP.x), smoothstep(0.30, 0.70, fract(gFaceP.y)));
+      pcFaceFrame(nP, upB, upSm);
+    }
+  #endif
   // (the speed test's flat ground: no strokes at all, shared.js uOilL.y; the lighter paint: two layers, the coarsest
   // left to the ground's own colour)
   if (uOilL.y > 0.5 && uOilL.y < 1.5) rem = 0.0;
+  #ifdef PC_CANOPY
+    // (the far view: the wood's roof first, in its own smaller dabs; what it covers whole is finished, render/farground.js)
+    pcCanopyLayers(ch, dlx, dly, o4.x, wpx, ocl, rB, rdx, rdy, acc, rem);
+  #endif
   for (int L = 0; L < 3; L++) {
     if (rem < 0.004) break;
     if (L == 2 && uOilL.x > 0.5) break;
     float ws = L == 0 ? 1.0 : L == 1 ? 2.0 : 4.0, w = o4.x * ws;
     vec3 rnd, rnd2; vec2 ds, ctr; float cov, has2;
+    #ifdef PC_ROCKF
+      float faceD = 0.0;
+      if (gFaceOn > 0.5) pcFaceLayer(ch, dlx, dly, rB - uBodyR, rdx, rdy, w, uOilS.z, 4.0 * wpx * uOilS.w * ws, ocl,
+                                     L == 0 ? vec2(0.35, 0.65) : L == 1 ? vec2(0.0, 0.35) : vec2(1.0, -1.0), rnd, ctr, ds, cov, rnd2, has2, faceD);
+      else
+    #endif
     pcDabLayer(ch, dlx, dly, w, uOilS.z, 4.0 * wpx * uOilS.w * ws, ocl,
                L == 0 ? vec2(0.35, 0.65) : L == 1 ? vec2(0.0, 0.35) : vec2(1.0, -1.0), rnd, ctr, ds, cov, rnd2, has2);
     if (cov <= 0.0) continue;
     gCtrB = pcGroundUnchart(vBody, ctr, uBodyR) * (rB + rdx * ds.x + rdy * ds.y);
+    #ifdef PC_CANOPY
+      gCtrCh = ctr;
+    #endif
+    #ifdef PC_ROCKF
+      gFaceD = faceD;
+      // (a dab of an upright chart: its centre's place from its own chart, and its place on the ground's chart)
+      if (faceD > 0.5) {
+        gCtrB = pcFaceCentre(ch, ctr, faceD);
+        pcFaceLight(ch, faceD, upB);
+        #ifdef PC_CANOPY
+          gCtrCh = ch + dlx * ds.x + dly * ds.y;
+        #endif
+      }
+    #endif
     pcGroundAt(ds, w, rnd, c, lvl, snowC, leaf, canopy);
     // (under trees the floor is nearly all fallen leaves, with the earth dark between: the clip's. A world may keep
     // more of its grass there, uGroundK.w: the owner's later references have grass under the trees and leaves strewn on it)
@@ -745,6 +881,12 @@ void main() {
     // colour (pcDensity of the canopy wash), because line 413 still takes the dab's ground colour toward that
     // canopy by gMid. ?floorvar=0.5 is half of it, ?floorvar=0 is exactly what shipped.)
     float fk = clamp(canopy * 1.6, 0.0, 0.88) * gVar * (uGroundK.w > 0.0 ? uGroundK.w : 1.0);
+    #ifdef PC_SEASONG
+      fk *= pcSeasonLeafK();                 // (a quarter of the fallen leaves in high summer, all of them in autumn)
+    #endif
+    #ifdef PC_ROCKF
+      fk *= 1.0 - gRock;                     // (no leaf lies on a rock face)
+    #endif
     acc += rem * cov * pcGroundPaint(c, leaf, fk, rnd, snowC, lvl);
     rem *= 1.0 - cov;
     if (has2 > 0.5 && rem >= 0.004) { acc += rem * pcGroundPaint(c, leaf, fk, rnd2, snowC, lvl); rem = 0.0; }
@@ -756,7 +898,25 @@ void main() {
     ${SKYUP('dot(normalize(vNL), normalize(vBody))')}
     float x0 = dot(nV, gSunV) * 0.5 + 0.5;
     float sun0 = min(pcSunAtSoft(vBody, vPar.z * mix(0.82, 1.0, gMid), 8.0, max(lw, o4.x * 0.5), 0.5), 1.0 - pcCast(vBody, 0.0));
-    vec3 bare = pcTone(pcDensity(mix(vCol2, vCol.rgb, gMid), 1.15), pcLevel(mix(min(x0, 0.44) - 0.10 * vPar.z, x0, sun0), 0.05));
+    vec3 bareC = pcDensity(mix(vCol2, vCol.rgb, gMid), 1.15);
+    #ifdef PC_CANOPY
+      // (under the painted canopy the ground between the dabs is the crowns' mean wash over the share they cover)
+      vec4 canM = pcCanopyMean(vFarS, vPar.w);
+      bareC = mix(bareC, canM.rgb, canM.a);
+    #endif
+    #ifdef PC_BLOOMF
+      bareC = mix(bareC, pcBloomPal(vBloomI), 0.45 * vBloomK * uBloomOn);      // (the ground between the dabs takes a share of the drift)
+    #endif
+    float lvl0 = pcLevel(mix(min(x0, 0.44) - 0.10 * vPar.z, x0, sun0), 0.05);
+    #ifdef PC_ROCKF
+      // (on a cliff the ground between the dabs is the cliff's rock at the pixel's own place, render/farground.js)
+      float clP = smoothstep(0.66, 0.50, gFaceP.x) * smoothstep(0.05, 0.20, 1.0 - vCol.a) * gFaceOn;
+      if (clP > 0.0) { bareC = mix(bareC, pcCliffC(vBody, rB - uBodyR, vec3(0.5), bareC, lw), clP); lvl0 = mix(lvl0, min(lvl0, 0.9), gGully * clP); }
+    #endif
+    vec3 bare = pcTone(bareC, lvl0);
+    #ifdef PC_ROCKDEBUG
+      if (gFaceOn > 0.5 && uRockDbg < 1.5) bare = vec3(0.5);
+    #endif
     #ifdef PC_FIRE
       // (the powers, fire) The ground that shows BETWEEN the strokes is charred too, or a burnt patch would show its
       // old green through the gaps between its black strokes. This one is a smooth wash and not a stroke, so it takes
@@ -976,6 +1136,18 @@ export function makeTerrainMaterial(bodyU) {
     vertexShader: TERRAIN_VERT, fragmentShader: TERRAIN_FRAG,
   });
   m.userData.pcPainted = true;
+  // (the far view's painted canopy: compiled in only with the oil look and ?canopy= on; a world without a painted canopy
+  // keeps uCanK.w at 0 and returns before any of it is worked out. terrain.js writes the season's crowns each frame.)
+  if (LOOK.oil && CANOPY > 0) {
+    m.defines = m.defines || {}; m.defines.PC_CANOPY = 1; m.defines.PC_CAN_DAB = _gf(CANOPY_DAB); m.defines.PC_CAN_FLOOR = _gf(CANOPY_FLOOR); Object.assign(m.uniforms, canopyUniforms());
+    if (CANOPY_DEBUG) m.defines.PC_CANDEBUG = 1;
+  }
+  // (the far view, FV3: the floor and the far colour follow the year; compiled in only with the oil look and ?groundseason=)
+  if (LOOK.oil && GROUND_SEASON) { m.defines = m.defines || {}; m.defines.PC_SEASONG = 1; Object.assign(m.uniforms, seasonUniforms()); }
+  // (the far view, FV4: rock faces, strata and snow that read from afar; compiled in only with the oil look and ?rockfield=)
+  // (the far view, FV6(b): the flower drifts from the air, with flora B; compiled in only with the oil look and ?bloomfar=1)
+  if (LOOK.oil && BLOOM_FAR) { m.defines = m.defines || {}; m.defines.PC_BLOOMF = 1; Object.assign(m.uniforms, bloomUniforms()); }
+  if (LOOK.oil && ROCKFIELD) { m.defines = m.defines || {}; m.defines.PC_ROCKF = 1; Object.assign(m.uniforms, rockUniforms()); if (ROCK_DEBUG) m.defines.PC_ROCKDEBUG = _gf(ROCK_DEBUG); }
   // (the powers, fire: the ground goes black where the fire passed. Only with ?powers=1 and ?look=oil; see addFire.)
   addFire(m, true);
   return register(m, 'terrain');
@@ -984,6 +1156,9 @@ export function makeTerrainMaterial(bodyU) {
 // ------------------------------------------------------------------------------------------
 // Water
 // ------------------------------------------------------------------------------------------
+// (the new paint's base pace, ?wpaint=2: the water's own speed where the mesher measured one, else the middle of v33's
+// band; each cell keeps a sixth of spread either way, render/waterchunk.js. ?flow=0 keeps v33's fixed band)
+const FLOW_V0 = FLOWSPD > 0 ? `vTurb.x > 0.002 ? vTurb.x * ${FLOW_VMAX} : 1.15` : '1.15';
 const WATER_VERT = /* glsl */`
 ${VERT_PARS}
 attribute float aDepth;
@@ -1005,6 +1180,11 @@ varying vec2 vFlow;      // the current (surface.js _riversOil), two bytes about
 // fixed dash rate it had); y how aerated the water is, 0 clear .. 1 the foot of a fall.
 attribute vec4 aTurb;
 varying vec2 vTurb;
+#ifdef PC_WPAINT
+// (the water's new paint, ?wpaint=2: aTurb.w is how STILL the water is here, 0 a current .. 1 a pond, a lake, the sea,
+// as the mesher measured it: world/patchgen.js. A byte of 0 everywhere without the switch, and nothing reads it)
+varying float vStill;
+#endif
 #endif
 varying vec3 vWake;
 #ifdef PC_POWERS
@@ -1063,6 +1243,9 @@ void main() {
   #ifdef PC_OIL
     vFlow = aLiqP.zw;
     vTurb = aTurb.xy;
+    #ifdef PC_WPAINT
+      vStill = aTurb.w;
+    #endif
   #endif
   vec4 mv = modelViewMatrix * vec4(p + pcRound(vBody), 1.0);
   vView = mv.xyz;
@@ -1094,10 +1277,20 @@ varying vec2 vLiqP;
 #ifdef PC_OIL
 varying vec2 vFlow;      // the current (surface.js _riversOil), two bytes about 128/255; 0, 0: still water
 varying vec2 vTurb;      // x the water's own speed (0: the mesher gave none), y how aerated it is (world/patchgen.js)
+#ifdef PC_WPAINT
+uniform float uWPaint;   // the water's new paint (?wpaint=2): 1 on, 0 v37's (the speed test's row); render/waterchunk.js
+varying float vStill;    // how still the water is here, 0 a current .. 1 a pond, a lake, the sea (world/patchgen.js)
+#endif
 #endif
 varying vec3 vWake;
 #define PC_PHYS_NO_WAKE
 ${WATER_GLSL}
+#if defined(PC_OIL) && defined(PC_WPAINT)
+${WATERCHUNK_GLSL}
+#endif
+#ifdef PC_WWAKE
+${WAKE2_GLSL}
+#endif
 
 // Mirror the painting itself: march the reflected ray through last frame's depth.
 // Returns uv and a confidence.
@@ -1142,6 +1335,15 @@ void main() {
   // and is given its whitecaps as a few anchored dabs instead.
   vec2 along;
   vec3 wv = pcPhysWaterD(vBody, along) + vWake;
+  #ifdef PC_WWAKE
+  // THE PLAYER'S OWN SMALL WAVES, PER PIXEL (the water group, lane W4, ?wakes=2; physics/water.js WAKES2, physics/splash.js):
+  // a footfall's ring, a swimmer's strokes and bow wave, a low flight's furrow. Worked out here and not at the mesh's
+  // corners, where a ring a metre long between vertices a metre or more apart was mostly lost; only within 30 m of the
+  // eye and only while one is alive (uWWakeN 0: the loop is not entered).
+  vec3 wk2 = vec3(0.0);
+  if (uWWakeN > 0.5 && dist < 32.0) wk2 = pcWake2(pcPhysGrid(vBody)) * (1.0 - smoothstep(22.0, 32.0, dist));
+  wv += wk2;
+  #endif
   // (PHYSICS P18: the sea that is here and the way its waves run, from the sea map: lower and fewer breaking in a bay
   // behind a spit, the crests coming round toward a beach; the reference sea where there is no map)
   vec4 sea = pcPhysSeaLocal(vBody);
@@ -1174,7 +1376,16 @@ void main() {
       skyc = mix(skyc, vec3(0.93, 0.87, 0.72), pow(max(dot(RvW, sunVw), 0.0), 3.0) * 0.60 * uDayness * (1.0 - uWx.x));
     }
   #endif
+  #ifdef PC_WPAINT
+  vec3 skyT = skyc;
+  #endif
   skyc = mix(skyc, vec3(1.0), 0.30);
+  #ifdef PC_WPAINT
+  // (THE WATER'S NEW PAINT, lane W3, ?wpaint=2: the sky as it is, not mixed with three tenths of white. From the air
+  // the reflected ray points at the zenith, and the white made every water seen from above a pale grey: the design's
+  // w06, w09, w15, w16. Until the look director's sky as painted (LOOK-AUDIT L9, pcSkyAt) is in, the keys' own sky.)
+  if (uWPaint > 1.5) skyc = skyT;
+  #endif
   vec3 dark = pcDensity(uReflDark, 1.0 + (r3.g - 0.5) * 0.9);
   vec3 c = mix(dark, skyc, skyAmt);
 
@@ -1238,9 +1449,24 @@ void main() {
   float fres = pow(1.0 - max(dot(Vd, up), 0.0), 2.5);
   float shallow = 1.0 - smoothstep(0.02, 0.42, vDep);
   vec3 bed = pcDensity(uBed, 1.0 + (r3.b - 0.5) * 0.8);
-  c = mix(c, bed * mix(vec3(1.0), c, 0.45), clamp((1.0 - fres) * 0.42 + shallow * 0.7, 0.0, 0.9) * (1.0 - vLiqP.y) * (1.0 - vLiqP.x * 0.8));
+  float bedK = clamp((1.0 - fres) * 0.42 + shallow * 0.7, 0.0, 0.9);
+  #ifdef PC_WPAINT
+  // (the new paint: the bed shows through by HOW DEEP the water is, not by the angle alone. Seen from above, v37 laid
+  // four tenths of the sand's colour over every water however deep, and that is most of why all water from the air was
+  // grey-beige. Now two metres of water from straight above shows a twentieth of its bed, half a metre two fifths, so
+  // a brook and the shallows stay light and a river's middle and a lake go deep. And the shallows' own band (under
+  // 0.42 m) is let go with the distance: round a submerged bump it is a ring, and from afar a thin pale line.)
+  if (uWPaint > 1.5) bedK = clamp((1.0 - fres) * 0.42 * exp(-vDep / 0.6) + shallow * 0.7 * (1.0 - 0.92 * smoothstep(30.0, 150.0, dist)), 0.0, 0.9);
+  #endif
+  c = mix(c, bed * mix(vec3(1.0), c, 0.45), bedK * (1.0 - vLiqP.y) * (1.0 - vLiqP.x * 0.8));
   // pigment pools at the water's edge
-  c = pcDensity(c, 1.0 + (1.0 - smoothstep(0.0, 0.09, vDep)) * 0.35);
+  float edgeK = (1.0 - smoothstep(0.0, 0.09, vDep)) * 0.35;
+  #ifdef PC_WPAINT
+  // (the new paint: the pigment's band at the waterline is nine centimetres wide; beyond a few tens of metres it is
+  // under a pixel, and it drew every shore and every submerged bump as a dark hairline, an outline)
+  if (uWPaint > 1.5) edgeK *= 1.0 - smoothstep(20.0, 80.0, dist);
+  #endif
+  c = pcDensity(c, 1.0 + edgeK);
   // bare-paper glints: broken dashes where ripples catch the light
   float glint = smoothstep(0.715, 0.76, r2.r * 0.62 + r1.b * 0.38) * smoothstep(0.04, 0.2, vDep) * max(uDayness, uMoon);
   glint *= (1.0 - smoothstep(40.0, 120.0, dist)) * (1.0 - vLiqP.y) * (1.0 - 0.7 * wavy);
@@ -1375,6 +1601,7 @@ void main() {
   // swallow the far water whole, strokes and all, and a storm sea painted as a pale blank is
   // no sea; the painter keeps it darker than the sky to the horizon and lets the stacks go pale)
   // (and what glows is seen through the haze: lava keeps its fire into the distance)
+  float wLitN = 0.0, wMarkN = 0.0;      // (the night's pull, below: the light strokes and the sun's or moon's marks)
   #ifdef PC_OIL
   {
     // water in strokes: short thin dashes lying along the water (the world's own chart, so they stay where they are),
@@ -1384,8 +1611,57 @@ void main() {
     // chart's derivatives come from a position measured from the eye: chunks.js pcGroundChartD.)
     vec2 wch = pcGroundChart(vBody, uBodyR);
     vec2 wdx = pcGroundChartD(vBody, -dFdx(vToCam), uBodyR), wdy = pcGroundChartD(vBody, -dFdy(vToCam), uBodyR);
-    vec2 woc = pcStrokeOct(dist * 1.1, uOilPx.z * 1.1);
     vec3 wr1, wr2; vec2 wds; float wown;
+    float wStill = 0.0;      // (how still the water is here, for the new colour below: the new paint's own, 0 in v37's)
+    // (and the churn's own chart, below: it is turned to the current on a far lower floor than the dashes are,
+    // because white water must MOVE even in an eddy, where the body of the water is rightly laid still)
+    vec2 ach = wch, adx = wdx, ady = wdy;
+    #ifdef PC_WPAINT
+    // (the lace's way, pace and octave in the new paint: set below)
+    vec2 aDir = vec2(1.0, 0.0); float aSpd = 0.0; vec4 ao4 = vec4(1.0, 0.0, 0.0, 0.0); vec3 aoc3 = vec3(0.0);
+    if (uWPaint > 0.5) {
+      // THE WATER'S NEW PAINT (lane W3, ?wpaint=2; the strokes themselves in render/waterchunk.js pcWStrokes).
+      // STILL WATER LAID STILL. How still the water is here comes from the mesher (vStill: a pond, a lake, the sea,
+      // and a widened pool whose "current" turns round on itself -- the junction pond that was painted as a whorl);
+      // where two currents disagree across a triangle (an eddy, at a meeting of waters) it is still as well, by
+      // v33's own test. Still water's strokes lie ALONG THE CRESTS OF THE WIND'S WAVES (PHYSICS' wave direction, turned
+      // by the sea map toward a shore: the same way the sea's far swell is laid, below), long and level, and do not
+      // run; where the water has a current they lie along it and run with it at its own pace, as v33 made them.
+      vec2 fl = vFlow * (255.0 / 127.0) - (128.0 / 127.0);
+      float coh = vFlow.x + vFlow.y > 0.004 ? dot(fl, fl) : 0.0;
+      vec3 Uf = normalize(abs(up.y) < 0.9 ? vec3(-up.z, 0.0, up.x) : vec3(0.0, up.z, -up.y));
+      vec2 fc = pcGroundChartD(vBody, Uf * fl.x + cross(up, Uf) * fl.y, uBodyR);
+      fc = dot(fc, fc) > 1e-12 ? normalize(fc) : vec2(1.0, 0.0);
+      vec2 kc = pcGroundChartD(vBody, cross(up, pcPhysWaterDir(sdir)), uBodyR);
+      kc = dot(kc, kc) > 1e-12 ? normalize(kc) : vec2(1.0, 0.0);
+      float still = max(vStill, 1.0 - smoothstep(0.30, 0.56, coh));
+      wStill = still;
+      vec2 dS = mix(fc, dot(kc, fc) < 0.0 ? -kc : kc, still);
+      dS = dot(dS, dS) > 1e-6 ? normalize(dS) : kc;
+      float v0 = ${FLOW_V0};
+      // NO SIZE JUMP: two octaves, each stroke of the finer one there or not by its own number (pcWStrokes). And where
+      // the rows are squeezed on the screen (seen low, the rows stacked away from the eye) the strokes are laid larger,
+      // by how much the rows are squeezed, up to three times: sized by the distance alone the rows went under two
+      // pixels and the finer octave's thinning strokes were dotted lines, a lattice of specks (the first stills of
+      // this paint, E4 at the phone's size). The squeeze is worked out from the way the rows stack and the way the eye
+      // looks, both smooth over the water: the rows' own size on the screen is a derivative, and the octave's derivative
+      // taken from it was blocky from one square of pixels to the next and frayed the strokes' ends.
+      vec3 f3 = Uf * fl.x + cross(up, Uf) * fl.y, k3 = cross(up, pcPhysWaterDir(sdir));
+      vec3 d3 = mix(dot(f3, f3) > 1e-6 ? normalize(f3) : k3, dot(k3, f3) < 0.0 ? -k3 : k3, still);
+      float rowF = length(cross(cross(up, dot(d3, d3) > 1e-6 ? normalize(d3) : k3), Vd));
+      float graze = 1.0 / max(rowF, 0.333);
+      vec4 wo4 = pcStrokeOct4(dist * graze * 1.1, uOilPx.z * 1.1);
+      vec3 woc3 = vec3(wo4.w - wo4.z, dFdx(wo4.w), dFdy(wo4.w));
+      // (with the new colour, still water's strokes are longer, as calm water is laid: the look director, on E3)
+      pcWStrokes(wch, wdx, wdy, dS, v0 * (1.0 - still), wo4.x, uWPaint > 1.5 && still > 0.5 ? 10.0 : 6.0, woc3, wr1, wr2, wown);
+      // (the lace: along the current wherever there is one, at the water's own pace, on its own octaves)
+      aDir = coh > 0.02 ? fc : kc; aSpd = coh > 0.02 ? v0 : 0.0;
+      ao4 = pcStrokeOct4(dist * graze * 1.1, uOilPx.z * 0.40);
+      aoc3 = vec3(ao4.w - ao4.z, dFdx(ao4.w), dFdy(ao4.w));
+    } else
+    #endif
+    {
+    vec2 woc = pcStrokeOct(dist * 1.1, uOilPx.z * 1.1);
     // (long thin dashes, and the deep ones well deeper: short and all pale, a stream was a strip of pale flat patches,
     // "low-poly ice": the critic)
     // THE CURRENT (the owner, 2026-11-16: "the rivers should be moving with the flow of the current same for the art
@@ -1402,9 +1678,6 @@ void main() {
     // of the look moves until the number arrives.
     float flowV = 1.15;      // (never read unless a current turns the chart below; the middle of v33's band)
     vec2 sch = wch, sdx = wdx, sdy = wdy;
-    // (and the churn's own chart, below: it is turned to the current on a far lower floor than the dashes are,
-    // because white water must MOVE even in an eddy, where the body of the water is rightly laid still)
-    vec2 ach = wch, adx = wdx, ady = wdy;
     if (vFlow.x + vFlow.y > 0.004) {
       vec2 fl = vFlow * (255.0 / 127.0) - (128.0 / 127.0);
       float coh = dot(fl, fl);
@@ -1428,19 +1701,78 @@ void main() {
       }
     }
     pcThinLayer(sch, sdx, sdy, woc.x, 11.0, vBody, 60.0, 4.0, wr1, wds, wown, wr2);
+    }
     // (water is deeper and bluer than the air over it: looking toward the sun a stream took the pale sky whole and a
     // wide share of its dashes were the sun's own, and the river was a pale gravel road through the grass: the stills
     // of 2026-11-16. Its body is half the water's own wash laid heavy and blue, whatever the sky gives it, and the sun's path is a narrow run of marks.)
-    c = mix(c, pcDensity(vLiq.rgb, 1.9) * vec3(0.80, 0.95, 1.06), 0.55 * (1.0 - vLiqP.x) * (1.0 - vLiqP.y));
-    vec3 cdeep = pcDensity(c, 2.1) * vec3(0.90, 0.92, 1.0), clight = mix(c, mix(skyc, vec3(1.0), 0.25), 0.45);
-    float wsp = pow(max(dot(reflect(-normalize(vToCam), up), uSunDirL), 0.0), 56.0) * 0.6 * max(uDayness, uMoon) * (1.0 - uWx.x);
+    float wBodyD = 1.9, wBodyK = 0.55, wSunE = 56.0, wSunK = 0.6;
+    vec3 wLightC = mix(skyc, vec3(1.0), 0.25);
+    #ifdef PC_WPAINT
+    if (uWPaint > 1.5) {
+      // THE WATER'S BODY BY ITS DEPTH (the new paint): its own wash laid heavier the deeper it is -- a brook and the
+      // shallows a lighter blue, a river's middle and a lake deep (the owner's aerial river sheets: deep blue in the
+      // middle, lighter at the edges); the light strokes carry the sky as it is, not whitened; and THE SUN'S PATH
+      // carries far: its lobe widens with the distance (56 near, 22 from a kilometre), so a sea or a lake looked at
+      // toward the sun keeps a path of broken light to the horizon, where v37's lobe shrank under a stroke.
+      // (and from the air a step deeper still, as every one of the owner's aerial references lays far water darker than
+      // the land's haze: measured at E3 from 150 m the water stood at median value 0.80 against the land's 0.51)
+      float dk = smoothstep(0.25, 2.5, vDep), dfar = smoothstep(80.0, 450.0, dist);
+      wBodyD = mix(1.45, 2.15, dk) + 0.9 * dfar; wBodyK = mix(0.42, 0.62, dk);
+      wLightC = skyc;
+      float fs = smoothstep(120.0, 1200.0, dist);
+      wSunE = mix(56.0, 22.0, fs); wSunK = mix(0.6, 0.45, fs);
+    }
+    #endif
+    #ifdef PC_WPAINT
+    vec3 cRef = c;      // (what the water mirrors and shows here, before its own body is laid: the new paint, below)
+    #endif
+    c = mix(c, pcDensity(vLiq.rgb, wBodyD) * vec3(0.80, 0.95, 1.06), wBodyK * (1.0 - vLiqP.x) * (1.0 - vLiqP.y));
+    vec3 cdeep = pcDensity(c, 2.1) * vec3(0.90, 0.92, 1.0), clight = mix(c, wLightC, 0.45);
+    float wThL = 0.62, wThD = 0.30;
+    #ifdef PC_WPAINT
+    if (uWPaint > 1.5) {
+      // BROKEN COLOUR, NOT A MIXTURE (the new paint). v37 mixed the water's blue body into what it mirrors, pixel by
+      // pixel, and laid its strokes a step lighter and darker than that mixture: under a golden sky a blue body and a
+      // cream sky mixed make GREY, and from the air every water was grey (the design's w06, w09, w15, w16). Now the
+      // strokes keep the two apart, as a painter lays water: the deep strokes are the water's own body, the light ones
+      // what it mirrors (the sky as it is, the land's reflection where the last frame gives it), the middle ones the
+      // two in the share the angle gives (more of the mirror the lower the eye looks across the water). And the lower
+      // the angle the more of the strokes are the mirror's, as far water is. Lava and a sea of cloud keep v37's way.
+      // (FROM FORTY METRES OUT, all of it by two hundred: near the eye v37's strokes -- navy, the body, a step lighter --
+      // are what the design found reads well from the bank, and laid as broken colour there the brook went a pale flat
+      // cyan in the first stills of this paint, E2.)
+      vec3 body = pcDensity(vLiq.rgb, wBodyD) * vec3(0.80, 0.95, 1.06);
+      // (the mirror's share held under three fifths, and the light strokes a quarter the body's: with more, the water
+      // from the air went LIGHTER than the land, median value 0.80 at E3, where the look rules hold it inside the land's)
+      // STILL WATER IS THE CALMEST THING ON THE MAP (the look director on the step-1 stills, E3: the pond read as crumpled
+      // foil, paler and busier than the river). So where it is still: its body a step deeper than the river's chop,
+      // less of the mirror in it, its strokes in two or three close values (few light ones, few deep ones), and white
+      // only where the sun's path crosses it. And all far water inside the look rules' water band (value 0.45 to 0.70,
+      // the water group's lead and the look director: it stood at 0.77 to 0.80 from 150 m).
+      body = pcDensity(vLiq.rgb, wBodyD + 0.45 * wStill) * vec3(0.80, 0.95, 1.06);
+      float fr = clamp(0.10 + 0.40 * fres, 0.0, 0.50) * (1.0 - 0.4 * wStill), bk = smoothstep(40.0, 220.0, dist) * liq;
+      vec3 cN = mix(body, cRef, fr), dN = pcDensity(body, mix(1.3, 1.12, wStill)) * vec3(0.90, 0.92, 1.0);
+      vec3 lN = mix(body, mix(cRef, skyc, 0.35), mix(0.62, 0.30, wStill));
+      c = mix(c, cN, bk); cdeep = mix(cdeep, dN, bk); clight = mix(clight, lN, bk);
+      wThL = mix(0.62, mix(mix(0.72, 0.50, fres), 0.86, wStill), bk); wThD = mix(0.30, mix(mix(0.36, 0.22, fres), 0.16, wStill), bk);
+    }
+    #endif
+    float wsp = pow(max(dot(reflect(-normalize(vToCam), up), uSunDirL), 0.0), wSunE) * wSunK * max(uDayness, uMoon) * (1.0 - uWx.x);
     vec3 wsun = min(mix(pcOilSunC(), vec3(1.0), 0.35) * 1.06, vec3(1.0));
     float wau = uAuroraK * (1.0 - uDayness);
-    vec3 w1 = wr1.x > 0.62 ? clight : (wr1.x < 0.30 ? cdeep : c), w2 = wr2.x > 0.62 ? clight : (wr2.x < 0.30 ? cdeep : c);
+    vec3 w1 = wr1.x > wThL ? clight : (wr1.x < wThD ? cdeep : c), w2 = wr2.x > wThL ? clight : (wr2.x < wThD ? cdeep : c);
     w1 = wr1.z < 0.34 * wau ? mix(vec3(0.10, 0.74, 0.60), vec3(0.24, 0.96, 0.56), step(0.5, fract(wr1.z * 31.7))) : w1;
     w2 = wr2.z < 0.34 * wau ? mix(vec3(0.10, 0.74, 0.60), vec3(0.24, 0.96, 0.56), step(0.5, fract(wr2.z * 31.7))) : w2;
     w1 = wr1.y < wsp * 1.2 ? wsun : w1; w2 = wr2.y < wsp * 1.2 ? wsun : w2;
+    // (for the night's pull, at the end: which of the pixel's strokes are light ones, and which the sun's or the moon's marks)
+    wLitN = mix(wr2.x > wThL ? 1.0 : 0.0, wr1.x > wThL ? 1.0 : 0.0, wown);
+    wMarkN = mix(wr2.y < wsp * 1.2 ? 1.0 : 0.0, wr1.y < wsp * 1.2 ? 1.0 : 0.0, wown);
     c = mix(w2, w1, wown);
+    #ifdef PC_WWAKE
+    // (the player's own rings, painted: where a ring's face is steep the stroke there takes the light step, in a line
+    // as thin as the ring's own crest; ?wakes=2, physics/splash.js)
+    c = mix(c, clight, smoothstep(0.035, 0.12, length(wk2.yz)) * 0.75 * liq);
+    #endif
     // AERATED WATER, AS PAINT (the owner, 2026-11-23: "airration" -- the white of a rapid, the lace below a fall,
     // the stirred edge where water meets rock). The foam above this is the SEA's, raised by the wind, and the game
     // had no other: nothing anywhere went white because the bed made it. The mesher measures the churn where each
@@ -1456,9 +1788,15 @@ void main() {
       // then the lace: a share of the fine strokes is bare white, the share growing with the churn, and the milk
       // shows between them. A smaller base width in pcStrokeOct gives finer strokes NEAR and exactly the same ones
       // far off, where it clamps to what the brush can hold -- which is why this cannot turn into a speckle.
-      vec2 aoc = pcStrokeOct(dist * 1.1, uOilPx.z * 0.40);
       vec3 ar1, ar2; vec2 ads; float aown;
+      #ifdef PC_WPAINT
+      if (uWPaint > 0.5) pcWStrokes(wch, wdx, wdy, aDir, aSpd, ao4.x, 9.0, aoc3, ar1, ar2, aown);      // (half again as long as the body's, as v37's lace was)
+      else
+      #endif
+      {
+      vec2 aoc = pcStrokeOct(dist * 1.1, uOilPx.z * 0.40);
       pcThinLayer(ach, adx, ady, aoc.x, 16.0, vBody, 60.0, 4.0, ar1, ads, aown, ar2);
+      }
       // (at full churn four strokes in five break, and they break to bare paper; a faintly stirred reach breaks a
       // few and breaks them only part of the way, or the first whisper of churn would be a sparkle of white specks)
       float ath = 1.0 - aer * 0.78;
@@ -1466,7 +1804,27 @@ void main() {
     }
   }
   #endif
+  #ifdef PC_OIL
+  // THE NIGHT (the water group's paint, lane W3; the look director's night key, L1, chunks.js pcNight). By the moon the
+  // land goes part of the way to its own value in the night key's hue and is laid at the night's strength (pcTone),
+  // but the water never passes through pcTone: by night the stream stayed the day's blue, laid half of its own wash
+  // "whatever the sky gives it", and was the lightest, bluest thing in the wood. So the water takes the same pull and the
+  // same strength as the land's lit paint (pcTone: lit * mix(1.0, uLookN.x, nk)). The lava and the sea of cloud glow or
+  // are their own colour and keep it. By day uMoon is 0 and this is the colour untouched; ?nightkey=0 (uLookF.x 0) is the
+  // night water as it was.
+  {
+    float nkW = uMoon * uLookF.x;
+    // (the look director, on the night stills: the strokes that catch the sky keep a step of light over the pulled body,
+    // so the river still reads as moving water, and the moon's own path is left out of the pull)
+    if (nkW > 0.0) c = mix(c, pcNight(c) * mix(1.0, uLookN.x, nkW * (1.0 - 0.45 * wLitN)), liq * (1.0 - wMarkN));
+  }
+  #endif
   float f = pcFogAmount(dist) * (1.0 - 0.45 * farSea) * (1.0 - 0.6 * vLiqP.x);
+  #ifdef PC_WPAINT
+  // (the new paint: water is a glossy surface and reads darker than the land's haze at a distance in every one of the
+  // owner's aerial references; from 60 m the air takes less of it, a third less from 450 m. To be agreed with the look director.)
+  if (uWPaint > 1.5) f *= 1.0 - 0.35 * smoothstep(60.0, 450.0, dist) * liq;
+  #endif
   c = pcAtmosV(c, f, vView);
   pcWrite(c, mix(mix(0.7, 0.22, white), 1.0, vLiqP.y), normalize(normalMatrix * up), -vView.z, 2.0);
 }
@@ -1491,6 +1849,11 @@ export function makeWaterMaterial(bodyU, skyU) {
   });
   // (the powers, ?powers=1: the water is compiled with the parted channel; without the flag its program is as it was)
   if (MODE.powers) { m.defines.PC_POWERS = 1; m.uniforms.uPwChanA = G.uPwChanA; m.uniforms.uPwChanB = G.uPwChanB; }
+  // (the player's own small waves, ?wakes=2 with the oil look: render/waterchunk.js turns physics' set on)
+  if (wakesOn()) { m.defines.PC_WWAKE = 1; m.uniforms.uWWake = WAKE_U.uWWake; m.uniforms.uWWakeN = WAKE_U.uWWakeN; }
+  // (the water's new paint, ?wpaint=2 with the oil look: compiled in behind one uniform the speed test can turn off;
+  // without the switch the program is v37's, to the letter. render/waterchunk.js)
+  if (wpaintOn()) { m.defines.PC_WPAINT = 1; m.uniforms.uWPaint = WPAINT.uWPaint; benchWPaint(); }
   m.userData.pcPainted = true;
   // (R1 W2.4: water drawn in this frame wants last frame's painting kept for the next: post.js finish)
   m.onBeforeRender = () => { PREV.water = true; };
@@ -1615,6 +1978,8 @@ uniform vec4 uOilA;
 uniform vec4 uOilB;
 uniform vec4 uOilD;
 uniform vec4 uOilG;
+uniform float uNeedle;    // (?pines: a conifer's needles never narrower on the screen than this many pixels; 0 off, as before)
+uniform vec4 uOilPx;      // (x: the angle one pixel of the scene pass takes, radians: shared.js)
 uniform mat4 uShM;
 uniform highp sampler2D uShTex;
 uniform vec4 uShK;
@@ -1649,7 +2014,7 @@ vec3 pcWetWashV(vec3 c, float amt) {
 ${LEAF_SUN}
 uniform vec4 uLeafLod;    // the trees' leaves by distance (flora.js): x the distance within which every leaf is drawn (0: off), y the least share kept
 #endif
-#if defined(PC_TREE_LEAF) || defined(PC_TREE_CARD)
+#if defined(PC_TREE_LEAF) || defined(PC_TREE_CARD) || defined(PC_TREE_WOOD)
 uniform vec4 uFocus;      // (the trees' leaf program: the window round the explorer is cut here, whole leaves; flora.js _focus)
 #endif
 
@@ -1715,6 +2080,19 @@ void main() {
       cardO *= cardG;
       lp = aCard + cardO;
     }
+    // A CONIFER'S NEEDLES STAY A MASS AT RANGE (?pines, 24 Nov: the spruces and tall pines 20 to 60 m off read as bare
+    // poles). The spruce's foliage is sprays of needle cards with the air left between its whorls -- some 11 square
+    // metres of needles on a 16 m tree, about a fifth of its outline -- which near by is the approved look, and from 20 m
+    // on is a pole with specks. So from 10 m out each needle card grows about its own centre, up to NEEDLE_FILL times at
+    // 30 m and beyond, and the sprays close into the kind's dark mass; and wherever it stands a needle is kept at least
+    // uNeedle pixels across, its two side corners (uv.y +-1) pushed out (a needle under a pixel wide is missed by the
+    // pixels' centres more often than it is hit). Within 10 m nothing changes. 0: as before.
+    if (uNeedle > 0.0 && aData.y > 4.5 && aData.y < 6.5) {
+      float dN = max(distance((im * vec4(aCard, 1.0)).xyz, uCamLocal), 0.1);
+      cardO *= mix(1.0, ${NEEDLE_FILL.toFixed(2)}, smoothstep(10.0, 30.0, dN));
+      if (abs(uv.y) > 0.5) cardO *= clamp(0.5 * uNeedle * dN * uOilPx.x / max(length(mat3(im) * cardO), 1e-4), 1.0, 5.0);
+      lp = aCard + cardO;
+    }
   #endif
   #if defined(PC_TREE_LEAF) || defined(PC_TREE_WOOD) || defined(PC_TREE_CARD)
     // THE TREES' TWO SHORT PROGRAMS (?trees2=, 2026-11-24; docs/lead/TREES-DESIGN.md on r2, package T2). Everything the
@@ -1758,6 +2136,15 @@ void main() {
         keepT = smoothstep(mix(0.35, 0.9, twT), mix(1.6, 3.6, twT), cdT);
         float bnT = aBranchId < 0.0 ? 0.985 : fract(aBranchId * 7.31 + inst.z * 3.7) * 0.94 + 0.02;
         if (vWash < 0.999 && (vWash >= 0.0 ? bnT > vWash : bnT < 1.0 + vWash)) keepT = 0.0;
+        // (a trunk or a bough between the lens and the explorer is pinched in round the line of sight to the figure,
+        //  as the big program cut a ragged window through it: the figure is never lost behind a tree)
+        if (uFocus.w > 0.5) {
+          vec3 cvT = (modelViewMatrix * vec4(cwT + pcRound(io + uOrigin), 1.0)).xyz;
+          if (cvT.z > uFocus.z + 0.4) {
+            vec3 rdT = normalize(cvT);
+            keepT = min(keepT, smoothstep(0.5, 1.4, length(uFocus.xyz - rdT * dot(uFocus.xyz, rdT))));
+          }
+        }
       #endif
       if (keepT < 1.0) { cardO *= keepT; cardG *= keepT; lp = aCard + (lp - aCard) * keepT; }
     }
@@ -1936,6 +2323,13 @@ void main() {
       float lvL = pcLevel(xl, 0.03);
       vec3 deepL = pcShadeLeaf(cs);      // (L2: the one foliage shade, chunks.js)
       vLeafC.rgb = mix(deepL, pcTone(cs, lvL), smoothstep(1.2, 2.0, lvL));
+      // (?pines: a conifer's needle mass from 20 m out sits at the references' deep green, about V 0.26 (#39432e), not
+      //  near-black: the look director's ruling. A needle darker than that is lifted to it, its hue kept, from 12 m to
+      //  20 m; a lighter one is left as it is; within 12 m nothing changes. Only trunks in shade go down to 0.08-0.18.)
+      if (uNeedle > 0.0 && aData.y < 5.5) {
+        float vN = max(max(vLeafC.r, vLeafC.g), vLeafC.b), tN = 0.24 * smoothstep(12.0, 20.0, length(cV));
+        if (vN < tN) vLeafC.rgb *= tN / max(vN, 0.02);
+      }
       vLeafK.rgb = cs;
       #ifdef PC_FIRE
         // (the powers, fire) A LEAF ON A CROWN THAT HAS BURNED GOES BLACK BEFORE IT GOES ALTOGETHER. Its paint is taken
@@ -2070,7 +2464,10 @@ void main() {
     //  read, before every discard that breaks a crown up. The gap from 4 to 2 ("plants one flat colour", which runs
     //  all of those first) is what they cost; the gap from 2 to "as set" is the paint proper. These do nothing
     //  whatever unless the speed test sets them.)
-    if (uOilL.y > 3.5 && uOilL.y < 4.5) { pcWrite(vec3(0.42, 0.40, 0.32), 0.0, vec3(0.0, 0.0, 1.0), -vView.z, 3.0); return; }
+    // (24 Nov, the trees lane with the coordinator's leave: every speed-test row that writes a plant at once (4) or in one
+    //  flat colour (2) writes alpha 1, a whole cover. It wrote 0, and with alpha to coverage on a multisampled picture a
+    //  0 lays nothing, so the row timed plants that were not there. The as-set paint is not touched.)
+    if (uOilL.y > 3.5 && uOilL.y < 4.5) { pcWrite(vec3(0.42, 0.40, 0.32), 1.0, vec3(0.0, 0.0, 1.0), -vView.z, 3.0); return; }
   #endif
   pcFp = pcFootprint(vBody);      // (R1 W2.1, chunks.js: before any discard, where the flow is uniform)
   pcDist = length(vView);         // (R1 re-fix: the leaf shadow's far octaves, chunks.js)
@@ -2090,12 +2487,14 @@ void main() {
     // (uOilL.y 2: every plant one flat colour; 3: only the far trees, to tell their paint from their shapes)
     // (2026-11-24, trees lane: the far test was 'over 1.5', so rows 5 and 6 -- a leaf in its own colour, no air on
     //  the plants -- flattened every far tree as well and measured more than they said. Now only 2 and 3.)
+    // (trees lane, 24 Nov: the far flat and the bark flat write alpha 1, a whole cover: the as-set paint writes its cover
+    //  there, and a 0 laid NOTHING on a multisampled picture, alpha to coverage, so those rows measured less than they said)
     #ifdef PC_FAR
-    if (uOilL.y > 1.5 && uOilL.y < 3.5) { pcWrite(vData.y > 4.5 ? uLeafA * 0.7 : uBarkB, 0.0, nV, -vView.z, 3.0); return; }
+    if (uOilL.y > 1.5 && uOilL.y < 3.5) { pcWrite(vData.y > 4.5 ? uLeafA * 0.7 : uBarkB, 1.0, nV, -vView.z, 3.0); return; }
     #else
-    if (uOilL.y > 1.5 && uOilL.y < 2.5) { pcWrite(vData.y > 4.5 ? uLeafA * 0.7 : uBarkB, 0.0, nV, -vView.z, 3.0); return; }
+    if (uOilL.y > 1.5 && uOilL.y < 2.5) { pcWrite(vData.y > 4.5 ? uLeafA * 0.7 : uBarkB, 1.0, nV, -vView.z, 3.0); return; }
     // (7: the near trees' BARK one flat colour, every leaf and every discard as set -- trees lane T0 row c)
-    if (uOilL.y > 6.5 && uOilL.y < 7.5 && vData.y < 0.5) { pcWrite(uBarkB, 0.0, nV, -vView.z, 3.0); return; }
+    if (uOilL.y > 6.5 && uOilL.y < 7.5 && vData.y < 0.5) { pcWrite(uBarkB, 1.0, nV, -vView.z, 3.0); return; }
     #endif
   #else
     vec4 n1 = texture(uNoise3D, vBody / 9.0);
@@ -2546,9 +2945,11 @@ void main() {
 // pixel was run by a program the size of the bark's, and where a twig crossed the leaves the whole group of pixels
 // waited on the bark. The owner's phone measured the near trees at about 52 ms of an 89 ms frame (v37). Here a tree is
 // drawn by two programs, each only as long as its own part:
-//   WOOD_FRAG: the bark's streaks as before -- the same chart, the same octaves, the same paint at a streak's centre --
-//     but TWO tones a pixel (the streak it lies in and the one at its edge), where the old one laid the coarser
-//     layer whole under the finer one and toned every streak of both.
+//   WOOD_FRAG: the bark's streaks as before -- the same chart, the same octaves, the same two layers laid the same
+//     way, each at its own light -- with only what the big program spent and threw away left out: the flat wash under
+//     the layers (one tone and a shadow read, painted over whole wherever the strokes are on), and the finer layer's
+//     tones and light where neither of its streaks is there. (A first cut toned only two streaks a pixel; the look
+//     director saw the trunk's streaks flatter and less broken at 5 m, and the owner keeps today's, 24 Nov.)
 //   LEAF_FRAG: a leaf's paint is already worked out once a leaf in the vertex shader; this only lays it, with the
 //     lantern and the air. No discard and no alpha to coverage: the leaves a window or a wash leaves out are folded
 //     away whole in the vertex shader (PROP_VERT, PC_TREE_LEAF), so the card can test depth before it paints.
@@ -2596,8 +2997,21 @@ vec3 pcWoodColour(vec3 rnd, vec4 nA, vec3 barkA, vec3 barkB, float markP, float 
   k = pcWetWash(pcDensity(k, 1.0 + ((rnd.y - 0.5) * 1.5 + (nA.r - 0.5) * 0.5) * uOilB.z), 0.9);
   return k * mix(vec3(1.0), mix(vec3(1.12, 0.96, 0.80), vec3(0.90, 0.90, 1.08), rnd.z), 0.7 * uOilB.z);
 }
-// and its paint at the light level the streak's centre is in (the big program tones a streak and the one at its
-// edge at the SAME level, the level of the pixel's own streak, so only the colour differs between the two)
+// One layer's light, at the centre of the pixel's own streak in it (its facing there, and the shadow map there), and
+// that streak's nudge by its own number: PROP_FRAG's bark lights each layer so. Out: the centre on the body, and the
+// noise there (it shades the streaks' colour).
+float pcWoodLevel(vec2 ds, float w, float rx, vec3 bdx, vec3 bdy, vec3 nvdx, vec3 nvdy, bool seenFront, vec3 sunV,
+                  float pale, float canopy, out vec3 Bc, out vec4 nA) {
+  Bc = vBody + bdx * ds.x + bdy * ds.y;
+  vec3 nVc = normalize(vNV + nvdx * ds.x + nvdy * ds.y);
+  if (!seenFront) nVc = -nVc;
+  nA = uOilL.x > 0.5 ? vec4(0.5) : pcNoiseS(Bc, 9.0, w);
+  float xf = dot(nVc, sunV) * 0.5 + 0.5, sunny = pcSunAt(Bc, canopy * 0.8, 8.0 - vAbove, w), jit = (rx - 0.5) * 0.10;
+  // (the look director's one light, L3, as PROP_FRAG's bark takes it: uLookF.z picks it, chunks.js pcLit)
+  return uLookF.z > 0.5 ? pcLit(xf + jit, sunny, canopy * 0.8, 0.03) : pcLevel(xf * mix(0.55 + 0.30 * pale, 1.0, sunny) + jit, 0.03);
+}
+// and a streak's paint at its layer's light level (the big program tones a streak and the one at its edge at the
+// SAME level, the level of the pixel's own streak in that layer, so only the colour differs between the two)
 vec3 pcWoodPaint(vec3 k, float lvl, float pk, vec3 Bc, float r) {
   vec3 l = pcTone(k, lvl);
   if (pk > 0.001) l = mix(l, pcTone(k, max(lvl, 1.0) * 0.5 + 1.0), pk);
@@ -2609,12 +3023,25 @@ vec3 pcWoodPaint(vec3 k, float lvl, float pk, vec3 Bc, float r) {
 }
 void main() {
   #include <logdepthbuf_fragment>
+  #ifdef PC_TREE_FAIL
+    pcTreeFail = 1.0;      // (?trees2fail=wood: not GLSL on purpose, the guard's test: materials.js TREE_GUARD)
+  #endif
   // (the speed test's cuts, shared.js uOilL.y, as the big program honours them: 4 written at once, 2 one flat colour)
-  if (uOilL.y > 3.5 && uOilL.y < 4.5) { pcWrite(vec3(0.42, 0.40, 0.32), 0.0, vec3(0.0, 0.0, 1.0), -vView.z, 3.0); return; }
+  if (uOilL.y > 3.5 && uOilL.y < 4.5) { pcWrite(vec3(0.42, 0.40, 0.32), 1.0, vec3(0.0, 0.0, 1.0), -vView.z, 3.0); return; }
   pcDist = length(vView);
+  // (which way the face seen is turned. The wood is drawn BackSide (makePropMaterial), and three draws a BackSide
+  //  material by turning the winding over, so the faces seen report themselves front-facing; the big program, drawing
+  //  the same faces DoubleSide, saw them as back faces and turned their normals round. PC_WOOD_FLIP keeps that
+  //  exactly, so the bark is lit as it always was.)
+  #ifdef PC_WOOD_FLIP
+    bool seenFront = !gl_FrontFacing;
+  #else
+    bool seenFront = gl_FrontFacing;
+  #endif
   vec3 nV = normalize(vNV);
-  if (!gl_FrontFacing) nV = -nV;
-  if (uOilL.y > 1.5 && uOilL.y < 2.5) { pcWrite(uBarkB, 0.0, nV, -vView.z, 3.0); return; }
+  if (!seenFront) nV = -nV;
+  // (2: the plants one flat colour; 7: the near bark one flat colour -- the split's wood is all bark)
+  if ((uOilL.y > 1.5 && uOilL.y < 2.5) || (uOilL.y > 6.5 && uOilL.y < 7.5)) { pcWrite(uBarkB, 1.0, nV, -vView.z, 3.0); return; }
   vec3 sunV = normalize((viewMatrix * vec4(uSunDirW, 0.0)).xyz);
   ${SKYUP('dot(nV, mat3(viewMatrix) * uUpW)')}
   float seed = vInst.z;
@@ -2642,26 +3069,29 @@ void main() {
   vec3 rF, rF2, rC, rC2; vec2 dsF, dsC; float cF, cC;
   pcThinLayer(ch, dcx, dcy, oc.x, ba, vObj + seed * 11.0, 4.0 * wpxP * ba, 2.0, rF, dsF, cF, rF2);
   pcThinLayer(ch, dcx, dcy, oc.x * 2.0, ba, vObj + seed * 11.0, 8.0 * wpxP * ba, 2.0, rC, dsC, cC, rC2);
-  // WHICH TWO STREAKS THIS PIXEL IS PAINTED FROM. A fine streak that is still there lies on top: its own paint, and at
-  // its edge the next fine streak's if that one is there, the coarse one under it if not. Where the fine streak has
-  // gone (its number under the octave's share), the coarse streak and its neighbour. Two tones a pixel, always: the
-  // old program toned every streak of both layers and a wash under them, five to nine tones.
+  // THE COARSER LAYER, whole, at its own light: its streak and the one at its edge (the big program's L == 1)
+  vec3 BcC, BcF; vec4 nAC, nAF;
+  float lvC = pcWoodLevel(dsC, oc.x * 2.0, rC.x, bdx, bdy, nvdx, nvdy, seenFront, sunV, pale, canopy, BcC, nAC);
+  vec3 c = mix(pcWoodPaint(pcWoodColour(rC2, nAC, barkA, barkB, markP, twig), lvC, pk, BcC, rC2.y),
+               pcWoodPaint(pcWoodColour(rC, nAC, barkA, barkB, markP, twig), lvC, pk, BcC, rC.y), cC);
+  // (the speed test's strokes off, uOilC.z: the big program's flat wash under the layers shows through; with the
+  //  strokes on, the default, the coarse layer covers it whole, so it is not painted at all)
+  if (uOilC.z < 0.999) {
+    float xbF = dot(nV, sunV) * 0.5 + 0.5, xbS = pcSunAt(vBody, canopy * 0.8, 8.0 - vAbove, oc.x);
+    float lvW = uLookF.z > 0.5 ? pcLit(xbF, xbS, canopy * 0.8, 0.04) : pcLevel(xbF * mix(0.55 + 0.30 * pale, 1.0, xbS), 0.04);
+    c = mix(pcTone(mix(barkA, barkB, 0.16), lvW), c, uOilC.z);
+  }
+  // THE FINER LAYER over it, at ITS own light: a fine streak still there lies on top, and at its edge the next fine
+  // streak if that one is there, the coarse layer if not; where the fine streak has gone (its number under the
+  // octave's share) the coarse layer shows, with the next fine streak still at the edge if it is there. Where neither
+  // is there the coarse layer is the whole answer, and the finer layer's light and tones are not worked out.
   bool here = rF.x * 0.999 >= gone, there = rF2.x * 0.999 >= gone;
-  vec3 rA = here ? rF : rC, rB = here ? (there ? rF2 : rC) : rC2;
-  vec2 dsA = here ? dsF : dsC;
-  float wA = here ? oc.x : oc.x * 2.0, covA = here ? cF : cC;
-  // the light, once, at the centre of the pixel's own streak: its facing, and the shadow map there
-  vec3 Bc = vBody + bdx * dsA.x + bdy * dsA.y;
-  vec3 nVc = normalize(vNV + nvdx * dsA.x + nvdy * dsA.y);
-  if (!gl_FrontFacing) nVc = -nVc;
-  vec4 nA = uOilL.x > 0.5 ? vec4(0.5) : pcNoiseS(Bc, 9.0, wA);
-  float xs = dot(nVc, sunV) * 0.5 + 0.5;
-  xs *= mix(0.55 + 0.30 * pale, 1.0, pcSunAt(Bc, canopy * 0.8, 8.0 - vAbove, wA));
-  xs += (rA.x - 0.5) * 0.10;
-  float lvl = pcLevel(xs, 0.03);
-  vec3 tA = pcWoodPaint(pcWoodColour(rA, nA, barkA, barkB, markP, twig), lvl, pk, Bc, rA.y);
-  vec3 tB = pcWoodPaint(pcWoodColour(rB, nA, barkA, barkB, markP, twig), lvl, pk, Bc, rB.y);
-  vec3 c = mix(tB, tA, covA);
+  if (here || there) {
+    float lvF = pcWoodLevel(dsF, oc.x, rF.x, bdx, bdy, nvdx, nvdy, seenFront, sunV, pale, canopy, BcF, nAF);
+    vec3 e = there ? pcWoodPaint(pcWoodColour(rF2, nAF, barkA, barkB, markP, twig), lvF, pk, BcF, rF2.y) : c;
+    vec3 lay = here ? mix(e, pcWoodPaint(pcWoodColour(rF, nAF, barkA, barkB, markP, twig), lvF, pk, BcF, rF.y), cF) : mix(e, c, cF);
+    c = mix(c, lay, uOilC.z);
+  }
   #ifdef PC_FIRE
     if (vBurnt > 0.001) {
       // (what the fire left standing is charred, as the big program chars it: a cold charcoal at the paint's own value)
@@ -2679,10 +3109,13 @@ const LEAF_FRAG = /* glsl */`
 ${TREE_HEAD}
 void main() {
   #include <logdepthbuf_fragment>
-  if (uOilL.y > 3.5 && uOilL.y < 4.5) { pcWrite(vec3(0.42, 0.40, 0.32), 0.0, vec3(0.0, 0.0, 1.0), -vView.z, 3.0); return; }
+  #ifdef PC_TREE_FAIL
+    pcTreeFail = 1.0;      // (?trees2fail=leaf: not GLSL on purpose, the guard's test: materials.js TREE_GUARD)
+  #endif
+  if (uOilL.y > 3.5 && uOilL.y < 4.5) { pcWrite(vec3(0.42, 0.40, 0.32), 1.0, vec3(0.0, 0.0, 1.0), -vView.z, 3.0); return; }
   vec3 nV = normalize(vNV);
   if (!gl_FrontFacing) nV = -nV;
-  if (uOilL.y > 1.5 && uOilL.y < 2.5) { pcWrite(uLeafA * 0.7, 0.0, nV, -vView.z, 3.0); return; }
+  if (uOilL.y > 1.5 && uOilL.y < 2.5) { pcWrite(uLeafA * 0.7, 1.0, nV, -vView.z, 3.0); return; }
   // (a leaf: one piece of flat colour, worked out once a leaf in the vertex shader; here the lantern's light, the fire's
   //  and the air are laid over it, as the big program's leaf branch lays them)
   float h = vData.w;
@@ -2728,7 +3161,7 @@ ${LEAF_SUN}
 ${SPRAY_GLSL}
 void main() {
   #include <logdepthbuf_fragment>
-  if (uOilL.y > 3.5 && uOilL.y < 4.5) { pcWrite(vec3(0.42, 0.40, 0.32), 0.0, vec3(0.0, 0.0, 1.0), -vView.z, 3.0); return; }
+  if (uOilL.y > 3.5 && uOilL.y < 4.5) { pcWrite(vec3(0.42, 0.40, 0.32), 1.0, vec3(0.0, 0.0, 1.0), -vView.z, 3.0); return; }
   // the card's chart, in the dab layer's own cells (kitbuild.js clusterCard), its screen derivatives for the leaf's
   // clean edge, and the topmost leaf laid there (dabtex.js SPRAY_GLSL: the shadow map finds the very same leaf)
   vec2 off = vec2(vCardS.y * 23.0);
@@ -2751,7 +3184,7 @@ void main() {
     if (cover < (uOilG.z > 0.5 ? 0.06 : 0.5)) discard;
   #endif
   vec3 nV = vCardM;
-  if (uOilL.y > 1.5 && uOilL.y < 2.5) { pcWrite(vCardLA * 0.7, 0.0, nV, -vView.z, 3.0); return; }
+  if (uOilL.y > 1.5 && uOilL.y < 2.5) { pcWrite(vCardLA * 0.7, 1.0, nV, -vView.z, 3.0); return; }
   pcUp = vCardS.z;
   vec3 sunV = normalize((viewMatrix * vec4(uSunDirW, 0.0)).xyz);
   float twig = vCardS.w;
@@ -2786,6 +3219,37 @@ void main() {
 // whether the pass runs, meshes the card meshes that take part, each carrying in userData.pcDepthMats the materials it
 // is drawn with in that pass (its wood hidden, its cards in depth only).
 export const TREE_DEPTH = { on: false, meshes: new Set() };
+// THE GUARD ON THE TREES' TWO SHORT PROGRAMS (the default since 24 Nov; flora.js TREES2). A phone's driver may refuse a
+// program the desktop takes. three says so in its own words for every program it links (renderer.debug.checkShaderErrors,
+// on by default: a console error with the compiler's log, and program.diagnostics.runnable false); the painter asks here
+// after each frame whether any of the trees' programs is among those (render/index.js), and the first that is sets
+// failed: every world's flora then puts every tree back to the one program at once (flora.js update), and the console
+// says which program and why. mats: every tree program made (makePropMaterial). ?trees2fail=wood or leaf (or 1, the
+// wood) breaks that program on purpose, so the guard can be seen to work.
+export const TREE_GUARD = { mats: new Set(), failed: '' };
+const TREE_FAIL = (() => {
+  if (typeof location === 'undefined' || !location.search) return '';
+  const q = new URLSearchParams(location.search).get('trees2fail');
+  return q === '1' || q === 'wood' ? 'wood' : q === 'leaf' ? 'leaf' : '';
+})();
+export function treeGuardCheck(renderer) {
+  if (TREE_GUARD.failed || !TREE_GUARD.mats.size || !renderer || !renderer.properties) return TREE_GUARD.failed;
+  for (const m of TREE_GUARD.mats) {
+    const progs = renderer.properties.get(m).programs;
+    if (!progs) continue;
+    for (const p of progs.values()) {
+      const d = p && p.diagnostics;
+      if (!d || d.runnable !== false) continue;
+      const log = [d.fragmentShader && d.fragmentShader.log, d.vertexShader && d.vertexShader.log, d.programLog].filter(Boolean).join('\n');
+      const first = (log.split('\n').find((l) => l.trim()) || 'the driver gave no log').trim().slice(0, 200);
+      TREE_GUARD.failed = (m.name || 'a tree program') + ': ' + first;
+      console.warn('[trees] the trees\' two short programs cannot be used on this device (' + TREE_GUARD.failed +
+        '). Every tree goes back to the one program it was drawn by before (as ?trees2=0).');
+      return TREE_GUARD.failed;
+    }
+  }
+  return '';
+}
 
 export function makePropMaterial(bodyU, opts = {}) {
   const v3 = (a, d) => ({ value: new THREE.Vector3().fromArray(a || d) });
@@ -2808,6 +3272,7 @@ export function makePropMaterial(bodyU, opts = {}) {
     uLeafLod: { value: new THREE.Vector4(0, 0, 0, 0) },
     uLeafFam: { value: new THREE.Vector4().fromArray(opts.oilFam || [0, 0, 0, 0]) },
     uOilDark: { value: new THREE.Vector4(opts.oilDark ? opts.oilDark[0] : 0, 0, 0, 0) },
+    uNeedle: { value: opts.needle || 0 },      // (?pines: flora.js; 0 for every plant but a conifer with the switch on)
     uOilDarkA: v3(opts.oilDark && opts.oilDark[1], [0.5, 0.4, 0.4]), uOilDarkB: v3(opts.oilDark && opts.oilDark[2], [0.2, 0.15, 0.2]),
   };
   const defines = {};
@@ -2849,6 +3314,8 @@ export function makePropMaterial(bodyU, opts = {}) {
   // (?treedepth=1, the cards only: opts.depth 'first' the depth pass, 'equal' the colour pass drawn after it)
   const dpass = tree === 'card' && (opts.depth === 'first' || opts.depth === 'equal') ? opts.depth : null;
   if (dpass) defines[dpass === 'first' ? 'PC_TREE_DEPTH' : 'PC_TREE_EQUAL'] = 1;
+  if (tree === 'wood' && opts.doubleSide) defines.PC_WOOD_FLIP = 1;      // (drawn BackSide: see WOOD_FRAG)
+  if (tree && tree === TREE_FAIL) defines.PC_TREE_FAIL = 1;      // (?trees2fail=: the guard's test, TREE_GUARD)
   const m = new THREE.ShaderMaterial({
     name: 'pc-prop-' + (opts.name || ''),
     defines,
@@ -2860,6 +3327,7 @@ export function makePropMaterial(bodyU, opts = {}) {
     side: tree === 'wood' && opts.doubleSide ? THREE.BackSide : opts.doubleSide ? THREE.DoubleSide : THREE.FrontSide,
   });
   m.userData.pcPainted = true;
+  if (tree) TREE_GUARD.mats.add(m);
   // (the powers, fire: a crown that has burned is left bare and black. The plants need no list of burnt places -- each
   // instance carries its own number, PROP_VERT aBurnt -- so only the dials are attached. A mesh that has no such
   // numbers (grass, ferns, stones, and the trees until the world fills them) reads 0 for every instance, which is
@@ -3177,8 +3645,20 @@ uniform vec3 uOrigin;
 uniform vec3 uCamLocal;
 uniform vec4 uNear;     // x full density out to here (m), y nothing beyond here, z now (s), w one pixel at 1 m (tangent)
 uniform vec4 uNear2;    // x, y the ring fades in between these distances (m), z how soft its marks are left
+uniform float uNearCut; // (the speed test only, core/bench.js: the share of the marks folded away whole, by number; 0 none)
 uniform float uTime;
 uniform vec4 uWx;
+#ifdef PC_OIL
+// (the flora lane, docs/lead/FLORA-DESIGN.md) x 1: a mark the eye cannot see is dropped at once (G1); z 1: the flowers'
+// heads are not drawn (the speed test's row; 0 in play); y, w: spare
+uniform vec4 uNearK;    // x 1: marks out of view are dropped (G1); y the year now (SEASON.t, the flowers' windows); z 1: no flower heads; w a flower head's least size on screen, a share (0: 1)
+uniform vec4 uNearL;    // x 1: the grass package's paint (G4), y how strong the gusts' sheen is, z w the bend (rad) it grows over
+varying float vSheen;   // (G4) how far the gust bends this blade away from the eye, as a step of light: 0 none
+varying float vTeeth;   // (G3) how many blades a fan-brush touch is cut into, from its size on the screen: 0 as it was
+                        // (F2) a flower's head: how many pixels tall it stands on the screen
+attribute float iTone;  // (F2) a mark's second colour, packed (world/nearground.js packTone): 0 none
+varying vec3 vTone;     // ... unpacked; x < 0: none, the second tone is the mark's own colour, deeper or paler
+#endif
 varying vec3 vBody;
 varying vec3 vNV;
 varying vec3 vView;
@@ -3197,7 +3677,7 @@ void main() {
   bool flick = kind > 1.5 && kind < 3.5;
   bool broad = kind > 3.5;
   bool fan = broad && kind < 4.5;
-  bool lying = kind > 5.5;
+  bool lying = kind > 5.5 && kind < 6.5;      // (kinds 7 to 12 are the oil look's flower heads, facing the eye as a round touch)
   bool dab = broad && !fan && !lying;
   vKind = kind;
   vLoad = flick ? 0.4 : (broad ? 0.6 : 1.0);
@@ -3208,6 +3688,50 @@ void main() {
   // every stroke has its own range (so the sward thins with distance) and grows in after it is laid
   float range = mix(uNear.x, uNear.y, fract(h * 7.31));
   float vis = (1.0 - smoothstep(range * 0.72, range, di)) * smoothstep(0.0, 0.7, uNear.z - iPar.w) * smoothstep(uNear2.x, uNear2.y, di);
+  // (the speed test's 'half the near grass': a share of the marks folded to nothing here, before any is rasterised, so
+  //  the row prices a mark whole. By PLACE, in half-metre cells of the ground, so that a plant of several marks -- a
+  //  stalk, its leaf, its heads, which stand within a few centimetres of one root -- goes whole, but for the rare one
+  //  that straddles a cell's edge (the flora lane's ask). At 0, the default, nothing here is worked out at all.)
+  if (uNearCut > 0.0) {
+    vec3 cq = floor(iRoot * 2.0);
+    vis *= step(uNearCut, fract(sin(dot(cq, vec3(12.9898, 78.233, 37.719))) * 43758.5453));
+  }
+  #ifdef PC_OIL
+  // G1, THE MARKS THE EYE CANNOT SEE (2026-11-24, docs/lead/FLORA-DESIGN.md 6.1). A ring is one draw of every mark round
+  // the eye, and every mark used to be shaded whole -- the bend field read three times a vertex, the air -- in view or
+  // not, in range or not: COUNTED at the autumn landing, two thirds of 23,305 marks lay outside the picture, and a mark
+  // past its range was only shrunk to nothing at the end. Here such a mark is sent outside the clip volume before any
+  // of that, and its triangles are dropped, in the phone's binning pass too. Nothing that could reach the picture goes:
+  // the margin is the mark's own reach (its length, its width twice, the height a round touch is held at, a few pixels
+  // for the floor on a far mark's size, and the lean of a bend). A mark with no size (vis 0) drew nothing before either.
+  // uNearK.x 0 (the speed test's row, ?nearcull=0, ?grass2=0) is the ring as it was.
+  if (uNearK.z > 0.5 && kind > 6.5) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); return; }   // (the speed test's 'no flower heads')
+  // THE YEAR (the flora lane, docs/lead/FLORA-DESIGN.md 5.1, ?bloomyear=0 off): a flower's window on the year rides in
+  // iTone's top six bits (world/nearground.js packYear: when it comes into flower and when it is over, in sevenths of
+  // SEASON.t, 0 high summer to 1 deep autumn), and uNearK.y is the year now. Out of its window a kind's heads thin out one
+  // by one (each head by its own hash) and shrink before they go, over a seventh of the year, so nothing pops; a cushion
+  // keeps its leaves and its flowers go back into them. A mark with no window (every blade, stalk and leaf) is untouched.
+  float tn = iTone, yrF = 1.0, yrS = 1.0;
+  if (iTone > 262143.5) {
+    float yw = floor(iTone / 262144.0);
+    tn = iTone - yw * 262144.0;
+    float ya = floor(yw / 8.0) / 7.0, yb = 1.0 - mod(yw, 8.0) / 7.0;
+    yrF = smoothstep(ya - 0.143, ya, uNearK.y) * (1.0 - smoothstep(yb, yb + 0.143, uNearK.y));
+    if (kind < 11.5) {
+      float yq = fract(h * 5.37);
+      if (yq >= yrF) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); return; }
+      yrS = mix(0.45, 1.0, smoothstep(0.0, 0.18, yrF - yq));
+    }
+  }
+  if (uNearK.x > 0.5) {
+    vec4 rv = modelViewMatrix * vec4(root, 1.0);
+    float ext = iAxis.w * 1.2 + 2.0 * iPar.x + (dab ? iCol.a : 0.0) + 0.3 + uNear.w * di * 4.0;
+    vec4 rc = projectionMatrix * rv;
+    float kx = ext * sqrt(projectionMatrix[0][0] * projectionMatrix[0][0] + 1.0);
+    float ky = ext * sqrt(projectionMatrix[1][1] * projectionMatrix[1][1] + 1.0);
+    if (vis <= 0.0 || rv.z > ext || abs(rc.x) - rc.w > kx || abs(rc.y) - rc.w > ky) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); return; }
+  }
+  #endif
   float flex = iExt.y;
   // fresh snow buries what is short: no stroke stands on a snowfield but the tall stubble
   float snowK = 1.0 - smoothstep(0.12, 0.50, uWx.z) * (1.0 - 0.30 * smoothstep(0.62, 0.95, iAxis.w));
@@ -3225,6 +3749,24 @@ void main() {
     ax = normalize(mix(ax, axh / max(length(axh), 0.05) + up * 0.16, fl * 0.92));
     vFlat = fl;
   } else vFlat = 0.0;
+  #ifdef PC_OIL
+  vTeeth = 0.0;
+  if (tn > 0.5) { float pk = tn - 1.0; vTone = vec3(floor(pk / 4096.0), mod(floor(pk / 64.0), 64.0), mod(pk, 64.0)) / 63.0; }
+  else vTone = vec3(-1.0);
+  if (kind > 11.5 && yrF < 1.0 && vTone.x >= 0.0) vTone = mix(iCol.rgb, vTone, yrF);
+  // (G4, THE GUSTS' SHEEN, 2026-11-24) PHYSICS' bend carries the wind's travelling waves (physics/flora.glsl.js: the gust
+  // and the wave train in pcPhysBend), so where a gust presses the sward the blades lean over together and, leaning away
+  // from the eye, show their lit backs: bands of paler grass sweep across a meadow as the gusts pass. Asked at the root,
+  // so a blade is lit WHOLE as everything in the look is.
+  vSheen = 0.0;
+  if (uNearL.y > 0.0 && flex > 0.01 && uPhysOn > 0.5) {
+    vec3 bd = uPhysEast * pb.x + uPhysNorth * pb.y;
+    float ba = length(bd);
+    vec3 th = toCam - up * dot(toCam, up);
+    float away = ba > 1e-4 ? -dot(bd / ba, th / max(length(th), 1e-3)) : 0.0;
+    vSheen = uNearL.y * smoothstep(uNearL.z, uNearL.w, ba) * (0.35 + 0.65 * away);
+  }
+  #endif
   vec3 sd = cross(ax, toCam / max(di, 0.001));
   sd /= max(length(sd), 0.05);
   float wPx = uNear.w * di;                                       // metres across one pixel here
@@ -3239,10 +3781,37 @@ void main() {
       vec3 da = t1 * cos(iCol.a) + t2 * sin(iCol.a), db = cross(ax, da);
       rel = da * (max(len, wPx * 1.2 * grow) * (t * 2.0 - 1.0)) + db * (side * max(iPar.x, wPx * 0.9) * grow);
     } else if (dab) {
-      rel = ax * (iCol.a * (len / max(iAxis.w, 1e-4)) + max(len, wPx * 1.3 * grow) * t) + sd * (side * max(iPar.x, wPx * 1.3) * grow);
+      float dl = len, dw = iPar.x;
+      #ifdef PC_OIL
+      // (a flower's head never shrinks under a few pixels across, so a poppy six metres off still reads as a poppy and
+      // not a speck -- the coordinator on the level meadow, 24 Nov: the old flowers were bold dabs, the new heads 3-6 px.
+      // The whole head grows, its shape kept: half-width 2.6 px for a daisy, cup or poppy, 2.0 for a bell (they hang
+      // several to a stalk), 1.4 for a spike or froth, which are tall already. Only the oil look's heads, kinds 7-12.)
+      if (kind > 6.5) {
+        float hf = (kind > 9.5 && kind < 11.5 ? 1.4 : (kind > 8.5 && kind < 9.5 ? 2.0 : 2.6)) * (uNearK.w > 0.0 ? uNearK.w : 1.0);
+        float fk = max(1.0, wPx * hf * grow / max(dw, 1e-5));
+        dl *= fk * yrS; dw *= fk * yrS;     // (yrS: a head about to go out of flower shrinks first, the year above)
+      }
+      #endif
+      rel = ax * (iCol.a * (len / max(iAxis.w, 1e-4)) + max(dl, wPx * 1.3 * grow) * t) + sd * (side * max(dw, wPx * 1.3) * grow);
+      #ifdef PC_OIL
+      if (kind > 6.5) vTeeth = max(dl, wPx * 1.3) / max(wPx, 1e-5);
+      #endif
     } else {
       // a fan-brush touch: broad at the foot, spreading a little, its top cut into blades by the fragment shader
-      rel = ax * (len * t) + sd * (side * iPar.x * (1.0 + 0.4 * t) * grow + iCol.a * len * t * t);
+      float wk = 1.0;
+      #ifdef PC_OIL
+      // (G3, THE MIDDLE BAND, 2026-11-24, docs/lead/FLORA-DESIGN.md 6.3, ?grass2=0 off) A touch was cut into five to ten
+      // blades whatever its size, so at 20 m (5.6 cm a pixel) a 20 cm touch had blades under a pixel wide: the yellow
+      // speckle of the stills from 10 m. Now it is cut into as many as leave each blade about two pixels, never under
+      // two; and since the ring thins past 25 m (nearground.js: each touch's own range), a touch grows a little as the
+      // ring thins, up to 1.4 times by 40 m, so the band keeps its cover with fewer, larger touches.
+      if (uNearL.x > 0.5) {
+        wk = mix(1.0, 1.4, smoothstep(15.0, 40.0, di));
+        vTeeth = clamp(floor(2.4 * iPar.x * wk / max(wPx * 2.2, 1e-5)), 2.0, 9.0);
+      }
+      #endif
+      rel = ax * (len * t) + sd * (side * iPar.x * wk * (1.0 + 0.4 * t) * grow + iCol.a * len * t * t);
     }
   } else {
     // (close to the eye a blade is as slender as a blade is; farther off it is as broad as the brush must be)
@@ -3291,6 +3860,10 @@ varying float vLoad;
 varying float vKind;
 #ifdef PC_OIL
 varying vec3 vRootB;
+uniform vec4 uNearL;
+varying float vSheen;
+varying float vTeeth;
+varying vec3 vTone;
 ${PC_UP_F}
 #endif
 #ifdef PC_FIRE
@@ -3310,12 +3883,62 @@ void main() {
     if (fract(vS.z * 13.37 + 0.11) > uOilG.x * uGroundK.y) discard;
     {
       vec3 r3o = vec3(vS.z, fract(vS.z * 13.7), fract(vS.z * 5.1));
-      if (vKind > 4.5) {
+      bool second = false;
+      if (vKind > 6.5) {
+        // (F2, THE FLOWERS' HEADS, 2026-11-24, docs/lead/FLORA-DESIGN.md 7.2; world/bloom.js, nearground.js layBlooms.) Each
+        // cut from one quad that faces the eye, as the round touch is: a clean flat piece, no outline, and at most two
+        // flat colours -- its own and a second (the eye, the light in a cup, the shadow of a bell's mouth, a cushion's
+        // flowers), the second set as data (vTone) or the mark's own colour deeper or paler, never a hue of the shader's
+        // (LOOK-RULES R2.1). Lit WHOLE at its root like every near mark. Fine detail -- petals, scallops, florets -- is cut
+        // only where the head is big enough on the screen for each piece to be about two pixels (vTeeth: its height in
+        // pixels), so nothing finer than a pixel is ever drawn (R4.5); smaller, a head is its plain shape in its two tones.
+        vec2 q = vec2(vS.y, vS.x * 2.0 - 1.0);
+        float px = vTeeth, rq = length(q);
+        if (vKind < 7.5) {                          // rayed: petals round an eye (daisy, aster, campion)
+          if (rq > 0.96) discard;
+          float np = floor(clamp(px * 1.1, 0.0, 12.0));
+          if (np >= 5.0) {
+            float pa = fract(atan(q.y, q.x) / 6.2832 * np + vS.z * 7.0);
+            if (rq > 0.40 && abs(pa - 0.5) * 2.0 > 1.0 - 0.75 * (rq - 0.40)) discard;
+          }
+          second = rq < (px < 5.0 ? 0.45 : 0.36);
+        } else if (vKind < 8.5) {                   // cup: a round head, the light in the cup a step paler (buttercup, gentian, poppy)
+          if (rq > 0.95) discard;
+          if (px > 7.0 && rq > 0.80 && abs(fract(atan(q.y, q.x) / 6.2832 * 5.0 + vS.z * 3.0) - 0.5) > 0.38) discard;
+          second = q.y > 0.15 - 0.15 * q.x * q.x;
+        } else if (vKind < 9.5) {                   // bell: a hanging cup from the side, its mouth in shadow (harebell, bluebell)
+          float bw = 0.55 + 0.32 * smoothstep(0.3, -0.9, q.y);
+          if (abs(q.x) > bw || q.y > 0.82 - 0.40 * q.x * q.x || q.y < -0.94) discard;
+          if (px > 7.0 && q.y < -0.72 && abs(fract(q.x * 1.6 + 0.5) - 0.5) < 0.16) discard;
+          second = q.y < -0.60;
+        } else if (vKind < 10.5) {                  // spike: florets stacked up the stem, smaller to the top (foxglove, loosestrife)
+          float nf = clamp(floor(px / 3.0), 3.0, 9.0);
+          float yy = (q.y + 1.0) * 0.5 * nf, cl = floor(yy), fy = fract(yy) - 0.5;
+          float sx = mod(cl, 2.0) < 1.0 ? -0.22 : 0.22;
+          if (length(vec2((q.x - sx) * 0.75, fy)) > 0.48 * (1.0 - 0.5 * cl / nf)) discard;
+          second = cl > nf - 1.5;
+        } else if (vKind < 11.5) {                  // froth: a loose head of small dabs (meadowsweet, cotton grass)
+          float nd = clamp(floor(px / 2.5), 1.0, 7.0);
+          bool hit = nd < 1.5 && rq < 0.9;
+          for (int k = 0; k < 7; k++) {
+            if (float(k) >= nd) break;
+            vec2 cc = vec2(fract(sin(float(k) * 12.9898 + vS.z * 78.233) * 43758.5), fract(sin(float(k) * 39.346 + vS.z * 11.135) * 24634.6)) * 1.2 - 0.6;
+            if (length(q - cc) < 0.40) hit = true;
+          }
+          if (!hit) discard;
+        } else {                                    // cushion: a low dome of leaves, its flowers on top (thrift, alpine pink)
+          float topY = -1.0 + 1.75 * sqrt(max(0.0, 1.0 - q.x * q.x));
+          if (q.y > topY) discard;
+          second = q.y > topY - 0.42;
+          if (second && px > 10.0 && abs(fract(q.x * 2.2 + vS.z * 5.0) - 0.5) > 0.36) second = false;
+        }
+      } else if (vKind > 4.5) {
         vec2 q = vec2(vS.y, vS.x * 2.0 - 1.0);
         if (vKind > 5.5 ? abs(q.x) > (1.0 - q.y * q.y) * 0.92 : dot(q, q) > 0.94) discard;
       } else if (vKind > 3.5) {
         float u = vS.y * 0.5 + 0.5, hz = vS.z;
         float nb = 5.0 + floor(fract(hz * 5.37) * 5.0);
+        if (vTeeth > 0.5) nb = min(nb, vTeeth);      // (G3: never a blade under two pixels)
         float b1 = u * nb + hz * 7.0 + 0.4 * sin(u * 9.0 + hz * 30.0), b2 = u * nb * 0.37 + hz * 3.0;
         float h1 = 0.30 + 0.70 * fract(sin(floor(b1) * 12.9898 + hz * 78.233) * 43758.5453);
         float h2 = 0.55 + 0.45 * fract(sin(floor(b2) * 39.3468 + hz * 11.135) * 24634.6345);
@@ -3326,6 +3949,9 @@ void main() {
         r3o = fract(r3o + h1 * vec3(0.37, 0.61, 0.83));      // (each blade of the tuft its own number: its own tone)
       }
       vec3 nVo = normalize(vNV);
+      // (the speed test's 'near grass one flat colour', shared.js uOilL.y 8: every mark keeps its shape, its light and
+      //  paint are not worked out -- the gap to 'as set' is what the sward's paint costs a pixel)
+      if (uOilL.y > 7.5 && uOilL.y < 8.5) { pcWrite(vCol, 0.0, nVo, -vView.z, 4.0 + vS.z * 0.9); return; }
       // (a blade, a pebble, a frost needle faces the sky its own way: chunks.js pcUp, as the ground under it does.
       // A blade stands up, so it sees about half the sky and takes the ground's warm bounce on its side; the floor
       // it stands on faces the sky whole. That is the difference this term is for.)
@@ -3338,9 +3964,14 @@ void main() {
       // tone is a flat patch)
       lv -= step(0.66, fract(r3o.x * 11.1)) * 0.6 * step(1.5, lv);
       if (vKind < 4.5 && vS.x > 0.42 + 0.3 * r3o.y) lv += 0.8 * sunO;
+      // (G4, the flora lane, ?grass2=0 off: the gusts' sheen lifts the blades they lean away from the eye, WHOLE, asked at
+      // the root. A step deeper at a blade's root was tried and taken out: LOOK-RULES R3.1, a stroke is one flat colour.
+      // The sward's dark roots are the ground's paint under it instead: world/bloom.js bloomTint.)
+      if (uNearL.x > 0.5 && vKind > 1.5 && vKind < 3.5) lv += 0.7 * vSheen;
       // (a stroke's wash is never darker than a middle one: the watercolour's deep washes, laid as flat paint in the
       // shade, were black thorns all over the wood's floor; in the shade a blade is a deep green)
       vec3 kc = vCol;
+      if (second) kc = vTone.x >= 0.0 ? vTone : pcDensity(vCol, vKind > 7.5 && vKind < 8.5 ? 0.72 : 1.45);
       float kl = dot(kc, vec3(0.3, 0.5, 0.2));
       kc = mix(kc, kc * (0.52 / max(kl, 0.08)), smoothstep(0.52, 0.30, kl) * 0.85);
       vec3 ko = pcDabTint(pcDensity(kc, 1.0 + (r3o.x - 0.5) * 0.25), r3o, 0.0);
@@ -3415,6 +4046,9 @@ export function makeNearMaterial(bodyU) {
     uniforms: baseUniforms(bodyU, Object.assign({
       uOrigin: { value: new THREE.Vector3() }, uCamLocal: { value: new THREE.Vector3() },
       uNear: { value: new THREE.Vector4(5, 13, 0, 0.002) }, uNear2: { value: new THREE.Vector4(0.8, 2.6, 0, 0) },
+      // (the flora lane: nearground.js FLORA sets them; 0 is each package off, the ring as it was. Read only in the oil look)
+      uNearK: { value: new THREE.Vector4(0, 0, 0, 0) }, uNearL: { value: new THREE.Vector4(0, 0, 0, 0) },
+      uNearCut: { value: 0 },
     }, PHYS)),
     vertexShader: NEAR_VERT, fragmentShader: NEAR_FRAG,
     side: THREE.DoubleSide,

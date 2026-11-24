@@ -186,3 +186,64 @@ test('land storms: the weather lives under its own top, not under half the atmos
     assert.ok(now.precipitation.rate > 10, `${now.precipitation.rate.toFixed(1)} mm/h at 700 m under its own top`);
   } finally { W.setForcedCell(null); }
 });
+
+test('land storms: under storms, every flash of a storm over the place lights it (the same flashes the bolts are drawn for)', async () => {
+  const E0 = await earth(); if (!E0) return;
+  const was = WX2.cloudmap;
+  try {
+    on(E0); WX2.cloudmap = true;
+    let t = W.STORMLAND.from;
+    for (; t < W.STORMLAND.from + 30 * 1674; t += 20) if (W.cellsAt('earth', t).some((c) => c.land && c.kindId === 'storm' && c.w > 0.7)) break;
+    const cf = new CloudField(18);
+    E0.wm.refresh('earth', t, E0.sunAt(t)); cf.refresh('earth', t, E0.sunAt(t), E0.wm);
+    const c = W.cellsAt('earth', t).find((q) => q.land && q.kindId === 'storm' && q.w > 0.7);
+    // a place 30 % of the way out from the storm's middle, where its wider cloud shield covers it more than its core
+    let ex = c.z, ez = -c.x; const el = Math.hypot(ex, ez); ex /= el; ez /= el;
+    const a = 0.3 * c.r / 4000, u = { x: c.x * Math.cos(a) + ex * Math.sin(a), y: c.y * Math.cos(a), z: c.z * Math.cos(a) + ez * Math.sin(a) };
+    const here = new Set(), listed = new Set(), out = {};
+    const near = (i, g, tt) => { const q = W.cellsAt('earth', tt).find((z) => z.i === i && z.gen === g); return q && dist(q, u) < q.r * 0.9; };
+    for (let q = 0; q < 1200; q++) {
+      const tt = t + q * 0.05;
+      const w = W.weatherAt('earth', u.x, u.y, u.z, 30, tt, 18, { moist: 1 }, out);
+      if (w.lightning.last && w.lightning.last.t > tt - 0.06 && w.lightning.last.t <= tt) here.add(w.lightning.last.t.toFixed(3));
+      cf.step(0.05, 'earth', tt, E0.sunAt(tt), E0.wm);
+      const L = cf.flashesFor('earth', tt, u.x * 4001.7, u.y * 4001.7, u.z * 4001.7);
+      // (every storm cell flashing within its own radius and a half of the place: the ones whose light reaches it)
+      for (let i = 0; i < L.n; i++) if (L[i].t > tt - 0.06 && L[i].t <= tt && near(L[i].cell, L[i].gen, tt)) listed.add(L[i].t.toFixed(3));
+    }
+    assert.ok(listed.size >= 2, `${listed.size} flashes of the storm listed in a minute`);
+    for (const f of listed) assert.ok(here.has(f), `the storm's flash at ${f} s lit the place under it (it saw ${[...here].join(', ')})`);
+  } finally { WX2.cloudmap = was; off(); }
+});
+
+test('land storms: the gust front blows at a mature storm\'s leading edge (15 to 25 m/s at 10 m), its outflow weak behind; no storm drifts over 10 m/s', async () => {
+  const E0 = await earth(); if (!E0) return;
+  const { windLarge } = await import('./wind.js');
+  try {
+    on(E0);
+    let n = 0, fastest = 0;
+    for (let t = W.STORMLAND.from; t < W.STORMLAND.from + 40 * 1674 && n < 6; t += 300) {
+      for (const c of W.cellsAt('earth', t)) {
+        if (!c.land || c.kindId !== 'storm') continue;
+        fastest = Math.max(fastest, Math.hypot(c.ve, c.vn));
+        if (c.w < 0.75 || Math.hypot(c.ve, c.vn) < 3) continue;
+        let ex = c.z, ez = -c.x; const el = Math.hypot(ex, ez); ex /= el; ez /= el; const nx = c.y * ez, ny = c.z * ex - c.x * ez, nz = -c.y * ex;
+        const sp = Math.hypot(c.ve, c.vn), de = c.ve / sp, dn = c.vn / sp, o = new Float64Array(6), m = new Float64Array(4);
+        // the 10 m wind as the near grid composes it (air.js): |mean x mul + outflow|, then the storm's own wind along it
+        const at = (k) => {
+          const a = k * c.r / 4000, tx = de * ex + dn * nx, ty = dn * ny, tz = de * ez + dn * nz;
+          const u = { x: c.x * Math.cos(a) + tx * Math.sin(a), y: c.y * Math.cos(a) + ty * Math.sin(a), z: c.z * Math.cos(a) + tz * Math.sin(a) };
+          W.weatherWind('earth', u.x, u.y, u.z, t, 18, o); windLarge('earth', u.x, u.y, u.z, t, 18, m);
+          const bs = Math.hypot(m[0] * o[0] + o[1], m[1] * o[0] + o[2], m[2] * o[0] + o[3]);
+          return { total: bs + o[5] * Math.min(1, bs / 2), out: Math.hypot(o[1], o[2], o[3]) };
+        };
+        const edge = at(0.9), behind = at(-0.9);
+        assert.ok(edge.total >= 14 && edge.total <= 26, `at the leading edge of a storm of strength ${c.w.toFixed(2)}: ${edge.total.toFixed(1)} m/s at 10 m`);
+        assert.ok(behind.out < edge.out / 3, `its outflow behind ${behind.out.toFixed(1)}, ahead ${edge.out.toFixed(1)} m/s`);
+        n++; break;
+      }
+    }
+    assert.ok(n >= 3, `${n} mature drifting storms looked at`);
+    assert.ok(fastest <= 10 + 1e-6, `the fastest storm drifts at ${fastest.toFixed(1)} m/s`);
+  } finally { off(); }
+});

@@ -5,7 +5,7 @@
 //
 // The constants below are interpolated from flora.js, so the shader and the CPU model cannot
 // drift apart. physics-lab.html?scene=flora draws both on top of each other as a check.
-import { FLORA, WAVE_K, WAVE_ROT, WAVE_A, BRANCH_M, BRANCH_S, FLUT_D, FLUT_PH, CROWN_D, CROWN_UP, CROWN_X, CROWN_ID, CLOCK_F, CLOCK_W, CLOCK_ID, CLOCK_M } from './flora.js';
+import { FLORA, WAVE_K, WAVE_ROT, WAVE_A, BRANCH_M, BRANCH_S, FLUT_D, FLUT_PH, CROWN_D, CROWN_UP, CROWN_X, CROWN_ID, CLOCK_F, CLOCK_W, CLOCK_ID, CLOCK_M, GUSTBAND } from './flora.js';
 
 const f = (x) => (Number.isInteger(x) ? x.toFixed(1) : String(x));
 const fd = (i) => `vec2(${f(FLUT_D[i][0])}, ${f(FLUT_D[i][1])})`;
@@ -232,4 +232,24 @@ vec4 pcPhysWind(vec3 p) {
   vec2 uv = (pcPhysGrid(p) - uPhysWindMap.xy) * uPhysWindMap.z + 0.5;
   return pcPhysTex(uPhysWind, uv, uPhysWindMap.w);
 }
+#ifdef PC_GUST
+// (group D, ?gustbands=1) GUSTS SEEN FROM THE AIR (flora.js GUSTBAND): 0..1 where a gust band lies over the body-local
+// point p (a stroke's centre: the band is laid by whole strokes), already times the gusts' strength there. One read of
+// the shared 3D noise (fragment stage only: uNoise3D), stretched across the wind and run along it; read with no mip
+// (the pattern is 20 m and more), so a band is the same band from 150 m and from 1 km. Only where a material defines
+// PC_GUST is this compiled, and that material binds uPhysGust (render/shared.js PHYS): no unbound uniform anywhere.
+uniform vec4 uPhysGust;
+float pcGustBand(vec3 p) {
+  float s = length(uPhysGust.xyz);
+  if (s < 0.01) return 0.0;
+  vec3 d = uPhysGust.xyz / s;
+  float al = dot(p, d);
+  vec3 q = p - d * al;
+  al -= uPhysGust.w;
+  // (one read: the texture's red channel already carries two finer octaves of its own, so a band's edge is ragged)
+  float n = textureLod(uNoise3D, q / ${f(GUSTBAND.across)} + d * (al / ${f(GUSTBAND.along)}), 0.0).r;
+  // (the stronger the wind, the more of the ground the bands cover and the bolder they are; in a calm, none)
+  return smoothstep(0.66 - 0.12 * s, 0.76 - 0.08 * s, n) * min(1.0, 0.55 + 0.45 * s);
+}
+#endif
 `;

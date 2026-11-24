@@ -98,7 +98,9 @@ export function createWorld(scene) {
   //  for, and the game without the switches loads nothing new. D's patch imported wx2.js at the top, which would have
   //  stopped the world loading wherever wx2.js is not yet merged: the look director's one change to it.)
   let storms = null;
-  if (LOOK.oil && typeof location !== 'undefined' && /[?&](wx2|rainshaft|bolts)=/.test(location.search || '')) {
+  // (the new weather is the default: fetched in the oil look unless the address says ?weather=old; physics/wx2.js says
+  //  whether the shafts and the bolts are on, and a program that does not compile switches itself off: wxguard.js)
+  if (LOOK.oil && typeof location !== 'undefined' && !/[?&]weather=old(&|$)/.test(location.search || '')) {
     import('../physics/wx2.js').then(({ WX2 }) => (WX2.rainshaft || WX2.bolts ? import('./storms.js').then((m) => {
       storms = m.makeStorms(null, { shafts: WX2.rainshaft, bolts: WX2.bolts }); scene.add(storms.shafts); scene.add(storms.bolts);
     }) : null)).catch((e) => console.warn('storms.js: ' + e.message));
@@ -315,7 +317,9 @@ export function createWorld(scene) {
   // (`src/world/wxfield.js`, update(fields)). Neither file exists yet: they are group D's (W1) to write. So both are
   // fetched on first use, and only where `?clouds3d=` asks (default 0 until W1's first commit flips the default below,
   // one line, with the look director's leave): a module that is not there is never asked for, so no request fails.
-  const CLOUDS3D = (() => { if (!LOOK.oil) return 0; try { const q = new URLSearchParams(location.search).get('clouds3d'); if (q != null && isFinite(+q)) return Math.max(0, +q); } catch { /* no address */ } return 0; })();
+  // (THE CLOUDS' FLIP, with the weather group's: the 3D clouds are the oil look's default; ?clouds3d=0 the opt-out, and
+  //  ?weather=old, the old weather, takes them out with the rest)
+  const CLOUDS3D = (() => { if (!LOOK.oil) return 0; try { const a = new URLSearchParams(location.search), q = a.get('clouds3d'); if (q != null && isFinite(+q)) return Math.max(0, +q); if (a.get('weather') === 'old') return 0; } catch { /* no address */ return 0; } return 1; })();
   const WXHOOK = { asked: false, clouds: null, wxfield: null };
   function askWeatherModules() {
     if (WXHOOK.asked || !CLOUDS3D) return; WXHOOK.asked = true;

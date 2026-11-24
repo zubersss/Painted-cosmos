@@ -221,6 +221,10 @@ function pickKind(regime, h) {
   return ks[ks.length - 1][0];
 }
 
+// (group D, ?stormland=1) a thunderstorm's gust front at its leading edge: its outflow by side, plus carry times its motion
+const STORMGUST = Object.freeze({ rear: 0.12, carry: 0.8, max: 16.5 });   // (rear: its outflow behind it, as a share)
+export { STORMGUST };
+const _lt = { flash01: 0, nextIn: Infinity, thunderIn: Infinity, thunder01: 0, last: { t: -1e9, x: 0, y: 1, z: 0, distance: 1e9 } };   // (one storm's lightning, merged in weatherAt)
 // ---- (group D) STORMS BORN FROM THE LAND -----------------------------------------------------------------------------
 // docs/lead/WEATHER-DESIGN.md 6.2 C2. Behind wx2.js WX2.stormland, and only on a body whose convection sites have been
 // registered (setLandStorms: the wind map's `sites`, windmap.js, read from the land). On a stormy afternoon a few sites
@@ -255,6 +259,8 @@ export const STORMLAND = Object.freeze({
   swing: 3.14,             // rad: the largest turn of the day's wind aloft from its usual direction (180 degrees: a reversal)
   speed: [0.6, 2.2],       // the day's wind aloft as a share of its usual speed
   swingDays: 1.6,          // days over which the swing changes (one knot of its smooth noise every 1.6 days)
+  driftMax: 10,            // m/s: no storm drifts faster (the coordinator, 24 Nov: at 16 a storm passed in 105 s; a passage of
+                           //  about three minutes is more to feel and more natural). Scaled by the owner's dial.
 });
 // (the owner's dial, the look data's `storms` for the body: physics/index.js passes it in; 1 = as tuned)
 let DIAL = 1;
@@ -346,7 +352,8 @@ function landDay(bodyId, seed, D) {
       const nx = site.y * ez, ny = site.z * ex - site.x * ez, nz = -site.y * ex;
       const st = swing ? S.steer : S.steer0;
       const ve0 = (_lw[0] * ex + _lw[2] * ez) * S.aloft * st, vn0 = (_lw[0] * nx + _lw[1] * ny + _lw[2] * nz) * S.aloft * st;
-      const ve = (ve0 * cr - vn0 * sr) * mul, vn = (ve0 * sr + vn0 * cr) * mul;
+      let ve = (ve0 * cr - vn0 * sr) * mul, vn = (ve0 * sr + vn0 * cr) * mul;
+      if (swing) { const sp = Math.hypot(ve, vn), cap = S.driftMax * DIAL; if (sp > cap) { ve *= cap / sp; vn *= cap / sp; } }
       // (swing) a lesser hill grows a lesser storm: smaller and weaker by its site's weight
       const lesser = swing ? site.w : 1;
       day.push({ k, j, site, tf, life, s: mix(0.75, 1, hash3(D, 30 + hk, 0, sd)) * (0.55 + 0.45 * lesser), r: mix(S.r[0], S.r[1], hash3(D, 40 + hk, 0, sd)) * (0.6 + 0.4 * lesser), ve, vn, ex, ez, nx, ny, nz });
@@ -441,7 +448,7 @@ export function cellsAt(bodyId, t, seed = DEFAULT_SEED) {
 }
 
 const _c = {};
-const _acc = { blow: 0, rate: 0, rateIce: 0, rateFrost: 0, cloud: 0, windMul: 1, calm: 0, flash: 0, fog: 0, haze: 0, dust: 0, ox: 0, oy: 0, oz: 0, storm: 0, top: null, topW: 0, topCell: -1, topGen: 0, front: 0, clear: 1, conv: 0, baseW: 0, topH: 0, coverSum: 0 };
+const _acc = { blow: 0, rate: 0, rateIce: 0, rateFrost: 0, cloud: 0, windMul: 1, calm: 0, flash: 0, fog: 0, haze: 0, dust: 0, ox: 0, oy: 0, oz: 0, storm: 0, top: null, topW: 0, topCell: -1, topGen: 0, front: 0, clear: 1, conv: 0, baseW: 0, topH: 0, coverSum: 0, fTopW: 0, fCell: -1, fGen: 0, fRate: 0, f2W: 0, f2Cell: -1, f2Gen: 0, f2Rate: 0, f3W: 0, f3Cell: -1, f3Gen: 0, f3Rate: 0 };
 
 // (group D) A CELL FORCED OVER A PLACE (physics.forceWeather: the speed test's storm row and the stills of a storm). While
 // one is set it is gathered after the body's own cells everywhere, so the sky numbers, the rain, the lightning and the
@@ -463,6 +470,7 @@ function forcedCentre() { _fown.x = _forced.x; _fown.y = _forced.y; _fown.z = _f
 function resetAcc(a) {
   a.blow = 0; a.rate = 0; a.rateIce = 0; a.rateFrost = 0; a.cloud = 0; a.windMul = 1; a.calm = 0; a.flash = 0; a.fog = 0; a.haze = 0; a.dust = 0;
   a.ox = a.oy = a.oz = 0; a.storm = 0; a.top = null; a.topW = 0; a.topCell = -1; a.topGen = 0; a.front = 0;
+  a.fTopW = 0; a.fCell = -1; a.fGen = 0; a.fRate = 0; a.f2W = 0; a.f2Cell = -1; a.f2Gen = 0; a.f2Rate = 0; a.f3W = 0; a.f3Cell = -1; a.f3Gen = 0; a.f3Rate = 0;
   a.clear = 1; a.conv = 0; a.baseW = 0; a.topH = 0; a.coverSum = 0;
 }
 
@@ -495,6 +503,19 @@ function accumulate(a, c, ux, uy, uz, R) {
     a.rate += rr;
     if (K === KINDS.ice) a.rateIce += rr; else if (K === KINDS.frost) a.rateFrost += rr;
     a.flash += K.flash * core;
+    // (group D: the three cells that give this place most of its lightning, each with its own rate: with the cloud map on,
+    //  the lightning here is theirs, so every flash of a storm over or beside this place lights it, as its bolt is drawn)
+    const fw = K.flash * core;
+    if (fw > a.f3W) {
+      if (fw > a.fTopW) {
+        a.f3W = a.f2W; a.f3Cell = a.f2Cell; a.f3Gen = a.f2Gen; a.f3Rate = a.f2Rate;
+        a.f2W = a.fTopW; a.f2Cell = a.fCell; a.f2Gen = a.fGen; a.f2Rate = a.fRate;
+        a.fTopW = fw; a.fCell = c.i; a.fGen = c.gen; a.fRate = K.flash * c.w;
+      } else if (fw > a.f2W) {
+        a.f3W = a.f2W; a.f3Cell = a.f2Cell; a.f3Gen = a.f2Gen; a.f3Rate = a.f2Rate;
+        a.f2W = fw; a.f2Cell = c.i; a.f2Gen = c.gen; a.f2Rate = K.flash * c.w;
+      } else { a.f3W = fw; a.f3Cell = c.i; a.f3Gen = c.gen; a.f3Rate = K.flash * c.w; }
+    }
   }
   if (K.vis > 0) {
     // A bank of fog, dust or haze. The extinction (in clear-air units) is shaped so that the
@@ -525,14 +546,31 @@ function accumulate(a, c, ux, uy, uz, R) {
   // gust front: cold outflow spreading from the core, strongest just ahead of the rain
   if (K.outflow > 0 && d > 1) {
     const ring = smoothstep(0.15, 0.8, x) * (1 - smoothstep(0.95, WEATHER.frontReach, x));
-    const v = K.outflow * c.w * ring;
+    let v = K.outflow * c.w * ring;
     if (v > 0) {
       // direction: from the cell centre to the point, in the tangent plane at the point
       let dx = ux - c.x, dy = uy - c.y, dz = uz - c.z;
       const dn = dx * ux + dy * uy + dz * uz;
       dx -= dn * ux; dy -= dn * uy; dz -= dn * uz;
       const l = Math.hypot(dx, dy, dz);
-      if (l > 1e-9) { a.ox += dx / l * v; a.oy += dy / l * v; a.oz += dz / l * v; a.front = Math.max(a.front, ring * c.w); }
+      // (group D, ?stormland=1, the coordinator's ruling of 24 Nov: A THUNDERSTORM'S GUST FRONT, where it belongs. The
+      //  cold pool under a storm runs out AHEAD of it: the strongest wind is at its leading edge, at and just before the
+      //  rain, the outflow and much of the storm's own speed together, and behind it the wind falls away. Before, the
+      //  outflow was the same all round and peaked inside the core, so with the storm's own wind the 10 m wind was
+      //  strongest in the rain and on the REAR side. MEASURED on six mature land storms, the 10 m wind as the near grid
+      //  composes it (mean x mul + outflow, then the storm's own wind): 3 to 10 m/s at 1.2 radii ahead (1 to 4 before),
+      //  12 to 26 at the leading edge, 0.8 to 1 radius (8 to 25 before), 12 to 22 behind (13 to 39 before).)
+      if (K === KINDS.storm && WX2.stormland && l > 1e-9) {
+        let ex = c.z, ez = -c.x; const el = Math.hypot(ex, ez) || 1; ex /= el; ez /= el;
+        const nx = c.y * ez, ny = c.z * ex - c.x * ez, nz = -c.y * ex;
+        const mx = ex * c.ve + nx * c.vn, my = ny * c.vn, mz = ez * c.ve + nz * c.vn;          // its motion, body-local
+        const ms = Math.hypot(mx, my, mz), along = (dx * mx + dy * my + dz * mz) / l;           // m/s toward this place
+        const cosA = ms > 1e-6 ? along / ms : 0;
+        const lead = smoothstep(0.5, 0.95, x) * (1 - smoothstep(1.1, WEATHER.frontReach, x)); // its ring: at the edge
+        const side = ms > 0.5 ? STORMGUST.rear + (1 - STORMGUST.rear) * (0.5 + 0.5 * cosA) : 0.75;
+        v = Math.min(STORMGUST.max, (K.outflow * side + STORMGUST.carry * Math.max(0, along)) * c.w * lead);
+      }
+      if (l > 1e-9 && v > 0) { a.ox += dx / l * v; a.oy += dy / l * v; a.oz += dz / l * v; a.front = Math.max(a.front, ring * c.w); }
     }
   }
   // a great spot turns: wind circling the centre, fastest at 70 % of its radius
@@ -595,7 +633,7 @@ export function liveCells(bodyId, t, seed = DEFAULT_SEED, out = []) {
 }
 // gather over a list made by liveCells (the same numbers gather gives at the same time and place). Returns its accumulator,
 // which the next call overwrites: read what you need from it first.
-const _acc2 = { blow: 0, rate: 0, rateIce: 0, rateFrost: 0, cloud: 0, windMul: 1, calm: 0, flash: 0, fog: 0, haze: 0, dust: 0, ox: 0, oy: 0, oz: 0, storm: 0, top: null, topW: 0, topCell: -1, topGen: 0, front: 0, clear: 1, conv: 0, baseW: 0, topH: 0, coverSum: 0 };
+const _acc2 = { blow: 0, rate: 0, rateIce: 0, rateFrost: 0, cloud: 0, windMul: 1, calm: 0, flash: 0, fog: 0, haze: 0, dust: 0, ox: 0, oy: 0, oz: 0, storm: 0, top: null, topW: 0, topCell: -1, topGen: 0, front: 0, clear: 1, conv: 0, baseW: 0, topH: 0, coverSum: 0, fTopW: 0, fCell: -1, fGen: 0, fRate: 0, f2W: 0, f2Cell: -1, f2Gen: 0, f2Rate: 0, f3W: 0, f3Cell: -1, f3Gen: 0, f3Rate: 0 };
 export function gatherFrom(cells, bodyId, ux, uy, uz) {
   const a = _acc2;
   resetAcc(a);
@@ -882,7 +920,31 @@ export function weatherAt(bodyId, ux, uy, uz, altitude, t, seed, env, o = {}) {
   li.flash01 = 0; li.nextIn = Infinity; li.thunderIn = Infinity; li.thunder01 = 0;
   li.last.t = -1e9; li.last.distance = 1e9;
   if (regime && regime.cells && a.topCell >= 0 && a.flash > 0.05) {
-    lightningFor(bodyId, regime, seed, a.topCell, a.topGen, a.flash, ux, uy, uz, t, atm.c, li, a.topCell === OWN_CELL ? _own : a.topCell === FORCED_CELL && _forced ? forcedCentre() : a.topCell >= LAND_BASE ? landCentre(bodyId, seed, a.topCell, a.topGen, t) : null);
+    // (group D, with the cloud map on: the storm overhead flashes as its own schedule says, the same flashes the cloud map
+    //  lists and the bolts draw (cloudfield.js flashesFor: flashOf, the cell's own rate); before, the place took the cell
+    //  that COVERED it most -- often a storm's wider cloud shield, a different cell -- at the rate gathered here, so the
+    //  flash of light and the bolt in the sky were two different series. Brightness still falls with the distance.)
+    //  (Up to the three storms that flash most here, each on its own schedule: the brightest flash of them, the latest one
+    //  as `last`, the soonest next.)
+    if (WX2.cloudmap && a.fCell >= 0 && a.topCell !== OWN_CELL) {
+      let tIn = Infinity, t01 = 0;
+      for (let q = 0; q < 3; q++) {
+        const cell = q === 0 ? a.fCell : q === 1 ? a.f2Cell : a.f3Cell;
+        if (cell < 0) continue;
+        const gen = q === 0 ? a.fGen : q === 1 ? a.f2Gen : a.f3Gen, per = q === 0 ? a.fRate : q === 1 ? a.f2Rate : a.f3Rate;
+        const L = _lt; L.flash01 = 0; L.nextIn = Infinity; L.thunderIn = Infinity; L.thunder01 = 0; L.last.t = -1e9; L.last.distance = 1e9;
+        lightningFor(bodyId, regime, seed, cell, gen, per, ux, uy, uz, t, atm.c, L, cell === FORCED_CELL && _forced ? forcedCentre() : cell >= LAND_BASE ? landCentre(bodyId, seed, cell, gen, t) : null);
+        if (L.flash01 > li.flash01) li.flash01 = L.flash01;
+        if (L.nextIn < li.nextIn) li.nextIn = L.nextIn;
+        if (L.last.t > li.last.t) { li.last.t = L.last.t; li.last.x = L.last.x; li.last.y = L.last.y; li.last.z = L.last.z; li.last.distance = L.last.distance; li.thunderIn = L.thunderIn; li.thunder01 = L.thunder01; }
+        // (the thunder that arrives next, or has just arrived, of the storms here: its count-down runs on smoothly when
+        //  another storm's flash is the latest, so a bang is never heard late or twice)
+        if (L.thunderIn > -0.5 && L.thunderIn < tIn) { tIn = L.thunderIn; t01 = L.thunder01; }
+      }
+      if (tIn < Infinity) { li.thunderIn = tIn; li.thunder01 = t01; }
+    } else {
+      lightningFor(bodyId, regime, seed, a.topCell, a.topGen, a.flash, ux, uy, uz, t, atm.c, li, a.topCell === OWN_CELL ? _own : a.topCell === FORCED_CELL && _forced ? forcedCentre() : a.topCell >= LAND_BASE ? landCentre(bodyId, seed, a.topCell, a.topGen, t) : null);
+    }
   }
 
   // ---- kind: one word for what a person would call it --------------------------------------------
