@@ -273,3 +273,19 @@ the owner first. Not started.
   under the same painted sky. On foot S1 is identical to the pixel with it on (0 pixels differ). V over 0.90 moves at
   most 0.8 of a point. NOT fixed by it: the mile at noon is still pale (FV1's thick air lasts to 1.76 km), and the
   golden-hour sky itself is still one warm ochre wash -- that is the sky's own gold key, a separate step.
+
+## The golden hour's sky (24 Nov; the coordinator's ruling (b))
+
+- Old: one gold wash all round the dome (0.80 of it low, 0.45 high), so from the air every direction was the same flat
+  ochre. Four tries were built and seen (rings by the angle to the sun, glazed over the bands); the third and fourth
+  painted the air well but from the ground at S1, which faces away from the sun, the approved golden-hour still lost its
+  warm sky. Ruling (b): on the ground the wash holds; the rings come in with height.
+- sky.js (`?goldsky=0` the wash everywhere; on unless `?light=old`): five rings by the angle to the sun, edges a pixel
+  wide and wandering: pale gold by the sun, gold, peach, cool lilac, and away from the sun the sky's own blue a step
+  deeper; each ring a glaze that keeps the value of the bands and clouds under it; a rose band low on the far side.
+  Mixed in by uSkyAir.w (world/index.js: a dip of 10 to 17 degrees, Earth 62 m to 180 m, as the sky's remap).
+- SEEN: S1 with it on is identical to the pixel to S1 without it (0 pixels differ): the warm sky over the fiery crowns
+  is today's. At 420 m (build/goldsky/b_420m_toward_then_away_old_left_new_right.jpg): toward the sun lilac, peach and
+  gold rings where the old is flat ochre; away from it a cool deep blue with its clouds and a rose band low where the
+  old is the same flat ochre.
+

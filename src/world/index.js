@@ -728,7 +728,11 @@ export function createWorld(scene) {
         const c = skyCeiling(body, look); return THREE.MathUtils.smoothstep(alt, c[0], c[1]);
       })() : space01;
       // (the sky's bands from the true horizon: its dot(view, up), eased in from a dip of 10 to 17 degrees; sky.js)
-      if (skyU.uSkyAir) skyU.uSkyAir.value.z = AIRTOP && body.atmosphereHeight > 0 ? -Math.sin(dip / DEG) * THREE.MathUtils.smoothstep(dip, 10, 17) : 0;
+      if (skyU.uSkyAir) {
+        const hk = body.atmosphereHeight > 0 ? THREE.MathUtils.smoothstep(dip, 10, 17) : 0;      // (Earth 62 m to 180 m)
+        skyU.uSkyAir.value.z = AIRTOP ? -Math.sin(dip / DEG) * hk : 0;
+        skyU.uSkyAir.value.w = LOOK.oil ? hk : 0;      // (the golden hour's painted rings come in with the same height: sky.js)
+      }
       const e = bu.uSunDirL.value.dot(_up);
       _east.crossVectors(Y, _up).normalize();
       const am = bu.uSunDirL.value.dot(_east) > 0;
@@ -965,7 +969,7 @@ export function createWorld(scene) {
     } else {
       // deep space: no atmosphere anywhere
       skyU.uAtmo.value.set(1, 1, 0.03, 1);
-      if (skyU.uSkyAir) skyU.uSkyAir.value.z = 0;      // (no world under the eye: no horizon to lay the bands from)
+      if (skyU.uSkyAir) { skyU.uSkyAir.value.z = 0; skyU.uSkyAir.value.w = 0; }      // (no world under the eye: no horizon to lay the bands from)
       OIL.uLookN.value.w = 0;
       skyU.uCloud.value.y = 0; skyU.uWxSky.value.set(0, 0, 0, 0); WX.key = 0; WX.flash = 0;
       sun.getWorldPosition(_v2);

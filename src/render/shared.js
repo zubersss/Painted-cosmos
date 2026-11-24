@@ -219,6 +219,10 @@ export const OIL = {
   //   w THE AIR FROM THE AIR (L5): how far the far air is laid as from the air -- 0 on foot, 1 from the air; set each
   //     frame by world/index.js from LOOK.airFar and the air's reach.
   uLookN: { value: new THREE.Vector4(0.60, 0.45, _qn('shadehue', 0), 0) },
+  // THE GOLDEN HOUR'S SKY (24 Nov, the coordinator: the golden-hour sky was one flat ochre wash; world/sky.js):
+  //   x how far the sky's gold lies toward the sun and in bands, cooling and deepening away from it and overhead
+  //     (1 unless ?light=old; ?goldsky=0 alone is the wash as it was)
+  uLookG: { value: new THREE.Vector4(_qn('goldsky', _LN), 0, 0, 0) },
 };
 
 // WHERE THE FIRE HAS BEEN, FOR THE GROUND'S OWN PAINT (the powers, fire; the paint itself is materials.js TERRAIN_FRAG).
