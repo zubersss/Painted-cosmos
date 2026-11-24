@@ -62,10 +62,18 @@ the phone prices both in one run.
 - NOT KNOWN: what the two short programs save on the phone (the design's reading: the bark's long program in every
   near-tree wave; only the bench can say), anything in motion, anything on a real graphics card.
 
-- T5 SEEN: the cards with and without `?treedepth=1` are identical inside every leaf; with multisampling on (the
-  gallery's tier 1 in software) they differed at leaf edges only, because the painter's loop forced alpha to coverage
-  back on for the colour pass (fixed: `render/index.js` leaves the trees' programs alone). The check with no
-  multisampling, as the phone draws (`?aa=0`), is in the render queue.
+- T5 SEEN: with no multisampling, as the phone draws (`?aa=0`), the cards with and without `?treedepth=1` are
+  PIXEL-IDENTICAL (0 pixels of 348,192 differ at 5 m and at 10 m). With multisampling (the gallery's tier 1 in
+  software) they first differed at leaf edges only, because the painter's loop forced alpha to coverage back on for
+  the colour pass (fixed: `render/index.js` leaves the trees' programs alone).
+- DESKTOP top tier (1280 x 600, quality 2, full paint), autumn wood, 5-45 m: `?trees2=1` equals today (lookstats to
+  the hundredth; bark warm-streak share 0.259 against 0.257). Committed: `A2_*_autumn-desktop-*`.
+- THE WOOD DRAWN BACKSIDE (half the wood rasterised): the same picture as DoubleSide once its facing is kept
+  (`PC_WOOD_FLIP`): B2 against B at the phone's settings, mean difference 0.13 of 255. FOUND ON THE WAY: every tube
+  in the kits is wound with its front facing INWARD, so today's bark is lit with its normals pointing into the trunk
+  (the sun side painted as the shade side). Told to the look director; not changed.
+- Cards with the denser spray (SPRAY.pres 0.9): still sparser than today at 5 m (`A2_cards-pres09_*`); more cards would
+  close it at more cost. Left there until the phone says cards are worth anything.
 
 **How the stills are made** (the tools are scratch, not committed; recreate from this): `tools/lab.mjs serve`, then
 open `/gallery.html?body=earth&biome=autumn_woodland&season=1&cam=trees&time=16.8&look=oil&lite=1&quality=1&t=0&ui=0&fov=58`
