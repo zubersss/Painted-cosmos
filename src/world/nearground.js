@@ -87,8 +87,10 @@ const VISTA = (() => {
 //                round touches (audit 2; passed as a default by the look director)
 //   `?patchfloor=` 1 also brings the heads' floor down in the middle and far rings (0.55 and 0.4 of it; not yet seen)
 //   `?sheen=`    0 takes away the gusts' sheen on the blades (G4: needs PHYSICS' bend, so the game, or the gallery's &physics=1).
+//   `?dense=`    1 THE NEAR GROUND DENSER (OFF until the look director passes it): more blades and flowers near the eye, the
+//                fine ring farther at the phone's tier (DENSE_K below); the speed test's row asks the other way (setDense)
 const FLORA = (() => {
-  const f = { grass2: 1, cull: 1, sheen: 1, bloom: 0, blade: 1, tuft: 1, comb: 1, patch: 0, pfloor: 0 };
+  const f = { grass2: 1, cull: 1, sheen: 1, bloom: 0, blade: 1, tuft: 1, comb: 1, patch: 0, pfloor: 0, dense: 0 };
   try {
     const q = new URLSearchParams(location.search), on = (k) => !q.has(k) || (q.get(k) !== '0' && q.get(k) !== 'false');
     // THE ONE OPT-OUT (the owner, 24 Nov, through the coordinator: "No do make it look different"): the lane is ON by
@@ -101,8 +103,9 @@ const FLORA = (() => {
     f.blade = f.grass2 && on('bladegreen') ? 1 : 0;
     f.tuft = f.grass2 && on('tuft') ? 1 : 0;
     f.comb = f.grass2 && on('comb') ? 1 : 0;
+    f.dense = f.grass2 && q.get('dense') === '1' ? 1 : 0;
   } catch { /* no address to read */ }
-  if (!LOOK.oil) { f.grass2 = 0; f.cull = 0; f.sheen = 0; f.blade = 0; f.tuft = 0; f.comb = 0; }
+  if (!LOOK.oil) { f.grass2 = 0; f.cull = 0; f.sheen = 0; f.blade = 0; f.tuft = 0; f.comb = 0; f.dense = 0; }
   // (F1-F3: the flowers from world/bloom.js's map, ?bloom=0 off; read there, where the ground's colour reads it too)
   f.bloom = LOOK.oil ? bloomSwitches().bloom : 0;
   try {
@@ -129,7 +132,29 @@ const RINGS_OIL = [Object.assign({}, RINGS_WC[0], { pool: bloomSwitches().year ?
 // have to carry them to 12 m (to 23 at the top tier) in every cell. Each blade's own range falls between 5 and 7 m, so
 // the carpet thins into the fine ring with no edge. Not laid at the low tier, nor above 14 m of height.
 const CARPET = { name: 'carpet', cell: 0.45, range: [0, 7, 8], per: 20, inner: [0.5, 1.2], soft: 0, alt: 14, step: 2, carpet: 1 };
-const RINGS = !LOOK.oil ? RINGS_WC : (FLORA.grass2 ? [CARPET] : []).concat(V > 0 ? RINGS_OIL : RINGS_WC);
+// THE NEAR GROUND DENSER (?dense=1, OFF until the look director passes it; the coordinator, 24 Nov, after the owner's phone
+// priced the near grass and flowers at 0.5 ms of a 24 ms frame at 2.25 times the pixels: "there is room for more grass and
+// flowers near the eye ... the owner wants much denser"). SEEN before it: from 1.8 m the meadow is full at the feet and
+// thin from 8 to 25 m, where the fine ring's blades thin out (their own ranges 0.66 to 1 of its 12 m at the phone's tier)
+// and the middle ring's touches are few. What changes (the oil look with the lane on; every number here, nothing else):
+//   the fine ring reaches 16 m at the phone's tier where it reached 12 (the top tier's 23 as it was) and its blades keep
+//     their own ranges between 0.75 and 1 of it; a cell has room for 15 marks where 12 (its stones, litter, reeds as
+//     before: `per0`), so 14 blades a tuft's worth where 11; its flowers 1.4 times what the map asks (room 14 where 10);
+//   the carpet lays 22 blades a cell's worth where 16 (room 28), to 8 m at the phone's tier (7; 9 at the top, 8);
+//   the middle ring has room for 10 touches a cell where 7 (its grass touches with it), the drift's heads 1.3 times.
+// The hashes a mark draws on are spread wider where a cell now lays more (no two marks of a cell share one).
+const DENSE_K = {
+  carpet: { range: [0, 8, 9], per: 28, bk: 22 / 16 },
+  fine: { range: [11, 16, 23], per: 15, per0: 12, lo: 0.75, fk: 1.4, room: 14 },
+  mid: { per: 10, fk: 1.3 },
+};
+function ringsFor(dense) {
+  if (!LOOK.oil) return RINGS_WC;
+  const d = dense && FLORA.grass2, K = (c, n) => (d ? Object.assign({}, c, DENSE_K[n]) : c);
+  return (FLORA.grass2 ? [K(CARPET, 'carpet')] : []).concat(V > 0 ? [K(RINGS_OIL[0], 'fine'), K(RINGS_OIL[1], 'mid')].concat(RINGS_OIL.slice(2)) : RINGS_WC);
+}
+const RINGS = ringsFor(FLORA.dense);
+export { ringsFor, DENSE_K };
 const GROW_T = 0.7;      // seconds a clump laid inside the range takes to grow in (the shader's measure)
 const HOLD_T = 6;        // seconds the strokes wait at most for their ground
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -238,7 +263,7 @@ function styleOf(look, b) {
 }
 
 class Ring {
-  constructor(cfg, S, styles, root, bu, bodyId) {
+  constructor(cfg, S, styles, root, bu, bodyId, mat) {
     this.cfg = cfg; this.S = S; this.styles = styles;
     this.n = Math.max(8, Math.round((Math.PI * 0.5 * S.R) / cfg.cell));
     this.cellM = (Math.PI * 0.5 * S.R) / this.n;
@@ -260,7 +285,7 @@ class Ring {
     this.aTone = LOOK.oil ? attr('iTone', 1) : null;
     if (this.aTone) this.attrs.push(this.aTone);
     g.instanceCount = 0;
-    this.material = makeNearMaterial(bu);
+    this.material = mat || makeNearMaterial(bu);     // (setDense hands a ring the material it had: one program, never compiled again)
     this.material.uniforms.uNearK.value.set(FLORA.cull, 0, 0, 0);
     // (the sheen grows over a bend of 0.03 to 0.35 rad: a breeze bends the grass a few degrees, a gust a fifth of a turn)
     this.material.uniforms.uNearL.value.set(FLORA.grass2, FLORA.sheen, 0.03, 0.35);
@@ -300,6 +325,8 @@ class Ring {
     this.aAxis.array.fill(0); this.all = true;
   }
   hide() { if (this.mesh.visible) { this.mesh.visible = false; this.clear(); } }
+  // (setDense: the ring's marks and buffers let go; its material is kept for the ring built in its place)
+  dispose() { if (this.mesh.parent) this.mesh.parent.remove(this.mesh); this.mesh.geometry.dispose(); }
 
   update(camLocal, alt, sliceMs, dt, pixel, ready) {
     const cfg = this.cfg, RANGE = cfg.range[QUALITY.level] || 0;
@@ -327,7 +354,7 @@ class Ring {
     // (G3, the flora lane: the middle ring's touches each have a range between 0.4 and 1 of the ring's, where they had
     // 0.66 to 1, so past about 25 m the band thins toward its rim instead of standing in rows behind one another: its
     // touches painted each pixel they covered 3.8 times at the autumn landing. The shader grows a touch as the band thins.)
-    u.uNear.value.set(RANGE * (FLORA.grass2 && cfg.name === 'mid' ? 0.40 : 0.66), RANGE, this.now, pixel || 0.002);
+    u.uNear.value.set(RANGE * (FLORA.grass2 && cfg.name === 'mid' ? 0.40 : (cfg.lo || 0.66)), RANGE, this.now, pixel || 0.002);
     if (u.uNearK) u.uNearK.value.w = cfg.name === 'mid' ? (FLORA.pfloor ? 0.55 : 0.85) : (cfg.name === 'far' ? (FLORA.pfloor ? 0.4 : 0.6) : 1);   // (a flower head's least size on screen, a share)
     if (u.uNearK) u.uNearK.value.y = FLORA.bloom ? SEASON.t : 0;    // (the flowers' year: packYear above)
     // (the fade-in band is a tier's own where a ring says so: the vista ring is laid at two tiers whose reaches
@@ -489,7 +516,7 @@ class Ring {
     const tall = sstep(0.52, 0.74, this.rough);
     // (F2: where the map grows flowers they are plants of several marks; the cell is given room for them)
     const blooming = FLORA.bloom && hasBlooms(this.S, this.bi);
-    let left = (lowQ ? per >> 1 : per) + (blooming ? 10 : 0);
+    let left = (lowQ ? per >> 1 : per) + (blooming ? (this.cfg.room || 10) : 0);
     // by the water: stones, moss, a few dark sedges
     if (shore > 0.25 && st.rock) {
       const ns = Math.min(left, H(60) < shore ? 2 : 1);
@@ -523,7 +550,7 @@ class Ring {
     // flowers in drifts: a stalk and a head; a drift is of one kind
     // (F2, the flora lane: where the biome has blooms of its own -- data/looks/*.js `oil.flora.blooms`, world/bloom.js --
     // they are laid from the one map instead, as plants: layBlooms below)
-    if (blooming) left -= this.layBlooms(i, j, born, 0.36, left - 2);
+    if (blooming) left -= this.layBlooms(i, j, born, 0.36 * (this.cfg.fk || 1), left - 2);
     const fl = !blooming && st.flower > 0 && st.flowers ? st.flower * sstep(0.50, 0.70, this.drift) * this.meadow * (1 - 0.6 * canopy) : 0;
     if (fl > 0.02 && left > 1) {
       const nf = Math.min(left >> 1, H(100) < fl * 1.3 ? (H(101) < fl * 0.6 ? 3 : 2) : (H(101) < fl * 2 ? 1 : 0));
@@ -540,7 +567,7 @@ class Ring {
     }
     // what lies on bare ground: pebbles, drift ripples; what stands on it: reeds, splinters
     const others = [];
-    const cnt = (share, k) => { const v = share * 8 * (per / 12); const nI = Math.floor(v); return nI + (H(k) < v - nI ? 1 : 0); };
+    const cnt = (share, k) => { const v = share * 8 * ((this.cfg.per0 || per) / 12); const nI = Math.floor(v); return nI + (H(k) < v - nI ? 1 : 0); };
     for (let q = cnt(st.reed * this.reedy, 120); q > 0; q--) others.push(1);
     for (let q = cnt(st.needle * 1.6 * this.needly, 121); q > 0; q--) others.push(2);
     for (let q = cnt(st.ripple * 1.3, 122); q > 0; q--) others.push(4);
@@ -730,7 +757,7 @@ class Ring {
     const bedK = st.reed > 0 ? 0.3 + 0.7 * Math.min(1, this.reedy) : 1;
     // (the fine ring lays st.blade x 11 x meadow x (0.7 + 0.5 rough) in a cell of 0.36 m2 with a tuft in five cells of six;
     // 16 in a cell of 0.2025 m2 is three times that a square metre)
-    const want = st.blade * 16 * st.carpet * this.meadow * (0.7 + 0.5 * this.rough) * bedK;
+    const want = st.blade * 16 * (this.cfg.bk || 1) * st.carpet * this.meadow * (0.7 + 0.5 * this.rough) * bedK;
     const n = Math.min(per, Math.floor(want) + (H(300) < want - Math.floor(want) ? 1 : 0));
     if (n <= 0) return;
     const nT = n <= 7 ? 1 : n <= 15 ? 2 : 3, C = this.cfg.cell;
@@ -739,8 +766,9 @@ class Ring {
       tu.push((H(301 + t) - 0.5) * C * 0.8); tv.push((H(305 + t) - 0.5) * C * 0.8);
       const z = H(309 + t); tsz.push((0.55 + 1.0 * z * z) * (1 + 0.45 * tall)); tl.push(H(313 + t) * 6.2832);
     }
+    const sK = per > 25 ? 40 : 25;     // (the hashes' stride: ?dense lays up to 28 a cell)
     for (let k = 0; k < n; k++) {
-      const q1 = H(320 + k), q2 = H(345 + k), q3 = H(370 + k), q4 = H(395 + k), q5 = H(420 + k);
+      const q1 = H(320 + k), q2 = H(320 + sK + k), q3 = H(320 + 2 * sK + k), q4 = H(320 + 3 * sK + k), q5 = H(320 + 4 * sK + k);
       const tf = k % nT;
       const ang = q1 * 6.2832, rad = 0.015 + 0.075 * q2;
       const lead = k < nT * 2 && q3 > 0.45;
@@ -780,7 +808,7 @@ class Ring {
       if (two2 && (gi === 0 ? ty >= 0.667 : ty < 0.333)) continue;
       const cap = two2 && ty >= 0.333 && ty < 0.667 ? cap0 >> 1 : left - 1;
       if (o.kind >= 0 && o.dens > 0.03 && left > 1) {
-        const b = o.bloom, sh = SHAPES[b.shape] || 0, v = o.dens * (far ? 10 : 9) * (two2 ? 1.5 : 1), yr = win ? packWin(win) : packYear(b), tone = (b.eye ? packTone(b.eye) : 0) + yr;
+        const b = o.bloom, sh = SHAPES[b.shape] || 0, v = o.dens * (far ? 10 : 9) * (two2 ? 1.5 : 1) * (cfg.fk || 1), yr = win ? packWin(win) : packYear(b), tone = (b.eye ? packTone(b.eye) : 0) + yr;
         const nf = Math.min(cap, left - 1, Math.floor(v) + (H(100 + ho) < v - Math.floor(v) ? 1 : 0));
         // (the look director on the final set: past the near ring "the heads are many tiny dots of every colour side by
         // side, which starts to read as confetti; let each drift keep to one or two kinds at that distance": the runner-up
@@ -939,8 +967,9 @@ class Ring {
       // (audit 2, ?comb: the touches lean with the meadow's comb, the same slow wind as the far drags, grassTurn,
       // instead of every way, so from 20 to 60 m the grass has a direction)
       const cb0 = FLORA.comb ? this.combUV(H(976), _cuv) : null, cla = cb0 ? Math.atan2(cb0[1], cb0[0]) : 0;
+      const g0 = per > 7 ? 1300 : 201, sG = per > 7 ? 12 : 7;      // (the hashes: ?dense has room for 10 a cell)
       for (let q = 0; q < ng; q++, k++) {
-        const q1 = H(201 + q), q2 = H(208 + q), q3 = H(215 + q), q4 = H(222 + q), q5 = H(229 + q), p = at(q1, q2);
+        const q1 = H(g0 + q), q2 = H(g0 + sG + q), q3 = H(g0 + 2 * sG + q), q4 = H(g0 + 3 * sG + q), q5 = H(g0 + 4 * sG + q), p = at(q1, q2);
         // the shaded side of a tuft, the sunlit one, the dry one: all near the ground's own value
         const v = FLORA.tuft && H(980 + q) < 0.7 ? vcell : q5 < 0.36 ? 2 : q5 < 0.72 ? 1 : 0, c = L ? L[v] : null, gm = v === 2 ? st.gmB - 0.02 : st.gmB;
         let cr = gr, cg = gg, cb = gb;
@@ -1136,6 +1165,7 @@ export class NearGround {
     this.mesh = new THREE.Group(); this.mesh.name = 'near-' + bodyId;
     root.add(this.mesh);
     this.rings = RINGS.map((cfg) => new Ring(cfg, S, styles, this.mesh, bu, bodyId));
+    this.S = S; this.styles = styles; this.bu = bu; this.bodyId = bodyId; this.dense = FLORA.dense;
     this.lastQ = QUALITY.level;
     this.groundReady = null;         // (face, u, v) -> may strokes be laid round this place yet (set by the world)
   }
@@ -1143,6 +1173,17 @@ export class NearGround {
   get pending() { let n = 0; if (this.mesh.visible) for (const r of this.rings) if (r.mesh.visible) n += r.pending.length; return n; }
   get triangles() { let n = 0; for (const r of this.rings) n += r.triangles; return n; }
   clear() { for (const r of this.rings) r.clear(); }
+  // THE NEAR GROUND DENSER at run time (?dense; the speed test's row asks the other way from how the run started): every
+  // ring is built again from the other numbers, on the material it had (the same program: nothing is compiled), and its
+  // marks are laid afresh as the eye's cells come due.
+  setDense(on) {
+    const d = on && FLORA.grass2 && LOOK.oil ? 1 : 0;
+    if (d === this.dense) return;
+    this.dense = d;
+    const old = new Map(this.rings.map((r) => [r.cfg.name, r]));
+    for (const r of this.rings) r.dispose();
+    this.rings = ringsFor(d).map((cfg) => { const o = old.get(cfg.name); return new Ring(cfg, this.S, this.styles, this.mesh, this.bu, this.bodyId, o && o.material); });
+  }
 
   // camLocal: the eye, body-local; alt: its height over the ground; sliceMs: time to build in
   update(camLocal, active, alt, sliceMs, dt, pixel) {
