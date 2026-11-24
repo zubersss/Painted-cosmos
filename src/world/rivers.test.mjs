@@ -125,3 +125,14 @@ test('no seam: walking away from the rivers, the ground steps no more often than
   assert.ok(t.big <= v.big * 1.1 + 5, 'steps over 1 m: tree ' + t.big + ', today ' + v.big);
   assert.ok(t.band <= v.band + 3, 'steps over 1 m at the 100 m switch: tree ' + t.band + ', today ' + v.band);
 });
+
+test('a world with no wood gets no network and no rough routing: under ?rivers=tree it is the world it was', () => {
+  for (const id of ['venus', 'jupiter', 'saturn', 'uranus', 'neptune']) {
+    const Sx = getSurface(id), Dx = ensureDrainage(id);
+    if (!Dx) continue;
+    assert.equal(Dx.rough, 0, id + ': no roughness in its routing');
+    assert.equal(Dx.to, null, id + ': no flow tree kept');
+    assert.equal(attachRivers(Sx, Dx), null, id + ': no network');
+    assert.equal(Sx.rivers, null);
+  }
+});

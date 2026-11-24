@@ -559,6 +559,10 @@ function now() { return (typeof performance !== 'undefined' && performance.now) 
 
 export function attachRivers(S, drain) {
   if (!S || S.rivers || !MODE.oil) return S ? S.rivers : null;
+  // (only a world with a WOOD asks for them: _forest is the one recipe that reads the distance to the water (surface.js
+  //  _base). Venus's acid pools, Uranus's sinkholes and Neptune's tundra lakes are other recipes: a network there was built
+  //  for nothing -- 122, 47 and 26 ms at load, measured 24 Nov)
+  if (!S.biomes.some((b) => b.terrain === 'forest')) return null;
   // (a look's springs: { at: 'landing' } is the world's first landing, which keeps its brook)
   const look = S.look && S.look.oil && S.look.oil.springs;
   let springs = null;

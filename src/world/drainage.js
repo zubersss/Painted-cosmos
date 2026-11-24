@@ -431,6 +431,12 @@ export function ensureDrainage(bodyId, opts) {
   done.add(bodyId);
   // (?rivers=tree: the field keeps its flow tree and routes over a little roughness; world/rivers.js. Read at the call:
   //  MODE is set in the page's own body, after this module has loaded.)
-  if (MODE.water && MODE.water.rivers && MODE.oil) opts = Object.assign({ keepTree: true, rough: 2.5 }, opts || {});
+  //  Only on a world with a WOOD, the one recipe the tree rivers serve (world/rivers.js attachRivers): elsewhere the rough
+  //  routing changed the catchment o.turb reads, and so the white water, for nothing (measured 24 Nov: 12 to 33 values in
+  //  40,000 samples on Venus, Jupiter, Saturn, Uranus and Neptune).
+  if (MODE.water && MODE.water.rivers && MODE.oil) {
+    const S0 = getSurface(bodyId);
+    if (S0 && S0.biomes.some((b) => b.terrain === 'forest')) opts = Object.assign({ keepTree: true, rough: 2.5 }, opts || {});
+  }
   try { return attachDrainage(getSurface(bodyId), opts); } catch (e) { return null; }
 }
