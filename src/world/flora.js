@@ -265,12 +265,21 @@ export class Flora {
     // in the oil overlay (the forest floor's), so without this line the LIVE WATERCOLOUR GAME would start turning
     // its seasons too -- which is a change to the live game, and those only happen when the owner asks.
     this._turn = [];
+    // THE SUMMER CANOPY (the look director, 24 Nov; render/shared.js LOOK.canopyGreen, off with ?light=old). The trees'
+    // summer dress was a lime (0.80, 0.92, 0.36), hue 73 at value 0.92, so the lit step of every crown came out at 0.91
+    // and from the air, where the crowns are most of the picture, the summer wood was one carpet of lime. A painter's
+    // summer wood is deep and varied with gold in its lights: the lightest of the three greens goes to an olive-gold a
+    // step down (about hue 60, value 0.78), the middle one a step deeper, the darkest toward a blue-green. Each kind
+    // keeps its own differences (it is a scale per channel, not new colours), the autumn dress is untouched, and the
+    // conifers, which have one dress, are not turned at all.
+    const SUMMER_K = [[0.98, 0.84, 0.92], [0.92, 0.82, 0.95], [0.86, 0.80, 1.02]];
+    const summerCanopy = (sum) => (LOOK.oil && LOOK.canopyGreen ? sum.map((c, k) => c.map((v, j) => v * SUMMER_K[Math.min(k, 2)][j])) : sum);
     for (let i = 0; LOOK.oil && i < TALL.length; i++) {
       const sp = TALL[i];
       if (!sp.leafSum && !sp.leafAut) continue;
       // `fam`, the family accent a kind's crowns carry (the maple's reds), is an AUTUMN colour: seen in the first
       // summer still it left red crowns in a green wood. Its amount rides the season with everything else.
-      this._turn.push({ mat: this.species[i].mat, far: i, sum: sp.leafSum || sp.leaf, aut: sp.leafAut || sp.leaf,
+      this._turn.push({ mat: this.species[i].mat, far: i, sum: sp.leafSum ? summerCanopy(sp.leafSum) : sp.leaf, aut: sp.leafAut || sp.leaf,
         famW: sp.fam ? (sp.fam[3] == null ? 1 : sp.fam[3]) : 0 });
     }
     this.treeDepth = TREEDEPTH; TREE_DEPTH.on = TREEDEPTH;

@@ -101,6 +101,10 @@ export const LOOK = {
   // with the rest, ?airfar=0 alone. world/index.js turns it into OIL.uLookN.w each frame: 0 on foot, rising to
   // 1 as the air's reach grows from the ground's to the air's.
   airFar: _qn('airfar', _LN),
+  // THE SUMMER CANOPY (24 Nov, the coordinator: with the far impostors drawing, the summer wood from the air was a carpet
+  // of bright LIME crowns, lit at V 0.91 over the rules' 0.60-0.82): world/flora.js lays the trees' summer leaf colours
+  // through it. 1 unless ?light=old; ?canopygreen=0 alone is the colours as they were.
+  canopyGreen: _qn('canopygreen', _LN),
 };
 MODE.oil = LOOK.oil;      // (for the look data and the surface, which do not load this module: data/mode.js)
 MODE.calm = LOOK.oil && !!(_qs && _qs.get('floor') === 'calm');      // (a calmer forest floor, to compare: data/looks/earth.js)
