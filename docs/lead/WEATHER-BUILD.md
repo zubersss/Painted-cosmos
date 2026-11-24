@@ -561,7 +561,7 @@ A separate session builds W1 CLOUDS once the look director's sky ceiling (touch 
   - `docs/shots/physics/weather-build/T_gust_render_shared_js.patch.txt`, for the look director: `uPhysGust` in
     shared.js `PHYS`, one line. syncPhysFlora's loop then copies it.
   - `docs/shots/physics/weather-build/T_gust_ground_materials_js.patch.txt`, for C, the far ground: in
-    `makeTerrainMaterial` `PC_GUST` with `?gustbands=1` or `?wx2=1` in the oil look. In `pcGroundPaint` a growth stroke
+    `makeTerrainMaterial` `PC_GUST` with `?gustbands=1` in the oil look (its own switch only: W3.12b). In `pcGroundPaint` a growth stroke
     (green to lemon and straw: `k.g - k.b`; not rock, not snow) under a band is laid a pale, cooler step, by whole
     strokes.
   - For A1, the far crowns: the same, one `pcGustBand(tree foot)` a tree in the impostor's fragment stage, a pale
@@ -573,12 +573,9 @@ A separate session builds W1 CLOUDS once the look director's sky ceiling (touch 
   - **Said plainly: it is subtle over a wood.** The crowns cover most of the ground from the air, so over woods the
     visible answer needs the crowns too (A1's impostors, and the middle trees). Over open grass it reads more.
   - In a calm, which this game's near winds mostly are (0.3 to 2.5 m/s at 2 m), it is off.
-- **Phone cost, derived (uncertain: no device):** one 3D texture read and about fifteen operations per ground stroke
-  layer, in growth strokes, while there is a breeze. The ground's paint is 24 to 34 ns a pixel (v37) with many reads,
-  so this is about a tenth of it: about 0.3 to 0.5 ms from the air over grass.
-  - That is over the 0.3 ms a change. On the phone tier, read it once a pixel at the coarse layer's stroke: about a
-    third of that.
-  - Speed-test row: 'weather: no gust bands seen from the air' (live).
+- **Phone cost, first estimate (superseded below):** one read per ground stroke layer, put at 0.3 to 0.5 ms from the
+  air over grass. That estimate was too low. It took a tenth of the ground row's 4.8 ms, but that row is the spawn's
+  view, where the ground is under half the picture; from the air it is nearly all of it.
 - **Suites:** physics 443, world and looks 103, unit 328.
 - **Agreed after (24 Nov, messages):**
   - **A1 (far crowns):** one `pcGustBand(foot)` per tree in the impostor's vertex stage, flat over the crown; each
@@ -591,6 +588,45 @@ A separate session builds W1 CLOUDS once the look director's sky ceiling (touch 
   - Both land with or after F's `uPhysGust` binding, never before.
   - **W1 asked:** the 16 m/s anvil in its game test was the drift before the cap (881c97d came after the c359e12 it
     merged); for a land cell the anvil is the capped drift.
+
+#### W3.12b: the open grass, the cheap read, and out of the flip (the coordinator, 24 Nov)
+
+- **Out of the flip's defaults:** `?gustbands=1` is now the ONLY way to turn the bands on (`wx2.js`, and the material
+  patches read the same). `?wx2=1` and the flip leave them off until the look director passes them over grass and
+  woods.
+- **The cheap read from the start:** the ground patch now reads the band ONCE A PIXEL, at the centre of the first
+  growth stroke the pixel lays (its top stroke; where the flowing strokes lay the coarse layer first, the coarse one),
+  and the strokes under it take the same number.
+  - A stroke still changes colour as a whole: in the crops no stroke is split.
+  - A band is 40 m by 120 m; a stroke is a metre or two from the air. So a stroke laid under another one hardly ever
+    straddles a band's edge.
+- **Seen, the open grass** (the alpine meadow, `wtime=5300`, a fresh breeze: the bands' strength 1; the camera looking
+  down 35 degrees from 150 m and 30 from 400 m; `W3.12_meadow*`: off, on, on one second later, 2x crops, x12
+  difference):
+  - 150 m: 14.9 % of the picture changes, and 5.0 % between the two frames a second apart.
+  - 400 m: 9.6 %, and 3.1 % a second apart.
+  - What it looks like: patches of the green strokes turn paler and silvery (sage), and a second later other strokes
+    have turned while the first have gone back. The difference picture shows the patches lying across the slope in
+    long swaths.
+  - Said plainly: on this meadow's mixed paint (violet rock, brown earth, grey-green turf) it is a moderate silvering
+    of patches. It is clear set side by side; one still on its own would not tell you it was the wind. It should read
+    best in motion, which only the owner's device can judge. On a greener meadow it would read more.
+  - Over the wood (above) it stays subtle: 2.3 %.
+- **Cost, MEASURED here (relative):** the same frame drawn with the bands working and with them idle (the uniform at 0,
+  the same compiled program), eight rounds interleaved, timed to the last pixel. This software renderer took about 3.8
+  to 4.1 s a frame, the ground about 3.0 to 3.3 s of it.
+  - 400 m: on 3,782 ms, idle 3,833 ms (means).
+  - 150 m: on 4,007 ms, idle 4,093 ms.
+  - So no cost shows above the noise, which bounds it at about 2 to 3.5 % of the ground's own cost (two standard
+    errors).
+- **Phone cost, derived from that:** the phone's ground from the air is about 8 to 11 ms (the v37 row's 4.8 ms for
+  40 to 50 % of the picture, scaled to 85 to 95 %).
+  - So the bands cost under about 0.2 to 0.4 ms. The count of work (one cached read against the ground's twenty-odd)
+    puts the true number under that bound.
+  - Unsettled: a software renderer weighs a read differently from the phone's chip. The phone's speed test, with the
+    row 'weather: no gust bands seen from the air', settles it.
+  - Reading the band per vertex would barely save anything: the far ground's mesh has about 216,000 vertices in this
+    view against 518,000 pixels.
 
 ## NEXT
 

@@ -1,41 +1,58 @@
 diff --git a/src/render/materials.js b/src/render/materials.js
-index c166588..d82d5f3 100644
+index c166588..1742cf7 100644
 --- a/src/render/materials.js
 +++ b/src/render/materials.js
-@@ -512,6 +512,15 @@ vec3 pcGroundPaint(vec3 c, vec3 leaf, float fk, vec3 rnd, float snowC, float lvl
+@@ -333,6 +333,9 @@ uniform vec4 uHeart;      // a great pale marking seen from orbit: xyz its place
+ // (Not carried over from the watercolour yet: strata, cracks, puddles, the trodden track, a world's great marking.)
+ varying vec3 vRel;
+ vec3 gBdx, gBdy, gC2dx, gC2dy, gNvdx, gNvdy, gNldx, gNldy, gSunV, gBc;
++#ifdef PC_GUST
++float gGust = -1.0;   // (the weather group's gust band, read ONCE a pixel at the first growth stroke laid on it; below)
++#endif
+ vec3 gMark;      // (the powers, fire) what the fire has done where this stroke lies: see pcMarksAt below
+ vec3 gCtrB;       // a dab's own place on the body (set before pcGroundAt; x > 1e20: none, the place is carried from the pixel)
+ vec4 gCdx, gCdy, gPdx, gPdy;
+@@ -512,6 +515,22 @@ vec3 pcGroundPaint(vec3 c, vec3 leaf, float fk, vec3 rnd, float snowC, float lvl
    // (GRASS in the shade is a deep green, its own colour laid heavier with half the cool key over it, as a leaf's shade
    // is; under the key whole a shaded meadow was a violet-brown floor: the owner's references of 2026-11-16 have the
    // shade on grass blue-green. Only where the stroke's wash is green; earth, litter, rock and snow shade as they did.)
 +  #ifdef PC_GUST
 +  // (the weather group's gust bands, ?gustbands=1: where a gust lays the grass its paler side shows -- a pale, cooler
 +  //  step on the green strokes, by whole strokes, running downwind; physics flora.glsl.js pcGustBand)
++  //  The band is read ONCE A PIXEL (the coordinator, 24 Nov: the phone's cheap read from the start), at the centre of
++  //  the first growth stroke this pixel lays, which is its top stroke, or the coarse one where the flowing strokes lay
++  //  the coarse layer first; the strokes laid under it take the same number. A band is 40 m by 120 m and a stroke a
++  //  metre or two from the air, so a stroke under another one hardly ever straddles a band's edge.
 +  {
 +    float gr = smoothstep(0.0, 0.08, k.g - k.b) * (1.0 - snowC);       // (growth: green to lemon and straw; not rock, not snow)
-+    float gb = gr > 0.0 ? pcGustBand(gBc) * gr : 0.0;
-+    if (gb > 0.0) k = mix(k, min(vec3(1.0), mix(k, vec3(dot(k, vec3(0.3, 0.5, 0.2))), 0.45) * 1.12 + vec3(0.01, 0.03, 0.06)), gb * 0.85);
++    if (gr > 0.0) {
++      if (gGust < 0.0) gGust = pcGustBand(gBc);
++      float gb = gGust * gr;
++      if (gb > 0.0) k = mix(k, min(vec3(1.0), mix(k, vec3(dot(k, vec3(0.3, 0.5, 0.2))), 0.45) * 1.12 + vec3(0.01, 0.03, 0.06)), gb * 0.85);
++    }
 +  }
 +  #endif
    vec3 tn = pcTone(k, lvl);
    float grn = smoothstep(0.02, 0.10, k.g - max(k.r, k.b)) * (1.0 - snowC);
    if (grn > 0.0) tn = mix(tn, mix(pcBody(pcDensity(k, 1.35)) * mix(vec3(1.0), pcOilShadeC(), 0.5) * 0.80, tn, smoothstep(1.2, 2.0, lvl)), grn);
-@@ -990,6 +999,12 @@ void main() {
+@@ -990,6 +1009,12 @@ void main() {
  #endif
  `;
  
-+// (group D, ?gustbands=1 / ?wx2=1: read from the address here, never imported: the contract for the weather's modules)
++// (group D, ?gustbands=1: read from the address here, never imported: the contract for the weather's modules)
 +const GUSTBANDS = (() => {
 +  if (typeof location === 'undefined' || !location || !location.search) return false;
 +  const q = new URLSearchParams(location.search), on = (k) => q.has(k) && q.get(k) !== '0' && q.get(k) !== 'false';
-+  return q.has('gustbands') ? on('gustbands') : on('wx2');
++  return on('gustbands');            // (its own switch only, not ?wx2=1, until the look director passes it: the coordinator, 24 Nov)
 +})();
  export function makeTerrainMaterial(bodyU) {
    const m = new THREE.ShaderMaterial({
      name: 'pc-terrain',
-@@ -1001,6 +1016,8 @@ export function makeTerrainMaterial(bodyU) {
+@@ -1001,6 +1026,8 @@ export function makeTerrainMaterial(bodyU) {
      vertexShader: TERRAIN_VERT, fragmentShader: TERRAIN_FRAG,
    });
    m.userData.pcPainted = true;
-+  // (the weather group's gust bands seen from the air, ?gustbands=1 or ?wx2=1, the oil look only: physics flora.glsl.js)
++  // (the weather group's gust bands seen from the air, ?gustbands=1, the oil look only: physics flora.glsl.js)
 +  if (LOOK.oil && GUSTBANDS) { m.defines = m.defines || {}; m.defines.PC_GUST = 1; }
    // (the powers, fire: the ground goes black where the fire passed. Only with ?powers=1 and ?look=oil; see addFire.)
    addFire(m, true);

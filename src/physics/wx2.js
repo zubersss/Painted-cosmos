@@ -16,7 +16,9 @@
 //   ?rainshaft=1  rain shafts hanging under every raining storm in view (world/storms.js; needs the cloud map)
 //   ?bolts=1      lightning bolts, cloud to ground (world/storms.js; needs the cloud map)
 //   ?rainmap=1    the rain box follows the map: its drops placed by the rate at its four corners (needs the cloud map)
-//   ?gustbands=1  gusts seen from the air: pale bands travelling with the wind over the grass (and the far crowns)
+//   ?gustbands=1  gusts seen from the air: pale bands travelling with the wind over the grass (and the far crowns);
+//                 only its own switch turns it on, not ?wx2=1 (the coordinator, 24 Nov: out of the flip's defaults until
+//                 the look director passes it over grass and woods)
 //   ?stormswing=0 (with ?stormland) the land storms as W3.2 laid them: 1 to 3 a day, drifting with the usual wind aloft
 const Q = (typeof location !== 'undefined' && location && location.search) ? new URLSearchParams(location.search) : null;
 const flag = (k, d) => (Q && Q.has(k) ? Q.get(k) !== '0' && Q.get(k) !== 'false' : d);
@@ -34,8 +36,9 @@ export const WX2 = {
   bolts: flag('bolts', ALL),
   // (W3.3's last part: the rain box's drops placed by the rain map read at the box's four corners, not one rate for all)
   rainmap: flag('rainmap', ALL),
-  // (gusts seen from the air: bands travelling across the grass and the crowns, flora.js GUSTBAND, flora.glsl.js pcGustBand)
-  gustbands: flag('gustbands', ALL),
+  // (gusts seen from the air: bands travelling across the grass and the crowns, flora.js GUSTBAND, flora.glsl.js pcGustBand;
+  //  its own switch only, never ?wx2=1 nor the flip, until the look director passes it)
+  gustbands: flag('gustbands', false),
   // (with ?stormland: every site its own chance, and the wind aloft swinging from day to day; ?stormswing=0 is W3.2's)
   stormswing: flag('stormswing', true),
   // (the speed test's row 'weather: wind map frozen': the map stops refreshing, so the script's change is its cost)
