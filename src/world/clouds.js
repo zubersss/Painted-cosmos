@@ -286,7 +286,7 @@ void main() {
   // and THE CREASES between heads: where a lobe's own surface turns in toward its cloud and still shows, it lies between
   // two heads, out of the light -- the half-tone. Front-lit (the sun behind the eye), this is what still draws a
   // cumulus' heads: from 600 m it was one flat light shape with a bumpy outline
-  float crease = smoothstep(0.10, -0.25, PC_AT(vCrease, ds)) * (1.0 - down);
+  float crease = smoothstep(0.22, -0.15, PC_AT(vCrease, ds)) * (1.0 - down);
   x = mix(x, min(x, 0.44), crease);
   float core = 1.0 - smoothstep(0.35, 0.75, PC_AT(vAxis, ds));
   x = mix(x, 0.22 - 0.16 * core * st, down);
@@ -964,7 +964,8 @@ export function createClouds(scene) {
       // (fair cumulus are wider than they are tall: humilis; a thicker map makes them towers)
       // (fewer and bigger, the review of 24 Nov: many small clouds read as stickers. A fair cumulus 110 to 240 m across its
       // shelf's radius, wider than it is tall)
-      let Rc = (110 + 130 * hash(k, gen, 13)) * (0.75 + 0.5 * cover) * (0.55 + 0.45 * s) * CLOUDS.size;
+      // (the look director, 24 Nov: fewer near-identical sizes -- a few large clouds among many smaller: the size skewed)
+      let Rc = (95 + 230 * Math.pow(hash(k, gen, 13), 2.2)) * (0.75 + 0.5 * cover) * (0.55 + 0.45 * s) * CLOUDS.size;
       const fairT = Rc * (0.65 + 0.55 * hash(k, gen, 17));
       let T = Math.max(60, (thick > 0 ? Math.max(fairT, thick * (0.55 + 0.45 * hash(k, gen, 19)) * (0.4 + 0.6 * conv)) : fairT) * (0.5 + 0.5 * s));
       // THE SEA OF CLOUD (the owner's Aloft reference): seen from above a closed deck, a cumulus is one of the deck's own
@@ -973,6 +974,13 @@ export function createClouds(scene) {
       if (deckK > 0.6 && camR > R + base + 40) {
         const hk = smooth(0.6, 0.9, deckK);
         Rc *= 1 + 0.5 * hk; T = T + (Rc * (0.30 + 0.22 * hash(k, gen, 21)) - T) * hk; base -= T * 0.32 * hk;
+      }
+      // (and toward the horizon the clouds crowd into rows and merge into a band, as perspective lays them: a far cloud wider
+      // and flatter, so its neighbours overlap it. Without it, from the air the far ones were separate small ovals)
+      {
+        const dx = sx * (R + base) - camD.x, dy = sy * (R + base) - camD.y, dz = sz * (R + base) - camD.z;
+        const farK = smooth(1500, 6000, Math.hypot(dx, dy, dz));
+        Rc *= 1 + 0.7 * farK; T *= 1 - 0.30 * farK;
       }
       const rb = R + base;
       // the cloud's base centre in the drifting frame, and the eye's distance to its middle

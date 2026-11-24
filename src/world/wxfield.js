@@ -64,9 +64,9 @@ function blankShadow() {
 }
 // (until clouds.js renders a shadow map, the matrix sends every point to uv (-1, -1): outside the map, no shadow)
 const _noShadowM = new THREE.Matrix4().set(0, 0, 0, -1, 0, 0, 0, -1, 0, 0, 0, 0, 0, 0, 0, 1);
-// (the look director's ruling of 24 Nov, touch T3: render/ does not import world/, so the three uniforms the last pass reads
-//  live in render/shared.js; where that file has them -- under any of these names -- these are the very same objects)
-const _CS = SHARED.CLOUD_SHADOW || SHARED.CLOUDSHADOW || (SHARED.uCloudShadow ? SHARED : null);
+// (the look director's touch T3, look-director a40647e: render/ does not import world/, so the three uniforms the last pass
+//  reads live in render/shared.js CLOUDSHADOW; these are the very same objects. One name only, as committed there)
+const _CS = SHARED.CLOUDSHADOW || null;
 
 export const WX = {
   uWxField: { value: atlas() },        // R low cover, G (top - base) / 2500 m, B sqrt(rain / 40 mm/h), A storm
