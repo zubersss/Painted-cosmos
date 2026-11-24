@@ -53,6 +53,9 @@ export const IMP = {
   leafLo: 1.4, leafHi: 4.0,                              // (never less, never more, than this much larger)
   variants: Math.round(_qn('impvar', 1, 1, 2)),          // trees baked of each kind (?impvar=2: two, at twice the memory)
   minLeaf: _qn('impminleaf', 2.0, 0, 6),                 // and never under this many texels across, at any level
+  // SMALL CROWNS IN TWO STEPS (?impsmall=1, or =N texels; OFF by default until the look director has seen the A/B): a
+  // view of 12 texels or fewer paints a crown's strokes in two light levels, its cap and its body (IMP_FRAG)
+  small: (() => { const v = _q && _q.get('impsmall'); if (!v || v === '0') return 0; const n = +v; return v === '1' || !isFinite(n) ? 12 : Math.max(0, Math.min(96, n)); })(),
 };
 // (the levels: halving until a view is a single texel; 96 texels give 96, 48, 24, 12, 6, 3 and the last is cut at 1.5
 //  so it stops at 3 -- six levels)
@@ -646,9 +649,22 @@ void main() {
     // a stroke of leaves: its colour from the tree's run by its own number, its light at its centre (PROP_VERT, "a
     // leaf's paint, once a leaf": the same steps, and the same tone function every surface takes, pcTone)
     float twig = step(1.5, vKB.x);
+    // SMALL CROWNS IN TWO STEPS (?impsmall=; the look director, 24 Nov: "at the coarse levels only (a view of 12 texels
+    // or fewer), pull a crown's strokes toward two steps: the cap one step, the rest of the crown one step, so each small
+    // crown reads as one lit mass with its shade, not lit and dark alternating; leave 24+ texels as they are. Keep the
+    // step difference between cap and body at one level (not less)". SEEN before it, from 1 km over the far view's
+    // canopy roof: crowns of 1-3 px each split into lit and dark strokes made the wood V 0.49 with a third of it under
+    // V 0.3, against the roof's 0.74 past the impostors' reach.) The strokes facing the sun are the cap, at the level a
+    // lit stroke of this crown takes; every other stroke is the body, one level under it. No stroke's own light jitter
+    // and no inner shade there; each stroke keeps its own colour. The conifer's dark core is left as it is.
+    bool small = false;
+    #ifdef PC_IMP_SMALL
+      small = uImpK.z * exp2(-vLod) < float(IMPS_T) + 0.5;
+    #endif
+    float azL = small ? 0.0 : az;
     float hue = vInst.x + (id - 0.5) * 1.7;
     vec3 cs = mix(vLA, vLB, clamp(0.5 + hue * 0.5, 0.0, 1.0));
-    cs = mix(cs, vLC, clamp(az * 0.55 + (r3.y - 0.5) * 0.6, 0.0, 1.0));
+    cs = mix(cs, vLC, clamp(azL * 0.55 + (r3.y - 0.5) * 0.6, 0.0, 1.0));
     cs = pcWetWash(pcDabTint(pcDensity(cs, 1.0 + vInst.y * 0.4), r3, 1.0 - twig), 0.7);
     bool snow = cls > 1.5 && cls < 2.5;
     if (snow) cs = mix(vec3(0.95, 0.97, 1.0), vec3(0.80, 0.87, 0.98), r3.x * 0.7);
@@ -663,6 +679,14 @@ void main() {
     xl = max(xl, mix(0.30 + 0.15 * r3.x, 0.18 + 0.12 * r3.x, ${'${FARCROWN}'}));
     if (cls > 2.5) xl = 0.2;
     float lv = pcLevel(xl, 0.03);
+    if (small && cls < 2.5) {
+      // (the cap's level: a stroke of this crown facing the sun at 0.6, lit, with the crown's own light against the sun)
+      float xc = max(0.80, vKB.y * 0.8 * (1.0 - twig));
+      if (snow) xc = max(xc, 0.68);
+      float lc = floor(pcLevel(xc, 0.002) + 0.5);      // (a soft of 0 would be a smoothstep with equal edges: undefined)
+      float cap = step(mix(0.05, 0.585, canopy), 0.5 + 0.5 * ms);
+      lv = cap > 0.5 ? lc : max(lc - 1.0, 0.0);
+    }
     // (the shade of a crown through the shared foliage shade where the build has it, chunks.js pcShadeLeaf, as a
     //  near leaf takes its own; otherwise pcTone alone)
     c = ${'${IMPSHADE}'};
@@ -694,7 +718,8 @@ export function makeImpostorMaterial(bodyU, atlas, farMat, farcrown = FARCROWN) 
   if (wind) Object.assign(own, PHYS, { uStiff: { value: 1 }, uPlantHeight: { value: 12 } });
   const m = new THREE.ShaderMaterial({
     name: 'pc-prop-far-impostor',
-    defines: Object.assign({ PC_IMPOSTOR: 1, PC_IMP_NV: Math.max(1, atlas.n), PC_NFAR: fu.uFarA.value.length }, _q && _q.get('impdebug') === '1' ? { PC_IMP_DEBUG: 1 } : null, wind ? { PC_PHYS: 1 } : null),
+    defines: Object.assign({ PC_IMPOSTOR: 1, PC_IMP_NV: Math.max(1, atlas.n), PC_NFAR: fu.uFarA.value.length }, _q && _q.get('impdebug') === '1' ? { PC_IMP_DEBUG: 1 } : null, wind ? { PC_PHYS: 1 } : null,
+      IMP.small > 0 ? { PC_IMP_SMALL: 1, IMPS_T: IMP.small.toFixed(1) } : null),
     uniforms: makePaintUniforms(bodyU, own),
     vertexShader: IMP_VERT,
     fragmentShader: IMP_FRAG.split('${FARCROWN}').join(fc).split('${IMPJIT}').join((+IMP.jit).toFixed(4))

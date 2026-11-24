@@ -2077,7 +2077,10 @@ void main() {
     //  read, before every discard that breaks a crown up. The gap from 4 to 2 ("plants one flat colour", which runs
     //  all of those first) is what they cost; the gap from 2 to "as set" is the paint proper. These do nothing
     //  whatever unless the speed test sets them.)
-    if (uOilL.y > 3.5 && uOilL.y < 4.5) { pcWrite(vec3(0.42, 0.40, 0.32), 0.0, vec3(0.0, 0.0, 1.0), -vView.z, 3.0); return; }
+    // (24 Nov, the trees lane with the coordinator's leave: every speed-test row that writes a plant at once (4) or in one
+    //  flat colour (2) writes alpha 1, a whole cover. It wrote 0, and with alpha to coverage on a multisampled picture a
+    //  0 lays nothing, so the row timed plants that were not there. The as-set paint is not touched.)
+    if (uOilL.y > 3.5 && uOilL.y < 4.5) { pcWrite(vec3(0.42, 0.40, 0.32), 1.0, vec3(0.0, 0.0, 1.0), -vView.z, 3.0); return; }
   #endif
   pcFp = pcFootprint(vBody);      // (R1 W2.1, chunks.js: before any discard, where the flow is uniform)
   pcDist = length(vView);         // (R1 re-fix: the leaf shadow's far octaves, chunks.js)
@@ -2102,7 +2105,7 @@ void main() {
     #ifdef PC_FAR
     if (uOilL.y > 1.5 && uOilL.y < 3.5) { pcWrite(vData.y > 4.5 ? uLeafA * 0.7 : uBarkB, 1.0, nV, -vView.z, 3.0); return; }
     #else
-    if (uOilL.y > 1.5 && uOilL.y < 2.5) { pcWrite(vData.y > 4.5 ? uLeafA * 0.7 : uBarkB, 0.0, nV, -vView.z, 3.0); return; }
+    if (uOilL.y > 1.5 && uOilL.y < 2.5) { pcWrite(vData.y > 4.5 ? uLeafA * 0.7 : uBarkB, 1.0, nV, -vView.z, 3.0); return; }
     // (7: the near trees' BARK one flat colour, every leaf and every discard as set -- trees lane T0 row c)
     if (uOilL.y > 6.5 && uOilL.y < 7.5 && vData.y < 0.5) { pcWrite(uBarkB, 1.0, nV, -vView.z, 3.0); return; }
     #endif
@@ -2614,11 +2617,11 @@ vec3 pcWoodPaint(vec3 k, float lvl, float pk, vec3 Bc, float r) {
 void main() {
   #include <logdepthbuf_fragment>
   // (the speed test's cuts, shared.js uOilL.y, as the big program honours them: 4 written at once, 2 one flat colour)
-  if (uOilL.y > 3.5 && uOilL.y < 4.5) { pcWrite(vec3(0.42, 0.40, 0.32), 0.0, vec3(0.0, 0.0, 1.0), -vView.z, 3.0); return; }
+  if (uOilL.y > 3.5 && uOilL.y < 4.5) { pcWrite(vec3(0.42, 0.40, 0.32), 1.0, vec3(0.0, 0.0, 1.0), -vView.z, 3.0); return; }
   pcDist = length(vView);
   vec3 nV = normalize(vNV);
   if (!gl_FrontFacing) nV = -nV;
-  if (uOilL.y > 1.5 && uOilL.y < 2.5) { pcWrite(uBarkB, 0.0, nV, -vView.z, 3.0); return; }
+  if (uOilL.y > 1.5 && uOilL.y < 2.5) { pcWrite(uBarkB, 1.0, nV, -vView.z, 3.0); return; }
   vec3 sunV = normalize((viewMatrix * vec4(uSunDirW, 0.0)).xyz);
   ${SKYUP('dot(nV, mat3(viewMatrix) * uUpW)')}
   float seed = vInst.z;
@@ -2683,10 +2686,10 @@ const LEAF_FRAG = /* glsl */`
 ${TREE_HEAD}
 void main() {
   #include <logdepthbuf_fragment>
-  if (uOilL.y > 3.5 && uOilL.y < 4.5) { pcWrite(vec3(0.42, 0.40, 0.32), 0.0, vec3(0.0, 0.0, 1.0), -vView.z, 3.0); return; }
+  if (uOilL.y > 3.5 && uOilL.y < 4.5) { pcWrite(vec3(0.42, 0.40, 0.32), 1.0, vec3(0.0, 0.0, 1.0), -vView.z, 3.0); return; }
   vec3 nV = normalize(vNV);
   if (!gl_FrontFacing) nV = -nV;
-  if (uOilL.y > 1.5 && uOilL.y < 2.5) { pcWrite(uLeafA * 0.7, 0.0, nV, -vView.z, 3.0); return; }
+  if (uOilL.y > 1.5 && uOilL.y < 2.5) { pcWrite(uLeafA * 0.7, 1.0, nV, -vView.z, 3.0); return; }
   // (a leaf: one piece of flat colour, worked out once a leaf in the vertex shader; here the lantern's light, the fire's
   //  and the air are laid over it, as the big program's leaf branch lays them)
   float h = vData.w;
@@ -2732,7 +2735,7 @@ ${LEAF_SUN}
 ${SPRAY_GLSL}
 void main() {
   #include <logdepthbuf_fragment>
-  if (uOilL.y > 3.5 && uOilL.y < 4.5) { pcWrite(vec3(0.42, 0.40, 0.32), 0.0, vec3(0.0, 0.0, 1.0), -vView.z, 3.0); return; }
+  if (uOilL.y > 3.5 && uOilL.y < 4.5) { pcWrite(vec3(0.42, 0.40, 0.32), 1.0, vec3(0.0, 0.0, 1.0), -vView.z, 3.0); return; }
   // the card's chart, in the dab layer's own cells (kitbuild.js clusterCard), its screen derivatives for the leaf's
   // clean edge, and the topmost leaf laid there (dabtex.js SPRAY_GLSL: the shadow map finds the very same leaf)
   vec2 off = vec2(vCardS.y * 23.0);
@@ -2755,7 +2758,7 @@ void main() {
     if (cover < (uOilG.z > 0.5 ? 0.06 : 0.5)) discard;
   #endif
   vec3 nV = vCardM;
-  if (uOilL.y > 1.5 && uOilL.y < 2.5) { pcWrite(vCardLA * 0.7, 0.0, nV, -vView.z, 3.0); return; }
+  if (uOilL.y > 1.5 && uOilL.y < 2.5) { pcWrite(vCardLA * 0.7, 1.0, nV, -vView.z, 3.0); return; }
   pcUp = vCardS.z;
   vec3 sunV = normalize((viewMatrix * vec4(uSunDirW, 0.0)).xyz);
   float twig = vCardS.w;
