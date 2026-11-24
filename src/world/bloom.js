@@ -159,6 +159,11 @@ export function bloomAt(S, x, y, z, s, bi, out, tEval) {
   // value that was the product of four soft fields lay at a middling density everywhere, which is the even confetti)
   const D = bd * rich * patch;
   out.kind = best; out.bloom = B[best]; out.dens = Math.max(ss(DT[0], DT[1], D), Math.min(D, 0.04)); out.heart = bh * Math.min(1, patch);
+  // (no flower stands in snow: the far view, C, 24 Nov: the surface lays snow over the wash by s.snowK before bloomTint tints
+  // it, and the far ground's snow shedding (patchgen.js) undoes that mix on steep faces, which brought a drift's colour back
+  // magnified up to 16 times: dark red smudges on the alpine ridges, SEEN by C. Here and not in bloomTint, so the near rings
+  // lay no flowers in snow either; a sample without snowK reads 0, unchanged)
+  { const ns = 1 - ss(0.05, 0.35, s.snowK || 0); out.dens *= ns; out.heart *= ns; }
   // (the runner-up: where a second kind's drift is nearly as strong, the near rings lay some of its plants among the
   // first's, so two drifts run into each other and a drift's heart is never one flower alone -- the look director on the
   // 1.8 m meadow, 24 Nov: "the buttercup drift ... reads as one orange carpet: mix kinds". out.mix is the share it takes.)
