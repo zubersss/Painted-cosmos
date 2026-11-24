@@ -237,7 +237,10 @@ export const OIL = {
   //    each frame from LOOK.airDark and the horizon's dip; ?airdark=0 the air as before)
   uLookG: { value: new THREE.Vector4(_qn('goldsky', _LN), 0, _qn('skylimb', _LN), 0) },
   // x: how far a storm takes the land's light down a step (chunks.js pcLevel; world/index.js sets it from LOOK.stormLight)
-  uLookS: { value: new THREE.Vector4(0, 0, 0, 0) },
+  // y: THE LIT MIDDLE DISTANCE on foot (chunks.js pcAtmosV: the far air the light's own colour toward the sun and the
+  //    sky's away from it, a step lighter than the near shade; ?midlight=0 the air as it was), z and w the lightness of
+  //    that air away from the sun and toward it
+  uLookS: { value: new THREE.Vector4(0, _qn('midlight', 0), 0.74, 0.88) },
 };
 
 // WHERE THE FIRE HAS BEEN, FOR THE GROUND'S OWN PAINT (the powers, fire; the paint itself is materials.js TERRAIN_FRAG).
