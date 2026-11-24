@@ -756,7 +756,8 @@ void main() {
     }
     #ifdef PC_GUST
       // (ONE TONE for a small crown a gust band has turned, the look director's (a): its colour the tree's own, with no
-      //  stroke's hue, inner shade or tint, stepped paler as above; its light the crown's mean. vGust.y fades it in.)
+      //  stroke's hue, inner shade or tint, stepped paler as above; its light halfway from the crown's mean to its cap.
+      //  vGust.y fades it in.)
       if (vGust.y > 0.0 && cls < 2.5) {
         vec3 rc1 = vec3(fract(vInst.z * 3.1), fract(vInst.z * 7.3), fract(vInst.z * 11.7));
         vec3 c1 = mix(vLA, vLB, clamp(0.5 + vInst.x * 0.5, 0.0, 1.0));
@@ -767,7 +768,9 @@ void main() {
         float xc1 = max(0.80, vKB.y * 0.8 * (1.0 - twig));
         if (snow) xc1 = max(xc1, 0.68);
         float lc1 = floor(pcLevel(xc1, 0.002) + 0.5);
-        float lv1 = max(lc1 - 1.0, 0.0) + vGust.z;
+        // (halfway from the crown's mean, one level under its cap raised by its lit share, to the cap itself: at the mean
+        //  the turned patch read duller than the busy wood round it, not paler -- the look director, 24 Nov, mix 0.5)
+        float lv1 = mix(max(lc1 - 1.0, 0.0) + vGust.z, lc1, 0.5);
         cs = mix(cs, c1, vGust.y); lv = mix(lv, lv1, vGust.y);
       }
     #endif
