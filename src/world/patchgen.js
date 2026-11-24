@@ -309,8 +309,19 @@ export function stepPatch(job, deadline) {
     //    most about 44 m wide (_riversOil: half width 2.5 m times 8.9 at its widest pool), so water found WIDE_R = 27 m to
     //    BOTH sides across the current is a pool. Asked of the surface itself (two samples), on a grid of about 6 m over
     //    the patch and laid between, so a patch at any level gives about the same answer.
-    // (Only with the switch: without it the byte stays 0, as it was, and nothing reads it.)
-    if (wturb && MODE.water && MODE.water.wpaint >= 1) {
+    // AND WHICH WATER IS THE SEA, into the other spare byte aTurb.z: 1 where the water stands at the sea's level (the sea, a
+    // fjord or a lagoon drowned to it, a river's last metres), 0 every other water (rivers, ponds, lakes stand above it).
+    // The paint uses the sea's own level there (?wsea=, v37's by default) and the rivers' and ponds' elsewhere (?wpaint=):
+    // the coordinator, 24 Nov. The sea's level is the surface's own (surface.js: the coast's and the islands' liquid is
+    // S.sea, 0 on a world that names none); within 0.15 m of it is the sea, 0.45 m above it is not, and between the paint
+    // breaks the change with noise. No samples: the level is already known at every vertex.
+    // (Only with the switch: without it both bytes stay 0, as they were, and nothing reads them.)
+    if (wturb && MODE.water && Math.max(MODE.water.wpaint, MODE.water.wsea || 0) >= 1) {
+      const seaL = S.sea == null ? 0 : S.sea;
+      for (let j = 0; j < V; j++) for (let i = 0; i < V; i++) {
+        const k = (j + 1) * E + (i + 1);
+        if (_lq[k] > -1e5) { const d = Math.abs(_lq[k] - seaL); wturb[(j * V + i) * 4 + 2] = d <= 0.15 ? 255 : d >= 0.45 ? 0 : Math.round(255 * (0.45 - d) / 0.3); }
+      }
       const st = (_stillSamp && _stillSamp.w.length >= S.nB) ? _stillSamp : (_stillSamp = makeSample(S.nB));
       const gs = Math.max(1, Math.round(6 / cellM)), G = Math.ceil((V - 1) / gs) + 1;
       if (_stillGrid.length < G * G) _stillGrid = new Float32Array(G * G);

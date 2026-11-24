@@ -83,8 +83,9 @@ first agent's record of M1 is kept at the end ("Earlier answers").
 
 A helper session of the coordinator, kept current after every step (the container can restart). The design is
 `docs/lead/WATER-DESIGN.md` (3.4, 3.6, 3.7, 5.3, 5.4 are these lanes; 6 the speed-test rows). Everything is behind
-`?wpaint=2` / `?wakes=2` / `?splash=1` with the oil look; without them the game is v37 exactly (checked: the bank view
-at 936 x 372 with `&t=5`, before and after, 0 pixels differ).
+`?wpaint=` / `?wsea=` / `?wakes=2` / `?splash=1` with the oil look. With the oil look the new strokes are the default on
+rivers and ponds and the sea keeps v37's (see THE DEFAULT NOW below); `?wpaint=0` is v37's water exactly (checked
+after every change of the default: river view with `&t=5`, before and after, at most 2 of 255 on under 80 pixels).
 
 **The order** (the coordinator's brief): 1 still water and the stroke octaves; 2 the night (the water through the look
 director's night pull); 3 colour, far shine and water from the air (FV5, with group C); 4 the player's wakes and
@@ -150,7 +151,21 @@ water), the river still a little over the band; E5 0.12 to 0.37 saturation, valu
 note still water is the calmest thing: a step deeper, less mirror, strokes 10:1 and in close values, white only on the sun's
 path. NIGHT (F's ask): the light strokes keep a step of light over the pulled body, the moon's marks are left out of the
 pull (`s2-E1-night-23h-wpaint2-crest-ab.jpg`: water V 0.45, land 0.22).
-**THE DEFAULT went back to `?wpaint=0` (v37's water) on 24 Nov, afternoon** (the coordinator's ruling: the look director
+**THE DEFAULT NOW (24 Nov, evening): the new strokes on rivers, ponds and lakes, v37's on the sea.** The mesher marks water
+standing at the sea's level (`patchgen.js`, the spare byte `aTurb.z`: within 0.15 m of `S.sea` 1, from 0.45 m above it 0;
+no samples, the level is known at every vertex) and the paint picks its level per pixel: `uWPaint` (`?wpaint=`, default 1)
+on rivers and ponds, `uWSea` (`?wsea=`, default 0; without it as `?wpaint=` when that is given) on the sea
+(`WATER_FRAG`: `wpL`, the change broken by the 17 m noise). `?wpaint=0` is v37's everywhere, `?wpaint=2` the new paint
+everywhere, `?wsea=1` the strokes on the sea too (for the sea's fix). SEEN: the sea at 150 m, 400 m and 1 km, default
+against v37 -- the sea's pixels the same, the only ones changed an inland river and its pools (red in
+`s7-sea-1km-changed.jpg`); E3 and E4 (`s7-E3-default-ab.jpg`, `s7-E4-default-ab.jpg`) the strokes F passed. PROVEN:
+`?wpaint=0` against the build before (1f1b684), river view with `&t=5`: 76 pixels of 518,400 differ by at most 2 of 255
+(the software renderer's rounding). Measured in Node: within 3 km of the landing no river meets the sea at its level
+(the tree rivers end on the cliffs 20 m up and fall), so no seam shows there. Wide lakes count with the ponds (strokes):
+if F wants them on v37 too, the sample needs the lake's size from the bodies of water (hydro.js), one field.
+NOT fixed: a river 2 km off at a grazing view is a grey and white speckle in both paints, a little finer in the new; it is
+the sea's "no grain" work, next.
+**The default went back to `?wpaint=0` (v37's water) on 24 Nov, afternoon** (the coordinator's ruling: the look director
 found the open sea from 150 m a checker of pale stair-stepped blocks at `?wpaint=1` and an electric blue, S 0.78, at
 `?wpaint=2`; E-W2's branch water-sea 9525b16 has a first fix). Next: tell rivers and ponds from the sea and wide open water
 so the strokes can be the default there. Before that it was: `?wpaint=1` -- the strokes of
