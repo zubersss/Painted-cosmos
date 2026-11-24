@@ -405,7 +405,16 @@ Branch `water-bodies` = lane 0 + look-proto v37.1 + `origin/design-water` (W1's 
   (0.40 before). ?wpaint=0 unchanged (0 to 2 pixels of 518400 by at most 2 of 255). NOT GOOD YET: where the crests run
   toward the eye the near sea reads as long streaks, not v37's swell; option rendered (far still water across the view; turns
   with the camera, a seam between near and far): F to choose.
-- NEXT: F's word on the sea; after the branches meet (the coordinator's call): the pool's pcThinLayer to W3's
+- **F on the sea (13:00):** the checker PASSES (keep the spread 0.26); across-the-view REFUSED (it would swim); the body a
+  step deeper: done on water-sea 079fcf3 (median 0.66 / 0.66 / 0.65 at 150 m / 400 m / 1 km, spread 0.26 at 150 m). The
+  crests' direction checked in the page: the strokes are along the crests; the crests run toward this coast because the wind
+  does (gallery ?physics=1: uPhysWaterDir -0.996, 0.091; the sea map off, uPhysSeaGrid.w 0); in the game physics' warp, which
+  turns crests toward a shore, covers 17 x 16 m round the player only. Turning them along the coast within ~300 m of land
+  needs a shore direction per sea vertex from the mesher (patchgen, a new two-byte attribute in terrain.js, read in
+  WATER_FRAG): asked the coordinator who does it.
+- design-water a877068 (the falls flip, with water-paint and its curtain fix) merged here (1dbc5ee); E's one line in
+  hydro.test kept (every part switched off for 'no part asked for'). Suites 325 / 107 / 445.
+- NEXT: the coordinator's word on the shore direction; after the branches meet (the coordinator's call): the pool's pcThinLayer to W3's
   pcWStrokes, pcFallMilk and the FALL_ colours into waterchunk.js.
 - Camera places for the falls views: `fallsView(S)` and the scratch `fallcams.mjs` (sea60, sea150, air400, bank, E7).
 
