@@ -226,6 +226,28 @@ build only where the look asks: 221040b).
   beside the explorer into the distance on the right, a riffle, the ship on the left, a meadow of yellow flowers): 8.5 %
   water-blue and 2.8 % white churn, against 6.4 % for v39.1; the three side by side `first-view-3.jpg`.
 
+### THE WATER FROM THE AIR (24 Nov 14:50-16:15, this session; the coordinator held the water out of v39.2 for it)
+
+The gate's high frame (gallery cam=high at the landing, 420 m up, looking north-north-east and down 29 degrees, 936x372)
+showed NO water with the water branch (`docs/shots/painter/water-air/gate-high-as-it-was-no-water.jpg`; ?canopy=0 the same).
+- THE MAIN CAUSE IS WHERE THE WATER IS, not a layer: over the ground in that frame (280 m to the horizon) the surface itself is
+  water at 14.0 % in v39.1 (the old oil rivers' dense net of wide channels and pools) and 0.31 % here. Round the landing there
+  is as much water or more (within 1 km 8.2 % against 7.7 %, 3 km 14.5 % against 11.3 %, 6 km 21.2 % against 15.8 %, with the
+  lakes): the rivers of the tree run elsewhere, the landing's south of the landing. RULING (the coordinator): keep the old
+  frame and ADD one at the landing's river; no denser rivers for a frame. THE ADDED FRAME: gallery.html?body=earth&biome=
+  autumn_woodland&time=15.4&cam=high&yaw=145.6&pitch=-13.4&t=0&ui=0&quality=1&look=oil (cam=high's place, facing south, 42
+  degrees down). SEEN: `gate-high-at-the-river.jpg`, the landing's river winding into a big lake.
+- THE FAR TREES: every impostor is one of placeTrees' trees, none in water (A1 checked). SEEN over the landing's river,
+  impostors against ?fartree=old (`impostors-vs-oldfar-150-400-1km.jpg`): 150 m reads either way; 400 m reads, thinner with
+  the impostors; 1 km the river is hidden (the lake reads). Tried: the wood standing back from a big river's water's edge
+  (full from 6 m, then from 12 m): no gain at 1 km (`bank-trees-tried-400-1km.jpg`), so NOT KEPT (the picture is the last
+  commit's to the sample: 0 of 60,000 differ). c.bankD (metres past a river's edge) stays written in rivers.js, unread.
+- AT 1 KM THE RIVER IS LOST IN THE GROUND ITSELF: with no trees and no painted canopy (`1km-bare-ground-no-trees-no-canopy.jpg`)
+  it is a faint broken line; a 19 m river falls between the far ground's vertices and under its brush. The fix proposed (not
+  built): pack the signed distance to the water's edge at each vertex (patchgen, the layout is this session's) and let the
+  far ground's paint (C's farground.js) draw a river-coloured line where the interpolated distance crosses zero: a line that
+  survives any vertex spacing. W3's notes already name "the far water byte for C".
+
 ### THE SPEED TEST'S FALLS VIEW AND ?bench=water (24 Nov, this session; lane 0, the coordinator's order)
 
 `src/core/bench.js`: a water part may PLACE its own view: a WATER_BENCH row with `place(S)` returning { dir, yaw (degrees),

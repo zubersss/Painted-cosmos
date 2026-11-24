@@ -32,7 +32,8 @@
 // THE CONTRACT (fixed by lane 0; world/waterhooks.js calls attachRivers once a world, before its first patch):
 //   attachRivers(S, drain)   build the network and set S.rivers = net; return net (or null: nothing attached).
 //   net.sample(S, c)         with c.x, c.y, c.z (the unit direction) and c.L (the wood's base level) set. Sets, EVERY time:
-//                            c.pool, c.bar, c.barZone (the bar and 6 m beyond: where trees stand back), c.fu, c.fv, c.still,
+//                            c.pool, c.bar, c.barZone (the bar and 6 m beyond: where trees stand back), c.bankD (metres past
+//                            a river's water's edge, 1e9 off the rivers: for the far view's water line, not read yet), c.fu, c.fv, c.still,
 //                            c.swell, c.lvR (the water level, which surface.js _forest
 //                            uses in place of the staircase) and c.L (the base level, graded toward the river); RETURNS the
 //                            distance to the nearest water (under the nominal half width 2.5 m inside a channel; beyond it,
@@ -784,7 +785,7 @@ class RiverNet {
       } else if (si >= 0) Pr += (pF - Pr) * smoothstep(o.near - 25, o.near, dC);
     }
     // 2. the channel, in the terms the land's recipes read (as _riversOil's `lay`)
-    let best = 1e9, bar = 0, deep = 0, win = 0, zone = 0;
+    let best = 1e9, bar = 0, deep = 0, win = 0, zone = 0, bankD = 1e9;
     const lay = (sI, k, gv, who) => {
       const w = k * W;
       let d = sI < w ? (k <= 1 ? sI / k : Math.max(0, sI - (w - W))) : W + (sI - w) * gv;
@@ -811,6 +812,10 @@ class RiverNet {
         if (bb > barW) { barW = bb; side = kb > 0; pb = true; }
       }
       const sI = Math.abs(sd), w = kP * W;
+      // (how far past this river's water's edge, metres, 1e9 off the rivers: written for the far view's water line -- from 1 km
+      //  a river under about 30 m wide falls between the ground's vertices, 24 Nov; the trees standing back by it was tried
+      //  and did not bring the river back from 1 km, so nothing reads it yet)
+      bankD = Math.max(0, sI - w);
       if (barW > 0.5 && sI > w && (sd > 0) === side) {
         // (a point bar: a bank up from the water, a flat of sand, and behind it a short scarp back up to the land's own lie, so
         //  that beyond the bar the ground is what it would be without it and two rivers' grounds still meet)
@@ -848,7 +853,7 @@ class RiverNet {
         lay(qs * tw, 0.5 * mask * (1 - smoothstep(10, ro ? 125 : 85, parent)), 3.0 / tw, 2);
       }
     }
-    c.pool = deep; c.bar = bar; c.barZone = zone;
+    c.pool = deep; c.bar = bar; c.barZone = zone; c.bankD = bankD;
     // 4. the current, along the channel that won, downstream
     c.fu = 0; c.fv = 0;
     if (best < W + 3) {
