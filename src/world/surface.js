@@ -972,7 +972,7 @@ class Surface {
     o.top = top;
     const c = this._ctx; c.x = x; c.y = y; c.z = z; c.baseReady = false;
     c.fu = 0; c.fv = 0; c.dr = null;
-    c.still = 0; c.bank = 0; c.cap = 0; c.swell = 0; c.lvR = NaN;
+    c.still = 0; c.bank = 0; c.cap = 0; c.swell = 0; c.lvR = NaN; c.turbW = NaN; c.fspdW = 0;
     const b = this._b;
     let h = 0;
     const gw = this._gw, gl = this._gl;
@@ -1072,6 +1072,10 @@ class Surface {
         }
       }
     }
+    // (THE WATER: a water part that owns the water here -- a river's mouth cut, a pond, a fall -- MAY say how aerated it is and
+    //  how fast it runs, c.turbW (0..1) and c.fspdW (m/s), in place of the drainage field's guess above; NaN, and so
+    //  nothing, unless it does. Without it the 380 m cut through the coast's berm painted white from end to end.)
+    if (c.turbW === c.turbW) { o.turb = c.turbW; o.fspd = c.fspdW; }
     if (full && this.clearings.length) {
       for (const cl of this.clearings) {
         const dx = x - cl.x, dy = y - cl.y, dz = z - cl.z;

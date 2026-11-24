@@ -1,5 +1,80 @@
 # PAINTER notes
 
+## Hand-over of THE FAR VIEW, group C, branch `farview` (READ THIS FIRST if you are group C; kept current)
+
+A helper session of the coordinator (24 Nov) works here on the ground seen from the air, after the owner's words of
+24 Nov: "things should look good far before I get there like when im flying high in the sky up to a mile I want trees
+from a distance to look good rocks the water the grass". The design is `docs/lead/FARVIEW-DESIGN.md` on `r2`; the look's
+rules and audit are `docs/lead/LOOK-RULES.md` and `LOOK-AUDIT.md` on `look-director`. This lane's packages: FV2 (the
+canopy painted into the ground), FV3 (the floor and the far colour follow the year), FV4 (rock faces, strata and snow
+from afar; the audit's F12 faceted mountains and F13 cliff smears, with the look director). Not this lane's: FV1 (the
+sky to a mile: look director), FV2-T and FV7 (the far trees and the air speed test: trees-far group), FV5 (water), FV6
+(meadows). Files of this lane: `src/render/farground.js` (new), `src/world/farstand.js` (new), TERRAIN_VERT/FRAG in
+`src/render/materials.js`, `src/world/terrain.js`, `src/world/patchgen.js`, `src/world/surface.js` (recipes and far
+colour only). NOT chunks.js, post.js, shared.js, world/index.js (look director), NOT flora.js, florakit.js (trees groups).
+
+**FV2, THE PAINTED CANOPY (`?canopy=0|1`, default 1; the oil look on Earth only).** BUILT AND SEEN in stills (list below).
+- `src/world/farstand.js` `standAt`: at every ground vertex, the tree placer's OWN keep share there (`stand`, 0..1: the
+  clump field, s.trees, the outside-the-woods group field, water) and the share of needle trees (the grove field picks
+  the pair, the roll the kind). A copy of `floraplace.js placeTrees`' arithmetic, not a call: `src/world/farstand.test.mjs`
+  counts the placer's real trees over 147 cells against it (MEASURED: autumn wood 1,901 real against 1,855 predicted,
+  green wood 2,590 / 2,557, mountain 42 / 42; needle share 0.186 real / 0.169 predicted). If the placer changes, the
+  test fails. Packed by `patchgen.js` into the far wash's spare alpha byte (stand) and the parameters' fourth byte (the
+  needle share: a crack's depth, which the oil ground never painted), only when `canopyOn(S.id)`; otherwise the bytes
+  are the old ones. MEASURED in Node: +0.26 ms a patch (+8.5 %) of the mesher's time slice.
+- `src/render/farground.js`: the GLSL and the uniforms. The canopy is laid in ITS OWN TWO LAYERS OF DABS
+  (`pcCanopyLayers`, called first in TERRAIN_FRAG's leaf-dab branch), at `?candab=` (0.5) and twice that of the ground's
+  finest cell: from a few hundred metres up the ground's own dab is as big as a whole crown (SEEN in the debug view,
+  `?candebug=1`), so a cap and a shaded side could not be laid with it. Each dab asks, at its own centre, which crown of a
+  jittered 8 m grid on the ground chart it lies on (four cells tried; a cell holds a crown by 1 - exp(-3 stand), the
+  placer's cover): a lit cap toward the sun (larger with a high sun), the body, the shaded side, a taller neighbour's
+  shadow, or the floor between crowns (in a crown's shadow or under a close roof: the crowns' own deepest wash, little
+  sky fill; at an open edge: left to the ground's own dabs). Where a crown is no bigger than a canopy dab, one cell, one
+  hash, the crown's mean light turned by the hill. Needle trees in groups of a few crowns (`pcCanNeedle`), dark, narrower.
+  Colours: `syncCanopy` (called by terrain.js each frame) writes the far trees' own washes for the season (the same look
+  data and rule as flora.js setSeason: each kind with its `oil` entry, broadleaf summer/autumn dresses averaged, the
+  family red riding the season), and each crown takes its place on the family run as the far tree does. Gate, at the
+  dab's centre: the eye looks down on it (5 degrees or more), 15 to 30 m above it or more, 60 m away or more; a pixel
+  with the eye less than 10 m above it skips everything at one comparison (on foot, nearly every pixel).
+- The ground's own dabs under the roof also ask the canopy (so the slivers between canopy dabs are crown-coloured), and
+  the bare ground between dabs takes the crowns' mean over the share they cover.
+- The canopy's lights are held at level 2.6 (between local and lit paint): with the full lit paint the lemon crowns
+  passed V 0.90 (a 1 km still went 11.1 to 13.7 per cent over 0.90; with the cap 11.1, as before).
+- Speed test handle: `CANOPY_BENCH.off` (farground.js) lays no canopy at run time (MEASURED: the same picture as
+  `?canopy=0` but for 465 pixels at most 2/255 apart). The row for core/bench.js's air table is sent to the coordinator
+  (bench.js is PILOT's): `['canopy painted off (FV2)', () => { CANOPY_BENCH.off = true; }, () => { CANOPY_BENCH.off = false; }]`.
+- **SEEN (stills opened, `docs/shots/painter/farview/fv2_*`, A above B):** autumn wood 150 m, 400 m, 1 km at 45 degrees
+  and 400 m straight down at the phone's settings (1024x480, tier 1, lighter paint), 150 m and 400 m in summer, 150 m and
+  400 m on the desktop's top tier (1280x720, tier 2, full paint), the alpine range at 400 m (unchanged but for a few
+  pixels: few trees there), and on foot (S1, 16.8 h): IDENTICAL, 0 of 491,520 pixels differ. The watercolour game at the
+  400 m view: 0 pixels differ. In summer the change is largest: the green wood no longer stands on a gold floor and the
+  far hill is green. From 1 km the "carpet of giant leaves" becomes a roof of smaller crown-coloured strokes in stands of
+  yellow, orange and red, with dark conifer groups.
+- **lookstats (docs/lead/lookstats.py on look-director), A -> B:** V over 0.90: 150 m 11.8 -> 9.9 %, 400 m 10.5 -> 6.9,
+  1 km 11.1 -> 11.1, down 21.3 -> 14.6, summer 150 m 10.1 -> 4.2, summer 400 m 9.3 -> 2.4, desktop 150 m 12.4 -> 9.8,
+  desktop 400 m 11.6 -> 7.3. S(V<0.3): never higher (150 m 0.40 -> 0.35; 1 km 0.82 both: that is the space sky, FV1).
+- **PHONE COST, DERIVED (nothing measured on a phone).** On foot: one dot product and a comparison per pixel in main,
+  then one comparison each where the canopy is asked (its layers, each ground dab, the bare ground) and two derivatives:
+  about 12 instructions of the ground's about 700, so at most 1.7 % of the v37 table's 4.8 ms, 0.08 ms. From the air:
+  where crowns are no bigger than a canopy dab (most of a view from 400 m up) a canopy dab is about 300 instructions and
+  2 to 3 texture reads and it REPLACES a ground dab (about 400 and 3 to 4) wherever it covers, so roughly even (within
+  plus or minus 10 % of the ground's pixel work: at most 1.7 ms either way on the design's 17 ms bound); in the near band
+  of a 150 m view a canopy dab tries four crowns, about 550 instructions, so about +15 % of the ground's pixel work over
+  the picture: between +0.4 ms (if the ground's 2.4 ms were all triangles) and +2.5 ms (if the 17 ms were all pixels).
+  SOFTWARE DRAWING here (CPU, not a phone, for direction only), whole frame, canopy on against off in the same page:
+  150 m +3.3 %, 400 m within noise (-2.6 % / +0.5 %), 1 km +6 to 7 %. The mesher: +0.26 ms a patch (+8.5 %) in Node.
+  Confirm on the phone with the air table's row.
+- Suites: unit 325, world 59 (57 + farstand.test.mjs's 2), physics 416; all.mjs static passes.
+
+**FV3 (the floor and the far colour follow the year, `?groundseason=`) IS WRITTEN AND NOT YET SEEN:** `SEASON_FRAG` in
+farground.js and its hooks in TERRAIN_FRAG, compiled in only with `?groundseason=1` (default OFF until seen). Next: stills
+in summer, mid-year and autumn, and the autumn-identity check.
+
+**FV4 (rocks): not started.** Plan in the coordinator's message: on steep rock the dabs' own stray taken down, the patch
+colours (alpine green and cream) desaturated toward the rock's value, two rock tones by height band where the biome has
+strata (vCol.a), snow shed from faces over about 50 degrees; the dabs along the contour need the look director's slope
+chart (L8, `pcSlopeChart` in chunks.js), asked for.
+
 Branch: `cosmos` (shared with PILOT and PHYSICS, one working tree). Commits: `tools/commit.sh painter`.
 This file was rewritten by the second PAINTER agent (the first ran out of working context). The
 first agent's record of M1 is kept at the end ("Earlier answers").

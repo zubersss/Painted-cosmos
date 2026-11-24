@@ -34,8 +34,10 @@ export const MODE = { oil: false, powers: false, calm: false, beasts: 0, water: 
 //   ?wpaint=1      the water's new strokes, THE DEFAULT (0: v37's;  ?wakes=2    ring waves per pixel (1: v37's, per vertex)
 //                  2: and its new colour, under review)
 //   ?splash=1      splashes going in, from footsteps, from a low flight
+//   ?runoff=1      the water that comes and goes with the rain: runnels that run in a storm and dry after it, streams and
+//                  ponds that rise and fall back (needs ?rivers=tree: the runnels come from the flow tree; world/waterstate.js)
 // A NUMBER or 0 for each: 0 is off, which is exactly the game as it was.
-MODE.water = { on: false, rivers: 0, lakes: 0, ponds: 0, puddles: 0, swell: 0, falls: 0, fjord: 0, wpaint: 1, wakes: 1, splash: 0 };
+MODE.water = { on: false, rivers: 0, lakes: 0, ponds: 0, puddles: 0, swell: 0, falls: 0, fjord: 0, wpaint: 1, wakes: 1, splash: 0, runoff: 0 };
 export function waterFromSearch(search) {
   const W = MODE.water;
   let q;
@@ -45,8 +47,8 @@ export function waterFromSearch(search) {
   W.lakes = n('lakes', 0); W.ponds = n('ponds', 0); W.puddles = n('puddles', 0); W.swell = n('swell', 0);
   W.falls = n('falls', 0); W.fjord = n('fjord', 0);
   W.wpaint = n('wpaint', 1);      // (the owner, 24 Nov: reviewed work becomes the default; the strokes passed the look director)
-   W.wakes = n('wakes', 1); W.splash = n('splash', 0);
-  W.on = !!(W.rivers || W.lakes || W.ponds || W.puddles || W.swell || W.falls || W.fjord);
+  W.wakes = n('wakes', 1); W.splash = n('splash', 0); W.runoff = n('runoff', 0);
+  W.on = !!(W.rivers || W.lakes || W.ponds || W.puddles || W.swell || W.falls || W.fjord || W.runoff);
   return W;
 }
 
