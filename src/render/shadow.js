@@ -40,6 +40,19 @@ const LEAD = 0.4, FULL = 0.86;
 // texel 41% coarser on the ground the player is standing on, nor the wider frustum's draws on a device at its frame
 // cap. The phone's middle distance wants the far trees drawn into this pass, not a bigger square.
 const MID_TIER = 219;
+// (the middle tier's reach as the trees' hand-over has it now, T1 x 1.15: flora.js setHandover writes it; 219 as it was)
+export const SHADOW_TIERS = { mid: MID_TIER };
+// THE SPLIT TREES DRAWN WHOLE IN THIS PASS (by default; ?shwhole=0 the old way; the coordinator, 24 Nov, from the near lane's count: a tree
+// drawn by its two short programs, ?trees2, is a mesh of two materials, and three draws such a mesh group by group even
+// under this pass's override material -- 29 more draw calls here, for nothing, as the override is one program for wood
+// and leaves alike). The meshes listed here (world/flora.js lists every mesh of two materials) are drawn in ONE call in
+// this pass: their groups and their array of materials set aside for the pass and put back after it. The map is the same
+// one: the same program over the same draw range (the leaves by distance, flora.js, set on the geometry as before).
+// MEASURED on foot in the autumn wood with the split trees, phone settings: 226 -> 207 draws a frame, every visible casting
+// split mesh, and the picture byte-identical; the default from v39.2 (the coordinator).
+export const SHADOW_WHOLE = new Set();
+export const SHADOW_OPTS = { whole: (() => { try { return new URLSearchParams(location.search).get('shwhole') !== '0'; } catch (e) { return true; } })() };
+const NO_GROUPS = Object.freeze([]);
 // Looking DOWN this steeply (the sines of 48 and 58 degrees) the middle distance has left the frame, so the square
 // comes back in and the near shadow has its finest texels again. Two numbers and not one so that a view held near
 // the threshold does not change the texels a shadow is cut on from frame to frame.
@@ -245,7 +258,7 @@ export class ShadowMap {
     // the air were judged with the square their own height gives them, and this step is for the player on the land.
     if (REACH > 0 && R === this.R0 && (QUALITY.level | 0) >= 2) {
       this._far = f.lengthSq() > 0.5 && -pitch < (this._far ? LOOK_OFF : LOOK_ON);
-      for (let s = 0; this._far && s < REACH && R < 359 && (LEAD + FULL) * R < MID_TIER; s++) R *= Math.SQRT2;
+      for (let s = 0; this._far && s < REACH && R < 359 && (LEAD + FULL) * R < SHADOW_TIERS.mid; s++) R *= Math.SQRT2;
     }
     if (R !== this.R) { this.R = R; const sc = this.cam; sc.left = -R; sc.right = R; sc.top = R; sc.bottom = -R; sc.updateProjectionMatrix(); }
     const c = this._c.copy(camL).addScaledVector(up, -alt).addScaledVector(f, this.R * LEAD);
@@ -272,7 +285,20 @@ export class ShadowMap {
     renderer.clear(true, true, false);
     const ov = scene.overrideMaterial;
     scene.overrideMaterial = this.mat;
-    try { renderer.render(scene, cam); } finally { scene.overrideMaterial = ov; }
+    // (each split tree one draw, as it was before the split, unless ?shwhole=0: SHADOW_WHOLE)
+    const whole = SHADOW_OPTS.whole && SHADOW_WHOLE.size ? (this._whole || (this._whole = [])) : null;
+    if (whole) {
+      whole.length = 0;
+      for (const m of SHADOW_WHOLE) {
+        if (!m.visible || !Array.isArray(m.material)) continue;
+        whole.push(m, m.material, m.geometry.groups);
+        m.material = m.material[0]; m.geometry.groups = NO_GROUPS;
+      }
+    }
+    try { renderer.render(scene, cam); } finally {
+      scene.overrideMaterial = ov;
+      if (whole) for (let i = 0; i < whole.length; i += 3) { whole[i].material = whole[i + 1]; whole[i].geometry.groups = whole[i + 2]; }
+    }
     // the figures (whatever in the scene is marked as a caster and is drawn by bones)
     for (const o of scene.children) {
       if (!o.visible || !o.userData || !o.userData.pcCaster) continue;
