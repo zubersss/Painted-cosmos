@@ -89,7 +89,10 @@ function splitGroups(geo) {
 // stroke by stroke in the tree's own colour run with the crown's lit and shaded sides (render/impostor.js). Kinds that
 // are not trees in leaf (CAN_CARD below) keep the form they had. ?fartree=impostor; the default stays the tree of
 // flat pieces until the owner's phone and the stills say otherwise.
-const FAR_IMP = typeof location !== 'undefined' && /[?&]fartree=impostor\b/.test(location.search || '');
+// (THE DEFAULT since 24 Nov, after the look director passed the grain fix and the owner's phone timed them: from 150 m
+//  up the frame went from 151 ms to the screen's 16.7. ?fartree=old -- or cards, lump, blob -- is today's far tree. A
+//  device that cannot draw them falls back to today's far tree by itself: render/impostor.js, THE GUARD.)
+const FAR_IMP = typeof location !== 'undefined' && !/[?&]fartree=(old|cards?|lump|blob)\b/.test(location.search || '');
 // THE HAND-OVER DISTANCES (T4 of docs/lead/TREES-DESIGN.md, 2026-11-24): with the impostors on, the middle tree hands
 // over to the impostor at 45 m (the design's full tree to middle tree at 18 m waits for the near lane's new middle
 // tree: see setHandover), at the phone's picture (372 lines, where a
@@ -360,6 +363,8 @@ export class Flora {
       if (!geos.length) return false;
       this.imp = new ImpostorAtlas(geos);
       this.mats.imp = makeImpostorMaterial(this.bodyUniforms, this.imp, this.mats.far);
+      // (the guard: if this device cannot draw them, today's far tree, and the hand-over as it was)
+      this.imp.onFail = (why) => { this.impFailed = why; this.setFarForm(FAR_BLOB ? 'blob' : 'cards'); this.setHandover(HAND.near, HAND.mid); };
       this.kit.impQuad = impostorQuadGeometry();
     }
     this.impOn = !!on && !!this.imp;
@@ -968,7 +973,7 @@ export class Flora {
     const now = this.farForm || (this.impOn ? 'impostor' : this.species.some((sp) => sp.cardFar) ? (FAR_BLOB ? 'blob' : 'cards') : 'lump');
     if (form === now) return now;
     // (the impostors stand in front of whatever far form the cards would be: the cards stay the tree of flat pieces)
-    if (form === 'impostor') { if (!this._impostors(true)) return now; this.farForm = form; this._dropFar(); return form; }
+    if (form === 'impostor') { if (this.impFailed || !this._impostors(true)) return now; this.farForm = form; this._dropFar(); return form; }
     this._impostors(false);
     // (the hand-over stays where it was for the speed test's swap: only the far form is the question there)
     // (ordered for thinning here too, or the speed test's swap loses it)

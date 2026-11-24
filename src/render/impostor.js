@@ -1,5 +1,5 @@
 // Painted Cosmos: far trees as painted impostors. OWNER: PAINTER (the trees lane, far: T1 of docs/lead/TREES-DESIGN.md
-// on r2). Behind ?fartree=impostor; without it nothing here is made or run.
+// on r2). The far trees of the oil look since 24 Nov (?fartree=old: today's far tree), with a guard that falls back to it.
 //
 // WHY. A far tree today is one shared form of 138 triangles (florakit.js farCardGeometry) sized to its kind: on the
 // owner's phone the far wood is 816,000 triangles on foot and 5.9 million at 150 m up (counted), and its crowns read as
@@ -191,7 +191,20 @@ function hook() {
   hooked = true;
   // (the bake needs the renderer and must run OUTSIDE a render: the painter's frame hooks run before the frame's
   //  passes, render/index.js. The renderer is handed over by the first impostor mesh that is drawn, flora.js.)
-  FRAME_HOOKS.push(() => { for (const a of PENDING) { if (a.ready || !a.renderer || a.bake(a.renderer, IMP.bakeMs > 0 ? IMP.bakeMs : Infinity)) PENDING.delete(a); } });
+  FRAME_HOOKS.push(() => {
+    for (const a of PENDING) {
+      if (a.ready || a.failed || !a.renderer) { PENDING.delete(a); continue; }
+      try {
+        // (THE GUARD, before the first step: the impostor program must compile on this device)
+        if (!a._probed) { a._probed = true; const why = a.probe(a.renderer); if (why) { a.fail(why); PENDING.delete(a); continue; } }
+        if (_q && _q.get('impfail') === 'bake') throw new Error('forced by ?impfail=bake');
+        if (a.bake(a.renderer, IMP.bakeMs > 0 ? IMP.bakeMs : Infinity)) {
+          PENDING.delete(a);
+          if (!a.texture || !a.hasTree()) a.fail('the atlas came out empty');
+        }
+      } catch (e) { a.fail('the bake threw: ' + ((e && e.message) || e)); PENDING.delete(a); }
+    }
+  });
 }
 
 // The atlas for one world: `variants` = [{ geo, layer }], the kit geometries in layer order.
@@ -259,9 +272,46 @@ export class ImpostorAtlas {
     };
     this.ms = 0;
   }
+  // THE GUARD (the coordinator, 24 Nov, before the impostors became the default far trees): if this device cannot
+  // compile the impostor program, or the bake throws or comes out empty, the far tier goes back to today's form and the
+  // console says why. probe() compiles the material on a one-tree mesh and reads three's own diagnostics of the program
+  // (renderer.debug.checkShaderErrors, on by default); it returns why it failed, or null.
+  probe(renderer) {
+    const m = this.material;
+    if (!m) return null;
+    const g = impostorQuadGeometry();
+    g.setAttribute('aInst', new THREE.InstancedBufferAttribute(new Float32Array(4), 4));
+    g.setAttribute('aBorn', new THREE.InstancedBufferAttribute(new Float32Array(1), 1));
+    g.setAttribute('aInst2', new THREE.InstancedBufferAttribute(new Float32Array(2), 2));
+    const mesh = new THREE.InstancedMesh(g, m, 1), scene = new THREE.Scene();
+    scene.add(mesh);
+    let why = null;
+    try {
+      renderer.compile(scene, new THREE.PerspectiveCamera());
+      const prog = renderer.properties.get(m).currentProgram;
+      if (prog && typeof prog.getUniforms === 'function') prog.getUniforms();      // (three checks a program on its first use)
+      const dg = prog && prog.diagnostics;
+      if (dg && !dg.runnable) why = 'the impostor program did not compile: ' + String(dg.programLog || (dg.fragmentShader && dg.fragmentShader.log) || '').slice(0, 200);
+    } catch (e) { why = 'the impostor program threw: ' + ((e && e.message) || e); }
+    g.dispose();
+    return why;
+  }
+  fail(why) {
+    if (this.failed) return;
+    this.failed = why;
+    console.warn('[painted cosmos] far impostors off, today\'s far trees instead: ' + why);
+    if (typeof this.onFail === 'function') this.onFail(why);
+  }
+  // (does any texel of the finest level hold a tree? sampled, not every texel)
+  hasTree() {
+    const d = this.texture && this.texture.mipmaps && this.texture.mipmaps[0] && this.texture.mipmaps[0].data;
+    if (!d) return false;
+    for (let i = 3; i < d.length; i += 4 * 97) if (d[i]) return true;
+    return false;
+  }
   // asked by every impostor mesh while it is drawn and the atlas is not yet made
   request(renderer) {
-    if (this.ready || !renderer) return;
+    if (this.ready || this.failed || !renderer) return;
     this.renderer = renderer;
     hook();
     PENDING.add(this);
@@ -646,12 +696,14 @@ export function makeImpostorMaterial(bodyU, atlas, farMat, farcrown = FARCROWN) 
     uniforms: makePaintUniforms(bodyU, own),
     vertexShader: IMP_VERT,
     fragmentShader: IMP_FRAG.split('${FARCROWN}').join(fc).split('${IMPJIT}').join((+IMP.jit).toFixed(4))
-      .split('${IMPSHADE}').join(/vec3\s+pcShadeLeaf\s*\(/.test(FRAG_PARS) ? 'mix(pcShadeLeaf(cs), pcTone(cs, lv), smoothstep(1.2, 2.0, lv))' : 'pcTone(cs, lv)'),
+      .split('${IMPSHADE}').join(/vec3\s+pcShadeLeaf\s*\(/.test(FRAG_PARS) ? 'mix(pcShadeLeaf(cs), pcTone(cs, lv), smoothstep(1.2, 2.0, lv))' : 'pcTone(cs, lv)')
+      + (_q && _q.get('impfail') === 'compile' ? '\n#error forced by impfail compile\n' : ''),
     side: THREE.DoubleSide,
   });
   m.userData.pcPainted = true;
   m.alphaToCoverage = true;      // (the silhouette's cover: IMP_FRAG)
   m.userData.impAtlas = atlas;
+  atlas.material = m;
   register(m, 'impostor', null);
   return m;
 }

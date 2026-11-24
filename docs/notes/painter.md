@@ -12,7 +12,14 @@ FV7 of `docs/lead/FARVIEW-DESIGN.md`. A second session (A2, branch `trees-near`)
 the same time: this lane touches only the far parts of `flora.js`, `florakit.js`, the plant material's far branch,
 `render/impostor.js`, `render/shadow.js` and new rows in `core/bench.js`.
 
-**State (update this line every step):** after the look director's review: the grain fix (cb5666f), the bake in steps
+**State (update this line every step):** THE IMPOSTORS ARE THE DEFAULT FAR TREES of the oil look (after F passed the
+grain fix on foot and from the air, and the owner's phone timed them: 150 m up 151 ms -> 16.7, the screen's cap);
+`?fartree=old` (or cards, lump, blob) is today's far tree. THE GUARD (`render/impostor.js` probe / fail): before the first
+bake step the impostor program is compiled on a one-tree mesh and three's own diagnostics read; a compile failure, a
+bake that throws or an atlas that comes out empty puts the far tier back to today's form (and the hand-over as it was)
+and the console says '[painted cosmos] far impostors off, today's far trees instead: <why>'. PROVEN in headless Chromium
+with `?impfail=compile` and `?impfail=bake`: impFailed set, 0 impostor trees, 5,915 trees in today's form. Row 'no
+shadows at all (400 m up)' added to `?bench=trees`. Earlier, after the look director's review: the grain fix (cb5666f), the bake in steps
 (7a48921) and the far wind (`?farwind=1`) committed; impostors still behind `?fartree=impostor`, waiting for the owner's
 `&bench=trees` table and F's verdict on the grain crops. Before that: T0 committed (rows built and run in software: they work; their timings mean
 nothing here, only the owner's phone can time them). T1 (impostors) committed behind `?fartree=impostor`, SEEN in A/B
