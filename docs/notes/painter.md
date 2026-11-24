@@ -184,8 +184,14 @@ failed 1 run in 5 there with none of this lane's changes): reported to the coord
 **Next:** the look director's standard set (S1-S6 at 1024 x 480) with `lookstats.py`; then FV6 (meadows from the air)
 with C (C owns patchgen.js and TERRAIN_FRAG; the bloom channel from `bloomAt` is to be agreed with it). The coordinator
 will put the new flora in front of the owner behind one switch once told. O and F4 wait for the trees lanes.
-**Branch state:** design-flora has look-proto v38.1 and look-director (to 4e48468) merged in; the watercolour game checked
-pixel for pixel against a tree of exactly those without this lane (see the commit that records it). ASKED OF THE FAR-VIEW LANE through the coordinator: a ground dab that takes a drift's colour WHOLE
+**THE SWITCH (the owner, 24 Nov: "No do make it look different"):** the lane is ON by default in the oil look; `?flora=old`
+(also `=0`) is the ONE opt-out, today's flora for comparison. The cull of unseen marks (G1) stays on either way.
+**PROVED** (bc04da1, five gallery views, each world settled before the grab: the autumn wood at 16.8, the alpine meadow at
+11, the green wood at night, the autumn wood from 420 m, the meadow in the watercolour game): `?flora=old` on design-flora
+against look-proto 0d5533b with no switch: 0 pixels differ in all five.
+**Branch state:** design-flora = look-proto 0d5533b + this lane's seven files (`git diff origin/look-proto` shows only them).
+A lesson recorded: af83f25 copied data/looks/earth.js from a scratch copy older than a merge and dropped the look director's
+`airTop` (found by the 420 m proof, fixed in 2f779d8); never copy a whole shared file over a merge, apply the lane's diff. ASKED OF THE FAR-VIEW LANE through the coordinator: a ground dab that takes a drift's colour WHOLE
 (pointillist) from `bloomAt`, the one thing that would make drifts read from 150 m and a mile.
 
 ## Hand-over of THE FAR TREES (trees lane A1, branch `trees-far`; kept current by that session)
