@@ -47,7 +47,8 @@ export const HYDRO_DEF = {
   // lakes
   lakeK: 0.78,       // the share of a basin's relief drowned where it is filled deepest (a look's oil.lakeK)
   lakeDrop: 1.4,     // metres the bed is let down under the base level where the fill is deep
-  lakeIn: 1.6,       // the hills go down over fill lakeMin .. lakeIn * lakeMin
+  lakeIn: 1.6,       // the hills go down over (lakeIn - 1) * lakeMin of fill from where the drowning starts
+  lakeArea: 0.75,    // km2: the most of any basin that becomes open water (its deepest core; about a kilometre across)
   // the mouth cut
   step: 6,           // metres between the stations of a corridor
   maxLen: 640,       // metres: a corridor no longer than this
@@ -107,13 +108,20 @@ function hash3(a, b, c, s) {
 // ---- the pure parts (named as the design names them; the class below calls them) ------------------------------------
 
 // LAKES: the hills of a filled basin drowned. `dr` is the drainage read for this point (fill), lakeMin the field's.
-export function lakeCarve(c, b, H, fill, lakeMin, o) {
-  if (!(fill > lakeMin)) return false;
-  const k = o.lakeK * smoothstep(lakeMin, lakeMin * o.lakeIn, fill);
-  const k2 = smoothstep(lakeMin, lakeMin * 2.5, fill);
+// f0: where in this basin the drowning starts (its fill, m): lakeMin for a small basin, deeper for a big one, so that only its
+// deepest core becomes open water (the coordinator's ruling, 24 Nov: lakes sit IN the wood, the largest about a kilometre
+// across); the shore is then a contour of the fill, which is a contour of the land's own base level.
+export function lakeCarve(c, b, H, fill, lakeMin, o, f0) {
+  const s0 = f0 === undefined ? lakeMin : f0;
+  if (!(fill > s0)) return false;
+  const k = o.lakeK * smoothstep(s0, s0 + lakeMin * (o.lakeIn - 1), fill);
+  const k2 = smoothstep(s0, s0 + lakeMin * 1.5, fill);
   const hb = H.hb - k * Math.max(0, H.hb + 0.4);
   b.h = H.L + hb - o.lakeDrop * k2 + H.hill * H.rise * (1 - k) + H.sm * (1 - 0.6 * k) + H.mi + H.rock * (1 - k);
-  if (b.lq > b.h) c.still = Math.max(c.still, smoothstep(lakeMin * 0.5, lakeMin * 1.5, fill));
+  if (b.lq > b.h) {
+    c.still = Math.max(c.still, smoothstep(lakeMin * 0.5, lakeMin * 1.5, fill));
+    c.swell = Math.max(c.swell, 0.6 * k / o.lakeK);      // (a lake rises a little after rain; the max rule shared with the rivers)
+  }
   return true;
 }
 
@@ -176,7 +184,7 @@ class Hydro {
     this.lakes = !!want.lakes; this.ponds = false; this.puddles = false;
     this.cors = []; this.nCor = 0; this.falls = [];
     this.cn = Math.max(4, Math.round((Math.PI * 0.5 * S.R) / o.pondCell));   // (the 120 m cells' count a face edge)
-    this.ms = { cuts: 0, ponds: 0 };
+    this.ms = { lakes: 0, cuts: 0, ponds: 0 };
     this._q = { x: NaN, y: NaN, z: NaN, i: -1, t: 0, d: 0, k: 0, f: 0 };
     this._lv = [NaN];
     // (the two hooks, bound so surface.js can call them as S.hydro.forest / S.hydro.coast)
@@ -190,11 +198,62 @@ class Hydro {
     this._smp = makeSample(S.nB);
     this._bw = new Float32Array(S.nB);
     const W = this.want;
+    if (W.lakes) this._buildLakes();
     if (W.falls || W.fjord) this._buildCuts();
     if (W.ponds) this._buildPonds();
     if (W.puddles) this._puddleSetup();
     this._smp = null;
     return this;
+  }
+
+  // THE LAKES' SIZE. Each basin the field fills (nodes filled over lakeMin, joined) drowns only its DEEPEST CORE, at most
+  // lakeArea km2 (about a kilometre across): the nodes taken deepest first until their area reaches it, and the fill of the
+  // last one taken is where that basin's drowning starts (lakeF0, per node, halo included). A basin smaller than that drowns
+  // whole, as before.
+  _buildLakes() {
+    const t0 = now();
+    const D = this.D, g = D.g, n = g.n, len = g.len, lm = D.lakeMin, R = this.R, o = this.o;
+    const F0 = new Float32Array(len).fill(1e9), comp = new Int32Array(len).fill(-1), nb = new Int32Array(8);
+    const d3 = [0, 0, 0], d4 = [0, 0, 0];
+    const areaOf = (f, i, j) => {      // (m2: the node's cell, from its neighbours' places)
+      g.dirOf(f, i, j, d3); g.dirOf(f, i + 1, j, d4);
+      const a = Math.hypot(d3[0] - d4[0], d3[1] - d4[1], d3[2] - d4[2]) * R;
+      g.dirOf(f, i, j + 1, d4);
+      return a * Math.hypot(d3[0] - d4[0], d3[1] - d4[1], d3[2] - d4[2]) * R;
+    };
+    const maxA = o.lakeArea * 1e6;
+    let id = 0, biggest = 0;
+    this.lakeCores = [];
+    for (let f = 0; f < 6; f++) for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
+      const p0 = g.pid(f, i, j);
+      if (comp[p0] >= 0 || D.lvl[p0] - D.ter[p0] <= lm) continue;
+      const st = [p0], nodes = [];
+      comp[p0] = id;
+      while (st.length) {
+        const p = st.pop(); nodes.push(p);
+        const k = D._nbs(p, nb);
+        for (let t = 0; t < k; t++) { const q = nb[t]; if (comp[q] < 0 && D.lvl[q] - D.ter[q] > lm) { comp[q] = id; st.push(q); } }
+      }
+      const rows = nodes.map((p) => {
+        const ff = Math.floor(p / g.s2), r = p - ff * g.s2, ii = (r % g.w) - 1, jj = ((r - (r % g.w)) / g.w) - 1;
+        return [D.lvl[p] - D.ter[p], areaOf(ff, ii, jj), p];
+      }).sort((a, b) => b[0] - a[0]);
+      let acc = 0, f0 = lm;
+      for (const [fl, a] of rows) { acc += a; if (acc > maxA) { f0 = Math.max(lm, fl); break; } }
+      for (const [, , p] of rows) F0[p] = f0;
+      const core = rows.filter((r) => r[0] >= f0).reduce((s2, r) => s2 + r[1], 0);
+      biggest = Math.max(biggest, core);
+      this.lakeCores.push({ nodes: nodes.length, area: rows.reduce((s2, r) => s2 + r[1], 0), core, f0 });
+      id++;
+    }
+    // (the halo, as the field's own: a read stands between four nodes of one face)
+    for (let f = 0; f < 6; f++) for (let j = -1; j <= n; j++) for (let i = -1; i <= n; i++) {
+      if (i >= 0 && i < n && j >= 0 && j < n) continue;
+      g.dirOf(f, i, j, d3);
+      F0[g.pid(f, i, j)] = F0[g.idOf(d3[0], d3[1], d3[2])];
+    }
+    this.lakeF0 = F0; this.lakeBiggest = biggest;
+    this.ms.lakes = now() - t0;
   }
 
   // the wood's share at a point: the weight of the biomes whose water is the wood's (groups 0 and 2), and of the coast
@@ -298,7 +357,13 @@ class Hydro {
     const mouths = this._mouths();
     this.mouthsSeen = mouths.length; this.cutFail = {};
     const fj = o.fjord;
-    let nf = 0;
+    // (which wide mouths are drowned: the one nearest the world's first landing stays a FALL -- the owner's waterfall off the
+    //  sea cliff -- and of the others, by their distance from the landing, every `every`-th from the second; so the choice
+    //  does not hang on the order the rivers' list happens to have)
+    const sp = S.getSpawn ? S.getSpawn() : null;
+    const dl = (m) => (sp && m.end ? Math.hypot(m.end[0] - sp.x, m.end[1] - sp.y, m.end[2] - sp.z) : 0);
+    const wide = mouths.filter((m) => m.width >= fj.minW && m.end).sort((a, b) => dl(a) - dl(b));
+    const drown = new Set(wide.filter((m, i) => i > 0 && (i - 1) % Math.max(1, fj.every | 0) === 0));
     for (let mi = 0; mi < mouths.length; mi++) {
       const m = mouths[mi];
       if (!m.dir || !m.end) { this.cutFail.nodir = (this.cutFail.nodir || 0) + 1; continue; }
@@ -310,7 +375,7 @@ class Hydro {
       const se = this._h(m.end);
       const top = se.lq !== NOLQ && se.lq > se.h - 0.5 ? se.lq : m.levelTop;
       if (!(top - sea > o.fallMin)) { this.cutFail.low = (this.cutFail.low || 0) + 1; continue; }
-      const fjord = !!this.want.fjord && m.width >= fj.minW && (nf++ % Math.max(1, fj.every | 0)) === 0;
+      const fjord = !!this.want.fjord && drown.has(m);
       if (!fjord && !this.want.falls) continue;            // (?fjord=1 alone: the other mouths are left as they were)
       const cor = fjord ? this._fjordCor(m, tr, top, sea) : this._fallCor(m, tr, top, sea);
       if (!cor) { this.cutFail.shelf = (this.cutFail.shelf || 0) + 1; continue; }
@@ -520,7 +585,15 @@ class Hydro {
 
   // ---- the hooks ------------------------------------------------------------------------------------------------------
   forest(S, c, b, H) {
-    if (this.lakes) { const dr = c.dr || S._drain(c); lakeCarve(c, b, H, dr.fill, this.D.lakeMin, this.o); }
+    if (this.lakes) {
+      const dr = c.dr || S._drain(c);
+      if (dr.fill > this.D.lakeMin) {
+        // (the basin's own start of drowning: the least of the four nodes the read stands between that lie in a basin)
+        const T = this.lakeF0, p = dr._p, w = this.D.g.w;
+        const f0 = Math.min(T[p], T[p + 1], T[p + w], T[p + w + 1]);
+        if (f0 < 1e8) lakeCarve(c, b, H, dr.fill, this.D.lakeMin, this.o, f0);
+      }
+    }
     const cell = this.ponds || this.nCor ? this._cell(c.x, c.y, c.z) : -1;
     if (this.ponds) this._pond(S, c, b, cell);
     if (this.puddles) this._puddle(S, c, b, H);
@@ -730,7 +803,7 @@ class Hydro {
     if (rho > 1.45) return;
     const lv = this._lv;
     b.h = pondAt(rho, b.h, P[o + 11], P[o + 12], lv);
-    if (lv[0] === lv[0]) { b.lq = lv[0]; c.still = 1; c.turbW = 0; c.fspdW = 0; }
+    if (lv[0] === lv[0]) { b.lq = lv[0]; c.still = 1; c.turbW = 0; c.fspdW = 0; c.swell = Math.max(c.swell, 0.3); }
   }
 
   // ---- puddles ------------------------------------------------------------------------------------------------------------
@@ -757,7 +830,8 @@ class Hydro {
     const ux = x + u[0] * e, uy = y + u[1] * e, uz = z + u[2] * e, vx = x + v[0] * e, vy = y + v[1] * e, vz = z + v[2] * e;
     const ru = big(ux, uy, uz) + forestRelief(S, ux, uy, uz) * H.rise, rv = big(vx, vy, vz) + forestRelief(S, vx, vy, vz) * H.rise;
     const slope = Math.hypot(ru - r0, rv - r0) / 4;
-    c.cap = puddleCap(H.sm, H.mi, slope, this.o, this.puddleK);
+    // (the max rule shared with the rivers' runnels, which set c.cap in _base before this: never take a runnel's away)
+    c.cap = Math.max(c.cap, puddleCap(H.sm, H.mi, slope, this.o, this.puddleK));
   }
 }
 

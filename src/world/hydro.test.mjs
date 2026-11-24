@@ -56,13 +56,21 @@ test('the wood\'s hills asked straight of the noise are _forest\'s own (forestRe
   assert.ok(n > 100, 'the wood was asked'); assert.ok(worst < 1e-9, 'worst ' + worst);
 });
 
-test('lakes: the filled basins are open water, dead level, and the landing keeps its ground', () => {
+test('lakes: each basin drowns only its deepest core, at most lakeArea (about a kilometre across)', () => {
+  const maxA = HY.HYDRO_DEF.lakeArea * 1e6;
+  assert.ok(hy.lakeCores && hy.lakeCores.length >= 10, 'the basins measured');
+  for (const L of hy.lakeCores) assert.ok(L.core <= maxA + 120 * 120, 'a core of ' + (L.core / 1e6).toFixed(2) + ' km2');
+  assert.ok(hy.lakeCores.some((L) => L.area > 2 * maxA && L.f0 > D.lakeMin), 'a big basin keeps most of its wood');
+  assert.ok(hy.lakeCores.some((L) => L.area < maxA && L.f0 === D.lakeMin), 'a small basin drowns whole');
+});
+
+test('lakes: the cores are open water, dead level, and the landing keeps its ground', () => {
   const g = D.g, n = g.n, d3 = [0, 0, 0], bw = new Float32Array(S.nB);
   let tot = 0, wetA = 0, wetB = 0;
   const levels = new Map();
   for (let f = 0; f < 6; f++) for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
     const p = g.pid(f, i, j);
-    if (D.lvl[p] - D.ter[p] < 2.5 || D.lvl[p] > 40) continue;          // the deep part of the wood's basins ...
+    if (D.lvl[p] - D.ter[p] < hy.lakeF0[p] + 1.0 || D.lvl[p] > 40) continue;    // the deep part of each lake's core ...
     g.dirOf(f, i, j, d3);
     S.biomeWeights(d3[0], d3[1], d3[2], bw);                           // ... inside the wood (not on a seam with the coast)
     let wood = 0; for (let k = 0; k < S.nB; k++) if (S.biomes[k].terrain === 'forest') wood += bw[k];
@@ -71,7 +79,7 @@ test('lakes: the filled basins are open water, dead level, and the landing keeps
     tot++; if (a.lq > a.h + 0.05) wetA++; if (b.lq > b.h + 0.05) wetB++;
     if (b.lq > b.h + 0.05) { const k = Math.round(D.lvl[p] * 100); if (!levels.has(k)) levels.set(k, []); levels.get(k).push(b.lq); }
   }
-  assert.ok(tot > 200, 'basin points ' + tot);
+  assert.ok(tot > 60, 'core points ' + tot);
   assert.ok(wetB / tot > 0.7, 'open water: ' + (100 * wetB / tot).toFixed(0) + '% (was ' + (100 * wetA / tot).toFixed(0) + '%)');
   assert.ok(wetB > wetA * 1.5);
   for (const [kk, L] of levels) if (L.length > 3) assert.ok(Math.max(...L) - Math.min(...L) < 0.02, 'a lake is dead level: ' + kk + ' ' + Math.min(...L) + '..' + Math.max(...L) + ' n ' + L.length);
@@ -124,7 +132,8 @@ test('ponds: each is held in by its rim, level, small, and none near a landing',
     const mid = withH(c[0], c[1], c[2]);
     assert.ok(Math.abs(mid.lq - level) < 1e-6 && mid.lq > mid.h + 0.3, 'water in the middle at the pond\'s level');
     for (let r = 0; r < 16; r++) {
-      const ang = r / 16 * Math.PI * 2, u = 1.3 * a * Math.cos(ang), v = 1.3 * b * Math.sin(ang);
+      // (just outside the water, on the raised rim: 1.12 radii, which the outline's 13 % bend keeps inside 1.27)
+      const ang = r / 16 * Math.PI * 2, u = 1.12 * a * Math.cos(ang), v = 1.12 * b * Math.sin(ang);
       const q = unit([c[0] + (e1[0] * u + e2[0] * v) / R, c[1] + (e1[1] * u + e2[1] * v) / R, c[2] + (e1[2] * u + e2[2] * v) / R]);
       const s = withH(q[0], q[1], q[2]);
       assert.ok(s.h >= level - 1e-6, 'the rim holds the water in');
