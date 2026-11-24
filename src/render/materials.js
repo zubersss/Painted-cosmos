@@ -547,9 +547,15 @@ vec3 pcGroundPaint(vec3 c, vec3 leaf, float fk, vec3 rnd, float snowC, float lvl
   #ifdef PC_ROCKF
     // (the far view, FV4: on a rock face no dab is laid a step darker by its own number, and its pigment and stray
     // are halved, so the face reads in lit and shaded planes by its own facing, render/farground.js)
-    cg = mix(cg, c, max(0.5 * gRock, gCliff));      // (a cliff's dab keeps its bed's tone: no stray pigment)
-    lvl -= (1.0 - f) * step(0.58, fract(rnd.x * 11.1)) * 0.9 * step(1.5, lvl) * (1.0 - gRock);
-    vec3 k = pcDabTint(mix(cg, leaf, f), mix(rnd, vec3(0.5), 0.5 * gRock), f);
+    // (SNOW IS ONE PAINT: on the snowy wash, the land's own white, no dab takes a neighbouring pigment or the warm and cool
+    // stray, and none is laid a step deeper: on near-white each of those read as its own pale green, peach or lilac leaf,
+    // the pastel confetti on the lit snowy ridges, SEEN by the look director at the alpine meadow from 420 m. The snow keeps
+    // its light and its shade, in bigger patches by the land's own snow.)
+    // (snow: light and nearly without hue, so a pale cream sand or meadow keeps its pigments)
+    float snW = smoothstep(0.80, 0.90, min(min(c.r, c.g), c.b)) * (1.0 - smoothstep(0.08, 0.16, max(max(c.r, c.g), c.b) - min(min(c.r, c.g), c.b)));
+    cg = mix(cg, c, max(max(0.5 * gRock, gCliff), snW));      // (a cliff's dab keeps its bed's tone: no stray pigment)
+    lvl -= (1.0 - f) * step(0.58, fract(rnd.x * 11.1)) * 0.9 * step(1.5, lvl) * (1.0 - gRock) * (1.0 - snW);
+    vec3 k = pcDabTint(mix(cg, leaf, f), mix(rnd, vec3(0.5), max(0.5 * gRock, snW)), f);
   #else
   lvl -= (1.0 - f) * step(0.58, fract(rnd.x * 11.1)) * 0.9 * step(1.5, lvl);
   vec3 k = pcDabTint(mix(cg, leaf, f), rnd, f);

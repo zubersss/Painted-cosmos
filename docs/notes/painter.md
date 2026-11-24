@@ -25,9 +25,15 @@ tree, not committed: 0.14, the summit white 4.1 to 5.6 per cent). Next for v39.5
 rock's 1-2 px pale speckle at 1 km (DONE, next commit after 6cf9c7a: it was the ground BETWEEN the dabs on a cliff,
 drawn per pixel in plain daylight, lighter and bluer than the dabs' shade planes; now it takes the planes and the
 warm/cool lean, and its beds go wholly to the mean by 3 px: isolated light flecks on the 1 km mountain 33.2 to 13.5 per
-thousand, ?rockfield=0 16.4; v37 at that address is another place at night in haze, not comparable), the snowy tops
-in fewer bigger patches (cause read: where the shedding leaves 40 per cent snow over the turf's green and cream
-patches), a stronger cool side plane at noon. B's flower line landed (design-flora dd86fb3); F passed it with 6cf9c7a.
+thousand, ?rockfield=0 16.4; v37 at that address is another place at night in haze, not comparable), THE SNOWY TOPS
+(DONE, next commit after 1ed9553: the pastel confetti on the lit snowy ridges was the STROKE PAINT, not the wash: each
+ground dab takes the land's colour or one of two neighbouring pigments (uHueA/uHueB) plus a warm/cool stray and a
+step-deeper share, and on near-white snow those read as pale mint, peach and lilac leaves. Now snow (wash light and
+nearly hueless: min channel 0.80 to 0.90, chroma under 0.08 to 0.16) is one paint: pastel share of the ridge 9.6 to 2.4
+per cent. Tried and NOT kept: the shed faces' snow kept whole in 70 m patches (patchgen; diff in scratch
+`shedpatch.diff`: no help with the confetti, and at 1 km a summit face lost its snow) and a sharper snow band in the
+alpine recipe (no visible difference)). Still to do: a stronger cool side plane at noon. FV6(b) ?bloomfar: the ground
+between the dabs takes no drift under 150 m (1ed9553, B's ask). B's flower line landed (design-flora dd86fb3); F passed it with 6cf9c7a.
 Scratch: `wt37` = main at v37.1.
 
 **STATE (24 Nov, second session, evening):** FV2 and FV3 ON by default. FV4 (THE COAST CLIFF AND THE MOUNTAINS) is ON
