@@ -3,7 +3,7 @@
 // What these hold, each because breaking it would change the owner's chosen trees without anyone seeing it:
 //   1. THE SAME TREE. With ?trees2 the grove kits draw every random number they drew before, in the same order, so the
 //      trunk, the boughs and where the clumps of leaves hang are the very ones of today's tree. Only what is laid on
-//      them changes: the hair twigs go, a side goes from every tube.
+//      them changes: the hair twigs go. (Every tube keeps its sides: a side fewer flattened the bark, kits/grove.js.)
 //   2. THE SPLIT KEEPS THE LEAVES. ?trees2=split changes no leaf: same count, same places, same numbers.
 //   3. A CARD CARRIES ITS OWN FRAME. A card's six corners agree on its centre and its radius (the shader reads the
 //      card's whole frame from any one corner), and the frame read back from a corner is square and the right size.
@@ -36,8 +36,7 @@ test('trees2=split: the same leaves, the same trunk, fewer wood triangles', () =
   for (const k of Object.keys(GROVE)) for (const seed of [11, 12, 13]) {
     const a = grow(GROVE[k], seed, 0, { oilLook: 1, double: 1 }), b = grow(GROVE[k], seed, 0, { oilLook: 1, double: 1, trees2: 'split' });
     assert.deepEqual(leafSig(b), leafSig(a), `${k} seed ${seed}: the leaves moved`);
-    // (a side fewer on the trunk moves its top ring's highest vertex by a few centimetres; the stem itself is the same)
-    assert.ok(Math.abs(trunkTop(a) - trunkTop(b)) < 0.05, `${k} seed ${seed}: the trunk changed height`);
+    assert.equal(trunkTop(b), trunkTop(a), `${k} seed ${seed}: the trunk changed`);
     assert.ok(b.index.count < a.index.count, `${k} seed ${seed}: no triangles saved`);
   }
 });
