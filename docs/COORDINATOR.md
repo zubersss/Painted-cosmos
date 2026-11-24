@@ -3301,3 +3301,6 @@ on this Earth is the 30-50 m SEA CLIFF, which is the coast recipe and is untouch
 and the trout is still not drawn.** Neither the heron nor the falling water has been SEEN in a frame of the game:
 the heron's FORM is seen from its own triangles and its PAINT is the deer's material unchanged; the water is
 measurement only.
+
+### 24 Nov — the owner switches back to the first account
+- OWNER (verbatim): "You take over now what do i need rn". This session (first account) takes over from the second account's v37. Read: HANDOVER.md in full, this log's last sections. Nothing started: the owner is told what is needed from them (a v37 speed test from the phone; the decision on 60 a second, which per 23 Nov needs a change to how a wood is drawn; whether item 41's standing permission to merge still holds for this account) and what is planned on their go (the fish, the waterfall's sheet and plunge pool, then the performance route the table decides).
