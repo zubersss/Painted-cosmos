@@ -366,3 +366,20 @@ the owner first. Not started.
 - My open lanes (the coordinator, 24 Nov): the light's design (a dark frame round a bright warm middle distance, the
   far wood stepping back into pale gold at 16.8) and the storm-lit land (the weather key takes the land down under a
   storm). Neither started.
+
+## The land under a storm (ce1701f, cce1cd1, 24 Nov): SEEN, a first step
+
+- chunks.js pcLevel, oil only: x = mix(x, 0.20 + 0.38 x, uStorm * uLookS.x), a further level toward the cool glaze
+  under a storm (a level, R1.3b; the same picture to the bit when uStorm is 0). world/index.js: OIL.uLookS.x from
+  LOOK.stormLight (`?stormlight=0` off; first named ?stormland, which is the weather group's land storms, renamed),
+  and uStorm takes the most of the physics storm and the 3D clouds' overhead01 x overheadStorm01 (`?stormsky=0`;
+  0 until weather-clouds 090d0d8 merges).
+- SEEN (gallery, phone settings, forced sky, LOOK.stormLight 1 then 0 in one page): autumn stream on foot with
+  wx=storm: 13.8 per cent changes, the banks and the far meadow from green to a cool grey-green, land V median 0.41
+  to 0.38, S 0.37 to 0.31. Green wood with wx=rain: 44 per cent, the lime slope to a deep moss green, V 0.44 to
+  0.37, S 0.59 to 0.46. Autumn wood from 150 m with wx=storm: 16.4 per cent, the floor between the trees from
+  green-ochre to a cool violet-grey. Stills build/stormlight/.
+- SAID PLAINLY, what it does not reach: (1) the trees' crowns, near and far (their paint does not go through this
+  step: the leaves' and the impostors' own light), stay as bright as in fair weather, the red crowns glowing under a
+  storm sky; (2) the river and the lake stay the palest thing under a storm (the water's mirror and wash, W3/E). Both
+  to be asked of their lanes: under uStorm the crowns a level down (A1, A2), the water toward the storm's grey (W3).
