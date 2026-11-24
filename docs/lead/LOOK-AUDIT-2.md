@@ -54,8 +54,8 @@ the storm leaves the land lit like a fair noon.
 ## 1. From the air the wood is confetti, not trees
 
 **Stills:** `audit2/aut_150_12.jpg`, `aut_150_16.8.jpg`, `sum_150_12.jpg`, `sum_150_16.8.jpg`, `aut_420_12.jpg`,
-`aut_420_16.8.jpg`, `sum_420_12.jpg`, `sum_420_16.8.jpg`; crops x3 `audit2/crop_aut150.jpg`, `crop_sum150.jpg`.
-(PENDING: 1 km.)
+`aut_420_16.8.jpg`, `sum_420_12.jpg`, `sum_420_16.8.jpg`, `aut_1km_12.jpg`, `sum_1km_12.jpg`, `sum_1km_16.8.jpg`;
+crops `audit2/crop_aut150.jpg`, `crop_sum150.jpg` (x3), `crop_wood1km.jpg` (x2).
 
 **What is seen.** At 150 m the autumn wood is a carpet of yellow, orange and red flecks, every fleck its own colour,
 with dark conifers dotted through it; the summer wood is the same carpet in green and lemon. You cannot point at a
@@ -73,13 +73,18 @@ roof at noon: warm families 69 per cent of the wood, V 0.90 S 0.78 (references V
 Summer roof at noon: V 0.65 S 0.62 (fine). At 420 m the same: pattern length 3 px (colour) and 2 px (lightness);
 autumn roof at noon V 0.89 S 0.66, at 16.8 V 0.74; summer V 0.64 S 0.48; and almost no darks in the wood (under V
 0.3: 4.9 per cent autumn, 6.4 summer), where the references' dark conifers and shaded meadow are about a sixth of
-the paint. At 16.8 a 15-degree sun throws no shadow across the wood and the hill has no shaded flank.
+the paint. At 16.8 a 15-degree sun throws no shadow across the wood and the hill has no shaded flank. At about 1 km the
+wood below is a pale carpet with NO darks at all: under V 0.3, 0.0 per cent (autumn and summer at noon, the
+wood in front of the mountains), summer V 0.78 S 0.41 (pale mint), autumn V 0.85 S 0.52; the references from
+5,000 to 25,000 m still show "DARK GREEN CONIFERS between and among them (a third to a half of the trees)".
 
 **Why it matters most.** The owner's own words (24 Nov): "things should look good far before I get there like when
 im flying high in the sky up to a mile I want trees from a distance to look good." This is that view, and it is the
 view in which the game least looks like the pictures the owner sent.
 
-**Which lane.** PENDING the A/B (`?canopy=0`, same view): whether the flecks are the canopy painted into the ground
+**Which lane.** Part of it is MINE: at 1 km the air from the air (L5) lifts the last darks out of the wood. Haze
+is a flat step of pale colour; it must not erase the value steps under it (R1.5). I will take the wood's darks at
+1 km back to at least about 8 per cent of the land's pixels without greying the near view. The rest PENDING the A/B (`?canopy=0`, same view): whether the flecks are the canopy painted into the ground
 (C, farground.js: each ground dab asks which crown its centre lies on) or the impostor trees standing on it (A1), or
 both. What the fix must do, either way: **one crown, one colour family, chosen per tree, never per stroke** (R1.3c),
 the crown's lit and shaded side in two or three whole strokes, its shadow on the floor beside it (R1.3d), and the
@@ -126,8 +131,8 @@ larger dashes cost the same or less.
 ## 3. Mountains are rainbow polygons
 
 **Stills:** `audit2/aut_150_12.jpg`, `sum_150_12.jpg` (top left), `aut_420_12.jpg`, `sum_420_12.jpg`,
-`aut_420_16.8.jpg`; crops `audit2/crop_mountains150.jpg` (x2), `crop_mount420.jpg`, `crop_teal420.jpg` (x3).
-(PENDING: 1 km.)
+`aut_420_16.8.jpg`, `aut_1km_12.jpg`, `sum_1km_12.jpg`, `sum_1km_16.8.jpg` (at 1 km the mountains fill half the
+picture); crops `audit2/crop_mountains150.jpg` (x2), `crop_mount420.jpg`, `crop_teal420.jpg` (x3).
 
 **What is seen.** The mountains behind the wood are heaps of tall leaf-shaped patches in pastel rose, lime, lemon,
 lilac and grey, laid every way, with flat triangles showing through. Neither face of the mountain is in shade; the
@@ -163,6 +168,10 @@ side; (c) one rock family per mountain (grey-violet, with the bed tones as small
   (sky, mist, shade) for the busy parts to read against. At 16.8 the far wood does not step back into a pale gold
   glow. The green wood at 16.8 (`green_vista_16.8.jpg`) is the closest the game comes: long shadows across the
   floor; but its back is not lit.
+- **A broken white hairline arcs across the sky at 1 km** (F, mine or W1's: `crop_arc1km.jpg`, x2, in
+  `aut_1km_12` and `sum_1km_12`, from the horizon up to the right). Most likely the far edge of the cloud deck at
+  that height (the deck is hidden by the eye's dip only from 52 degrees; at 1 km the dip is 37). Not yet found in
+  the code; mine to chase, since v39.2 draws the sky's own cloud.
 - **A storm leaves the land lit like a fair noon** (F, mine; seen in D-W1's stills today, W1_WG_13_stormover_*).
 
 ## What I could not settle
