@@ -83,7 +83,7 @@ const FLORA = (() => {
   const f = { grass2: 1, cull: 1, sheen: 1, bloom: 0, blade: 1 };
   try {
     const q = new URLSearchParams(location.search), on = (k) => !q.has(k) || (q.get(k) !== '0' && q.get(k) !== 'false');
-    f.grass2 = on('grass2') ? 1 : 0;
+    f.grass2 = on('grass2') && on('flora') ? 1 : 0;      // (?flora=0: the whole flora lane off, for the owner's comparison)
     f.cull = f.grass2 && on('nearcull') ? 1 : 0;
     f.sheen = f.grass2 && on('sheen') ? 1 : 0;
     f.blade = f.grass2 && on('bladegreen') ? 1 : 0;

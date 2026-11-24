@@ -37,6 +37,8 @@ import { MODE } from '../data/mode.js';
 import { SEASON } from '../data/season.js';
 
 // THE SWITCHES (the oil look only; 1 by default, 0 gives the picture back as it was, to the bit):
+//   ?flora=0     THE WHOLE FLORA LANE OFF: the grass package and the flowers, the picture as it was before the lane (one
+//                switch for the owner's comparison; it is ?grass2=0&bloom=0)
 //   ?bloom=0     no flowers from this map at all (the near rings lay their flowers as before, the ground is not tinted)
 //   ?bloomair=0  the flowers, but not their colour in the ground (A1)
 //   ?bloomyear=0 the flowers, but not following the year (every kind in flower all the year, as before the year came)
@@ -48,8 +50,8 @@ export function bloomSwitches() {
   const f = { bloom: 1, air: 1, grass2: 1, year: 1 };
   try {
     const q = new URLSearchParams(location.search), on = (k) => !q.has(k) || (q.get(k) !== '0' && q.get(k) !== 'false');
-    f.grass2 = on('grass2') ? 1 : 0;
-    f.bloom = on('bloom') ? 1 : 0;
+    f.grass2 = on('grass2') && on('flora') ? 1 : 0;
+    f.bloom = on('bloom') && on('flora') ? 1 : 0;
     f.air = f.bloom && on('bloomair') ? 1 : 0;
     f.year = f.bloom && on('bloomyear') ? 1 : 0;
   } catch { /* no address to read (Node): everything on, if the look is */ }
