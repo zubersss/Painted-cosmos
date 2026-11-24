@@ -374,6 +374,7 @@ export function attachBench(pc) {
     const gust0 = (() => { const f = flora(); const u = f && f.mats && f.mats.imp && f.mats.imp.uniforms.uImpGust; return !!u; })();
     const cm0 = (() => { const f = flora(); return f ? !!f.crownMass : true; })();
     const fsh0 = (() => { const f = flora(); return f ? !!f.farShadow : false; })();
+    const mv0 = (() => { const f = flora(); return f ? !!f.massV : true; })();      // (crown mass's paint once a crown as the run starts: massV)
     const mpx0 = (() => { const f = flora(); return f && f.impMinPx != null ? f.impMinPx : 0; })();      // (the smallest far crown drawn as the run starts: impMinPx)      // (the far crowns' shadows on the ground as the run starts: farShadow)      // (the far crowns as masses as the run starts: crownMass)      // (the far crowns take the gust bands: impGust)      // (the shadow pass's whole-draw setting as the run starts: shWhole)
     const T0 = {
       leaves: ['near trees: leaves only', nearPart('leaves'), nearPart(null)],
@@ -414,6 +415,9 @@ export function attachBench(pc) {
       // (the two together, the look director's request: the far shadows draw every impostor in view into the map, so fewer
       //  impostors may make them cheaper; asked only when the run starts with both off)
       farShMinPx: ['far crowns cast shadows, trees in leaf under 4 px left to the canopy', () => { const f = flora(); if (f && f.setFarShadow) f.setFarShadow(true); if (f && f.setImpMinPx) f.setImpMinPx(4); }, () => { const f = flora(); if (f && f.setFarShadow) f.setFarShadow(fsh0); if (f && f.setImpMinPx) f.setImpMinPx(mpx0); }],
+      // (crown mass's paint worked out once a crown in the vertex shader, the default, against once a pixel, ?imppaint=0:
+      //  the same picture; the row asks the other way from how the run started: flora.setMassV)
+      massV: [mv0 ? 'far crowns painted once a pixel' : 'far crowns painted once a crown', () => { const f = flora(); if (f && f.setMassV) f.setMassV(!mv0); }, () => { const f = flora(); if (f && f.setMassV) f.setMassV(mv0); }],
       impGust: ['far crowns: no gust bands', () => { const f = flora(); if (f && f.setImpGust) f.setImpGust(false); }, () => { const f = flora(); if (f && f.setImpGust) f.setImpGust(true); }],
       shWhole: [shw0 ? 'split trees by part in shadow pass' : 'split trees whole in shadow pass',
         () => { const f = flora(); if (f && f.setShadowWhole) f.setShadowWhole(!shw0); }, () => { const f = flora(); if (f && f.setShadowWhole) f.setShadowWhole(shw0); }],
@@ -715,8 +719,8 @@ export function attachBench(pc) {
       T0.blob, T0.imp, T0.noFar, T0.farFlat, T0.farStill,
       [AS, null, null],
       T0.mid45, T0.hand, T0.pack,
-      ...airAt(150, 30, [T0.noFar, T0.blob, T0.imp, T0.farFlat, T0.a2c, T0.farStill, T0.farShadow, ...(gust0 ? [T0.impGust] : [])]),
-      ...airAt(400, 45, [T0.noFar, T0.blob, T0.imp, T0.noSh, T0.crownMass, T0.farShadow, T0.impMinPx, ...(!fsh0 && !(mpx0 > 0) ? [T0.farShMinPx] : [])]),
+      ...airAt(150, 30, [T0.noFar, T0.blob, T0.imp, T0.farFlat, T0.a2c, T0.farStill, T0.farShadow, T0.massV, ...(gust0 ? [T0.impGust] : [])]),
+      ...airAt(400, 45, [T0.noFar, T0.blob, T0.imp, T0.noSh, T0.crownMass, T0.massV, T0.farShadow, T0.impMinPx, ...(!fsh0 && !(mpx0 > 0) ? [T0.farShMinPx] : [])]),
       onFoot,
       [AS + ', last', null, null],
     ];
