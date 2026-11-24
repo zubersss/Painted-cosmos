@@ -211,9 +211,13 @@ golden hours are `pcGold()`. Targets for Earth (other worlds keep their own keys
   metres from the screen angle, so the scene pass's resolution cancels out): a sharper picture or a dynres step makes
   them crisper, never larger or smaller on the screen. Every OTHER threshold set in pixels must say which kind it is:
   (a) A LOOK threshold (when a crown becomes one patch, one tone, when a band or a bark turns, when a far tree is left
-  to the canopy, when strokes merge into a mass) is a decision about how big a thing LOOKS: write it in pixels at
-  480 lines and scale it by `uOilPx.y / 480`, so the design is the same at any resolution and a dynres step never
-  flips a crown from strokes to a patch. (b) An ANTI-GRAIN floor (R4.5's 1.3 px, a stroke never under about 2.5-3 px,
+  to the canopy, when strokes merge into a mass) is in REAL PIXELS OF THE DEVICE'S FULL-QUALITY PICTURE (the scene
+  pass's height with dynres at 1): scale it by `uOilPx.y / topLines`, where topLines is that full height. So a dynres
+  step never flips a crown from strokes to a patch, AND a taller picture keeps its finer detail: the desktop's 1080
+  lines and the sharper phone keep crowns as strokes down to a smaller size than a 480-line phone, which is the
+  owner's rule ("the desktop sets the look; the phone follows with cheaper settings"). AMENDED the same evening: the
+  first wording (pixels at 480 lines, scaled by lines/480) made the desktop's far crowns go flat at 1.5-2.25 times
+  their v39.5 size, the opposite of that rule (found by the coordinator's independent review of v39.6). (b) An ANTI-GRAIN floor (R4.5's 1.3 px, a stroke never under about 2.5-3 px,
   a head's minimum half-width, the canopy dab's floor, the thinnest water row) is about the real pixel: keep it in
   real pixels. Today's (a) thresholds in real pixels to convert: A1's crown mass (30 px), one tone (4-7 px), bark as
   leaves (30 px), the gust's small crowns (4-10 px), ?impminpx (4 px). Measures quoted in pixels (my pattern length,
