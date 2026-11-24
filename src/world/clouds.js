@@ -39,6 +39,8 @@
 //                 carries its valley channel)
 import * as THREE from 'three';
 import { G, OIL, LOOK, register, ensureGlobals } from '../render/shared.js';
+import * as SHARED from '../render/shared.js';
+import { WX } from './wxfield.js';
 import { makePaintUniforms, defaultBodyUniforms } from '../render/materials.js';
 import { VERT_PARS, VERT_END, FRAG_PARS } from '../render/chunks.js';
 import { BODIES } from '../data/bodies.js';
@@ -58,7 +60,7 @@ export const CLOUDS = {
   size: Math.max(0.2, _qn('cloudsize', 1)),
   deck: _qn('deck', 1) > 0,                      // ?deck=0: no deck (A3)
   valley: _qn('valleycloud', 1),                 // ?valleycloud=0: none; a number over 1 forces that much cover (0..1 as v - 1), for looking (A5)
-  rebuild: 0.25,          // s between rebuilds of the instances (the drift itself is the group's turn, every frame)
+  rebuild: 0.5,           // s between rebuilds of the instances (the drift itself is the group's turn, every frame; a lobe grows over tens of seconds, so twice a second is smooth)
   maxLobes: 6144,         // instances a level of detail holds at most
   sagPx: 1.4,             // how far a lobe's outline may stand off the true round, in pixels, before the next level is taken
   life: [150, 360],       // s: a cumulus' life (the painter's clock)
@@ -237,13 +239,14 @@ void main() {
   vec3 sunC = mix(pow(uLight, vec3(uOilA.z)), vec3(1.0, 0.84, 0.52), 0.75 * pcGold());
   vec3 midS = mix(pcCloudDens(uSkyZenith, 1.0 + 0.45 * uAtmo.y), uSkyHorizon, 0.62);
   vec3 cTop = mix(vec3(0.78, 0.78, 0.785), uSkyHorizon, 0.18) * mix(vec3(1.0), sunC, 0.30);
-  vec3 cHalf = pcCloudDens(uCloudShade, 1.65);
-  cHalf = mix(cHalf, vec3(dot(cHalf, vec3(0.3, 0.5, 0.2))), 0.24);
-  // (the belly: the half-tone a step deeper with a little of the sky's middle in it, and pulled toward its grey: laid
-  // with a third of the sky's blue it was a periwinkle flat across every base seen from below, the first stills)
-  vec3 cBase = mix(pcCloudDens(cHalf, 1.25), midS, 0.14);
+  // (the steps are steps of VALUE, as the sky's own cloud lays them: half-tone, belly and deep about 0.68, 0.60 and 0.48 in
+  // luminance under a lit top of 0.78. Laid lighter, every tone of a cloud measured within 0.73 to 0.80 -- one value,
+  // the form told by hue alone: criterion 2 of the design's 4.4 counted a single step, 24 Nov)
+  vec3 cHalf = pcCloudDens(uCloudShade, 1.85);
+  cHalf = mix(cHalf, vec3(dot(cHalf, vec3(0.3, 0.5, 0.2))), 0.20);
+  vec3 cBase = mix(pcCloudDens(cHalf, 1.35), midS, 0.10);
   cBase = mix(cBase, vec3(dot(cBase, vec3(0.3, 0.5, 0.2))), 0.22);
-  vec3 cDeep = mix(pcCloudDens(cBase, 1.7), vec3(dot(cBase, vec3(0.3, 0.5, 0.2)) * 0.62), 0.24);
+  vec3 cDeep = mix(pcCloudDens(cBase, 1.8), vec3(dot(cBase, vec3(0.3, 0.5, 0.2)) * 0.62), 0.24);
   vec3 cRim = min(mix(cTop, sunC, 0.45) * 1.06, vec3(0.86));
   // a storm's cloud: the bellies go to the world's heavy-weather pigment, the tops a half-tone
   float st = clamp(max(vK.z, uWxSky.y), 0.0, 1.0);
@@ -256,6 +259,14 @@ void main() {
   vec3 c2 = xN > 0.54 ? cTop : xN > 0.38 ? cHalf : xN > 0.09 ? cBase : cDeep;
   c1 = mix(c1, cRim, rim);
   vec3 c = mix(c2, c1, own);
+  // THE GOLDEN HOURS, as the sky lays them over its own cloud (sky.js: the whole sky warms, most of all low down): a cloud
+  // left out of it stood lilac against a gold sky at 16:30, the first stills. Three fifths of the sky's, so the form stays.
+  {
+    float sunE = dot(sun, normalize(vUp));
+    float gold = (1.0 - smoothstep(0.48, 0.86, sunE)) * uAtmo.y * (1.0 - uAtmo.x) * (1.0 - uWxSky.x) * uOilG.w;
+    float eV = dot(vdir, normalize(vUp));
+    c = mix(c, vec3(0.92, 0.80, 0.58), gold * mix(0.80, 0.45, smoothstep(0.0, 0.7, eV)) * 0.6);
+  }
   // by night a cloud is a flat shape a step lighter than the sky it lies in, with no lit side (sky.js, the oil night)
   vec3 nightC = mix(mix(uSkyZenith, uSkyHorizon, 0.5), uSkyHorizon, 0.30) * (0.92 + 0.10 * hS);
   c = mix(nightC, c, uAtmo.y);
@@ -265,7 +276,9 @@ void main() {
   c = mix(c, farC, vAirSun.x);
   c = pcCloudCap(c, uSkyOil.y);
   vec3 nV = normalize(vNV);
-  pcWrite(c, 0.0, nV, -vView.z, 0.02 + 0.5 * fract(vK.w * 3.7));
+  // (region 0, the sky's: the post passes leave clouds out of everything they lay on the land -- the night's near wash,
+  // the far contrast, the cloud shadow's glaze -- by testing aux.w against 0.5, so the hash stays well under it)
+  pcWrite(c, 0.0, nV, -vView.z, 0.02 + 0.4 * fract(vK.w * 3.7));
 }
 `;
 
@@ -368,8 +381,8 @@ void main() {
   float cov = clamp(vDeck.x, 0.0, 1.0);
   // (the gaps from a broader, rounder field than the rolls: cut from the rolls themselves they were slivers along the
   // wind, a scatter of thin gold streaks over a storm's edge, the stills of 24 Nov)
-  vec3 qh = vPosD / (uShellK.z * 2.4);
-  float hm = texture(uNoise3D, qh + 0.53).b * 0.78 + texture(uNoise3D, qh * 2.3 + 0.11).r * 0.22;
+  vec3 qh = vPosD / (uShellK.z * 3.6);
+  float hm = texture(uNoise3D, qh + 0.53).b * 0.82 + texture(uNoise3D, qh * 2.3 + 0.11).r * 0.18;
   // (the gaps: where the sheet's own mass falls under what its cover leaves open. A closed sheet has none at all: with a
   // threshold that only grew toward nothing, the noise's few deep dips were pin-holes of sky all over a storm's deck)
   float edge = hm - (1.0 - cov) * 1.15 + 0.12 * smoothstep(0.80, 1.0, cov);
@@ -392,13 +405,15 @@ void main() {
   vec3 sunC = mix(pow(uLight, vec3(uOilA.z)), vec3(1.0, 0.84, 0.52), 0.75 * pcGold());
   vec3 midS = mix(pcShDens(uSkyZenith, 1.0 + 0.45 * uAtmo.y), uSkyHorizon, 0.62);
   vec3 cTop = mix(vec3(0.78, 0.78, 0.785), uSkyHorizon, 0.18) * mix(vec3(1.0), sunC, 0.30);
-  vec3 cHalf = pcShDens(uCloudShade, 1.65);
-  cHalf = mix(cHalf, vec3(dot(cHalf, vec3(0.3, 0.5, 0.2))), 0.24);
-  vec3 cBase = mix(pcShDens(cHalf, 1.25), midS, 0.14);
+  vec3 cHalf = pcShDens(uCloudShade, 1.85);
+  cHalf = mix(cHalf, vec3(dot(cHalf, vec3(0.3, 0.5, 0.2))), 0.20);
+  vec3 cBase = mix(pcShDens(cHalf, 1.35), midS, 0.10);
   cBase = mix(cBase, vec3(dot(cBase, vec3(0.3, 0.5, 0.2))), 0.22);
-  vec3 cDeep = mix(pcShDens(cBase, 1.7), vec3(dot(cBase, vec3(0.3, 0.5, 0.2)) * 0.62), 0.24);
+  vec3 cDeep = mix(pcShDens(cBase, 1.8), vec3(dot(cBase, vec3(0.3, 0.5, 0.2)) * 0.62), 0.24);
   float st = clamp(max(vDeck.z, uWxSky.y * (1.0 - uShellK.x)), 0.0, 1.0);
-  vec3 sDeep = pcShDens(uStormWash, 1.32), sBase = pcShDens(uStormWash, 1.15), sHalf = mix(pcShDens(uStormWash, 0.85), cHalf, 0.35);
+  // (a storm's ceiling a step lighter than its heaviest pigment: the sky is the light of a rain picture and its darks stay
+  // over the wood's, PAINTER 16/17; laid at full weight the first stills' storm was one dark indigo lid)
+  vec3 sDeep = pcShDens(uStormWash, 1.18), sBase = pcShDens(mix(uStormWash, cHalf, 0.25), 1.0), sHalf = mix(pcShDens(uStormWash, 0.80), cHalf, 0.45);
   cDeep = mix(cDeep, sDeep, st * 0.85);
   cBase = mix(cBase, sBase, st * 0.70);
   cHalf = mix(cHalf, sHalf, st * 0.60);
@@ -421,10 +436,15 @@ void main() {
   float thick = clamp(eS / 0.30, 0.0, 1.0);
   // the valley cloud: a low white mist, lit, its shade a little cool (no belly: it is seen from above and from its side)
   if (uShellK.x > 0.5) c = mix(c, mix(cTop, cHalf, step(0.62, thick + jit) * 0.5), 0.75);
+  {
+    float gold = (1.0 - smoothstep(0.48, 0.86, se)) * uAtmo.y * (1.0 - uAtmo.x) * (1.0 - uWxSky.x) * uOilG.w;
+    float eV = dot(normalize(vRel), up);
+    c = mix(c, vec3(0.92, 0.80, 0.58), gold * mix(0.80, 0.45, smoothstep(0.0, 0.7, abs(eV))) * 0.6 * (1.0 - 0.6 * st));
+  }
   vec3 nightC = mix(mix(uSkyZenith, uSkyHorizon, 0.5), uSkyHorizon, 0.30) * (0.90 + 0.12 * thick);
   c = mix(nightC, c, uAtmo.y);
   // the sheet's own air, in flat steps of the distance (the land's air would swallow it)
-  float af = floor(min(0.6, 0.62 * (1.0 - exp(-dist / 7000.0))) * 5.0 + 0.5) / 5.0;
+  float af = floor(min(0.45, 0.55 * (1.0 - exp(-dist / 8000.0))) * 5.0 + 0.5) / 5.0;
   vec3 farC = mix(uSkyHorizon, vec3(0.48, 0.50, 0.63), uOilS.x * 0.6);
   c = mix(c, farC, af);
   c = pcShCap(c, uSkyOil.y);
@@ -449,6 +469,61 @@ function makeShellMaterial(skyU, own, kind) {
   m.userData.pcPainted = true;
   return register(m, 'cloud-sheet', { kind });
 }
+
+// ---- A6 THE CLOUD SHADOW MAP ------------------------------------------------------------------------------------------
+// The lobes and the deck drawn from the sun, straight along its light, into a small square (256 x 256 texels over the
+// ground the eye can see: about 9 to 27 m a texel) every second frame: 1 where a cloud stands between the sun and the
+// ground, 0 where the light comes through. Read with WXFIELD_GLSL pcCloudShadow(body-local position) or, in a pass over
+// the picture, through uCloudShadowV (view space -> the square), it is the clouds' own shapes lying on the land, and
+// they move as the clouds move. It is smooth across a texel (the hardware's filter): the reader thresholds it crisply.
+const SHADOW_LOBE_VERT = /* glsl */`
+uniform highp sampler3D uNoise3D;
+uniform vec3 uAnchorD;
+attribute vec4 iA;
+attribute vec4 iB;
+attribute vec4 iC;
+attribute vec4 iD;
+void main() {
+  vec3 dir = normalize(position);
+  vec3 up = normalize(uAnchorD + iB.xyz);
+  float n1 = texture(uNoise3D, dir * 0.55 + iC.w * 7.13).r;
+  float n2 = texture(uNoise3D, dir * 1.30 + iC.w * 3.71).g;
+  vec3 off = dir * iA.w * (0.86 + 0.30 * n1 + 0.10 * n2);
+  off -= up * dot(off, up) * (1.0 - iD.x);
+  vec3 p = iA.xyz + off;
+  float hb = dot(p - iB.xyz, up) + iB.w;
+  if (hb < 0.0) p -= up * hb;
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
+}
+`;
+const SHADOW_FRAG = /* glsl */`
+void main() { gl_FragColor = vec4(1.0); }
+`;
+const SHADOW_SHEET_VERT = /* glsl */`
+uniform vec3 uAnchorD;
+attribute vec4 aDeck;
+varying vec3 vPosD;
+varying float vCov;
+void main() {
+  vPosD = uAnchorD + position;
+  vCov = aDeck.x;
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+}
+`;
+const SHADOW_SHEET_FRAG = /* glsl */`
+uniform highp sampler3D uNoise3D;
+uniform vec4 uShellK;
+varying vec3 vPosD;
+varying float vCov;
+void main() {
+  vec3 qh = vPosD / (uShellK.z * 3.6);
+  float hm = texture(uNoise3D, qh + 0.53).b * 0.82 + texture(uNoise3D, qh * 2.3 + 0.11).r * 0.18;
+  float cov = clamp(vCov, 0.0, 1.0);
+  if (hm - (1.0 - cov) * 1.15 + 0.12 * smoothstep(0.80, 1.0, cov) < 0.0) discard;
+  gl_FragColor = vec4(1.0);
+}
+`;
+const CLOUD_LAYER = 7;
 
 // ---- numbers from a slot -----------------------------------------------------------------------------------------------
 function hash(a, b, c) {
@@ -617,11 +692,22 @@ export function createClouds(scene) {
     return { lod, g, mesh: null, n: 0 };
   });
   const anchor = new THREE.Vector3();
+  // A6: the shadow map's target, its camera (placed in the body's own frame, carried to the scene at each render), and the
+  // matrix from a body-local place to the map
+  const shadowRT = new THREE.WebGLRenderTarget(256, 256, { depthBuffer: false, stencilBuffer: false });
+  shadowRT.texture.minFilter = shadowRT.texture.magFilter = THREE.LinearFilter;
+  shadowRT.texture.generateMipmaps = false; shadowRT.texture.name = 'pc-cloud-shadow';
+  const shCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 1, 18000);
+  shCam.matrixAutoUpdate = false; shCam.matrixWorldAutoUpdate = false; shCam.layers.set(CLOUD_LAYER);
+  const shBody = new THREE.Matrix4(), shBodyInv = new THREE.Matrix4(), shM = new THREE.Matrix4(), shRootInv = new THREE.Matrix4();
+  const BIAS = new THREE.Matrix4().set(0.5, 0, 0, 0.5, 0, 0.5, 0, 0.5, 0, 0, 0.5, 0.5, 0, 0, 0, 1);
+  const NO_SHADOW = new THREE.Matrix4().set(0, 0, 0, -1, 0, 0, 0, -1, 0, 0, 0, 0, 0, 0, 0, 1);
+  const shState = { on: false, frame: 0, h: 2000, sun: new THREE.Vector3(0, 1, 0), centre: new THREE.Vector3(), fwd: new THREE.Vector3(), Rg: 4000, has: false, mats: null };
+  const _cc = new THREE.Color(), _sp = new THREE.Vector3(), _st = new THREE.Vector3(), _su = new THREE.Vector3(), _sx = new THREE.Vector3();
   const self = {
     eyeInCloud01: 0, enabled: true,
     group, meshes, deck, valley, stats: { clouds: 0, lobes: 0, tris: 0, ms: 0 },
-    // (A6, step 3: the cloud shadow map; render/index.js asks for it before the main render, WEATHER-DESIGN 8.4 T5)
-    renderShadow() {},
+    shadowTarget: shadowRT,
   };
   // the drifting frame
   const Q = new THREE.Quaternion();
@@ -670,6 +756,12 @@ export function createClouds(scene) {
     const reach = Math.min(9000, Math.sqrt(Math.max(0, camR * camR - Rg * Rg)) + Math.sqrt(Math.max(0, (Rg + 1200) ** 2 - Rg * Rg)));
     const cosLim = Math.cos(Math.min(Math.PI, reach / R));
     anchor.copy(camD);
+    shState.Rg = Rg; shState.h = Math.max(1200, Math.min(3500, reach * 0.75));
+    // (A8: as the eye climbs past the sky's ceiling the fair cumulus go, one by one by their own numbers, and the far small
+    // ones first; the thunderstorms stay until the shell has taken over. From 4 km the scatter of far puffs along the limb
+    // read as specks round the globe, the first stills of the hand-over.)
+    const c0 = wx.ceiling ? wx.ceiling[0] : 2800;
+    const handK = smooth(c0 * 0.8, c0 * 1.4, camR - Rg);
     // the wind aloft at the eye, in the drifting frame (what the towers lean along)
     let we = 2.5, wn = 0.8;
     if (W) { W.at(upx, upy, upz, _wOut); we = _wOut.aloftE; wn = _wOut.aloftN; }
@@ -679,6 +771,7 @@ export function createClouds(scene) {
     for (let k = 0; k < S.T; k++) {
       const sx = S.x[k], sy = S.y[k], sz = S.z[k];
       if (sx * upx + sy * upy + sz * upz < cosLim) continue;
+      if (handK > 0 && hash(k, 77, 1) < handK * 1.15) continue;
       // where the slot is now, on the world
       _w.set(sx, sy, sz).applyQuaternion(Q);
       let cover, base, thick, storm = 0, conv = 1;
@@ -792,11 +885,11 @@ export function createClouds(scene) {
       // how many lobes: as many as are larger than a few pixels at this distance (a storm keeps them all)
       const pxR = cl.Rc / Math.max(cl.dist, 1) / rad;
       // (a cloud under two pixels across its radius is not drawn: the air has taken it by then)
-      if (pxR < 2) continue;
+      if (pxR < 2 + 4 * handK) continue;
       const nl = cl.cb ? t.lobes.length : Math.max(pxR < 4 ? 1 : 2, Math.min(t.lobes.length, Math.round(t.lobes.length * smooth(6, 60, pxR))));
       const cxA = cl.bx + ux * cl.T * 0.45, cyA = cl.by + uy * cl.T * 0.45, czA = cl.bz + uz * cl.T * 0.45;
       const baseD = cl.T * 0.45;
-      const air = Math.round(Math.min(0.6, 0.62 * (1 - Math.exp(-cl.dist / 7000))) * 5) / 5;
+      const air = Math.round(Math.min(0.45, 0.55 * (1 - Math.exp(-cl.dist / 8000))) * 5) / 5;
       const fewK = 1 + 0.55 * (1 - nl / t.lobes.length);
       for (let i = 0; i < nl; i++) {
         const o = t.lobes[i];
@@ -868,20 +961,94 @@ export function createClouds(scene) {
     own.uAnchorD.value.copy(anchor);
     // the sky's own shell becomes the far background, the altocumulus, a kilometre over the land under the eye (sky.js uCloud3D)
     if (skyU.uCloud3D) skyU.uCloud3D.value.set(1, Rg + (wx.alto != null ? wx.alto : 1000), wx.altoShare != null ? wx.altoShare : 0.45, 0);
+    // the high cloud lies the way the wind aloft blows (sky.js A4), and a rainbow may stand where the map has rain (A9)
+    if (skyU.uCirrus) {
+      let ex = upz, ez = -upx; const el = Math.hypot(ex, ez) || 1; ex /= el; ez /= el;
+      const nx = upy * ez, ny = upz * ex - upx * ez, nz = -upy * ex;
+      _w2.set(ex * we + nx * wn, ny * wn, ez * we + nz * wn).applyQuaternion(Q);      // (drifting frame -> the body's)
+      if (_w2.lengthSq() < 1e-8) _w2.set(1, 0, 0);
+      _w2.normalize();
+      skyU.uCirrus.value.set(_w2.x, _w2.y, _w2.z, wx.cirrus != null ? wx.cirrus : 0.25);
+    }
+    if (skyU.uRainbow) skyU.uRainbow.value.set(C && wx.rainbow !== 0 ? 1 : 0, 1500, 0, 0);
     own.uGroundR.value = R + (look.weather && look.weather.shadowGround != null ? look.weather.shadowGround : 250);
     self.stats.clouds = clouds.length; self.stats.lobes = meshes.reduce((a, M) => a + M.n, 0); self.stats.tris = tris;
     self.stats.ms = performance.now() - t0;
 
   }
 
+  // A6: the shadow map, drawn every second frame before the scene (render/index.js through shared.js PREPASSES, or
+  // world.clouds.renderShadow(renderer): WEATHER-DESIGN 8.4 T5). Nothing is drawn at night, nor with the speed test's
+  // row 'storm: no cloud shadows' (WX.uCloudShadowK 0): the map then reads no shadow anywhere.
+  self.renderShadow = function renderShadow(renderer, scene0) {
+    const root = group.parent;
+    const live = root && group.visible && mat && shState.has && WX.uCloudShadowK.value > 0 && shState.sun.dot(shState.centre) > 0.02 * shState.centre.length();
+    if (!live) { if (shState.on) { WX.uCloudShadowM.value.copy(NO_SHADOW); shState.on = false; } return; }
+    if ((shState.frame++ & 1) && shState.on) return;
+    const sc = scene0 || scene;
+    if (!sc) return;
+    if (!shState.mats) {
+      const lobeM = new THREE.ShaderMaterial({ name: 'pc-cloud-shadow-lobes', uniforms: { uNoise3D: G.uNoise3D, uAnchorD: own.uAnchorD }, vertexShader: SHADOW_LOBE_VERT, fragmentShader: SHADOW_FRAG, side: THREE.DoubleSide });
+      const sheetM = (sh) => new THREE.ShaderMaterial({ name: 'pc-cloud-shadow-sheet', uniforms: { uNoise3D: G.uNoise3D, uAnchorD: sh.u.uAnchorD, uShellK: sh.u.uShellK }, vertexShader: SHADOW_SHEET_VERT, fragmentShader: SHADOW_SHEET_FRAG, side: THREE.DoubleSide });
+      shState.mats = new Map();
+      for (const M of meshes) shState.mats.set(M.mesh, lobeM);
+      shState.mats.set(deck.mesh, sheetM(deck));
+      shState.mats.set(valley.mesh, sheetM(valley));
+    }
+    // the camera: in the body's frame, high along the sun over the ground the eye looks at, looking down the light
+    const c = _st.copy(shState.centre).addScaledVector(shState.fwd, shState.h * 0.45);
+    _sp.copy(c).addScaledVector(shState.sun, 9000);
+    _su.copy(shState.centre).normalize();
+    if (Math.abs(_su.dot(shState.sun)) > 0.99) _su.set(1, 0, 0);
+    shBody.lookAt(_sp, c, _su); shBody.setPosition(_sp);
+    shBodyInv.copy(shBody).invert();
+    const h = shState.h;
+    shCam.left = -h; shCam.right = h; shCam.top = h; shCam.bottom = -h; shCam.updateProjectionMatrix();
+    root.updateMatrixWorld();
+    shCam.matrixWorld.multiplyMatrices(root.matrixWorld, shBody); shCam.matrixWorldInverse.copy(shCam.matrixWorld).invert();
+    shM.multiplyMatrices(shCam.projectionMatrix, shBodyInv).premultiply(BIAS);
+    // the clouds' own materials out, the shadow's in; drawn alone (the camera sees only their layer)
+    const swapped = [];
+    for (const [mesh, m] of shState.mats) if (mesh) { swapped.push(mesh, mesh.material); mesh.material = m; }
+    const prevT = renderer.getRenderTarget(), prevAuto = renderer.autoClear, prevA = renderer.getClearAlpha();
+    renderer.getClearColor(_cc);
+    try {
+      renderer.setRenderTarget(shadowRT);
+      renderer.setClearColor(0x000000, 0); renderer.clear(true, false, false);
+      renderer.autoClear = false;
+      renderer.render(sc, shCam);
+    } finally {
+      for (let i = 0; i < swapped.length; i += 2) swapped[i].material = swapped[i + 1];
+      renderer.setRenderTarget(prevT); renderer.autoClear = prevAuto; renderer.setClearColor(_cc, prevA);
+    }
+    WX.uCloudShadow.value = shadowRT.texture;
+    WX.uCloudShadowM.value.copy(shM);
+    shState.on = true;
+  };
+  // (the frame hook, at the start of every render: the eye's view space to the map, for a pass over the picture, and
+  //  which way the eye looks, so the square is laid over the ground in front of it)
+  const _cf = new THREE.Vector3();
+  if (SHARED.FRAME_HOOKS) SHARED.FRAME_HOOKS.push((camera) => {
+    const root = group.parent;
+    if (!root || !shState.on || !WX.uCloudShadowV) return;
+    root.updateMatrixWorld();
+    shRootInv.copy(root.matrixWorld).invert();
+    WX.uCloudShadowV.value.multiplyMatrices(shM, shRootInv).multiply(camera.matrixWorld);
+    camera.getWorldDirection(_cf).transformDirection(shRootInv);
+    const up = _sx.copy(shState.centre).normalize();
+    _cf.addScaledVector(up, -_cf.dot(up));
+    if (_cf.lengthSq() > 1e-6) shState.fwd.copy(_cf.normalize());
+  });
+  if (SHARED.PREPASSES) SHARED.PREPASSES.push((renderer, sc) => self.renderShadow(renderer, sc));
+
   self.update = function update(dt, camL, root, sunL, fields, skyU) {
     if (!LOOK.oil || !CLOUDS.mode) return;
     // (the speed test's row 'weather: clouds as before': the sky's own flat cloud back in their place)
-    if (self.enabled === false) { group.visible = false; if (skyU && skyU.uCloud3D) skyU.uCloud3D.value.x = 0; return; }
+    if (self.enabled === false) { group.visible = false; if (skyU && skyU.uCloud3D) skyU.uCloud3D.value.x = 0; if (skyU && skyU.uRainbow) skyU.uRainbow.value.x = 0; return; }
     const id = root && root.name && root.name.startsWith('body-') ? root.name.slice(5) : null;
     if (!id || !BODIES[id]) return;
     const look = getLook(id);
-    if (!(BODIES[id].atmosphereHeight > 0) || !(look.cloud > 0.01 || (look.weather && look.weather.cumulus))) { group.visible = false; if (skyU && skyU.uCloud3D) skyU.uCloud3D.value.x = 0; return; }
+    if (!(BODIES[id].atmosphereHeight > 0) || !(look.cloud > 0.01 || (look.weather && look.weather.cumulus))) { group.visible = false; if (skyU && skyU.uCloud3D) skyU.uCloud3D.value.x = 0; if (skyU && skyU.uRainbow) skyU.uRainbow.value.x = 0; return; }
     group.visible = true;
     if (id !== bodyId || group.parent !== root) setBody(id, root);
     if (!mat) {
@@ -893,6 +1060,7 @@ export function createClouds(scene) {
         sh.mesh.name = sh.name;
         sh.mesh.frustumCulled = false;
         sh.mesh.renderOrder = 11;
+        sh.mesh.layers.enable(CLOUD_LAYER);
         sh.mesh.visible = false;
         group.add(sh.mesh);
       }
@@ -901,6 +1069,7 @@ export function createClouds(scene) {
         M.mesh.name = 'pc-cloud-lobes-' + M.lod.detail;
         M.mesh.frustumCulled = false;
         M.mesh.renderOrder = 10;        // after the ground (5), before the sky (1000)
+        M.mesh.layers.enable(CLOUD_LAYER);
         M.mesh.visible = false;
         group.add(M.mesh);
       }
@@ -924,12 +1093,25 @@ export function createClouds(scene) {
       if (sp > 1e-6) { _qs2.setFromAxisAngle(_w.multiplyScalar(1 / sp), sp * dT / R); Q.premultiply(_qs2); }
     }
     group.quaternion.copy(Q);
+    // A8: the cloud shell seen from outside (orbit.js) reads the same map and comes in as the eye climbs past the sky's
+    // ceiling; the 3D clouds are left out above it (they are small and far below by then, and the shell covers them)
+    {
+      const shell = root.getObjectByName('pc-cloudshell');
+      const altG = camL.length() - (shState.Rg || R);
+      const c0 = (look.weather && look.weather.ceiling) ? look.weather.ceiling[0] : 2800;
+      const hand = smooth(c0, c0 * 1.6, altG);
+      if (shell && shell.material.uniforms.uWx3D) shell.material.uniforms.uWx3D.value.set(1, hand, 0, 0);
+      if (hand >= 0.999) { group.visible = false; return; }
+    }
     since += dt;
     const wall = performance.now();
     if (since >= CLOUDS.rebuild || wall - lastWall > CLOUDS.rebuild * 4000) { since = 0; lastWall = wall; rebuild(camL, sunL, fields, skyU, look); }
     // what the shaders need every frame, in the drifting frame
     _qi.copy(Q).invert();
     own.uCloudSun.value.copy(sunL).applyQuaternion(_qi).normalize();
+    shState.sun.copy(sunL).normalize();
+    shState.centre.copy(camL).normalize().multiplyScalar(shState.Rg);
+    shState.has = true;
     own.uCamD.value.copy(camL).applyQuaternion(_qi).sub(anchor);
     for (const sh of [deck, valley]) sh.u.uCamD.value.copy(camL).applyQuaternion(_qi).sub(sh.anchor);
     // the eye in a cloud: the deepest it stands inside any lobe near it (the near air whites out, world/index.js)
