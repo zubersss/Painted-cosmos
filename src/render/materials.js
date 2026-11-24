@@ -23,6 +23,8 @@ const _q22 = (() => { try { return new URLSearchParams(location.search); } catch
 const _d22 = (k, d) => (_q22 && _q22.has(k) && isFinite(+_q22.get(k)) ? +_q22.get(k) : d);
 const _gf = (v) => (+v).toFixed(4);      // a number as GLSL must read it: a bare integer there is a type error, not a float
 const SKYFACE = _d22('skyface', 1), FLOORVAR = _gf(_d22('floorvar', 1)), FARCROWN = _gf(_d22('farcrown', 1));
+// (?farfix=0: the far trees' tables at eight kinds, as before 2026-11-24; see makePropMaterial)
+const FARFIX = (() => { try { return new URLSearchParams(location.search).get('farfix') !== '0'; } catch { return true; } })();
 // THE WATER'S PAINT KNOWS THE FALL, AND WHITE WATER WHERE IT CHURNS (the owner, 2026-11-23: the water should be
 // "constantly moving the way water would be naturally", with "airration"). Until now every dash on every river ran
 // at one fixed rate whatever the slope, and the only foam in the game was the sea's, raised by the wind. The mesher
@@ -1560,9 +1562,9 @@ varying vec3 vCardB;      // that centre on the body: a leaf is lit, shaded and 
 #ifdef PC_FAR
   attribute vec2 aInst2;  // species index into the far tables
   varying float vSpecies;
-  uniform float uFarTaper[8];
-  uniform float uFarTrunk[8];
-  uniform float uFarDrop[8];
+  uniform float uFarTaper[PC_NFAR];
+  uniform float uFarTrunk[PC_NFAR];
+  uniform float uFarDrop[PC_NFAR];
 #endif
 #ifdef PC_HOLLOW
   uniform vec4 uHollow;   // a spire's form in its own units: x girth at the foot, y height, z lean of the top along +Z (of the height)
@@ -1631,11 +1633,11 @@ uniform vec4 uLeafFam;
 uniform float uOilKind;
 uniform float uCanopy;
 #ifdef PC_FAR
-  uniform vec3 uFarA[8];
-  uniform vec3 uFarB[8];
-  uniform vec3 uFarC[8];
-  uniform vec4 uFarFam[8];
-  uniform float uFarKind[8];
+  uniform vec3 uFarA[PC_NFAR];
+  uniform vec3 uFarB[PC_NFAR];
+  uniform vec3 uFarC[PC_NFAR];
+  uniform vec4 uFarFam[PC_NFAR];
+  uniform float uFarKind[PC_NFAR];
   uniform vec3 uSunDirL;    // the sun (by night the moon) in the BODY'S own axes, which is the frame a crown's pieces are measured in here. Every painted material is already handed it (baseUniforms); the far program is the only one of these that reads it.
 #endif
 ${PC_UP_V}
@@ -2019,8 +2021,8 @@ uniform float uGem;       // 1: a crystal or a splinter of ice or glass, lit thr
 uniform vec4 uLeafFam;    // the oil look: each tree its own colour (rgb the third colour of the wood, a red; a how far each tree keeps to its own part of yellow, orange, red)
 uniform float uOilKind;   // the oil look: 0 a tree in leaf; 1 a tree of the snow, its boughs loaded (snow on what faces up); 2 a bare tree: its "leaves" are twigs
 #ifdef PC_FAR
-  uniform float uFarKind[8];
-  uniform vec4 uFarFam[8];
+  uniform float uFarKind[PC_NFAR];
+  uniform vec4 uFarFam[PC_NFAR];
 #endif
 uniform vec4 uOilDark;    // x: the share of this kind's trees whose bark is the dark pair below (the oil look's woods)
 uniform vec3 uOilDarkA;
@@ -2028,11 +2030,11 @@ uniform vec3 uOilDarkB;
 #endif
 uniform mat3 normalMatrix;
 #ifdef PC_FAR
-  uniform vec3 uFarA[8];
-  uniform vec3 uFarB[8];
-  uniform vec3 uFarC[8];
-  uniform vec3 uFarBarkA[8];
-  uniform vec3 uFarBarkB[8];
+  uniform vec3 uFarA[PC_NFAR];
+  uniform vec3 uFarB[PC_NFAR];
+  uniform vec3 uFarC[PC_NFAR];
+  uniform vec3 uFarBarkA[PC_NFAR];
+  uniform vec3 uFarBarkB[PC_NFAR];
   varying float vSpecies;
 #endif
 #ifdef PC_HOLLOW
@@ -2102,10 +2104,14 @@ void main() {
     // (the lighter paint: no noise for a plant's wash; and the speed test's flat plants, shared.js uOilL.y)
     vec4 n1 = uOilL.x > 0.5 ? vec4(0.5) : texture(uNoise3D, vBody / 9.0);
     // (uOilL.y 2: every plant one flat colour; 3: only the far trees, to tell their paint from their shapes)
+    // (2026-11-24, trees lane: the far test was 'over 1.5', so rows 5 and 6 -- a leaf in its own colour, no air on
+    //  the plants -- flattened every far tree as well and measured more than they said. Now only 2 and 3.)
     #ifdef PC_FAR
-    if (uOilL.y > 1.5) { pcWrite(vData.y > 4.5 ? uLeafA * 0.7 : uBarkB, 0.0, nV, -vView.z, 3.0); return; }
+    if (uOilL.y > 1.5 && uOilL.y < 3.5) { pcWrite(vData.y > 4.5 ? uLeafA * 0.7 : uBarkB, 0.0, nV, -vView.z, 3.0); return; }
     #else
     if (uOilL.y > 1.5 && uOilL.y < 2.5) { pcWrite(vData.y > 4.5 ? uLeafA * 0.7 : uBarkB, 0.0, nV, -vView.z, 3.0); return; }
+    // (7: the near trees' BARK one flat colour, every leaf and every discard as set -- trees lane T0 row c)
+    if (uOilL.y > 6.5 && uOilL.y < 7.5 && vData.y < 0.5) { pcWrite(uBarkB, 0.0, nV, -vView.z, 3.0); return; }
     #endif
   #else
     vec4 n1 = texture(uNoise3D, vBody / 9.0);
@@ -2840,7 +2846,14 @@ export function makePropMaterial(bodyU, opts = {}) {
   if (opts.far) {
     // far trees of every species share one mesh: per-instance species picks the washes
     defines.PC_FAR = 1;
-    const pad = (a) => { while (a.length < 8) a.push(a[a.length - 1].clone ? a[a.length - 1].clone() : a[a.length - 1]); return a; };
+    // (2026-11-24, the trees lane) THE TABLES HOLD EVERY KIND. They were eight long, and Earth in the oil look has
+    // thirteen kinds of tree: the far trees of the poplar, the oak, the birch, the willow and the sapling -- five of the
+    // autumn wood's six -- read past the end of every table (the graphics card clamps such a read to the last entry it
+    // has, or returns nothing), so they were drawn with another kind's colours, taper and colour family. ?farfix=0
+    // keeps the eight, for an A and a B.
+    const nFar = FARFIX ? Math.max(8, opts.far.length) : 8;
+    defines.PC_NFAR = nFar;
+    const pad = (a) => { while (a.length < nFar) a.push(a[a.length - 1].clone ? a[a.length - 1].clone() : a[a.length - 1]); if (a.length > nFar) a.length = nFar; return a; };
     const arr = (k) => ({ value: pad(opts.far.map((f) => new THREE.Vector3().fromArray(f[k]))) });
     own.uFarA = arr('leafA'); own.uFarB = arr('leafB'); own.uFarC = arr('leafC');
     own.uFarBarkA = arr('barkA'); own.uFarBarkB = arr('barkB');
@@ -3459,3 +3472,6 @@ export function standInFor(object, material) {
   standIns.set(material, s);
   return s;
 }
+
+// (the far impostors, render/impostor.js, take the plants' own air, the sky-facing line and the pcUp stand-in from here)
+export { FOG_VERT, SKYUP, PC_UP_F, FARCROWN };
