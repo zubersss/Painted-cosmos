@@ -88,7 +88,7 @@ the same time: this lane touches only the far parts of `flora.js`, `florakit.js`
 `render/impostor.js`, `render/shadow.js` and new rows in `core/bench.js`.
 
 **State (update this line every step):** (24 Nov, about 14:35) SMALL CROWNS ARE THE DEFAULT (`?impsmall=0` the old
-way), after F passed them with its colour fixes; look-director at 64f1742 merged into trees-far on the coordinator's
+way), after F passed them with its colour fixes, and F signed off the real-branch pair (ea41746); look-director at 64f1742 merged into trees-far on the coordinator's
 word (8f3848d; the impostor.js conflict kept my azL line and added F's pcSummerTree line). SEEN on the real branch,
 phone settings, autumn wood 15.4 h, roof on (`A1_small_default_*`): 1 km, the impostor zone hue 92 S 0.36 V 0.56 with
 ?impsmall=0, hue 85 S 0.46 V 0.68 by default, C's roof past the reach hue 77 S 0.46 V 0.74; 150 m V 0.48 -> 0.51,
