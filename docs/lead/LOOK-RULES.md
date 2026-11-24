@@ -160,6 +160,10 @@ golden hours are `pcGold()`. Targets for Earth (other worlds keep their own keys
 - **R2.2 MUST: darks are deep and quiet.** On screen, anything with V under 0.30 has HSV saturation at most 0.50
   (the references: conifer 0.31, trunk 0.33, meadow in shade 0.49). Today the stills measure 0.41 .. 0.57 for the
   darkest fifteenth of a still and the five private foliage shades reach 0.91 .. 0.94 (audit F4).
+  (AMENDED 24 Nov after the coordinator's S1 review, which this rule's first build failed: it is the GREEN and
+  ground darks that must be quiet, to about S 0.55 on screen (0.50 is the aim, 0.60 the most). A warm crown in
+  shade -- reds, oranges, golds over V 0.30 -- keeps its saturation: value down, saturation held or a little up.
+  That is the fire of the golden hour and it is not a dark. Judge it on S1: B's crowns as fiery as A's.)
 - **R2.3 MUST: the lights carry the colour, not the darks**: the most saturated paint in a picture is in the
   middle and light values (canopy 0.6 .. 0.9, as the references' 0.71 .. 0.86), and only the accents go over 0.90
   (the cloak, the lantern, flowers, fire, the aurora).

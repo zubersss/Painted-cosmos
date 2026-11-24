@@ -60,6 +60,8 @@ vec3 pcRound(vec3 body) {
 // (materials.js FOG_VERT pcFogAmountV) and a leaf's paint, worked out once a leaf (materials.js PROP_VERT, which
 // includes the PAINT chunk below). Anything that includes VERT_PARS already has it: do not declare it again.)
 uniform vec4 uOilAir;
+uniform vec4 uLookF;   // the look director's switches and the night's two numbers (shared.js; also declared in FRAG_PARS)
+uniform vec4 uLookN;
 #endif
 `;
 
@@ -163,7 +165,58 @@ float pcGold() { return (1.0 - smoothstep(0.48, 0.86, dot(uSunDirW, uUpW))) * uD
 vec3 pcOilSunC() { return mix(pow(uLight, vec3(uOilA.z)), vec3(1.0, 0.84, 0.52), 0.75 * pcGold()); }
 // (the cool key with its green drawn down: a shade leans to violet and maroon, not to slate)
 vec3 pcOilShadeC() { return pow(uGlaze, vec3(uOilA.w)) * vec3(1.0, uOilD.z, 1.0); }
-vec3 pcBody(vec3 c) { return pcDensity(c, uOilA.y); }
+// THE NIGHT KEY'S PULL (L1, 2026-11-24): by the moon only (uMoon is 0 by day, so by day this is the colour untouched),
+// a colour goes part of the way to its own VALUE in the night key's own hue (the cool key with its green kept: blue on
+// Earth, teal on Neptune). pcBody takes it, so every paint built on a body colour -- pcTone's local and shade, AND the
+// foliage shade that leaves, blades and far crowns still build for themselves from pcBody (LOOK-AUDIT F4, until L2) --
+// is in the night's key; pcTone's lit paint, which is not built on pcBody, takes it in pcTone. uLookN.y is the world's
+// share (world/index.js); uLookF.x 0 is the night exactly as it was.
+vec3 pcNight(vec3 c) {
+  float nk = uMoon * uLookF.x;
+  if (nk <= 0.0) return c;
+  vec3 shC = pcOilShadeC();
+  vec3 kh = shC / max(dot(shC, vec3(0.3, 0.5, 0.2)), 1e-3);
+  return mix(c, clamp(vec3(dot(c, vec3(0.3, 0.5, 0.2))) * kh, 0.0, 1.0), uLookN.y * nk);
+}
+vec3 pcBody(vec3 c) { return pcDensity(pcNight(c), uOilA.y); }
+// THE ONE FOLIAGE SHADE (L2, 2026-11-24; LOOK-AUDIT F4). Leaves, blades, far crowns and green floor dabs took their
+// shade from a private recipe written out five times in materials.js -- pcBody(pcDensity(c, 1.35)) * mix(1, the cool
+// key, 0.5) * 0.80 -- which takes a green blade to (0.10, 0.27, 0.03), saturation 0.91 at value 0.27, where the
+// owner's references put a meadow in shade at 0.49 and 0.33: the poster-paint darks the art pass of 18 Nov measured.
+// This is that recipe ONCE. (REWORKED the same day, after the coordinator's S1 review: the first version pulled every
+// hue half-way to grey and the autumn crowns at golden hour lost their fire, dull brown-maroon where the A was red
+// and orange. Now the recipe stands as it was -- value down, saturation held or up, which is what a lit wood's shade
+// does -- for every hue but the acid greens: a green (hue past about 70, the yellow-greens to the blue-greens) that
+// comes out saturated is brought toward its own value in a breath of the cool key's hue, only as far as takes it to
+// saturation about 0.55 (R2.2), and lifted by six tenths of that pull, so a quieted shade sits up in the shaded
+// grass's band (V 0.25-0.42) instead of sinking into murk. Worked through: the orange leaf's shade is the
+// recipe's own (0.57, 0.20, 0.03), untouched; the green blade (0.10, 0.27, 0.03), hue 102 and S 0.89, is pulled 0.49
+// of the way, to about (0.17, 0.28, 0.13), S 0.55 at value 0.28; an olive at hue 62 is untouched.) It takes pcBody,
+// so it is in the night's key (L1). uLookF.y 0 is the recipe exactly as it was.
+vec3 pcShadeLeaf(vec3 c) {
+  vec3 shC = pcOilShadeC();
+  vec3 d = pcBody(pcDensity(c, 1.35)) * mix(vec3(1.0), shC, 0.5) * 0.80;
+  if (uLookF.y < 0.5) return d;
+  float mx = max(d.r, max(d.g, d.b)), ch = mx - min(d.r, min(d.g, d.b)), s = ch / max(mx, 1e-4);
+  // (how green: with green the largest channel, how far red falls under it -- 0 at hue 60, 0.5 at 90, 1 from 120 on)
+  float gr = d.g >= mx ? clamp((d.g - d.r) / max(ch, 1e-4), 0.0, 1.0) : 0.0;
+  float w = smoothstep(0.15, 0.40, gr) * smoothstep(0.50, 0.75, s);
+  // (the share of the way to grey that leaves saturation 0.55: (ch - 0.55 mx) / (ch - 0.55 (mx - L)))
+  float L = dot(d, vec3(0.3, 0.5, 0.2));
+  float k = w * clamp((ch - 0.55 * mx) / max(ch - 0.55 * (mx - L), 1e-4), 0.0, 1.0);
+  vec3 g = vec3(L) * mix(vec3(1.0), shC / max(dot(shC, vec3(0.3, 0.5, 0.2)), 1e-3), 0.5);
+  return mix(d, g, k) * (1.0 + 0.6 * k);
+}
+// ONE LIGHT (L3, 2026-11-24; LOOK-AUDIT F3, LOOK-RULES R1.2a). The level for a stroke facing the sun by x (half-
+// Lambert, 0..1, with the stroke's own jitter already in it) that the sun reaches by sunny (1 lit .. 0 in cast shadow)
+// under a canopy of the given density. It is the GROUND's own formula, which was the reference: in cast shadow a
+// thing is in the shade step (level 1) whichever way it faces, under a closed canopy the deep one, and it is modelled
+// by the sun only where the sun reaches it. Each material used to make its own -- bark x * mix(0.55, 1, sunny), crown
+// dabs x * mix(0.62, 1, sunny), rock x * mix(0.45, 1, sunny), the explorer and the creatures no shadow at all -- so one
+// shadow came out at level 1 on the floor, 2 on a trunk, 2.4 on a crown and 3 on the figure. uLookF.z picks it.
+float pcLit(float x, float sunny, float canopy, float soft) {
+  return pcLevel(mix(min(x, 0.44) - 0.10 * canopy, x, sunny), soft);
+}
 // WHICH WAY A SURFACE FACES, FOR THE LIGHT THAT KNOWS UP FROM DOWN (2026-11-22). THE CONTRACT, so a material and
 // this chunk cannot drift apart:
 //   WHAT IT IS. pcUp is dot(normalize(vBody), n) -- the body's own up against the normal the surface is shaded by.
@@ -186,8 +239,20 @@ vec3 pcBody(vec3 c) { return pcDensity(c, uOilA.y); }
 // would not compile the plants at all.)
 float pcUp = 0.5;
 vec3 pcTone(vec3 c, float level) {
-  vec3 b = pcBody(c);
   vec3 sunC = pcOilSunC(), shC = pcOilShadeC();
+  // THE NIGHT KEY (L1, 2026-11-24; docs/lead/LOOK-AUDIT.md F1; the pull itself is pcNight above). By the moon the oil look painted the day's picture: the
+  // lit paint below takes three tenths of the key's colour and none of its strength, so under Earth's night light
+  // (0.80, 0.86, 1.0) open ground was the body colour times (1.00, 1.03, 1.12) -- as bright as by day and a breath
+  // bluer -- and the last pass then excused every warm pixel from the night's grade, so lemon grass and orange leaves
+  // stood at full strength under a night sky (the stills: the autumn wood's median value 0.54 at 23:00 against 0.42 at
+  // the golden hour). Now, by the moon only (uMoon: 0 by day, so nothing here moves by day), a colour first goes part
+  // of the way to its own VALUE in the night key's own hue (the cool key with its green kept: blue on Earth, teal on
+  // Neptune), and the lit and local paints are laid at the night's own strength. Value order is kept, so snow and pale
+  // things stay the lightest; the lantern, which paints from the stroke's own colour (pcLamp), keeps its gold.
+  // uLookN is the world's (world/index.js); uLookF.x 0 is the night exactly as it was.
+  float nk = uMoon * uLookF.x;
+  c = pcNight(c);
+  vec3 b = pcDensity(c, uOilA.y);      // (pcBody of the colour already pulled: pcBody itself would pull it twice)
   // (the lights are laid in lighter, yellower paint than the local colour, as a painter mixes them: the body colour's
   // full weight under a warm light turned every sunlit leaf and every sunlit patch of the floor to one orange)
   // (the light's own colour takes three tenths of a lit paint, not four: under the golden hours' light every lit leaf
@@ -205,6 +270,28 @@ vec3 pcTone(vec3 c, float level) {
   // (the violet is the cool key's own hue, its green drawn down: a plum by a day's violet key, a deep blue by a night's
   // teal one; a fixed violet turned a teal night's shadows purple)
   vec3 shH = shC / max(dot(shC, vec3(0.3, 0.5, 0.2)), 1e-3) * vec3(1.12, 0.84, 0.84);      // (by day about (1.12, 0.73, 1.12): a plum, red and blue level; with more blue the trunks' shade stood indigo)
+  // THE SHADE FOLLOWS THE BODY (L6, 2026-11-24; LOOK-AUDIT F8). That plum is the clip's shadow on an ORANGE leaf floor,
+  // and it was laid on everything: a green alpine slope turned from the sun went to a dark violet mass, its own colour
+  // gone (V median 0.13-0.16), and a grey rock face to a purple one. A painter's shade on a green field is a deeper,
+  // cooler green, on grey stone a blue-grey. So the key's hue is kept as it is for warm bodies (the orange floor keeps
+  // its plum: S1 must not move) and turned, by how green the body is (its hue from the olives to the blue-greens),
+  // toward the same key with its green kept and a breath of blue, and by how grey it is, part of the way there. uLookN.z is the switch (shared.js, ?shadehue=);
+  // 0 is the shade exactly as it was, AND THE DEFAULT: seen on 24 Nov it moves almost nothing (alpine vista 0.14 % of
+  // the pixels, S1 2.2 %, the green wood 0.5 %, the coast 0.34 %): the alpine slopes' violet is the look's own
+  // pigments (cobaltViolet, neutralTint, rawUmber) in deep shade, a data matter for the ground's owner, not this
+  // shade's plum. Kept behind a uniform branch, so it costs nothing while it is off.
+  if (uLookN.z > 0.0) {
+    float bmx = max(b.r, max(b.g, b.b)), bch = bmx - min(b.r, min(b.g, b.b)), bs = bch / max(bmx, 1e-4);
+    // (the body's hue in degrees: green from the olives at about 52 -- the meadow's yellow-green, which the ground's
+    // own green exception, k.g over k.r, never caught -- to the blue-greens; the autumn floor's golds sit under 48)
+    float ic = 1.0 / max(bch, 1e-4);
+    float bh = bmx == b.r ? 60.0 * (b.g - b.b) * ic : bmx == b.g ? 60.0 * (2.0 + (b.b - b.r) * ic) : 60.0 * (4.0 + (b.r - b.g) * ic);
+    bh = bh < 0.0 ? bh + 360.0 : bh;
+    float hw = max(smoothstep(48.0, 62.0, bh) * (1.0 - smoothstep(180.0, 205.0, bh)) * smoothstep(0.10, 0.25, bs),
+                   (1.0 - smoothstep(0.08, 0.22, bs)) * 0.6) * uLookN.z;
+    vec3 shG = shC / max(dot(shC, vec3(0.3, 0.5, 0.2)), 1e-3) * vec3(0.86, 1.02, 1.08);
+    shH = mix(shH, shG, hw);
+  }
   // (the sky's fill, and now by HOW MUCH OF THE SKY THE SURFACE CAN SEE: pcUp above. 0.52 + 0.96 * pcUp is 1.0 at
   // pcUp 0.5, which is what a material that does not set pcUp gets, so nothing moves until one does; flat ground
   // looking up takes 1.48 of it and a trunk 0.52, and the max keeps an underside from taking a negative fill.)
@@ -230,8 +317,8 @@ vec3 pcTone(vec3 c, float level) {
   // without their eye. On ?litcurve=0 the old paint comes back with the old curve.)
   vec3 g2 = mix(pcDensity(g1, 1.7), mix(g1, vec3(dot(g1, vec3(0.3, 0.5, 0.2))), 0.20) * 0.66, uOilAir.z);
   vec3 r = mix(g2, g1, clamp(level, 0.0, 1.0));
-  r = mix(r, loc, clamp(level - 1.0, 0.0, 1.0));
-  r = mix(r, lit, clamp(level - 2.0, 0.0, 1.0));
+  r = mix(r, loc * mix(1.0, uLookN.x, nk), clamp(level - 1.0, 0.0, 1.0));
+  r = mix(r, lit * mix(1.0, uLookN.x, nk), clamp(level - 2.0, 0.0, 1.0));
   return r;
 }
 vec3 pcToneWash(vec3 c, float level) {
@@ -323,7 +410,14 @@ float pcFogAmount(float dist) {
     // steady 19-25 % all the way up and at most 0.013 of haze different on the ground -- which is what was done.
     // It is a change to the air itself, in three files, and it still wants a still taken from a hilltop.
     float pcHigh = clamp((1.0 / max(uFog.x, 1e-6) - 200.0) / 2400.0, 0.0, 1.0);
-    dist *= mix(uOilC.w, 2.4, pcHigh);
+    // THE AIR FROM THE AIR (L5, 2026-11-24; LOOK-AUDIT F2). From the air the distance was taken 2.4 times and the
+    // ceiling below gone, so everything past a few hundred metres went wholly to the haze: the stills from the air
+    // measured the picture's saturation at 0.10, beige where the owner's aerial references are amber. uLookN.w
+    // (world/index.js: 0 on foot, 1 once the air's reach is the air's) takes the distance 1.4 times instead and keeps
+    // a share of the far land's own paint at every height (0.16 at the horizon, below). On foot it is 0 and nothing
+    // here moves; ?airfar=0 is the air exactly as it was. THE 2.4 AND THE 1.4 HAVE A TWIN in world/index.js
+    // (SHADOW.air, the lit air): change them together.
+    dist *= mix(mix(uOilC.w, 2.4, pcHigh), mix(uOilC.w, 1.4, pcHigh), uLookN.w);
   #endif
   float f = 1.0 - exp(-dist * uFog.x);
   #ifdef PC_OIL
@@ -365,12 +459,40 @@ float pcFogAmount(float dist) {
       float fc = knee + U * u * (u - 1.0) * (u - 1.0) + D * u * u * (3.0 - 2.0 * u);
       f = mix(min(fc, f), f, pcHigh * pcHigh);      // (the min is both the identity below the knee and the promise that this can never make the air THICKER than it was)
     }
+    if (uLookN.w > 0.0) {
+      // (L5: from the air the same knee, to a share of 0.16 kept: the land at the horizon from a mile up still shows a
+      // sixth of its own paint, as the far-view design's 0.86 of haze at the horizon asks; nothing nearer moves under
+      // the knee)
+      float keep = 0.16, cap = 1.0 - keep;
+      float knee = min(uOilAir.y, 1.0 - 2.0 * keep);
+      float U = 1.0 - knee, D = cap - knee;
+      float u = clamp((f - knee) / U, 0.0, 1.0);
+      float fc = knee + U * u * (u - 1.0) * (u - 1.0) + D * u * u * (3.0 - 2.0 * u);
+      f = mix(f, min(fc, f), uLookN.w);
+    }
   #endif
   return clamp(max(f * uFog.z, uAirNear.x * (1.0 - exp(-dist / max(uAirNear.y, 0.1)))), 0.0, 1.0);
 }
 
 `;
 export const AIR_FN = (name) => (name === 'pcFogAmount' ? AIR_SRC : AIR_SRC.replace('float pcFogAmount(float dist) {', 'float ' + name + '(float dist) {'));
+
+// (the sun at a place in the eye's space, L3: a piece of its own, so the creatures' vertex shader can take it too,
+// beastmat.js, with its own declarations of uShV, uSunV, uShTex and uShK)
+export const SUN_VIEW_SRC = /* glsl */`
+// THE SUN AT A PLACE GIVEN IN THE EYE'S SPACE (L3, 2026-11-24): for what has no place on the body to hand -- the
+// explorer, the creatures -- the shadow map asked through uShV. The place is taken a little toward the sun (lift, m)
+// so a figure is not shadowed by itself (it is drawn into the map: shadow.js); outside the square, and with no map,
+// it is in the sun. 1 lit .. 0 shaded. Needs uShV, uSunV, uShTex, uShK.
+float pcSunAtView(vec3 viewPos, float lift) {
+  if (uShK.x < 0.004) return 1.0;
+  vec3 q = (uShV * vec4(viewPos + uSunV * lift, 1.0)).xyz;
+  vec2 a = abs(q.xy);
+  float inside = (1.0 - smoothstep(uShK.w, 0.97, max(a.x, a.y))) * uShK.x;
+  if (inside < 0.004) return 1.0;
+  return mix(1.0, step(q.z - uShK.y, textureLod(uShTex, q.xy * 0.5 + 0.5, 0.0).r), inside);
+}
+`;
 
 export const FRAG_PARS = /* glsl */`
 #include <common>
@@ -406,9 +528,13 @@ uniform vec4 uOilD;
 uniform vec4 uOilS;
 uniform vec4 uOilG;
 uniform vec4 uOilAir;  // the air's ceiling and the light's four values (shared.js OIL.uOilAir; also declared in VERT_PARS)
+uniform vec4 uLookF;   // the look director's switches (shared.js OIL.uLookF; also declared in VERT_PARS)
+uniform vec4 uLookN;   // the night's two numbers for the world the eye is on (shared.js OIL.uLookN)
 uniform vec4 uOilL;    // x 1: the lighter paint (phones); y the speed test's flat modes (shared.js)
 uniform vec4 uOilPx;
 uniform mat4 uShM;
+uniform mat4 uShV;     // (the eye's space to the shadow map's square, shadow.js; L3: pcSunAtView)
+uniform vec3 uSunV;    // (the way to the sun in the eye's space, shadow.js)
 uniform highp sampler2D uShTex;
 uniform vec4 uShK;
 uniform sampler2D uShAir;
@@ -505,6 +631,16 @@ vec3 pcHazeAt(vec3 viewPos) {
 vec3 pcAtmosV(vec3 c, float f, vec3 viewPos) {
   vec3 h = pcOilHaze(pcHazeAt(viewPos));
   vec3 sunV = normalize((viewMatrix * vec4(uSunDirW, 0.0)).xyz);
+  if (uLookN.w > 0.0) {
+    // (L5, LOOK-AUDIT F6: the far air was one fixed mix of the gold and the blue-violet whichever way one looked, and
+    // the two are complementary: mixed they make the khaki of the golden hour from the air. A painter keeps them
+    // apart: the gold toward the sun, the blue-violet away from it and deeper with distance. From the air only, and
+    // the sky's lowest band does the same (sky.js pcSkyAir), so the land and the sky still meet in one air.)
+    float side = smoothstep(-0.4, 0.7, dot(normalize(viewPos), sunV));
+    vec3 hz = pcHazeAt(viewPos);
+    vec3 warm = mix(pow(hz, vec3(uOilC.x)), vec3(0.95, 0.85, 0.63), 0.75 * pcGold() * (0.45 + 0.55 * side));
+    h = mix(h, mix(warm, vec3(0.48, 0.50, 0.63), clamp(uOilS.x * mix(1.5, 0.45, side) * mix(0.8, 1.2, f), 0.0, 1.0)), uLookN.w);
+  }
   float toward = pow(max(dot(normalize(viewPos), sunV), 0.0), 3.0) * uDayness * (1.0 - uMoon) * (1.0 - uWx.x);
   h = mix(h, min(mix(pcOilSunC(), vec3(1.0), 0.5) * 1.05, vec3(1.0)), toward * uOilC.y);
   return mix(c, ${_far('c', 'h')}, f);      // (where ?farlight= is on, the thing's own light is carried into the air it stands in here: pcFarLight above. It is laid on the haze AFTER the sun's glow, so toward the sun, where the air goes to white, the gain can only be 1 or under and nothing burns out.)
@@ -688,7 +824,7 @@ float pcSunAtSoft(vec3 bodyPos, float canopy, float lift, float w, float r) {
   }
   return pcDappleS(bodyPos, canopy, lift, w);
 }
-#endif
+${SUN_VIEW_SRC}#endif
 
 // The shade the explorer and the ship lay on the ground: a soft-edged glaze under and beside
 // them (0 none .. 1 full), so they stand on the land instead of floating over it. rag: any

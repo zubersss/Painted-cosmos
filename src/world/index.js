@@ -92,6 +92,17 @@ export function createWorld(scene) {
   // (NOT a glaze: the bubble is laid in MARKS with gaps between them, in the scene pass, the same path the leaves
   //  in the air take -- see world/timefx.js. It was built as a glaze first and was invisible for it.)
   if (timeFx) { scene.add(timeFx.mesh); scene.add(timeFx.rip); }
+  // (group D, design-weather 2579208, T2: a storm's rain shafts and its lightning, world/storms.js, behind ?rainshaft=1 /
+  //  ?bolts=1 (or ?wx2=1); the oil look only. Its switches live in physics/wx2.js, and BOTH modules are fetched only
+  //  when the address names one of those switches -- so on a branch or a game without them nothing is ever asked
+  //  for, and the game without the switches loads nothing new. D's patch imported wx2.js at the top, which would have
+  //  stopped the world loading wherever wx2.js is not yet merged: the look director's one change to it.)
+  let storms = null;
+  if (LOOK.oil && typeof location !== 'undefined' && /[?&](wx2|rainshaft|bolts)=/.test(location.search || '')) {
+    import('../physics/wx2.js').then(({ WX2 }) => (WX2.rainshaft || WX2.bolts ? import('./storms.js').then((m) => {
+      storms = m.makeStorms(null, { shafts: WX2.rainshaft, bolts: WX2.bolts }); scene.add(storms.shafts); scene.add(storms.bolts);
+    }) : null)).catch((e) => console.warn('storms.js: ' + e.message));
+  }
 
   const sun = new THREE.Object3D();
   sun.name = 'pc-sun';
@@ -260,8 +271,9 @@ export function createWorld(scene) {
       const q = new URLSearchParams(location.search).get('skyceil');
       if (q === '0') return null;
       if (q) { const p = q.split(',').map(Number); if (p.length === 2 && p.every(isFinite) && p[1] > p[0] && p[0] >= 0) return { given: p }; }
+      if (q === '1') return { k: [3.5, 7.5] };
     } catch { /* no address */ }
-    return { k: [3.5, 7.5] };
+    return LOOK.lightNew ? { k: [3.5, 7.5] } : null;      // (on; off with ?light=old: render/shared.js, the look director's switch)
   })();
   function skyCeiling(body, look) {
     if (SKYCEIL.given) return SKYCEIL.given;
@@ -270,6 +282,34 @@ export function createWorld(scene) {
     const a = Math.max(1, body.atmosphereHeight || 1);
     return [a * SKYCEIL.k[0], a * SKYCEIL.k[1]];
   }
+  // THE AIR'S TOP (2026-11-24: T1 reworked after the coordinator's review, with the far-view design's FV1 folded in, so
+  // there is ONE change to where the air ends; docs/lead/FARVIEW-DESIGN.md FV1, docs/lead/LOOK-BUILD.md).
+  // T1's ceiling was a fixed 3.5 to 7.5 of a world's atmosphere. It is now read off WHAT THE EYE SEES OF ITS WORLD:
+  // the dip of the horizon below level, acos(R / (R + h)), with h the eye's height over the land under it. On the
+  // ground the dip is nothing and the world is a floor; as the eye climbs the horizon falls away and the world
+  // closes into a ball, and that -- not a height -- is when a painter's sky gives way to space. The sky stays a day
+  // sky to a dip of 52 degrees and is space by 66 (Earth, 4 km across: 2.5 km and 6.0 km, which is T1's 2.8 and 6.0
+  // brought a little lower; at the owner's mile the dip is 44 degrees, a day sky). A world's `weather.ceiling` row
+  // and `?skyceil=a,b` still name heights outright.
+  // And where a look turns it on (`oil.airTop`, Earth first: the far-view design checked Earth only) the same dip
+  // carries FV1's four numbers: the ground's own air (`air01`, gone to space's clear air from a dip of 46 to 59
+  // degrees, Earth 1.76 to 3.68 km, which is FV1's four times the old 440 to 920 m), the cloud deck seen from above
+  // (it gathers with the sky's own turn to space instead of from 480 m, where it lay as paper cut-outs over the wood),
+  // the relief's rounding toward the limb (from 0.6 radii up instead of 0.35), and the visibility, which keeps
+  // growing above 160 m, 1.2 m for every metre up to 1,640 m more. Under 160 m none of FV1 changes anything at all:
+  // every ramp reads 0 there exactly as before.
+  // The sky's own bands are also laid from the TRUE horizon from the air (uSkyAir.z, sky.js): from a mile up the
+  // horizon stands 44 degrees below level, and everything between it and level was one flat band of haze -- the
+  // coordinator's flat grey-blue sky at 1 to 3 km. Now the zenith deepens to blue, the band low down is the pale
+  // warm air, and the brush strokes run down to the limb. That turn is eased in from a dip of 10 to 17 degrees
+  // (Earth 62 m to 180 m: the coordinator's ruling, so the sky over the wood is painted from 150 m too -- no view
+  // between 62 m and 420 m had been approved by the owner); on foot, where the approved views are, nothing moves.
+  // `?airtop=0` is T1 exactly as it was committed (fixed heights, no FV1, no remapped bands); the watercolour game
+  // never reads any of it. (`?light=old` turns all of this, and T1's ceiling itself, off together: render/shared.js.)
+  const AIRTOP = (() => { if (!LOOK.oil) return 0; try { const q = new URLSearchParams(location.search).get('airtop'); if (q != null && isFinite(+q)) return +q ? 1 : 0; } catch { /* no address */ } return LOOK.lightNew ? 1 : 0; })();      // (on; off with ?light=old)
+  const DEG = 180 / Math.PI;
+  const dipOf = (h, R) => (h > 0 ? Math.acos(R / (R + h)) * DEG : 0);
+  const airTopOn = (look) => AIRTOP && look && look.oil && look.oil.airTop;
   // THE WEATHER GROUP'S HOOKS (WEATHER-DESIGN.md 8.4 T1 b-d): the 3D clouds (`src/world/clouds.js`, createClouds(scene),
   // update(dt, camL, root, sun, fields, uniforms), eyeInCloud01, renderShadow) and the weather field's textures
   // (`src/world/wxfield.js`, update(fields)). Neither file exists yet: they are group D's (W1) to write. So both are
@@ -541,7 +581,8 @@ export function createWorld(scene) {
       if (MODE.powers && MODE.oil && st === active) syncFireGlow(physics && physics.particles && physics.particles.system ? physics.particles.system.fires : null, st.id, st.camLocal);
       // (from orbit the limb closes on the mean sphere: chunks.js pcRound. Full relief to a third of a radius up, a quarter
       // of it from 0.8 radii (at a third Earth's alpine range still stood off the limb as a bump); about the sea's level where the world has one, so a coast stays a coast)
-      { const R = st.body.radius; st.bu.uRound.value.set(0.75 * THREE.MathUtils.smoothstep(st.camLocal.length() - R, R * 0.35, R * 0.8), R + (st.look.seaLevel || 0)); }
+      { const R = st.body.radius, r0 = st.body.atmosphereHeight > 0 && airTopOn(st.look) ? 0.6 : 0.35;      // (FV1: from 0.6 radii where the look turns the air's top on)
+        st.bu.uRound.value.set(0.75 * THREE.MathUtils.smoothstep(st.camLocal.length() - R, R * r0, R * 0.8), R + (st.look.seaLevel || 0)); }
       // sun direction
       const bu = st.bu;
       if (st.forcedTime != null) {
@@ -556,7 +597,11 @@ export function createWorld(scene) {
       const isActive = st === active;
       if (st.clouds) {
         // the deck gathers as you leave the atmosphere and thins away as you come down through it
-        const a01 = THREE.MathUtils.smoothstep(st.camLocal.length() - st.body.radius, st.body.atmosphereHeight * 0.6, st.body.atmosphereHeight * 1.6);
+        // (FV1, where the look turns the air's top on: the deck gathers with the sky's own turn to space, a dip of 52 to
+        // 66 degrees, not from 480 m, where it lay over the wood as paper cut-outs below the eye)
+        const a01 = st.body.atmosphereHeight > 0 && airTopOn(st.look)
+          ? THREE.MathUtils.smoothstep(dipOf(st.camLocal.length() - st.body.radius, st.body.radius), 52, 66)
+          : THREE.MathUtils.smoothstep(st.camLocal.length() - st.body.radius, st.body.atmosphereHeight * 0.6, st.body.atmosphereHeight * 1.6);
         st.clouds.visible = seen && a01 > 0.02;
         const cu = st.clouds.material.uniforms.uCloud.value;
         // banded worlds close into a full deck seen from outside
@@ -674,9 +719,16 @@ export function createWorld(scene) {
       // with the sky and the two at least agreed. With the mountain air on, the sky now reads the same height
       // the ground does. ?mtnair=0 gives back exactly the old pair.
       const spaceH = MTN_AIR ? alt : camR - body.radius;
-      const space01 = body.atmosphereHeight > 0 ? THREE.MathUtils.smoothstep(spaceH, atmH * 0.55, atmH * 1.15) : 1;
+      // (FV1, where the look turns the air's top on: space by the horizon's dip, as the ground's air below -- AIRTOP above)
+      const dip = dipOf(alt, body.radius), fv1 = body.atmosphereHeight > 0 && airTopOn(look);
+      const space01 = body.atmosphereHeight > 0 ? (fv1 ? THREE.MathUtils.smoothstep(dip, 46, 59) : THREE.MathUtils.smoothstep(spaceH, atmH * 0.55, atmH * 1.15)) : 1;
       // (the SKY's own number in the oil look: SKYCEIL above. Where it is off, or on an airless world, it is space01.)
-      const skySpace01 = SKYCEIL && body.atmosphereHeight > 0 ? (() => { const c = skyCeiling(body, look); return THREE.MathUtils.smoothstep(alt, c[0], c[1]); })() : space01;
+      const skySpace01 = SKYCEIL && body.atmosphereHeight > 0 ? (() => {
+        if (AIRTOP && !SKYCEIL.given && !(look.weather && look.weather.ceiling)) return THREE.MathUtils.smoothstep(dip, 52, 66);
+        const c = skyCeiling(body, look); return THREE.MathUtils.smoothstep(alt, c[0], c[1]);
+      })() : space01;
+      // (the sky's bands from the true horizon: its dot(view, up), eased in from a dip of 10 to 17 degrees; sky.js)
+      if (skyU.uSkyAir) skyU.uSkyAir.value.z = AIRTOP && body.atmosphereHeight > 0 ? -Math.sin(dip / DEG) * THREE.MathUtils.smoothstep(dip, 10, 17) : 0;
       const e = bu.uSunDirL.value.dot(_up);
       _east.crossVectors(Y, _up).normalize();
       const am = bu.uSunDirL.value.dot(_east) > 0;
@@ -692,6 +744,9 @@ export function createWorld(scene) {
       wDay -= lost; wNight += lost * 0.24;
       blendKeys(look, wDay, (am ? wTwi : 0) + lost * 0.40, (am ? 0 : wTwi) + lost * 0.36, wNight);
       const dayness = 1 - wNight;
+      // (the night key's two numbers for this world, L1: a look's oil.night.v and .c, else 0.60 and 0.45, or 0.85 and
+      // 0.20 where the world has a night key of its own -- Neptune's teal night, which the owner liked as it was)
+      if (LOOK.oil) { const on = look.oil && look.oil.night, nv = on && on.v != null ? on.v : on ? 0.85 : 0.60, nc = on && on.c != null ? on.c : on ? 0.20 : 0.45; OIL.uLookN.value.x = nv; OIL.uLookN.value.y = nc; }      // (z, w: shared.js)
       // ---- weather in the picture (PHYSICS' sky numbers; they belong to the air near the ground)
       // the sky numbers are eased over about two seconds before anything is painted from them
       // (PHYSICS' may move by 8 to 15 % a second: a wash must not jump). A forced sky, a first
@@ -811,9 +866,14 @@ export function createWorld(scene) {
       // the night key, the dust and the leaf fall all keep the old `space01`, so the blast radius of this is the
       // ground's air and nothing else.
       // (An airless world's land already went by `alt`, which is why that branch is unchanged.)
-      const air01 = body.atmosphereHeight > 0 ? (MTN_AIR ? THREE.MathUtils.smoothstep(alt, atmH * 0.55, atmH * 1.15) : space01)
+      // (FV1, where the look turns it on: the ground's air goes to space by the horizon's dip, 46 to 59 degrees -- see
+      // AIRTOP above -- and the visibility keeps growing over 160 m, 1.2 m a metre, to 1,640 m more)
+      const air01 = body.atmosphereHeight > 0 ? (fv1 ? THREE.MathUtils.smoothstep(dip, 46, 59) : MTN_AIR ? THREE.MathUtils.smoothstep(alt, atmH * 0.55, atmH * 1.15) : space01)
         : THREE.MathUtils.smoothstep(alt, 250, 2500);
-      const vis = (v0 * mist + (v1 - v0 * mist) * THREE.MathUtils.smoothstep(alt, 6, 160)) * (hazeK + (1 - hazeK) * air01) + 40000 * air01;
+      const vis = (v0 * mist + (v1 - v0 * mist) * THREE.MathUtils.smoothstep(alt, 6, 160) + (fv1 ? Math.min(1640, Math.max(0, alt - 160) * 1.2) : 0)) * (hazeK + (1 - hazeK) * air01) + 40000 * air01;
+      // (L5, the air from the air: 0 on foot, 1 once the air's reach is the air's -- the same reach the shaders read as
+      // pcHigh, (vis - 200) / 2400, taken from 0.25 to 0.80 of it, so the views on foot do not move; chunks.js)
+      OIL.uLookN.value.w = LOOK.oil ? (LOOK.airFar || 0) * THREE.MathUtils.smoothstep(Math.min(1, Math.max(0, (vis - AIR_HIGH_0) / AIR_HIGH_W)), 0.25, 0.80) : 0;
       bu.uFog.value.set(1 / vis, LOOK.oil ? LOOK.oilBands : 6, 1 - air01 * 0.9, space01 * st.limbK);      // (the oil look lays the air in ten bands, not six: shared.js LOOK.oilBands, `?bands=`. The watercolour's six are untouched.)
       if (bu.uFogBank) bu.uFogBank.value.set(bank * (1 - air01), look.bankSize || 150);
       // sky
@@ -831,6 +891,7 @@ export function createWorld(scene) {
         const psys = physics && physics.particles && physics.particles.system ? physics.particles.system : null;
         timeFx.update(cameraPos, active.root, _camL, bu, psys ? psys.times : null, active.id, psys ? psys.rips : null);
       }
+      if (storms) storms.update(cameraPos, active.root, _camL, bu, physics, active.id);
       skyU.uSkyHorizon.value.copy(tmpKey.horizon);
       skyU.uHaze.value.copy(tmpKey.haze);
       skyU.uCloudShade.value.copy(tmpKey.cloudShade);
@@ -899,6 +960,8 @@ export function createWorld(scene) {
     } else {
       // deep space: no atmosphere anywhere
       skyU.uAtmo.value.set(1, 1, 0.03, 1);
+      if (skyU.uSkyAir) skyU.uSkyAir.value.z = 0;      // (no world under the eye: no horizon to lay the bands from)
+      OIL.uLookN.value.w = 0;
       skyU.uCloud.value.y = 0; skyU.uWxSky.value.set(0, 0, 0, 0); WX.key = 0; WX.flash = 0;
       sun.getWorldPosition(_v2);
       skyU.uSunDirL.value.copy(_v2.sub(cameraPos)).normalize();
@@ -939,7 +1002,8 @@ export function createWorld(scene) {
     // air the light's own colour, gold through the look's golden hours; by the sun only, and strongest when it is low)
     {
       const fx = active.bu.uFog.value.x, reach = 1 / Math.max(fx, 1e-6), k4 = OIL.uOilC.value.w;
-      SHADOW.air = fx * (k4 + (2.4 - k4) * Math.min(1, Math.max(0, (reach - AIR_HIGH_0) / AIR_HIGH_W)));      // (the twin of chunks.js:336; see AIR_HIGH_* at the top of this file)
+      const hiA = Math.min(1, Math.max(0, (reach - AIR_HIGH_0) / AIR_HIGH_W)), lw = OIL.uLookN.value.w;      // (lw: L5's air from the air)
+      SHADOW.air = fx * (k4 + ((2.4 - k4) * (1 - lw) + (1.4 - k4) * lw) * hiA);      // (the twin of chunks.js pcFogAmount; see AIR_HIGH_* at the top of this file)
       const se = active.bu.uSunDirW.value.dot(active.bu.uUpW.value);
       const lowSun = 1 - THREE.MathUtils.smoothstep(se, 0.48, 0.86);
       // (how far this world takes the golden hours: a look's oil.gold; all the way on Earth, a third elsewhere)

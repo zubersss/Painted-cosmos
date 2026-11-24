@@ -3,6 +3,10 @@
 // value-stepped light, cool glaze shadows, dry-brush sparkle, banded aerial perspective. The
 // post passes (post.js) then treat the result as wet paint on paper.
 import * as THREE from 'three';
+// THE GROUND SEEN FROM THE AIR (group C, the far view): the canopy painted into the ground. Its shader text, its uniforms
+// and its switch (?canopy=) live in render/farground.js; the hooks in the ground's shaders are all inside #ifdef PC_CANOPY, which is set
+// only in the oil look with the switch on.
+import { CANOPY, CANOPY_DEBUG, CANOPY_DAB, CANOPY_VERT_DECL, CANOPY_VERT_MAIN, CANOPY_FRAG, canopyUniforms, GROUND_SEASON, SEASON_FRAG, seasonUniforms } from './farground.js';
 import { G, PHYS, PHYSW, PREV, OIL, LOOK, BURNPAINT, register, ensureGlobals, makeBodyUniforms } from './shared.js';
 import { MODE } from '../data/mode.js';
 import { FLORA_GLSL } from '../physics/flora.glsl.js';
@@ -259,6 +263,7 @@ varying vec3 vUpV;
 #ifdef PC_OIL
 varying vec3 vRel;        // the place measured from the eye, in the body's axes: small numbers, so its screen derivatives are exact (chunks.js pcGroundChartD)
 #endif
+${CANOPY_VERT_DECL}
 void main() {
   float d = distance(position, uCamLocal);
   float m = max(clamp((d - uMorph.x) / (uMorph.y - uMorph.x), 0.0, 1.0), uMorph.z);
@@ -275,6 +280,7 @@ void main() {
   vec4 mv = modelViewMatrix * vec4(p + pcRound(vBody), 1.0);
   vView = mv.xyz;
   vCol = mix(aColor, aColorP, m); vCol2 = mix(aColor2.rgb, aColor2P.rgb, m); vPar = mix(aParams, aParamsP, m);
+${CANOPY_VERT_MAIN}
   gl_Position = projectionMatrix * mv;
   ${VERT_END}
 }
@@ -408,6 +414,8 @@ vec3 pcSoot(vec3 paint, float stray, float ash) {
 }
 ${FIRE_GLOW}
 #endif
+${CANOPY_FRAG}
+${SEASON_FRAG}
 // The ground where a stroke lies (ds: the pixels from here to its centre; w: its width, m): its wash, the light's
 // level, the snow's cover, the canopy's colour and its cover there.
 void pcGroundAt(vec2 ds, float w, vec3 rnd, out vec3 c, out float lvl, out float snowC, out vec3 leaf, out float canopy) {
@@ -420,6 +428,9 @@ void pcGroundAt(vec2 ds, float w, vec3 rnd, out vec3 c, out float lvl, out float
   vec4 colC = clamp(vCol + gCdx * dsA.x + gCdy * dsA.y, 0.0, 1.0);
   vec3 col2C = clamp(vCol2 + gC2dx * dsA.x + gC2dy * dsA.y, 0.0, 1.0);
   vec4 parC = vPar + gPdx * dsA.x + gPdy * dsA.y;
+  #ifdef PC_SEASONG
+    col2C = pcSeasonFar(col2C, parC.z);      // (the far view, FV3: a wood's far colour is its trees' colour now, render/farground.js)
+  #endif
   vec3 nVc = normalize(vNV + gNvdx * dsA.x + gNvdy * dsA.y), nLc = normalize(vNL + gNldx * dsA.x + gNldy * dsA.y);
   c = mix(col2C, colC.rgb, gMid);                  // (far away the forest floor is its canopy)
   // (the lighter paint looks up no noise for a dab: its hue and weight vary by the dab's own numbers alone, pcGroundPaint)
@@ -469,12 +480,27 @@ void pcGroundAt(vec2 ds, float w, vec3 rnd, out vec3 c, out float lvl, out float
     // is a hole and not a stain; the light going out of it, as it does down a well, is what makes it one.
     lvl -= sqrt(gMark.z) * 0.95 + gMark.y * 0.35;
   #endif
+  #ifdef PC_CANOPY
+    // (the far view: is this dab a crown of the wood's roof seen from above, render/farground.js; asked at the dab's own
+    // centre with the stand and the needle share carried there, the floor's own wash and the land's own light)
+    pcCanopyAt(Bc, gCtrCh, clamp(vFarS + gSdx * dsA.x + gSdy * dsA.y, 0.0, 1.0), clamp(parC.w, 0.0, 1.0), colC.rgb, x, w, rnd, false);
+    #ifdef PC_FIRE
+      if (gMark.x > 0.3) gCan = 0.0;      // (no crown stands where the fire has been)
+    #endif
+  #endif
   leaf = pcDensity(col2C, 1.15);
+  #ifdef PC_SEASONG
+    leaf = pcSeasonLeaf(leaf, colC.rgb);     // (in summer a fallen leaf is last year's, brown)
+  #endif
   canopy = parC.z;
   gBc = Bc;
 }
 // One stroke's paint from that: its own colour (a fallen leaf's, for the share fk of the strokes), the snow, the light.
 vec3 pcGroundPaint(vec3 c, vec3 leaf, float fk, vec3 rnd, float snowC, float lvl) {
+  #ifdef PC_CANOPY
+    // (a dab of the painted canopy: the crown's own wash in the crown's own light, one flat colour, render/farground.js)
+    if (gCan > 0.5) return pcTone(pcDabTint(gCanC, rnd, gCanLf), gCanL);
+  #endif
   float f = step(1.0 - fk, fract(rnd.z * 13.7));
   // (bare ground and grass, where no leaf has fallen: a dab is the ground's colour or one of its two neighbouring
   // pigments, and a share of the dabs are laid a step deeper; lit grass all of one colour was a flat lemon patch,
@@ -489,7 +515,7 @@ vec3 pcGroundPaint(vec3 c, vec3 leaf, float fk, vec3 rnd, float snowC, float lvl
   // shade on grass blue-green. Only where the stroke's wash is green; earth, litter, rock and snow shade as they did.)
   vec3 tn = pcTone(k, lvl);
   float grn = smoothstep(0.02, 0.10, k.g - max(k.r, k.b)) * (1.0 - snowC);
-  if (grn > 0.0) tn = mix(tn, mix(pcBody(pcDensity(k, 1.35)) * mix(vec3(1.0), pcOilShadeC(), 0.5) * 0.80, tn, smoothstep(1.2, 2.0, lvl)), grn);
+  if (grn > 0.0) tn = mix(tn, mix(pcShadeLeaf(k), tn, smoothstep(1.2, 2.0, lvl)), grn);
   #ifdef PC_FIRE
     // (the powers, fire) WHERE THE FIRE PASSED, THIS STROKE IS LAID IN CHARCOAL instead of its own colour. It is asked
     // at the STROKE'S OWN CENTRE (gBc, which is where this stroke's paint is worked out anyway), so the edge of a burn
@@ -627,6 +653,9 @@ void main() {
   gC2dx = dFdx(vCol2); gC2dy = dFdy(vCol2);
   gPdx = dFdx(vPar); gPdy = dFdy(vPar);
   gNvdx = dFdx(vNV); gNvdy = dFdy(vNV); gNldx = dFdx(vNL); gNldy = dFdy(vNL);
+  #ifdef PC_CANOPY
+    gSdx = dFdx(vFarS); gSdy = dFdy(vFarS);
+  #endif
   float wpx = uOilA.x * uOilPx.y / 720.0;
   vec3 c, leaf; float lvl, snowC, canopy;
   vec3 acc;
@@ -723,9 +752,26 @@ void main() {
   float rdx = dot(upB, gBdx), rdy = dot(upB, gBdy);
   acc = vec3(0.0);
   float rem = 1.0;
+  #ifdef PC_CANOPY
+    // (the far view's canopy is carried by these dabs only: render/farground.js. The eye on the body, and the sun's way
+    // along the ground's chart and its height, once a pixel)
+    // (on a world with no painted canopy, and wherever the eye is not well above this place -- on foot nearly
+    // everywhere -- it is off for the whole pixel at one comparison: the dabs never ask)
+    gCanOn = uCanK.w * step(10.0, -dot(vRel, upB));
+    if (gCanOn > 0.5) {
+      gEye = vBody - vRel;
+      gSunE = dot(upB, uSunDirL);
+      vec2 scCan = pcGroundChartD(vBody, uSunDirL - upB * gSunE, uBodyR);
+      gSunCh = scCan / max(length(scCan), 1e-6);
+    }
+  #endif
   // (the speed test's flat ground: no strokes at all, shared.js uOilL.y; the lighter paint: two layers, the coarsest
   // left to the ground's own colour)
   if (uOilL.y > 0.5 && uOilL.y < 1.5) rem = 0.0;
+  #ifdef PC_CANOPY
+    // (the far view: the wood's roof first, in its own smaller dabs; what it covers whole is finished, render/farground.js)
+    pcCanopyLayers(ch, dlx, dly, o4.x, wpx, ocl, rB, rdx, rdy, acc, rem);
+  #endif
   for (int L = 0; L < 3; L++) {
     if (rem < 0.004) break;
     if (L == 2 && uOilL.x > 0.5) break;
@@ -735,6 +781,9 @@ void main() {
                L == 0 ? vec2(0.35, 0.65) : L == 1 ? vec2(0.0, 0.35) : vec2(1.0, -1.0), rnd, ctr, ds, cov, rnd2, has2);
     if (cov <= 0.0) continue;
     gCtrB = pcGroundUnchart(vBody, ctr, uBodyR) * (rB + rdx * ds.x + rdy * ds.y);
+    #ifdef PC_CANOPY
+      gCtrCh = ctr;
+    #endif
     pcGroundAt(ds, w, rnd, c, lvl, snowC, leaf, canopy);
     // (under trees the floor is nearly all fallen leaves, with the earth dark between: the clip's. A world may keep
     // more of its grass there, uGroundK.w: the owner's later references have grass under the trees and leaves strewn on it)
@@ -745,6 +794,9 @@ void main() {
     // colour (pcDensity of the canopy wash), because line 413 still takes the dab's ground colour toward that
     // canopy by gMid. ?floorvar=0.5 is half of it, ?floorvar=0 is exactly what shipped.)
     float fk = clamp(canopy * 1.6, 0.0, 0.88) * gVar * (uGroundK.w > 0.0 ? uGroundK.w : 1.0);
+    #ifdef PC_SEASONG
+      fk *= pcSeasonLeafK();                 // (a quarter of the fallen leaves in high summer, all of them in autumn)
+    #endif
     acc += rem * cov * pcGroundPaint(c, leaf, fk, rnd, snowC, lvl);
     rem *= 1.0 - cov;
     if (has2 > 0.5 && rem >= 0.004) { acc += rem * pcGroundPaint(c, leaf, fk, rnd2, snowC, lvl); rem = 0.0; }
@@ -756,7 +808,16 @@ void main() {
     ${SKYUP('dot(normalize(vNL), normalize(vBody))')}
     float x0 = dot(nV, gSunV) * 0.5 + 0.5;
     float sun0 = min(pcSunAtSoft(vBody, vPar.z * mix(0.82, 1.0, gMid), 8.0, max(lw, o4.x * 0.5), 0.5), 1.0 - pcCast(vBody, 0.0));
-    vec3 bare = pcTone(pcDensity(mix(vCol2, vCol.rgb, gMid), 1.15), pcLevel(mix(min(x0, 0.44) - 0.10 * vPar.z, x0, sun0), 0.05));
+    vec3 bareC = pcDensity(mix(vCol2, vCol.rgb, gMid), 1.15);
+    #ifdef PC_SEASONG
+      bareC = pcDensity(mix(pcSeasonFar(vCol2, vPar.z), vCol.rgb, gMid), 1.15);
+    #endif
+    #ifdef PC_CANOPY
+      // (under the painted canopy the ground between the dabs is the crowns' mean wash over the share they cover)
+      vec4 canM = pcCanopyMean(vFarS, vPar.w);
+      bareC = mix(bareC, canM.rgb, canM.a);
+    #endif
+    vec3 bare = pcTone(bareC, pcLevel(mix(min(x0, 0.44) - 0.10 * vPar.z, x0, sun0), 0.05));
     #ifdef PC_FIRE
       // (the powers, fire) The ground that shows BETWEEN the strokes is charred too, or a burnt patch would show its
       // old green through the gaps between its black strokes. This one is a smooth wash and not a stroke, so it takes
@@ -976,6 +1037,14 @@ export function makeTerrainMaterial(bodyU) {
     vertexShader: TERRAIN_VERT, fragmentShader: TERRAIN_FRAG,
   });
   m.userData.pcPainted = true;
+  // (the far view's painted canopy: compiled in only with the oil look and ?canopy= on; a world without a painted canopy
+  // keeps uCanK.w at 0 and returns before any of it is worked out. terrain.js writes the season's crowns each frame.)
+  if (LOOK.oil && CANOPY > 0) {
+    m.defines = m.defines || {}; m.defines.PC_CANOPY = 1; m.defines.PC_CAN_DAB = _gf(CANOPY_DAB); Object.assign(m.uniforms, canopyUniforms());
+    if (CANOPY_DEBUG) m.defines.PC_CANDEBUG = 1;
+  }
+  // (the far view, FV3: the floor and the far colour follow the year; compiled in only with the oil look and ?groundseason=)
+  if (LOOK.oil && GROUND_SEASON) { m.defines = m.defines || {}; m.defines.PC_SEASONG = 1; Object.assign(m.uniforms, seasonUniforms()); }
   // (the powers, fire: the ground goes black where the fire passed. Only with ?powers=1 and ?look=oil; see addFire.)
   addFire(m, true);
   return register(m, 'terrain');
@@ -1504,7 +1573,10 @@ float pcSunAtV(vec3 bodyPos, float canopy, float r) {
   }
   return pat;
 }
-vec3 pcLeafDeep(vec3 cs) { return pcBody(pcDensity(cs, 1.35)) * mix(vec3(1.0), pcOilShadeC(), 0.5) * 0.80; }
+// (the trees lane's one leaf shade, for its own programs: since the merge with the look director's lane it IS the shared
+// foliage shade, chunks.js pcShadeLeaf, whose off branch (uLookF.y 0, the default without ?light=new) is this recipe
+// exactly: pcBody(pcDensity(cs, 1.35)) * mix(vec3(1.0), pcOilShadeC(), 0.5) * 0.80)
+vec3 pcLeafDeep(vec3 cs) { return pcShadeLeaf(cs); }
 `;
 
 const PROP_VERT = /* glsl */`
@@ -1916,7 +1988,7 @@ void main() {
       // It is laid in the deep tone whatever the sun: the dark the leaves stand on. Nothing else has a shade over 1.)
       if (aData.z > 1.5) xl = 0.2;
       float lvL = pcLevel(xl, 0.03);
-      vec3 deepL = pcLeafDeep(cs);
+      vec3 deepL = pcShadeLeaf(cs);      // (L2: the one foliage shade, chunks.js)
       vLeafC.rgb = mix(deepL, pcTone(cs, lvL), smoothstep(1.2, 2.0, lvL));
       vLeafK.rgb = cs;
       #ifdef PC_FIRE
@@ -2244,8 +2316,9 @@ void main() {
     vec3 nvdx = dFdx(vNV), nvdy = dFdy(vNV), mvdx = dFdx(vMassV), mvdy = dFdy(vMassV);
     vec3 vwdx = dFdx(vView), vwdy = dFdy(vView), bdx = dFdx(vRelO), bdy = dFdy(vRelO);      // (the place's derivatives from a position measured from the eye: the body's own coordinates are too coarse to difference, chunks.js pcGroundChartD)
     float pale = smoothstep(0.55, 0.9, dot(barkA, vec3(0.333)));
-    float xb0 = (dot(nV, sunV) * 0.5 + 0.5) * mix(0.55 + 0.30 * pale, 1.0, pcSunAt(vBody, canopy * 0.8, 8.0 - vAbove, oc.x));
-    vec3 acc = isBark ? pcTone(mix(barkA, barkB, 0.16), pcLevel(xb0, 0.04)) : pcTone(pcDensity(leafC, 1.5), 0.7);
+    float xbF = dot(nV, sunV) * 0.5 + 0.5, xbS = pcSunAt(vBody, canopy * 0.8, 8.0 - vAbove, oc.x);      // (L3: one light)
+    float xb0 = xbF * mix(0.55 + 0.30 * pale, 1.0, xbS);
+    vec3 acc = isBark ? pcTone(mix(barkA, barkB, 0.16), uLookF.z > 0.5 ? pcLit(xbF, xbS, canopy * 0.8, 0.04) : pcLevel(xb0, 0.04)) : pcTone(pcDensity(leafC, 1.5), 0.7);
     float accA = isBark ? 1.0 : 0.0;
     for (int L = 1; L >= 0; L--) {
       float w = oc.x * (L == 1 ? 2.0 : 1.0);
@@ -2277,9 +2350,10 @@ void main() {
         k1 *= mix(vec3(1.0), mix(vec3(1.12, 0.96, 0.80), vec3(0.90, 0.90, 1.08), rnd.z), 0.7 * uOilB.z * fine);
         k2 *= mix(vec3(1.0), mix(vec3(1.12, 0.96, 0.80), vec3(0.90, 0.90, 1.08), rnd2.z), 0.7 * uOilB.z * fine);
         xs_ = dot(nVc, sunV) * 0.5 + 0.5;
-        xs_ *= mix(0.55 + 0.30 * pale, 1.0, pcSunAt(Bc, canopy * 0.8, 8.0 - vAbove, w));
+        float xsF = xs_ + (rnd.x - 0.5) * 0.10 * fine, xsS = pcSunAt(Bc, canopy * 0.8, 8.0 - vAbove, w);      // (L3: one light)
+        xs_ *= mix(0.55 + 0.30 * pale, 1.0, xsS);
         xs_ += (rnd.x - 0.5) * 0.10 * fine;
-        float lvl = pcLevel(xs_, 0.03), pk = pale * 0.45 * max(uDayness, uMoon);
+        float lvl = uLookF.z > 0.5 ? pcLit(xsF, xsS, canopy * 0.8, 0.03) : pcLevel(xs_, 0.03), pk = pale * 0.45 * max(uDayness, uMoon);
         vec3 l1 = mix(pcTone(k1, lvl), pcTone(k1, max(lvl, 1.0) * 0.5 + 1.0), pk), l2 = mix(pcTone(k2, lvl), pcTone(k2, max(lvl, 1.0) * 0.5 + 1.0), pk);
         l1 = pcLamp(l1, k1, Bc, rnd.y); l2 = pcLamp(l2, k2, Bc, rnd2.y);
         #ifdef PC_FIRE
@@ -2313,13 +2387,14 @@ void main() {
         // (the sun behind a crown comes through its leaves: those glow)
         float through = pow(max(dot(-Vc, sunV), 0.0), 1.5);
         xs_ = max(xs_, through * (0.55 + 0.45 * rnd.x));
-        xs_ *= mix(0.62, 1.0, pcSunAt(Bc, canopy * 0.6, 8.0 - vAbove, w));
-        xs_ += (vData.w - 0.5) * 0.22 + (rnd.y - 0.5) * 0.20;
-        xs_ = max(xs_, 0.30 + 0.18 * rnd.x + (vData.w - 0.5) * 0.14);
-        float lvl = pcLevel(xs_, 0.03);
+        float xcJ = (vData.w - 0.5) * 0.22 + (rnd.y - 0.5) * 0.20, xcF = xs_ + xcJ, xcS = pcSunAt(Bc, canopy * 0.6, 8.0 - vAbove, w), xcFl = 0.30 + 0.18 * rnd.x + (vData.w - 0.5) * 0.14;      // (L3: one light)
+        xs_ *= mix(0.62, 1.0, xcS);
+        xs_ += xcJ;
+        xs_ = max(xs_, xcFl);
+        float lvl = uLookF.z > 0.5 ? max(pcLit(xcF, xcS, canopy * 0.6, 0.03), pcLevel(xcFl, 0.03)) : pcLevel(xs_, 0.03);
         // (a crown's shade is its own colour laid heavier with half the cool key over it: the key alone over an orange
         // crown is mud; light comes through leaves)
-        vec3 deepF = pcBody(pcDensity(cs, 1.35)) * mix(vec3(1.0), pcOilShadeC(), 0.5) * 0.80;
+        vec3 deepF = pcShadeLeaf(cs);      // (L2: the one foliage shade, chunks.js)
         vec3 lit = pcLamp(mix(deepF, pcTone(cs, lvl), smoothstep(1.2, 2.0, lvl)), cs, Bc, rnd.y);
         #ifdef PC_FIRE
           lit = pcFireLit(lit, cs, Bc, rnd.y);      // (the powers, fire: the leaves over a fire are lit by it, dab by dab)
@@ -2454,8 +2529,9 @@ void main() {
       float upF = dot(nV, upV);
       float snowR = max(pcSnowCover(upF * 0.5 + 0.5, fh, 0.0), uGroundK.x * step(0.55, upF));
       c = mix(c, vec3(0.92, 0.95, 0.98), snowR);
-      x = (dot(nV, sunV) * 0.5 + 0.5) * mix(0.45, 1.0, pcSunAt(vBody, canopy, 8.0 - vAbove, 0.3));
-      float lvlR = floor(pcLevel(x, 0.04) * 2.0 + 0.5) * 0.5;
+      float xrF = dot(nV, sunV) * 0.5 + 0.5, xrS = pcSunAt(vBody, canopy, 8.0 - vAbove, 0.3);      // (L3: one light)
+      x = xrF * mix(0.45, 1.0, xrS);
+      float lvlR = floor((uLookF.z > 0.5 ? pcLit(xrF, xrS, canopy, 0.04) : pcLevel(x, 0.04)) * 2.0 + 0.5) * 0.5;
       if (uGem > 0.5) lvlR = max(lvlR, 1.5);      // (a crystal is lit through: none of its faces goes to the deep step)
       vec3 kR = c;                                // (its own wash, kept: the lantern and the fire mix their light from it)
       c = pcLamp(pcTone(c, lvlR), kR, vBody, fh);
@@ -3077,7 +3153,10 @@ void main() {
     pcThinLayer(fch, fdx, fdy, foc.x, 5.0, vObj, 40.0, 2.0, fr1, fds, fown, fr2);
     vec3 co = pcWetWash(pcDensity(vCol, 1.0 + (smoothstep(0.42, 0.62, fold) - 0.45) * 0.30 * (1.0 - max(vMat.z, 0.0))), 0.7);
     float sunF = dot(nV, sunV);
-    float lvo = pcLevel(sunF * 0.5 + 0.5, 0.05) + 0.9 * smoothstep(0.50, 0.85, rim) * smoothstep(0.0, 0.5, sunF) * uDayness;
+    // (L3, one light: the figure stands in the same shadow as everything else, read at its own place lifted 0.8 m
+    // toward the sun so it is not shadowed by itself; its rim is the sun's, so it goes with the sun)
+    float sunFg = uLookF.z > 0.5 ? pcSunAtView(vView, 0.8) : 1.0;
+    float lvo = (uLookF.z > 0.5 ? pcLit(sunF * 0.5 + 0.5, sunFg, 0.0, 0.05) : pcLevel(sunF * 0.5 + 0.5, 0.05)) + 0.9 * smoothstep(0.50, 0.85, rim) * smoothstep(0.0, 0.5, sunF) * uDayness * sunFg;
     // (the light in flat steps, half a tone each, with clean edges between them: a limb shaded smoothly from light to
     // dark was a rendered cylinder, the one soft gradient on the figure)
     lvo = floor(lvo * 2.0 + 0.5) * 0.5;
@@ -3321,7 +3400,7 @@ void main() {
       ko = mix(ko, vec3(1.0), uWx.z * smoothstep(0.35, 0.9, vS.x) * 0.8);
       // (in the shade a stroke is its own colour laid heavier with half the cool key over it, as a leaf's is: the key
       // whole made the grass of a shaded bank a violet brown)
-      vec3 deepO = pcBody(pcDensity(ko, 1.35)) * mix(vec3(1.0), pcOilShadeC(), 0.5) * 0.80;
+      vec3 deepO = pcShadeLeaf(ko);      // (L2: the one foliage shade, chunks.js)
       vec3 co = pcLamp(mix(deepO, pcTone(ko, lv), smoothstep(1.2, 2.0, lv)), ko, vRootB, r3o.y);
       #ifdef PC_FIRE
         // (the powers, fire: the grass at the foot of a fire is lit by it, blade by blade, and the blades standing
