@@ -202,6 +202,17 @@ vec3 pcShadeLeaf(vec3 c) {
   // (how green: with green the largest channel, how far red falls under it -- 0 at hue 60, 0.5 at 90, 1 from 120 on)
   float gr = d.g >= mx ? clamp((d.g - d.r) / max(ch, 1e-4), 0.0, 1.0) : 0.0;
   float w = smoothstep(0.15, 0.40, gr) * smoothstep(0.50, 0.75, s);
+  // (and the OLIVE DARKS, 24 Nov, found by B on the coast: a grey-green body, S 0.26, comes out of the recipe's density
+  // as a dark olive (0.24, 0.26, 0.11), S 0.60 at V 0.26 -- hue about 67, under the greens above, so it slipped through.
+  // R2.2 wants a dark under V 0.30 at S 0.50 or under; so a yellow-green to blue-green that comes out DARK (V under
+  // about 0.32) and saturated is quieted the same way. The warm crowns are reds, oranges and golds under hue 45 and
+  // their shade is far lighter than this, so they are untouched.)
+  {
+    float ic = 1.0 / max(ch, 1e-4);
+    float h = mx == d.r ? 60.0 * (d.g - d.b) * ic : mx == d.g ? 60.0 * (2.0 + (d.b - d.r) * ic) : 60.0 * (4.0 + (d.r - d.g) * ic);
+    h = h < 0.0 ? h + 360.0 : h;
+    w = max(w, smoothstep(44.0, 54.0, h) * (1.0 - smoothstep(180.0, 200.0, h)) * (1.0 - smoothstep(0.28, 0.34, mx)) * smoothstep(0.50, 0.70, s));
+  }
   // (the share of the way to grey that leaves saturation 0.55: (ch - 0.55 mx) / (ch - 0.55 (mx - L)))
   float L = dot(d, vec3(0.3, 0.5, 0.2));
   float k = w * clamp((ch - 0.55 * mx) / max(ch - 0.55 * (mx - L), 1e-4), 0.0, 1.0);
