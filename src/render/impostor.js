@@ -30,7 +30,7 @@
 import * as THREE from 'three';
 import { VERT_PARS, VERT_END, FRAG_PARS } from './chunks.js';
 import { FOG_VERT, SKYUP, PC_UP_F, FARCROWN, makePaintUniforms } from './materials.js';
-import { FRAME_HOOKS, register } from './shared.js';
+import { FRAME_HOOKS, register, OIL } from './shared.js';
 
 const _q = (() => { try { return new URLSearchParams(location.search); } catch { return null; } })();
 const _qn = (k, d, lo, hi) => { const v = _q && _q.has(k) ? +_q.get(k) : NaN; return isFinite(v) ? Math.max(lo, Math.min(hi, v)) : d; };
@@ -587,4 +587,104 @@ export function makeImpostorMaterial(bodyU, atlas, farMat, farcrown = FARCROWN) 
   m.userData.impAtlas = atlas;
   register(m, 'impostor', null);
   return m;
+}
+
+// ---- the impostors' own cast shadows, from the air (T6's option; ?impshadow=1) ---------------------------------------
+// A far tree has thrown no shadow in the oil look (flora.js: the 138-triangle far tree drawn again from the sun was 2.8
+// ms on the phone), so from the air no crown has a shadow lying beside it (LOOK-RULES R1.3d; the references from a few
+// hundred metres: "each tree ... with its shadow lying on the grass beside it"). An impostor can throw one for two
+// triangles: its quad is turned to face the SUN, the view baked nearest the sun's direction is read, and only the
+// strokes that are there are drawn into the map -- the crown's silhouette as the sun sees it. A share of a crown's strokes
+// casts, as a share of a near crown's leaves does (shadow.js uThinLeaf), so the shade on the floor is broken by light.
+// Drawn only from the air (shadow.js: SHADOW_CROWD, the shadow pass's own list of meshes with a shadow twin), where no
+// near or middle tree stands in the square at all.
+export const IMP_SHADOW = _q ? _q.get('impshadow') === '1' : false;
+const IMP_SH_VERT = /* glsl */`
+attribute vec4 aInst;
+attribute vec2 aInst2;
+uniform vec3 uCamLocal;
+uniform vec4 uLod;
+uniform float uInv;
+uniform vec3 uSunDirL;
+uniform vec4 uImpK;
+uniform vec4 uImpAtlas;
+uniform vec4 uImpC[PC_IMP_NV];
+uniform vec4 uImpH[PC_IMP_NV];
+uniform vec4 uShK;
+varying float vS;
+varying vec2 vQuad;
+flat varying vec4 vTile;
+flat varying float vLod;
+void main() {
+  mat4 im = instanceMatrix;
+  vec3 io = im[3].xyz;
+  float di = distance(io, uCamLocal);
+  float j = 1.0 + (aInst.z - 0.5) * uLod.z;
+  float vis = step(uLod.x * j, di) * (1.0 - smoothstep(uLod.y * j * uLod.w, uLod.y * j, di)) * uImpK.x;
+  int ly = int(aInst2.y + 0.5);
+  vec4 CR = uImpC[ly];
+  vec2 HR = uImpH[ly].xy;
+  mat3 ir = mat3(im);
+  vec3 d = normalize(inverse(ir) * uSunDirL);
+  vec3 dh = vec3(d.x, max(d.y, 0.0), d.z);
+  dh /= abs(dh.x) + dh.y + abs(dh.z) + 1e-6;
+  float N = uImpK.y;
+  vec2 cell = clamp(floor((vec2(dh.x + dh.z, dh.x - dh.z) * 0.5 + 0.5) * N), 0.0, N - 1.0);
+  vec2 qc = (cell + 0.5) / N * 2.0 - 1.0;
+  vec2 pc = vec2(qc.x + qc.y, qc.x - qc.y) * 0.5;
+  vec3 dc = normalize(vec3(pc.x, 1.0 - abs(pc.x) - abs(pc.y), pc.y));
+  vec3 ref = abs(dc.y) > 0.999 ? vec3(0.0, 0.0, 1.0) : vec3(0.0, 1.0, 0.0);
+  vec3 rt = normalize(cross(ref, dc));
+  vec3 up = cross(dc, rt);
+  float sinE = clamp(dc.y, 0.0, 1.0);
+  vec2 hwv = vec2(CR.w, HR.x * sqrt(1.0 - sinE * sinE) + CR.w * sinE);
+  vec3 lp = CR.xyz + rt * (position.x * hwv.x) + up * (position.y * hwv.y);
+  vec3 wp = (im * vec4(lp * vis, 1.0)).xyz;
+  vec4 mv = modelViewMatrix * vec4(wp, 1.0);
+  vS = -mv.z * uInv;
+  vQuad = position.xy * 0.5 + 0.5;
+  float T = uImpK.z;
+  float col = mod(float(ly), uImpAtlas.z), row = floor(float(ly) / uImpAtlas.z);
+  vTile = vec4(((vec2(col, row) * N + cell) * T) / uImpAtlas.xy, vec2(T) / uImpAtlas.xy);
+  // (the level by the map's own texel: the square is projectionMatrix's 2 / width across, uShK.z one texel of it)
+  float texel = 2.0 / max(projectionMatrix[0][0], 1e-6) * max(uShK.z, 1.0 / 4096.0);
+  float px = 2.0 * max(hwv.x * length(ir[0]), hwv.y * length(ir[1])) / max(texel, 1e-4);
+  vLod = clamp(floor(log2(T / max(px, 1e-3)) + 0.5), 0.0, uImpK.w);
+  gl_Position = projectionMatrix * mv;
+}
+`;
+const IMP_SH_FRAG = /* glsl */`
+uniform highp sampler2D uImpTex;
+uniform vec4 uImpK;
+uniform float uThinLeaf;
+varying float vS;
+varying vec2 vQuad;
+flat varying vec4 vTile;
+flat varying float vLod;
+void main() {
+  float T = uImpK.z * exp2(-vLod);
+  vec2 uq = clamp(vQuad, 0.5 / T, 1.0 - 0.5 / T);
+  vec4 t = textureLod(uImpTex, vTile.xy + uq * vTile.zw, vLod);
+  if (t.a < 0.002) discard;
+  float cls = floor(t.b * 255.0 + 0.5) - floor(floor(t.b * 255.0 + 0.5) / 4.0) * 4.0;
+  // (a share of the crown's strokes casts, each whole, by its own number: shadow.js uThinLeaf, as a near crown's leaves)
+  if (cls > 0.5 && cls < 2.5 && fract(t.r * 7.31 + 0.13) < uThinLeaf) discard;
+  gl_FragColor = vec4(vS, 0.0, 0.0, 1.0);
+}
+`;
+// The shadow twin of an impostor material (shadow.js asks for it once, with its own uInv): the atlas and the sun shared
+// by reference, its own copies of what flora.js writes per mesh before each draw.
+export function makeImpostorShadowMaterial(impMat, uInv) {
+  const u = impMat.uniforms;
+  return new THREE.ShaderMaterial({
+    name: 'pc-shadow-impostor',
+    defines: { PC_IMP_NV: impMat.defines.PC_IMP_NV },
+    uniforms: {
+      uOrigin: { value: new THREE.Vector3() }, uCamLocal: { value: new THREE.Vector3() }, uLod: { value: new THREE.Vector4(0, 1e9, 0, 0.9) },
+      uWashIn: { value: new THREE.Vector3(1e6, 0, 0.55) },
+      uInv, uSunDirL: u.uSunDirL, uImpK: u.uImpK, uImpAtlas: u.uImpAtlas, uImpC: u.uImpC, uImpH: u.uImpH, uImpTex: u.uImpTex,
+      uShK: OIL.uShK, uThinLeaf: { value: 0.66 },
+    },
+    vertexShader: IMP_SH_VERT, fragmentShader: IMP_SH_FRAG, side: THREE.DoubleSide,
+  });
 }

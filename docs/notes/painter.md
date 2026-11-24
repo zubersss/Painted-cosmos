@@ -16,7 +16,9 @@ the same time: this lane touches only the far parts of `flora.js`, `florakit.js`
 nothing here, only the owner's phone can time them). T1 (impostors) committed behind `?fartree=impostor`, SEEN in A/B
 stills at the phone's and the desktop's settings (`docs/shots/painter/trees-far/`); not yet the default (waits for the
 owner's phone: `&bench=trees` has the row). T4 committed: with the impostors on, the middle tree hands to the impostor
-at 45 m (was 57); the near hand-over stays at 27 m (18 m waits for A2's middle tree). Next: T6. Nothing merged.
+at 45 m (was 57); the near hand-over stays at 27 m (18 m waits for A2's middle tree). T6: the impostors' own shadows
+from the air built behind `?impshadow=1`, NOT the default (the low-sun A/B is mixed); T6's main part, cheaper shadows of
+the near and middle trees drawn as clusters, waits for A2's cluster trees. Nothing merged.
 
 **T0, the speed test's tenth form (`src/core/bench.js`).** `?bench=1` the whole table with the new rows; `?bench=trees`
 the tree questions alone, on foot and from the air (24 rows); `?bench=air` or `?bench=air,<m>` the air table (FV7: 400 m
@@ -87,6 +89,17 @@ DERIVED: the middle trees from 45 to 57 m, about 42k triangles a frame at 0.043 
 range) and their pixels painted by the impostor instead: about -2 to -6 ms. Rows: 'middle trees only to 45 m',
 'trees hand over at 18 / 45 m', 'impostors from 45 m' (the package as `?fartree=impostor` ships it).
 Debug: `?impdebug=1` paints each impostor texel flat by what it is and the level it was read from.
+
+**T6, the impostors' shadows from the air (`render/impostor.js` `makeImpostorShadowMaterial`; `?impshadow=1`).** Above
+60 m (where no near or middle tree stands in the shadow square) each far impostor mesh joins the shadow pass's own list
+(`SHADOW_CROWD`, as the animals do) with a shadow twin: the quad turned to face the SUN, the baked view nearest the
+sun's direction read at the map's own texel, a third of the crown's strokes casting (`uThinLeaf`, as a near crown). SEEN
+at 17 h (`A1_impshadow_{air150,air400}_17h_{A,B}_phone.jpg`, `A1_impshadow_air150_2x.jpg`): plum shade lies beside the
+crowns in the glades and along the river banks, but the canopy as a whole gets darker (lookstats V median 0.51 -> 0.42 at
+150 m) and at 400 m the gain is slight. Not clearly earned, so OFF by default; the look director and the owner to rule.
+COUNTED: +33 calls and +48k triangles at 150 m, +41 calls at 400 m (the shadow pass's fragments not measured).
+T6's main part (the near and middle trees casting as clusters with the spray's coverage, about -0.8 ms) needs A2's
+cluster trees first.
 
 ## Hand-over of THE OIL LOOK, prototype on branch `look-proto` (READ THIS FIRST; kept current)
 

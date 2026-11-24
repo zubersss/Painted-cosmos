@@ -19,9 +19,9 @@ import { INST_STRIDE, U_GRASS, U_FERN, U_BUSH, U_ROCK, U_FLOWER, U_STONE, U_REED
 import { SEASON, leafNow } from '../data/season.js';
 import { FLORA_PHYS, TALL_KITS, farCardGeometry, farBlobGeometry, sortLeafCards, leafDrawCount, farTreeGeometry, grassGeometry, grassPatchGeometry, reedGeometry, fernGeometry, bushGeometry, rockGeometry, flowerGeometry, shardGeometry } from './florakit.js';
 import { makePropMaterial } from '../render/materials.js';
-import { ImpostorAtlas, makeImpostorMaterial, impostorQuadGeometry, IMP } from '../render/impostor.js';
+import { ImpostorAtlas, makeImpostorMaterial, impostorQuadGeometry, IMP, IMP_SHADOW, makeImpostorShadowMaterial } from '../render/impostor.js';
 import { treeCell, underCell, hasCell, TREE_LEVEL, UNDER_LEVEL } from './obstacles.js';
-import { QUALITY, G, LOOK, SCREEN, SHADOW } from '../render/shared.js';
+import { QUALITY, G, LOOK, SCREEN, SHADOW, SHADOW_CROWD } from '../render/shared.js';
 import { SHADOW_LAYER, SHADOW_TIERS } from '../render/shadow.js';
 import { FELLED, FELL, felledAt, fallingOn, felledOn, fallTurn } from '../data/felled.js';
 
@@ -436,6 +436,12 @@ export class Flora {
     // lets the depth test throw away most of their painting before it is done. The same table's row 7, drawn
     // FIRST, is +2.3 ms, which is the other half of the same fact.
     if (far) mesh.renderOrder = 9;
+    // (an impostor mesh's own shadow, from the air: render/impostor.js IMP_SHADOW; on the shadow pass's list while the eye
+    //  is up there, see update)
+    if (far && this.mats && mat === this.mats.imp) {
+      mesh.userData.crowdEntry = { mesh, material: mat, makeShadow: makeImpostorShadowMaterial };
+      if (this._impSh) SHADOW_CROWD.add(mesh.userData.crowdEntry);
+    }
     // (the oil look's cast shadows, render/shadow.js: trees, bushes and stones cast; blades and flowers do not)
     if (mat.userData.pcCasts) mesh.layers.enable(SHADOW_LAYER);
     mesh.count = 0;
@@ -873,6 +879,7 @@ export class Flora {
 
   _disposeChunk(chunk) {
     for (const m of chunk.meshes) {
+      if (m.userData.crowdEntry) SHADOW_CROWD.delete(m.userData.crowdEntry);
       this.group.remove(m);
       for (const k of SHARED) m.geometry.deleteAttribute(k);
       m.geometry.setIndex(null);
@@ -1057,6 +1064,13 @@ export class Flora {
     //  the change that would be made if it is worth it -- so the device measures the fix itself, not a guess.)
     if (this.benchTreeK != null) { ts *= this.benchTreeK; }
     this.treeScale = ts; this.farScale = fs;
+    // THE IMPOSTORS' SHADOWS, FROM THE AIR ONLY (?impshadow=1; T6's option): above 60 m no near or middle tree stands in the
+    // shadow square, and the far crowns throw their own; on the ground the pass is left as it was.
+    const impSh = !!(IMP_SHADOW && this.impOn && (SHADOW.alt || 0) > 60);
+    if (impSh !== !!this._impSh) {
+      this._impSh = impSh;
+      for (const ch of this.farChunks.values()) for (const m of ch.meshes) if (m.userData.crowdEntry) { if (impSh) SHADOW_CROWD.add(m.userData.crowdEntry); else SHADOW_CROWD.delete(m.userData.crowdEntry); }
+    }
     if (now != null) this.washNow = now;
     else { const w = performance.now(); this.washNow += this._washWall ? Math.min(0.1, Math.max(0.02, (w - this._washWall) / 1000)) : 0; this._washWall = w; }
     const alt = camLocal.length() - this.R;
