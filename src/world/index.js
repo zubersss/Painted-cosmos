@@ -36,12 +36,11 @@ function lerp3(out, a, b, t) { out.set(a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - 
 // chunks.js pcFogAmount reads the eye's "height" from the AIR'S OWN REACH, not from the altitude:
 // `pcHigh = clamp((1/uFog.x - 200) / 400)`. post.js's lit air (SHADOW.air in castShade below) must agree with the
 // ground's air to the number, so those two numbers are written out here too.
-// THE SAME TWO NUMBERS NOW STAND IN THREE PLACES AND NONE MAY BE CHANGED ALONE (checked 2026-11-23):
-//     src/render/chunks.js:336   pcFogAmount  -- the ground, the water, the far trees
-//     src/render/materials.js:93 pcFogAmountV -- the plants, in the vertex shader (that file's own note says it is
-//                                chunks.js "line for line, and it must stay so"; it had drifted once, 2026-11-22,
-//                                and went unseen because on Earth's 185 m pcHigh is 0 on foot)
-//     here                       SHADOW.air   -- the light in the air, post.js OIL_FRAG
+// THE SAME TWO NUMBERS STAND IN TWO PLACES AND NEITHER MAY BE CHANGED ALONE (since 2026-11-24, L0):
+//     src/render/chunks.js AIR_SRC  pcFogAmount -- the ground, the water, the far trees, AND the plants' vertex-shader
+//                                   pcFogAmountV, which is made from the same text (AIR_FN); until 2026-11-24 that was
+//                                   a hand copy in materials.js, and it had drifted once, 2026-11-22
+//     here                          SHADOW.air  -- the light in the air, post.js OIL_FRAG
 // 2026-11-23: the reading's fix for the hilltop fault (the far land vanishing between 40 and 90 m of height)
 // raises the 400 to 2400. It is a change in all THREE, in one breath, or a tree stands in a different air from
 // the ground under it and the lit air says one thing while the air itself says another.

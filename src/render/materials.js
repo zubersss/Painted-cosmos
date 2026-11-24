@@ -7,7 +7,7 @@ import { G, PHYS, PHYSW, PREV, OIL, LOOK, BURNPAINT, register, ensureGlobals, ma
 import { MODE } from '../data/mode.js';
 import { FLORA_GLSL } from '../physics/flora.glsl.js';
 import { WATER_GLSL } from '../physics/water.js';
-import { VERT_PARS, VERT_END, FRAG_PARS, FOG_BANK, PAINT } from './chunks.js';
+import { VERT_PARS, VERT_END, FRAG_PARS, FOG_BANK, PAINT, AIR_FN } from './chunks.js';
 
 // THE LOOK AT THREE HUNDRED YARDS (the owner, 2026-11-22: "better lighting ... i want things to look high quality and
 // fully rendered even from 300 yards away" -- 275 m). What this file does for that is on three dials, read once from
@@ -59,15 +59,6 @@ const SKYUP = (e) => (SKYFACE <= 0 ? '' : SKYFACE >= 1 ? `pcUp = ${e};` : `pcUp 
 // knee that bends the top of the curve over so a thing at 275 m keeps a quarter of its own paint, eased off by
 // pcHigh SQUARED as the eye climbs. Its own guard (uOilAir.x over 0.004) is also what keeps this safe where the
 // uniform is declared and not attached, which reads 0.)
-const AIR_CEIL_V = /uniform[^;]*\buOilAir\b/.test(VERT_PARS) ? `
-    if (uOilAir.x > 0.004) {
-      float keep = uOilAir.x, cap = 1.0 - uOilAir.x;
-      float knee = min(uOilAir.y, 1.0 - 2.0 * keep);
-      float U = 1.0 - knee, D = cap - knee;
-      float u = clamp((f - knee) / U, 0.0, 1.0);
-      float fc = knee + U * u * (u - 1.0) * (u - 1.0) + D * u * u * (3.0 - 2.0 * u);
-      f = mix(min(fc, f), f, pcHigh * pcHigh);
-    }` : '    // (chunks.js pcFogAmount has no ceiling on the air in this build: there is nothing here to match)';
 const PC_UP_V = /\bpcUp\b/.test(PAINT) ? '' : 'float pcUp = 0.5;';
 const PC_UP_F = /\bpcUp\b/.test(FRAG_PARS) ? '' : 'float pcUp = 0.5;';
 
@@ -80,7 +71,8 @@ uniform vec2 uAirNear;
 uniform highp sampler3D uNoise3D;
 uniform vec2 uFogBank;
 ${FOG_BANK}
-// THE PLANTS BREATHE THE SAME AIR AS THE GROUND. This is chunks.js pcFogAmount line for line, and it must stay so: a
+// THE PLANTS BREATHE THE SAME AIR AS THE GROUND. Since 2026-11-24 (L0) this IS chunks.js pcFogAmount, made from the same
+// text (chunks.js AIR_FN), so the two cannot drift again. The history, kept: a
 // tree standing in a different air from the ground under it is the most visible fault this look can have, so any
 // change there belongs here in the same breath.
 // (2026-11-22) It had drifted, under a comment that said the two matched: 1.6 times where the ground has 2.4, and the
@@ -88,24 +80,7 @@ ${FOG_BANK}
 // visibility is 185 m, pcHigh is 0 on foot and the two did agree exactly -- which is why it went unseen. Everywhere
 // the air reaches past 200 m they did not: measured at 275 m on Mercury (visibility 1400 m, so pcHigh is 1), the
 // ground was 0.34 of the way into the air and the plants standing on it 0.17, half as far.
-float pcFogAmountV(float dist) {
-  #ifdef PC_OIL
-    float pcHigh = clamp((1.0 / max(uFog.x, 1e-6) - 200.0) / 2400.0, 0.0, 1.0);
-    dist *= mix(uOilC.w, 2.4, pcHigh);
-  #endif
-  float f = 1.0 - exp(-dist * uFog.x);
-  #ifdef PC_OIL
-    f = mix(f * f * (3.0 - 2.0 * f), f, pcHigh);
-  #endif
-  float q = f * uFog.y;
-  float fl = floor(q);
-  f = (fl + smoothstep(0.15, 0.85, q - fl)) / uFog.y;
-  #ifdef PC_OIL
-    // (and the air's own ceiling, so a tree at 275 m keeps as much of its paint as the ground it stands on keeps)
-${AIR_CEIL_V}
-  #endif
-  return clamp(max(f * uFog.z, uAirNear.x * (1.0 - exp(-dist / max(uAirNear.y, 0.1)))), 0.0, 1.0);
-}
+${AIR_FN('pcFogAmountV')}
 `;
 
 let _defaultBody = null;
