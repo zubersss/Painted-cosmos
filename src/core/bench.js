@@ -35,10 +35,26 @@
 // The header also says how the depth is kept (reversed or logarithmic: with the second, nothing hidden is skipped), the
 // script's own time a frame (the CPU's share) and the draw calls and triangles of a frame.
 
+// TENTH FORM (2026-11-24, the trees lane, T0 of docs/lead/TREES-DESIGN.md on r2): THE NEAR TREES' 52 ms SPLIT, AND
+// THE AIR. The v37 table says the near trees are 51.8 ms of an 89 ms frame and cannot say whether the wood, the leaves,
+// the wind in the vertex shader, the two-sided drawing or the order of drawing carries it. Six rows cut it there, each
+// with machinery that is already in the game (leaves only, wood only, the bark one flat colour, no wind, one-sided, drawn
+// after the ground); one asks whether turning alpha-to-coverage on for every plant (it is, in the oil look, though the
+// phone draws with one sample) stops the phone skipping hidden pixels; one times the far tree of two crossed cards
+// (?fartree=blob) in the same minute as the tree of flat pieces, which prices a far quad's pixels against a mesh's
+// triangles. And THE AIR: no row had ever timed a frame from the air. The pin is lifted 150 m (30 degrees down) and
+// 400 m (45 degrees down) over the same spot and a few questions are asked there.
+//   ?bench=1      the whole table (these rows included)
+//   ?bench=trees  the tree questions only, on foot and in the air: shorter, so the phone is cooler for each row
+//   ?bench=air    the air table (FV7 of docs/lead/FARVIEW-DESIGN.md): 400 m up and 45 degrees down, or ?bench=air,150
+//                 for another height; the questions every air lane waits on.
+
 import { BUILD } from './build.js';
 import { MAX_PIXELS } from './preset.js';   // (the ceiling on the 'every pixel the screen has' row)
 
 export function attachBench(pc) {
+  // which table (tenth form): '1' the whole of it, 'trees' the tree questions, 'air' or 'air,<metres>' the air table
+  const MODE_B = String(new URLSearchParams(location.search).get('bench') || '1').toLowerCase();
   const el = document.createElement('pre');
   el.id = 'pc-bench';
   // (2026-11-18, the owner: "Make the bench mark a copy and paste getting too big to screenshot". Twenty-six rows no
@@ -97,7 +113,7 @@ export function attachBench(pc) {
   const takePin = () => {
     const S = pc.sim;
     if (!S || !S.ex || !S.footCam) return null;
-    return { t: S.t, p: { ...S.ex.p }, v: { ...S.ex.v }, fwd: { ...S.ex.fwd }, view: { ...S.footCam.viewFwd }, pitch: S.footCam.pitch, boom: S.footCam.boom };
+    return { t: S.t, p: { ...S.ex.p }, v: { ...S.ex.v }, fwd: { ...S.ex.fwd }, view: { ...S.footCam.viewFwd }, pitch: S.footCam.pitch, boom: S.footCam.boom, flying: !!S.ex.flying };
   };
   const putBack = () => {
     const S = pc.sim, k = pin;
@@ -105,6 +121,29 @@ export function attachBench(pc) {
     S.t = k.t;
     S.ex.p = { ...k.p }; S.ex.v = { ...k.v }; S.ex.fwd = { ...k.fwd };
     S.footCam.viewFwd = { ...k.view }; S.footCam.pitch = k.pitch; S.footCam.boom = k.boom;
+    // (held in the air: the wanderer hovers, hands off, where the pin is; on foot whatever it was doing)
+    S.ex.flying = k.flying;
+  };
+  // THE AIR (tenth form). The pin on foot, kept, and the pin lifted `h` metres straight up from it with the view
+  // `deg` degrees down along the same heading: the explorer hovering there, held as the walk is held. The land under
+  // it, the far trees and the ground's patches are built again for the height before anything is timed.
+  let foot = null;
+  const lift = async (h, deg) => {
+    const S = pc.sim;
+    if (!foot) foot = pin;
+    if (!S || !foot) return false;
+    const p = foot.p, r = Math.hypot(p.x, p.y, p.z) || 1, k = (r + h) / r;
+    pin = { ...foot, p: { x: p.x * k, y: p.y * k, z: p.z * k }, v: { x: 0, y: 0, z: 0 }, pitch: -deg * Math.PI / 180, flying: true };
+    putBack();
+    await wait(600);
+    if (pc.settle) await Promise.race([pc.settle(12), wait(40000)]);
+    return true;
+  };
+  const land = async () => {
+    if (!foot) return;
+    pin = foot; putBack();
+    await wait(600);
+    if (pc.settle) await Promise.race([pc.settle(12), wait(40000)]);
   };
   pc.game.frame = (dt) => {
     const t = performance.now();
@@ -168,7 +207,7 @@ export function attachBench(pc) {
     try { const gl = R.getContext(), e = gl.getExtension('WEBGL_debug_renderer_info'); if (e) gpu = String(gl.getParameter(e.UNMASKED_RENDERER_WEBGL)); } catch { /* not told */ }
     const i = P.info || {}, c = R.domElement;
     const sun = sunOut == null ? '' : sunOut ? 'sun out (shadows drawn)' : 'sun not out (no shadows drawn)';
-    return 'PAINTED COSMOS SPEED TEST 9, ' + BUILD + ': press Copy the table at the bottom, then paste it\n' +
+    return 'PAINTED COSMOS SPEED TEST 10' + (MODE_B === '1' ? '' : ' (' + MODE_B + ')') + ', ' + BUILD + ': press Copy the table at the bottom, then paste it\n' +
       gpu.slice(0, 64) + ' | depth ' + (i.depth || '?') + ' | ' + sun + '\n' +
       'picture ' + (i.internalWidth || c.width) + 'x' + (i.internalHeight || c.height) + ' | screen ' + window.innerWidth + 'x' + window.innerHeight + ' @' + (window.devicePixelRatio || 1).toFixed(2) + (pin ? ' | held still' : ' | NOT HELD') +
       ' | tier ' + i.quality + ' | edges ' + (P.aaMode ? P.aaMode() : '?') + ' | paint ' + (P.lite ? 'lighter' : 'full') +
@@ -227,6 +266,60 @@ export function attachBench(pc) {
       if (pc.settle) await Promise.race([pc.settle(12), wait(20000)]);
     };
     const AS = 'as set';
+    // ---- THE TENTH FORM'S HANDLES (see the top of this file) ----------------------------------------------------
+    const tallMats = () => mats(/^pc-prop-tall/);
+    const tallMeshes = (fn) => pc.scene.traverse((o) => { if (o.isMesh && o.material && /^pc-prop-tall/.test(o.material.name || '')) fn(o); });
+    const nearPart = (v) => () => { const f = flora(); if (f) f.benchNear = v; };
+    // (no wind in the near trees' vertex shader: their own uPhysOn is 0 while the rest of the world's stays as it is.
+    //  The uniform is shared by every plant, so the near trees are given one of their own for the row and handed the
+    //  shared one back after it.)
+    const noWind = (on) => {
+      for (const m of tallMats()) {
+        const U = m.uniforms;
+        if (!U || !U.uPhysOn) continue;
+        if (on) { if (!m.userData.benchPhys) m.userData.benchPhys = U.uPhysOn; U.uPhysOn = { value: 0 }; }
+        else if (m.userData.benchPhys) { U.uPhysOn = m.userData.benchPhys; m.userData.benchPhys = null; }
+        m.uniformsNeedUpdate = true;
+      }
+    };
+    // (one-sided: the back faces of every wood tube and every leaf card turned away are not drawn -- the leaves seen
+    //  from behind go with them, which the row's name says; the programs are built again, and calm() waits)
+    const oneSide = (on) => {
+      for (const m of tallMats()) {
+        if (on) { if (m.userData.benchSide == null) m.userData.benchSide = m.side; m.side = 0; }
+        else if (m.userData.benchSide != null) { m.side = m.userData.benchSide; m.userData.benchSide = null; }
+        m.needsUpdate = true;
+      }
+    };
+    const a2c = (on) => { for (const m of mats(/^pc-prop-/)) { if (on) { if (m.userData.benchA2C != null) { m.alphaToCoverage = m.userData.benchA2C; m.userData.benchA2C = null; } } else { if (m.userData.benchA2C == null) m.userData.benchA2C = m.alphaToCoverage; m.alphaToCoverage = false; } } };
+    const farForm = async (form) => {
+      const f = flora();
+      if (!f || !f.setFarForm || f.setFarForm(form) == null) return;
+      await wait(400);
+      if (pc.settle) await Promise.race([pc.settle(12), wait(30000)]);
+    };
+    const form0 = (() => { const f = flora(); return f ? (f.farForm || (cards0 ? 'cards' : 'lump')) : 'cards'; })();
+    // the rows themselves: [label, on, off]
+    const T0 = {
+      leaves: ['near trees: leaves only', nearPart('leaves'), nearPart(null)],
+      wood: ['near trees: wood only', nearPart('wood'), nearPart(null)],
+      bark: ['near bark one flat colour', () => B({ flat: 7 }), () => B({ flat: 0 })],
+      wind: ['near trees: no wind in shader', () => noWind(true), () => noWind(false)],
+      side: ['near trees one-sided', () => oneSide(true), () => oneSide(false)],
+      order: ['near trees after the ground', () => tallMeshes((o) => { o.renderOrder = 6; }), () => tallMeshes((o) => { o.renderOrder = 0; })],
+      a2c: ['plants without alpha-to-cov', () => a2c(false), () => a2c(true)],
+      blob: ['far trees as crossed cards', () => farForm('blob'), () => farForm(form0)],
+      noFar: ['no far trees', () => show(/^pc-prop-far/, false), () => show(/^pc-prop-far/, true)],
+      farFlat: ['far trees one flat colour', () => B({ flat: 3 }), () => B({ flat: 0 })],
+      noNear: ['no near trees', () => show(/^pc-prop-tall/, false), () => show(/^pc-prop-tall/, true)],
+    };
+    const r = (row, tag) => [row[0] + tag, row[1], row[2]];
+    // THE AIR ROWS: an "as set" that lifts the pin (it is the base the questions after it are set against), the
+    // questions, and an "as set" back on foot that puts it down again. (The air's "as set" rows are a different picture,
+    // so, like the water views', they are kept out of the check that the "as set" rows agree: `alone`.)
+    const airAt = (h, deg, qs) => [[AS + ', ' + h + ' m up, ' + deg + ' deg down', () => lift(h, deg), null, { alone: true }]].concat(qs.map((q) => r(q, ' (' + h + ' m up)')));
+    const onFoot = [AS + ', back on foot', () => land(), null];
+    const ground = (on) => show(/^pc-terrain/, on);
     // ---- THE WATER VIEWS (docs/lead/WATER-DESIGN.md, section 6) -------------------------------------------------------
     // The view this test is held at, the landing, has NO WATER in it: 0.0 % of its pixels, measured 24 Nov in a copy of
     // that view (936 x 372). So no row taken there can measure the water, and v37's "no water drawn -0.6 ms" was noise.
@@ -352,6 +445,10 @@ export function attachBench(pc) {
       ['a leaf in its own colour', () => B({ flat: 5 }), () => B({ flat: 0 })],
       ['no air laid on the plants', () => B({ flat: 6 }), () => B({ flat: 0 })],
       ['no near trees', () => show(/^pc-prop-tall/, false), () => show(/^pc-prop-tall/, true)],
+      // (TENTH FORM, 2026-11-24: the near trees' 51.8 ms split six ways, and the depth questions; see the top)
+      T0.leaves, T0.wood, T0.bark, T0.wind, T0.side, T0.order, T0.a2c,
+      [AS, null, null],
+      T0.blob,
       // (2026-11-23, after speed test 9: the near trees are 62.7 ms of a 101 ms frame and NOTHING in that table says
       //  why. These three rows split it. "hand over at half the distance" is not a diagnostic -- it IS the change
       //  that would be made, so the device measures the fix and not a guess. "half their leaves" drives the leaf
@@ -377,6 +474,11 @@ export function attachBench(pc) {
       ['trees cast no shadow', () => treeMeshes((o) => o.layers.disable(2)), () => treeMeshes((o) => o.layers.enable(2))],
       ['no light in the air', () => B({ shaft: false }), () => B({ shaft: true })],
       [lite0 ? 'the full paint' : 'the lighter paint', () => B({ lite: !lite0 }), () => B({ lite: lite0 })],
+      // (TENTH FORM) THE AIR: no row had ever timed it. The same spot, from 150 m and 400 m up.
+      ...airAt(150, 30, [T0.noFar, T0.blob]),
+      ...airAt(400, 45, [T0.noFar]),
+      onFoot,
+      // (the water's rows come LAST, after the final as-set row: see THE WATER'S ROWS LAST below)
       // (back to the size the device really draws, so the four rows below are measured from IT and not from
       //  whatever sharper size the questions above had to be asked at: see MK at the top of this file)
       [AS, () => sharpen(1), null],
@@ -396,6 +498,39 @@ export function attachBench(pc) {
       //  view costs at most about two minutes and the test cannot hang on it.)
       ...waterRows,
     ];
+    // ?bench=trees: the tree questions alone, on foot and from the air (a shorter run: each row on a cooler phone)
+    const treeSteps = [
+      [AS, null, null],
+      T0.leaves, T0.wood, T0.bark, T0.wind,
+      [AS, null, null],
+      T0.side, T0.order, T0.a2c, T0.noNear,
+      [AS, null, null],
+      T0.blob, T0.noFar, T0.farFlat,
+      ...airAt(150, 30, [T0.noFar, T0.blob, T0.farFlat, T0.a2c]),
+      ...airAt(400, 45, [T0.noFar, T0.blob]),
+      onFoot,
+      [AS + ', last', null, null],
+    ];
+    // ?bench=air[,h]: the air table (FV7, docs/lead/FARVIEW-DESIGN.md on r2), held h metres up (400 if not said),
+    // 45 degrees down. The other air lanes' switches (canopy, the far water, the meadow, the rock, the air's top)
+    // join here as rows when they exist.
+    const airH = (() => { const m = /^air,(\d+)/.exec(MODE_B); const h = m ? +m[1] : 400; return Math.max(30, Math.min(1500, h)); })();
+    const airSteps = [
+      [AS + ', on foot', null, null],
+      ...airAt(airH, 45, [
+        ['no ground drawn', () => ground(false), () => ground(true)],
+        ['ground one flat colour', () => B({ flat: 1 }), () => B({ flat: 0 })],
+        T0.noFar, T0.farFlat, T0.blob,
+        ['no water drawn', () => show(/^pc-water/, false), () => show(/^pc-water/, true)],
+        T0.a2c,
+        ['no shadows at all', () => B({ shadow: false }), () => B({ shadow: true })],
+      ]),
+      ...(airH < 1000 ? airAt(1000, 45, [T0.noFar]) : []),
+      onFoot,
+      [AS + ', last', null, null],
+    ];
+    if (MODE_B === 'trees') steps.splice(0, steps.length, ...treeSteps);
+    else if (MODE_B === 'air' || MODE_B.startsWith('air,')) steps.splice(0, steps.length, ...airSteps);
     const rows = [];
     let r0 = null, base = null;
     const bases = [];      // (2026-11-19) every "as set" row, so the table can say when it disagrees with itself
@@ -409,6 +544,7 @@ export function attachBench(pc) {
       r.fps = 1000 / Math.max(r.mean, 1e-3);
       if (k === 0 && P._shadow) sunOut = P._shadow.frames > f0;
       if (off) { await off(); if (name.startsWith('far trees as') || name.startsWith('far trees of')) await calm(); }
+      // (a row that left the ground is put down again if the table ends up there; see airAt)
       // (2026-11-19) The header quotes the first row THAT WAS REALLY DRAWING. It used to quote the first row
       // whatever it was, and at v22 that row drew nothing, so the header described the whole game as "script
       // 0.0 ms, 0 calls, 0k triangles a frame".
@@ -417,7 +553,7 @@ export function attachBench(pc) {
       // (each question is set against the "as set" row before it: the phone warms through the run)
       const d = base && !isBase ? r.mean - base.mean : null;
       rows.push(String(k + 1).padStart(2) + ' ' + (name + ' ').padEnd(27, '.') + ' ' + r.mean.toFixed(1).padStart(5) + ' ms = ' + r.fps.toFixed(1).padStart(5) + ' a second' +
-        (d == null ? '          ' : '  ' + ((d >= 0 ? '+' : '') + d.toFixed(1)).padStart(6) + ' ms') + '  (middle ' + r.mid.toFixed(0) + ', longest ' + r.worst.toFixed(0) + ', script ' + r.script.toFixed(1) + (r.calls < DRAWS ? ', NOTHING DRAWN' : ok ? '' : ', NOT SETTLED') + ')');
+        (d == null ? '          ' : '  ' + ((d >= 0 ? '+' : '') + d.toFixed(1)).padStart(6) + ' ms') + '  (middle ' + r.mid.toFixed(0) + ', longest ' + r.worst.toFixed(0) + ', script ' + r.script.toFixed(1) + ', ' + Math.round(r.tris / 1000) + 'k tri' + (r.calls < DRAWS ? ', NOTHING DRAWN' : ok ? '' : ', NOT SETTLED') + ')');
       if (isBase) { base = r; if (!(opt && opt.alone)) bases.push(r.mean); }
     }
     // DO THE BASELINES AGREE? Every + / - in this table is measured against the "as set" row before it, so if those
@@ -432,8 +568,9 @@ export function attachBench(pc) {
         + ' they cannot be trusted. Run it again without touching the phone, and wait for the wood to finish'
         + ' building before you start.';
     }
-    // the explorer back at the landing, if the water's rows took it away
+    // the explorer back at the landing, if the water's rows or the air's took it away
     if (waterRows.length) await goView(null);
+    if (foot && pin !== foot) await land();
     // the picture is the phone's own again (it was held through the run: see sharpen above)
     if (pc.game && typeof pc.game.holdPictureSize === 'function') pc.game.holdPictureSize(0, 0);
     el.textContent = head(r0) + '\n' + rows.join('\n') + '\ndone. (+ / - ms: against the "as set" row before it)' + warn;

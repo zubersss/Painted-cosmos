@@ -165,6 +165,9 @@ export class Flora {
     this.farFill = !!(LOOK.oil && FAR_FILL);
     this.farSize = this.treeSize * this.farSpan;       // far trees are batched in cells this many tree cells to a side
     this.rangeScale = 1; this.treeScale = 1; this.farScale = 1; this.lastScale = -1; this.benchTreeK = null;
+    // (the speed test's handle on the near trees' index, core/bench.js: 'leaves' draws a tall mesh from its first leaf
+    //  card on, 'wood' only what comes before it -- sortLeafCards puts every piece of wood first. null: the whole tree.)
+    this.benchNear = null;
     this.lastLaid = -10; this.washNow = 1; this._washWall = 0;
     this.lastRelease = -10;
     this.held = [];                    // cells that are built and wait for their ground (see update)
@@ -380,6 +383,14 @@ export class Flora {
     //  to break its outline, so a crown must not be culled at the edge of the screen for those few extra metres.)
     mesh.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 0, 0), chunk.size * 0.75 + (LOOK.oil ? 30 : 24));
     const origin = chunk.origin, flora = this, camRel = new THREE.Vector3(), lodv = new THREE.Vector4().fromArray(lod);
+    // (the draw range of a tree's sorted index: n is what the leaves by distance ask for; the speed test may keep only
+    //  the wood or only the leaves of a NEAR tree, flora.benchNear, and never touches a far one)
+    const benchRange = (geometry, lf, n) => {
+      const bn = far ? null : flora.benchNear;
+      if (bn === 'wood') geometry.setDrawRange(0, lf.base);
+      else if (bn === 'leaves') geometry.setDrawRange(lf.base, Math.max(0, n - lf.base));
+      else geometry.setDrawRange(0, n);
+    };
     mesh.onBeforeRender = function (renderer, scene, camera, geometry, material) {
       // (a tree's ranges follow its size on the screen in the oil look, and the far trees the air they are seen through: update())
       const u = material.uniforms, k = far ? flora.farScale : chunk.isTree ? flora.treeScale : flora.rangeScale;
@@ -401,11 +412,11 @@ export class Flora {
             let thr = (1 - keep) * 1.06 - 0.06;
             // (the shadow pass: of a crown's leaves only a share throws a shadow at all, shadow.js uThinLeaf)
             if (u.uThinLeaf) thr = 1 - Math.min(1 - u.uThinLeaf.value, keep * 0.5) - 0.02;
-            geometry.setDrawRange(0, leafDrawCount(lf, thr));
+            benchRange(geometry, lf, leafDrawCount(lf, thr));
           }
         } else {
           u.uLeafLod.value.set(0, 0, 0, 0);
-          if (lf) geometry.setDrawRange(0, Infinity);
+          if (lf) benchRange(geometry, lf, geometry.index ? geometry.index.count : Infinity);
         }
       }
       if (u.uWashIn) u.uWashIn.value.set(flora.washNow, mesh.userData.laid, WASH_T);
@@ -750,14 +761,35 @@ export class Flora {
     on = !!on;
     const now = this.species.some((sp) => sp.cardFar);
     if (on === now) return now;
-    if (on && !this.kit.farCards) this.kit.farCards = sortLeafCards(FAR_BLOB ? farBlobGeometry(6) : farCardGeometry(6));   // (ordered for thinning here too, or the speed test's swap loses it)
-    for (const sp of this.species) sp.cardFar = on && sp.canCard;
+    return this.setFarForm(on ? (FAR_BLOB ? 'blob' : 'cards') : 'lump') !== 'lump';
+  }
+  // THE FAR TREES' FORM, swapped while the game runs (the speed test, core/bench.js; 2026-11-24, trees lane T0):
+  // 'cards' the tree of flat pieces that ships (138 triangles), 'blob' two crossed six-cornered cards (?fartree=blob:
+  // 10 triangles, which prices on the phone what a quad's fragments cost against a mesh's triangles), 'lump' the old
+  // lump. Every far patch is dropped and built again in its turn. Returns the form now drawn, or null where there is
+  // nothing to swap (not the oil look, or not yet made).
+  setFarForm(form) {
+    if (!LOOK.oil || !this.ready) return null;
+    const now = this.farForm || (this.species.some((sp) => sp.cardFar) ? (FAR_BLOB ? 'blob' : 'cards') : 'lump');
+    if (form === now) return now;
+    // (ordered for thinning here too, or the speed test's swap loses it)
+    // (each form made once and kept: its buffers stay on the graphics card while the meshes come and go)
+    const fg = this._farGeo || (this._farGeo = {});
+    if (this.kit.farCards && now !== 'lump' && !fg[now]) fg[now] = this.kit.farCards;
+    if (form === 'blob') this.kit.farCards = fg.blob || (fg.blob = sortLeafCards(farBlobGeometry(6)));
+    else if (form === 'cards') this.kit.farCards = fg.cards || (fg.cards = sortLeafCards(farCardGeometry(6)));
+    else form = 'lump';
+    for (const sp of this.species) sp.cardFar = form !== 'lump' && sp.canCard;
+    this.farForm = form;
+    this._dropFar();
+    return form;
+  }
+  _dropFar() {
     for (const [key, ch] of this.farChunks) {
       if (ch.queued) { const qi = this.queue.indexOf(ch); if (qi >= 0) this.queue.splice(qi, 1); ch.queued = false; }
       this._disposeChunk(ch); this.farChunks.delete(key);
     }
     this.lastTreeEval.set(1e9, 0, 0);
-    return on;
   }
 
   _disposeChunk(chunk) {

@@ -4,6 +4,32 @@ Branch: `cosmos` (shared with PILOT and PHYSICS, one working tree). Commits: `to
 This file was rewritten by the second PAINTER agent (the first ran out of working context). The
 first agent's record of M1 is kept at the end ("Earlier answers").
 
+## Hand-over of THE FAR TREES (trees lane A1, branch `trees-far`; kept current by that session)
+
+Started 24 Nov 2026 by helper session A1 (TREES FAR) of the coordinator. Branch `trees-far`, cut from `look-proto` =
+`main` at v37.1. The design is `docs/lead/TREES-DESIGN.md` on `r2` (packages T0, T1, T4, T6 are this lane's) and FV2-T /
+FV7 of `docs/lead/FARVIEW-DESIGN.md`. A second session (A2, branch `trees-near`) rebuilds the NEAR and MIDDLE trees at
+the same time: this lane touches only the far parts of `flora.js`, `florakit.js`, the plant material's far branch,
+`render/impostor.js`, `render/shadow.js` and new rows in `core/bench.js`.
+
+**State (update this line every step):** T0 committed (rows built and run in software: they work; their timings mean
+nothing here, only the owner's phone can time them). T1 (impostors) being built. Nothing merged.
+
+**T0, the speed test's tenth form (`src/core/bench.js`).** `?bench=1` the whole table with the new rows; `?bench=trees`
+the tree questions alone, on foot and from the air (24 rows); `?bench=air` or `?bench=air,<m>` the air table (FV7: 400 m
+up, 45 degrees down, then 1 km). New rows: near trees leaves only / wood only (`flora.benchNear`, the sorted index's
+`leaf.base`), near bark one flat colour (`uOilL.y = 7`, one line in `PROP_FRAG`), no wind in the near trees' vertex
+shader (their own `uPhysOn` set to 0), one-sided, drawn after the ground, plants without alpha-to-coverage, far trees
+as two crossed cards (`flora.setFarForm('blob')`), and the AIR: the pin lifted 150 m (30 deg
+down) and 400 m (45 deg down) over the same spot (`lift` / `land` in bench.js; the wanderer hovers there, held). Each
+row now prints its triangles. SEEN in software at 936x372: leaves only 972k triangles against 1,124k as set, wood only
+1,026k (so near wood about 152k triangles, near leaves about 98k, both passes).
+**Found on the way:** the far material's tables were 8 long and Earth has 13 kinds in the oil look: the far trees of
+the poplar, oak, birch, willow and sapling read past the end (drawn with another kind's colours, taper and family).
+To be fixed with T1 (it changes the default far wood, so A/B stills first). And the flat test of the far branch caught
+rows 5 and 6 (a leaf in its own colour, no air on the plants) too, so those two v37 rows also flattened every far tree:
+fixed in T0 (the far flat now only for 2 and 3).
+
 ## Hand-over of THE OIL LOOK, prototype on branch `look-proto` (READ THIS FIRST; kept current)
 
 Branch: `look-proto`, cut from `main` at `5e85754`. Nothing here is live. The plan, the owner's instructions, the sort of
