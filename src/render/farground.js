@@ -576,15 +576,22 @@ vec3 pcRockWash(vec3 c, float up, vec3 Bc, float strata, float dist, vec3 rnd, f
 }
 // THE ROCK'S LIGHT IN PLANES (the look director's second audit, 3: "a mountain is a few big planes, lit and shaded").
 // The oil look's light lights whatever faces the sun at all, so under a high sun every face of a range was lit and none
-// was in shade. A rock dab is lit by its slope's own facing in THREE PLANES instead: facing the sun (d, the facing's dot
-// with the sun, over 0.72) the full light, side on (0.42 to 0.72) the local colour, turned away the cool shade, and a
-// gully on the shaded side a step deeper still. The step is taken whole at the dab (its facing is the dab's), handed to
-// the shared pcLevel as a facing it understands, so night, cloud and storm still rule it. lvl: the dab's own level, kept
-// where it is darker (a cast shadow); nV the facing in the eye's axes.
+// was in shade. A rock dab is lit by its slope's own facing in THREE PLANES instead, as a painter splits a mountain:
+// the side turned TOWARD THE SUN'S BEARING the full light, the side on the local colour, the side turned AWAY from the
+// sun's bearing the deep shade, and a gully on the shaded side a step deeper still. The bearing and not the height: at
+// noon the sun is high and a face turned away from it still saw the sun (the first form, by the facing's dot with the
+// sun, left 0.00 per cent of a mountain under V 0.3, SEEN). A face that is truly turned from the sun (a low sun) is in
+// shade whatever its bearing. The step is taken whole at the dab (its facing is the dab's) and handed to the shared
+// pcLevel, so night, cloud and storm still rule it. lvl: the dab's own level, kept where darker (a cast shadow).
 float pcRockPlanes(float lvl, vec3 nV, float sunny) {
+  vec3 upV = normalize(vUpV);
   float d = dot(nV, gSunV);
-  float dq = mix(mix(-0.20, 0.12, smoothstep(0.39, 0.45, d)), 0.50, smoothstep(0.69, 0.75, d));
-  float lp = pcLevel(0.5 + 0.5 * dq, 0.02) - 0.7 * gGully * (1.0 - smoothstep(0.55, 0.65, d));
+  vec3 nh = nV - upV * dot(nV, upV), sh = gSunV - upV * dot(gSunV, upV);
+  float dh = dot(nh, sh) / max(length(nh) * length(sh), 1e-4);
+  float b = mix(dh, 1.0, smoothstep(0.30, 0.12, length(nh)));      // (a gentle face has no side: its bearing does not count)
+  b = min(b, smoothstep(0.02, 0.16, d) * 2.0 - 1.0);               // (turned from a low sun: shade)
+  float dq = mix(mix(-0.20, 0.12, smoothstep(-0.30, -0.20, b)), 0.50, smoothstep(0.30, 0.40, b));
+  float lp = pcLevel(0.5 + 0.5 * dq, 0.02) - 0.45 * (1.0 - smoothstep(-0.30, -0.20, b)) - 0.4 * gGully * (1.0 - smoothstep(0.30, 0.40, b));
   lp = mix(min(lp, 1.0), lp, sunny);
   return mix(lvl, lp, gRock);
 }
