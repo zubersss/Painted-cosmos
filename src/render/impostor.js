@@ -91,6 +91,14 @@ const MASSV = /pcDabTint/.test(MASSV_FNS) && /pcWetWash/.test(MASSV_FNS) && !(_q
 // a crown of 7 to 30 px (no one-tone blend, no bark left), in fair weather (no storm step), not in a gust band's one
 // tone; any other crown is painted as in step 1. ?imppaint=1: step 1 alone; flora.setMassT for the speed test.
 const MASST = MASSV && !(_q && _q.get('imppaint') === '1');
+// (step 3, MASSO, on by default, ?imptone=0 off: the crowns UNDER 7 px take their tones once a
+//  crown too. Their one-tone blend puts the light between whole levels, where the paint does read which way a stroke faces
+//  the sky; there each band (the cap, the body, the shaded side) takes the mean of that over the band's own part of the
+//  crown's seen face -- a ball seen from the crown's baked view, under its sun, sampled sixteen times in the vertex
+//  shader -- in place of each stroke's own. At a whole level it is exact as in step 2. MEASURED: at noon 0 pixels changed
+//  at 150 m, 420 m and 1 km (the cap at level 3 keeps every blended level at 2 or over), at 16 h 0 at 420 m and at most
+//  4 of 255 at 1 km. flora.setMassO.)
+const MASSO = MASST && !(_q && _q.get('imptone') === '0');
 // (THE CROWNS UNDER A STORM, IMP_FRAG: how far of a level the far crowns step down under a storm, beside the land's own
 //  step (the look director's ?stormlight, which scales both). 0.5: SEEN under wx=storm from 150 m, a full step made the
 //  wood one violet-maroon mass, crowns and floor alike; half keeps the crowns red against the storm's grey floor.
@@ -503,6 +511,9 @@ const IMP_VERT = /* glsl */`
 #ifndef PC_MASS_V
 #undef PC_MASS_T
 #endif
+#ifndef PC_MASS_T
+#undef PC_MASS_O
+#endif
 ${VERT_PARS}
 ${FOG_VERT}
 attribute vec4 aInst;     // per instance: x hue, y value, z seed, w canopy shade at its foot
@@ -586,6 +597,30 @@ uniform float uImpStorm;
 ${PAINT}
 ${MASSV_FNS}
 ${'${IMPSHADE_FN}'}
+#ifdef PC_MASS_O
+uniform float uCanopy;
+// (MASSO: the mean of which way a stroke faces the sky, dot(n, up), over each light band's part of a ball's seen face:
+//  v the baked view, s the sun, u up, all in the kit's own axes; sixteen normals over the seen half, weighed by the area
+//  each covers on the screen; a band with none takes two thirds of the view's own, the seen half's mean)
+vec3 pcImpBandUp(vec3 v, vec3 s, vec3 u, bool sm, float can) {
+  vec3 t1 = normalize(abs(v.y) < 0.9 ? cross(v, vec3(0.0, 1.0, 0.0)) : cross(v, vec3(1.0, 0.0, 0.0)));
+  vec3 t2 = cross(v, t1);
+  vec3 acc = vec3(0.0), ws = vec3(0.0);
+  for (int i = 0; i < 4; i++) {
+    float th = (float(i) + 0.5) * 0.392699;
+    for (int j = 0; j < 4; j++) {
+      float ph = float(j) * 1.570796 + float(i) * 0.785398;
+      vec3 n = v * cos(th) + (t1 * cos(ph) + t2 * sin(ph)) * sin(th);
+      float w = cos(th) * sin(th), fm = 0.5 + 0.5 * dot(n, s), up = dot(n, u);
+      float b = sm ? (fm > mix(0.05, 0.585, can) ? 0.0 : 1.0) : (fm > mix(0.60, 0.75, can) ? 0.0 : (fm > mix(0.35, 0.55, can) ? 1.0 : 2.0));
+      vec3 m = vec3(b < 0.5 ? 1.0 : 0.0, b > 0.5 && b < 1.5 ? 1.0 : 0.0, b > 1.5 ? 1.0 : 0.0);
+      acc += m * (w * up); ws += m * w;
+    }
+  }
+  float fb = dot(v, u) * 0.667;
+  return vec3(ws.x > 0.0 ? acc.x / ws.x : fb, ws.y > 0.0 ? acc.y / ws.y : fb, ws.z > 0.0 ? acc.z / ws.z : fb);
+}
+#endif
 flat varying vec4 vMassC;  // the crown's colour under crown mass (xyz) and its cap's light level (w)
 #endif
 void main() {
@@ -770,21 +805,42 @@ void main() {
       #ifdef PC_IMP_STORM
         stK = smoothstep(0.15, 0.6, uStorm) * uLookS.x * uImpStorm;
       #endif
-      bool fastT = vMass.x < uMassK.z && vMass.x < uMassK2.w && vMass.x >= uMassK.y && stK <= 0.0 && L0 == floor(L0);
+      float one = 1.0 - smoothstep(uMassK.w, uMassK.y, vMass.x);
+      bool fastT = vMass.x < uMassK.z && vMass.x < uMassK2.w && stK <= 0.0 && L0 == floor(L0);
+      #ifndef PC_MASS_O
+        fastT = fastT && one <= 0.0;
+      #endif
       #ifdef PC_GUST
         fastT = fastT && vGust.y <= 0.0;
       #endif
       if (fastT) {
-        float vfl = max(0.18, vVF);
-        vec3 cT0, cT1, cT2;
-        for (int i = 0; i < 3; i++) {
-          float lv = max(L0 - float(i), 0.0);
+        float vfl = max(0.18, vVF), L1 = max(L0 - 1.0, 0.0), O = L1 + vMass.y;
+        vec3 upB = vec3(0.5);
+        #ifdef PC_MASS_O
+          bool smB = false;
+          #ifdef PC_IMP_SMALL
+            smB = uImpK.z * exp2(-vLod) < float(IMPS_T) + 0.5;
+          #endif
+          if (one > 0.0) upB = pcImpBandUp(dc, vSunK, vUpK, smB, vInst.w * uCanopy * 0.4);
+        #endif
+        vec3 cT0, cT1, cT2, cTF;
+        for (int i = 0; i < 4; i++) {
+          // (the cap, the body, the shaded side, as the crown-mass block below lays them with the one-tone blend; and the
+          //  filled gap's tone, min(lv, the cap less one), which is the cap less one itself)
+          float lv = i < 3 ? max(L0 - float(i), 0.0) : L1;
+          if (i < 3 && one > 0.0) lv = mix(lv, O, one);
+          #ifdef PC_MASS_O
+            if (i < 3 && one > 0.0) { ${SKYUP("(i == 0 ? upB.x : (i == 1 ? upB.y : upB.z))")} }
+          #endif
           vec3 c = ${'${IMPSHADE}'};
           float vmx = max(c.r, max(c.g, c.b));
           if (vmx < vfl) c *= vfl / max(vmx, 1e-3);
-          if (i == 0) cT0 = c; else if (i == 1) cT1 = c; else cT2 = c;
+          if (i == 0) cT0 = c; else if (i == 1) cT1 = c; else if (i == 2) cT2 = c; else cTF = c;
         }
         vBA = cT0; vBB = cT1; vMassC = vec4(cT2, -1.0);
+        // (the leaf washes are not read for such a crown: they carry the filled gap's tone, and whether the shaded
+        //  side's own level lies under it, in which case a filled gap there keeps the shaded side's tone)
+        vLA = cTF; vLB = vec3(mix(max(L0 - 2.0, 0.0), O, one) <= L1 ? 1.0 : 0.0, 0.0, 0.0);
       }
     }
   #endif
@@ -800,6 +856,9 @@ const IMP_FRAG = /* glsl */`
 #endif
 #ifndef PC_MASS_V
 #undef PC_MASS_T
+#endif
+#ifndef PC_MASS_T
+#undef PC_MASS_O
 #endif
 ${FRAG_PARS}
 ${'${IMPSHADE_FN}'}
@@ -925,8 +984,8 @@ void main() {
         smallT = uImpK.z * exp2(-vLod) < float(IMPS_T) + 0.5;
       #endif
       int bT = smallT ? (fmT > mix(0.05, 0.585, canopyT) ? 0 : 1) : (fmT > mix(0.60, 0.75, canopyT) ? 0 : (fmT > mix(0.35, 0.55, canopyT) ? 1 : 2));
-      if (fill) bT = max(bT, 1);      // (a filled gap: the crown's shaded tone, min(lv, the cap less one))
       vec3 cT = bT == 0 ? vBA : (bT == 1 ? vBB : vMassC.rgb);
+      if (fill && !(bT == 2 && vLB.x > 0.5)) cT = vLA;      // (a filled gap: min(lv, the cap less one), worked out once too)
       if (!(uOilL.y > 5.5 && uOilL.y < 6.5)) cT = pcAtmosV(cT, vFog, vView);
       pcWrite(cT, clamp(cover, 0.0, 1.0), vec3(0.0, 0.0, 1.0), -vView.z, 4.0 + fract(vInst.z * 7.0) * 0.9);
       return;
@@ -1150,6 +1209,7 @@ export function makeImpostorMaterial(bodyU, atlas, farMat, farcrown = FARCROWN) 
       IMP.small > 0 ? { PC_IMP_SMALL: 1, IMPS_T: IMP.small.toFixed(1) } : null,
       CROWNMASS && MASSV ? { PC_MASS_V: 1 } : null,
       CROWNMASS && MASST ? { PC_MASS_T: 1 } : null,
+      CROWNMASS && MASSO ? { PC_MASS_O: 1 } : null,
       // (the crowns under a storm: only once the look director's chunks declare uLookS and the oil look is on)
       LOOK.oil && /uniform\s+vec4\s+uLookS\b/.test(FRAG_PARS) && /uniform\s+float\s+uStorm\b/.test(FRAG_PARS) ? { PC_IMP_STORM: 1 } : null),
     uniforms: makePaintUniforms(bodyU, own),

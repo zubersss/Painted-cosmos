@@ -532,7 +532,17 @@ FV7 of `docs/lead/FARVIEW-DESIGN.md`. A second session (A2, branch `trees-near`)
 the same time: this lane touches only the far parts of `flora.js`, `florakit.js`, the plant material's far branch,
 `render/impostor.js`, `render/shadow.js` and new rows in `core/bench.js`.
 
-**State (update this line every step):** (24 Nov, about 22:30) C SET THE HOOK'S LEVEL TO 0.40 (farview 5b9400e). RENDERED on a
+**State (update this line every step):** (24 Nov, about 23:00) THE IMPOSTORS' PAINT CHEAPER (the coordinator's top priority
+after the owner's phone table: 'far trees one flat colour' saved as much as no far trees, so the cost is the paint per
+pixel; F: R3.9 first). DONE, ALL THE SAME PICTURE, ALL ON: f898935 R3.9 (thresholds in px of 480 lines; 0 pixels at
+1024x480); aedfc01 step 1, crown mass's colour and cap level once a crown in the vertex shader (MASSV, ?imppaint=0 off;
+bench row massV); 44d0a96 step 2, its three tones once a crown where the paint does not read pcUp (whole levels; 7-30 px,
+fair weather) and a stroke only picks one (MASST, ?imppaint=1 off; bench row massT); this commit step 3, the crowns under
+7 px likewise with each band's mean sky-facing (MASSO, ?imptone=0 off). MEASURED: fast path 32.7 / 35.6 / 5.5 percent of
+the frame at 150 m / 420 m / 1 km (magenta marker, not committed); old against new in one page: 150 m 2 pixels (max 3 of
+255), 400 m 0, on foot 0; step 3 at 16 h max 4 of 255 at 1 km. Sheet A1_imppaint_AB_150m_400m_foot. What it saves is the
+phone's: rows massV, massT. Sent to F and the coordinator.
+Before: C SET THE HOOK'S LEVEL TO 0.40 (farview 5b9400e). RENDERED on a
 scratch merge with it, 16 h (sun 25 deg up: a 14 m tree's shadow 30 m long), 150 m: land under V 0.3 off 10.7, at 0.33
 16.5, at 0.40 13.4 percent; near-black 0.94 / 1.34 / 1.02; the pools lighter umber-grey (A1_farshadow_16h_150m_zoom_040).
 BUT the open lime clearing in that zoom is GROUND, not the painted canopy (seen with ?candebug=1), so 0.40 does not reach

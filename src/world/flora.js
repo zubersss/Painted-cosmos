@@ -1099,6 +1099,9 @@ export class Flora {
   // And its three tones once a crown (render/impostor.js MASST; ?imppaint=1 without them), for the speed test's row.
   setMassT(on) { const m = this.mats && this.mats.imp; if (!m) return null; const was = !!m.defines.PC_MASS_T; if (on) m.defines.PC_MASS_T = 1; else delete m.defines.PC_MASS_T; m.needsUpdate = true; return was; }
   get massT() { const m = this.mats && this.mats.imp; return !!(m && m.defines.PC_MASS_T); }
+  // And the crowns under 7 px likewise (render/impostor.js MASSO, ?imptone=1), for judging and the speed test.
+  setMassO(on) { const m = this.mats && this.mats.imp; if (!m) return null; const was = !!m.defines.PC_MASS_O; if (on) m.defines.PC_MASS_O = 1; else delete m.defines.PC_MASS_O; m.needsUpdate = true; return was; }
+  get massO() { const m = this.mats && this.mats.imp; return !!(m && m.defines.PC_MASS_O); }
   // The far crowns' shadows on the ground from the air (render/shadow.js FAR_SHADOW, ?farshadow=1), for the speed test's
   // row: on or off while the game runs (the shadow square, the casters' list at the next update, the twin's whole crown).
   setFarShadow(on) { const was = FAR_SHADOW.on; FAR_SHADOW.on = !!on; return was; }
