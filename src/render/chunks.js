@@ -297,6 +297,81 @@ vec3 pcFarLight(vec3 c, vec3 h, float f) {
   return h * clamp(1.0 + (${_fl(FAR_LIGHT)} * w) * (dot(c, vec3(0.3, 0.5, 0.2)) - lh) / max(lh, 0.08), 0.70, 1.40);
 }` : '';
 
+// THE AIR, ONCE (2026-11-24, the look director's L0; docs/lead/LOOK-AUDIT.md F15). The ground's air (FRAG_PARS) and the
+// plants' air worked out in their vertex shader (materials.js FOG_VERT, pcFogAmountV) were two hand copies of one
+// function, and on 22 Nov the copy was found to have drifted under a comment saying the two matched. Now both are made
+// from this one text: AIR_FN('pcFogAmountV') is this function under the vertex shader's name, word for word, so a change
+// here reaches both, and the 200 and 2400 live in two places only (here and world/index.js AIR_HIGH_*). It needs uFog,
+// uAirNear and, in the oil look, uOilC and uOilAir declared above it; FRAG_PARS and VERT_PARS + FOG_VERT both do.
+const AIR_SRC = /* glsl */`
+// Atmospheric perspective in soft stacked bands. Returns 0..1.
+float pcFogAmount(float dist) {
+  #ifdef PC_OIL
+    // (the clip's wood stands in a thick pale air: a trunk thirty metres off is half gone. From the ship the land must
+    // read, so the thickening eases off as the air's own reach grows with the eye's height)
+    // (from the air the land must still go back into the air's colour toward the horizon: at 1.6 times, with the curve
+    // below, the land a kilometre off stood as strong as the land underfoot, and the wood from the ship was one flat
+    // sheet of colour: the stills from 150 m. So 2.4 times there, and the curve only on the ground.)
+    // THE 200 AND THE 2400 STAND IN TWO PLACES AND NEITHER MAY BE CHANGED ALONE: here (which since 2026-11-24 is also
+    // the plants' pcFogAmountV, made from this text: AIR_FN) and world/index.js AIR_HIGH_0 / AIR_HIGH_W (the lit air).
+    // (Until 2026-11-24 a third hand copy stood in materials.js.) CHANGED 2026-11-23 from 400 to 2400,
+    // in all three in one commit (v34), because the day's reading measured what the 400 was doing: climbing in the autumn wood, the share of its own paint the land a mile off
+    // keeps goes 24 % on foot, 18 % at 30 m, 6 % at 40 m, 0 % at 50 m and 60 m, 2 % at 70 m, 10 % at 100 m, 21 % at
+    // 160 m -- a hilltop and a low hover are the worst places in the game to look far, because this lets the
+    // ceiling below go at 45 m of height, where the visibility is still only 723 m and far too short to carry the
+    // land instead. 2400 would let it go exactly as the visibility finishes its own ramp to 2600 m, measured as a
+    // steady 19-25 % all the way up and at most 0.013 of haze different on the ground -- which is what was done.
+    // It is a change to the air itself, in three files, and it still wants a still taken from a hilltop.
+    float pcHigh = clamp((1.0 / max(uFog.x, 1e-6) - 200.0) / 2400.0, 0.0, 1.0);
+    dist *= mix(uOilC.w, 2.4, pcHigh);
+  #endif
+  float f = 1.0 - exp(-dist * uFog.x);
+  #ifdef PC_OIL
+    f = mix(f * f * (3.0 - 2.0 * f), f, pcHigh);      // (on the ground: thin near the eye, where colour and detail must stand whole; thick far off)
+  #endif
+  float q = f * uFog.y;
+  float fl = floor(q);
+  f = (fl + smoothstep(0.15, 0.85, q - fl)) / uFog.y;
+  #ifdef PC_OIL
+    // A CEILING ON THE GROUND, NOT A LIMIT (2026-11-22, the owner: "i want things to look high quality and fully
+    // rendered even from 300 yards away"). MEASURED on the autumn wood (visibility 259 m, so the dial above takes the
+    // distance 2.66 times): this function returned EXACTLY 1.000 for anything 230 m off or farther, which means every
+    // pixel out there was one flat haze colour and nothing the ground, the trees or the water worked out was ever
+    // seen. The curve is not touched -- lowering uOilC.w is a rejected change, and the near thick pale air is the
+    // owner's own reference -- so instead the TOP of it is bent over with a soft knee: nothing changes below the knee
+    // (uOilAir.y, 0.46, which the wood's curve reaches at 60 m), the slope is still 1 at the knee, and the far end
+    // comes to rest at 1 - uOilAir.x so a thing at 275 m keeps a quarter of its own paint.
+    // The shape is the cubic with slope 1 at the knee and flat at the end, written out without a divide for the
+    // slope; the knee is held at or under 1 - 2 * keep, which is exactly the bound that keeps it RISING everywhere
+    // (slacker than that and the knee dips, and a far ridge would read clearer than a nearer one).
+    // Eased off by pcHigh SQUARED, not pcHigh: from the air the land must still go right back into the air's colour
+    // (the stills from 150 m, the note above), but pcHigh is already 0.15 standing in the wood, and a straight mix
+    // would hand a fifth of the ceiling back before the eye had left the ground.
+    // MEASURED after, on the wood, the ceiling and the oil look's ten bands together (they ship together, and this is
+    // what the player sees) -- haze before, haze now: 30 m 0.167 to 0.200, 60 m 0.468 to 0.434, 100 m 0.668 to 0.656,
+    // 150 m 0.836 to 0.738, 200 m 0.968 to 0.749, and from 230 m out 1.000 to 0.755. So a thing at 275 m keeps 0.245
+    // of its own paint where it kept nothing. ?air=0 is the air exactly as it was, ?bands=6 the bands as they were.
+    // WHAT THIS DOES NOT DO: it does not put DEPTH back past about 230 m, because the curve itself has already
+    // reached 1 there and there is nothing left to tell 275 m from 500 m. What comes back is the thing's own colour
+    // and its value steps, which is what the owner asked for. More depth than that wants a longer visibility or a
+    // smaller uOilC.w, and the second of those is a rejected change.
+    // And on the CLEAR worlds (Mercury 1400 m, Pluto 1600 m) and from the air, pcHigh is 1 and this does nothing at
+    // all: there the air at 275 m was only a third anyway.
+    if (uOilAir.x > 0.004) {
+      float keep = uOilAir.x, cap = 1.0 - uOilAir.x;
+      float knee = min(uOilAir.y, 1.0 - 2.0 * keep);
+      float U = 1.0 - knee, D = cap - knee;
+      float u = clamp((f - knee) / U, 0.0, 1.0);
+      float fc = knee + U * u * (u - 1.0) * (u - 1.0) + D * u * u * (3.0 - 2.0 * u);
+      f = mix(min(fc, f), f, pcHigh * pcHigh);      // (the min is both the identity below the knee and the promise that this can never make the air THICKER than it was)
+    }
+  #endif
+  return clamp(max(f * uFog.z, uAirNear.x * (1.0 - exp(-dist / max(uAirNear.y, 0.1)))), 0.0, 1.0);
+}
+
+`;
+export const AIR_FN = (name) => (name === 'pcFogAmount' ? AIR_SRC : AIR_SRC.replace('float pcFogAmount(float dist) {', 'float ' + name + '(float dist) {'));
+
 export const FRAG_PARS = /* glsl */`
 #include <common>
 #include <logdepthbuf_pars_fragment>
@@ -389,70 +464,7 @@ float pcLineF(float e0, float e1, float a, float gpx, float cell, float cov) {
 }
 
 ${PAINT}
-// Atmospheric perspective in soft stacked bands. Returns 0..1.
-float pcFogAmount(float dist) {
-  #ifdef PC_OIL
-    // (the clip's wood stands in a thick pale air: a trunk thirty metres off is half gone. From the ship the land must
-    // read, so the thickening eases off as the air's own reach grows with the eye's height)
-    // (from the air the land must still go back into the air's colour toward the horizon: at 1.6 times, with the curve
-    // below, the land a kilometre off stood as strong as the land underfoot, and the wood from the ship was one flat
-    // sheet of colour: the stills from 150 m. So 2.4 times there, and the curve only on the ground.)
-    // THE 200 AND THE 2400 STAND IN THREE PLACES AND NONE MAY BE CHANGED ALONE: here, materials.js pcFogAmountV
-    // (the plants) and world/index.js AIR_HIGH_0 / AIR_HIGH_W (the lit air). CHANGED 2026-11-23 from 400 to 2400,
-    // in all three in one commit (v34), because the day's reading measured what the 400 was doing: climbing in the autumn wood, the share of its own paint the land a mile off
-    // keeps goes 24 % on foot, 18 % at 30 m, 6 % at 40 m, 0 % at 50 m and 60 m, 2 % at 70 m, 10 % at 100 m, 21 % at
-    // 160 m -- a hilltop and a low hover are the worst places in the game to look far, because this lets the
-    // ceiling below go at 45 m of height, where the visibility is still only 723 m and far too short to carry the
-    // land instead. 2400 would let it go exactly as the visibility finishes its own ramp to 2600 m, measured as a
-    // steady 19-25 % all the way up and at most 0.013 of haze different on the ground -- which is what was done.
-    // It is a change to the air itself, in three files, and it still wants a still taken from a hilltop.
-    float pcHigh = clamp((1.0 / max(uFog.x, 1e-6) - 200.0) / 2400.0, 0.0, 1.0);
-    dist *= mix(uOilC.w, 2.4, pcHigh);
-  #endif
-  float f = 1.0 - exp(-dist * uFog.x);
-  #ifdef PC_OIL
-    f = mix(f * f * (3.0 - 2.0 * f), f, pcHigh);      // (on the ground: thin near the eye, where colour and detail must stand whole; thick far off)
-  #endif
-  float q = f * uFog.y;
-  float fl = floor(q);
-  f = (fl + smoothstep(0.15, 0.85, q - fl)) / uFog.y;
-  #ifdef PC_OIL
-    // A CEILING ON THE GROUND, NOT A LIMIT (2026-11-22, the owner: "i want things to look high quality and fully
-    // rendered even from 300 yards away"). MEASURED on the autumn wood (visibility 259 m, so the dial above takes the
-    // distance 2.66 times): this function returned EXACTLY 1.000 for anything 230 m off or farther, which means every
-    // pixel out there was one flat haze colour and nothing the ground, the trees or the water worked out was ever
-    // seen. The curve is not touched -- lowering uOilC.w is a rejected change, and the near thick pale air is the
-    // owner's own reference -- so instead the TOP of it is bent over with a soft knee: nothing changes below the knee
-    // (uOilAir.y, 0.46, which the wood's curve reaches at 60 m), the slope is still 1 at the knee, and the far end
-    // comes to rest at 1 - uOilAir.x so a thing at 275 m keeps a quarter of its own paint.
-    // The shape is the cubic with slope 1 at the knee and flat at the end, written out without a divide for the
-    // slope; the knee is held at or under 1 - 2 * keep, which is exactly the bound that keeps it RISING everywhere
-    // (slacker than that and the knee dips, and a far ridge would read clearer than a nearer one).
-    // Eased off by pcHigh SQUARED, not pcHigh: from the air the land must still go right back into the air's colour
-    // (the stills from 150 m, the note above), but pcHigh is already 0.15 standing in the wood, and a straight mix
-    // would hand a fifth of the ceiling back before the eye had left the ground.
-    // MEASURED after, on the wood, the ceiling and the oil look's ten bands together (they ship together, and this is
-    // what the player sees) -- haze before, haze now: 30 m 0.167 to 0.200, 60 m 0.468 to 0.434, 100 m 0.668 to 0.656,
-    // 150 m 0.836 to 0.738, 200 m 0.968 to 0.749, and from 230 m out 1.000 to 0.755. So a thing at 275 m keeps 0.245
-    // of its own paint where it kept nothing. ?air=0 is the air exactly as it was, ?bands=6 the bands as they were.
-    // WHAT THIS DOES NOT DO: it does not put DEPTH back past about 230 m, because the curve itself has already
-    // reached 1 there and there is nothing left to tell 275 m from 500 m. What comes back is the thing's own colour
-    // and its value steps, which is what the owner asked for. More depth than that wants a longer visibility or a
-    // smaller uOilC.w, and the second of those is a rejected change.
-    // And on the CLEAR worlds (Mercury 1400 m, Pluto 1600 m) and from the air, pcHigh is 1 and this does nothing at
-    // all: there the air at 275 m was only a third anyway.
-    if (uOilAir.x > 0.004) {
-      float keep = uOilAir.x, cap = 1.0 - uOilAir.x;
-      float knee = min(uOilAir.y, 1.0 - 2.0 * keep);
-      float U = 1.0 - knee, D = cap - knee;
-      float u = clamp((f - knee) / U, 0.0, 1.0);
-      float fc = knee + U * u * (u - 1.0) * (u - 1.0) + D * u * u * (3.0 - 2.0 * u);
-      f = mix(min(fc, f), f, pcHigh * pcHigh);      // (the min is both the identity below the knee and the promise that this can never make the air THICKER than it was)
-    }
-  #endif
-  return clamp(max(f * uFog.z, uAirNear.x * (1.0 - exp(-dist / max(uAirNear.y, 0.1)))), 0.0, 1.0);
-}
-
+${AIR_SRC}
 // Each distance band is lighter, cooler, lower in contrast; the far end is bare paper.
 #ifdef PC_OIL
 // (the oil look: the far end is the air's own colour, and toward the sun the air glows with the light's; the distance
