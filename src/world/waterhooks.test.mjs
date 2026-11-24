@@ -13,15 +13,16 @@ test('the switches: the watercolour game has none; the oil look has the reviewed
   const W = waterFromSearch('?flow=1');
   assert.equal(W.on, false);
   for (const k of ['rivers', 'lakes', 'ponds', 'puddles', 'swell', 'falls', 'fjord', 'splash']) assert.equal(W[k], 0, k);
-  assert.equal(W.wpaint, 1, 'the water\'s new strokes are the default (24 Nov, passed by the look director); ?wpaint=0 is v37\'s');
+  assert.equal(W.wpaint, 0, 'v37\'s strokes stay the default for v39.2 (the sea from the air did not pass); ?wpaint=1 the new ones');
+  assert.equal(waterFromSearch('?wpaint=1').wpaint, 1);
   assert.equal(waterFromSearch('?wpaint=0').wpaint, 0);
   assert.equal(W.wakes, 1);
   // (the oil look's defaults, 24 Nov: rivers of the tree with bends, lakes, ponds, puddles, fjord, and the falls since the
   //  paint's curtain fix passed the look director)
   const O = waterFromSearch('?look=oil');
   assert.equal(O.on, true);
-  for (const k of ['rivers', 'lakes', 'ponds', 'puddles', 'fjord', 'falls', 'wpaint']) assert.equal(O[k], 1, k);
-  for (const k of ['swell', 'runoff', 'mount', 'splash']) assert.equal(O[k], 0, k);
+  for (const k of ['rivers', 'lakes', 'ponds', 'puddles', 'fjord', 'falls']) assert.equal(O[k], 1, k);
+  for (const k of ['swell', 'runoff', 'mount', 'splash', 'wpaint']) assert.equal(O[k], 0, k);
   assert.equal(O.bends, 1);
   // (all six turned off: the oil look's ground water as it was)
   const X = waterFromSearch('?look=oil&rivers=old&lakes=0&ponds=0&puddles=0&fjord=0&falls=0');
