@@ -719,7 +719,10 @@ void pcBloomAt(vec2 dsA, vec3 rnd) {
   gBloom = 0.0;
   if (uBloomOn < 0.5) return;
   float k = clamp(vBloomK + gBkdx * dsA.x + gBkdy * dsA.y, 0.0, 1.0);
-  if (k <= 0.02 || fract(rnd.z * 23.17 + rnd.y * 5.31) >= 0.9 * k) return;
+  // (near the eye a third as many: at 10 m the drifts' strokes took 46 per cent of the ground and the meadow was a quilt of
+  // flower colour with little green, MEASURED by flora B; the look director wants about 10 to 15 per cent there. 0.3 of the
+  // cover under 60 m, rising to 0.9 by 250 m)
+  if (k <= 0.02 || fract(rnd.z * 23.17 + rnd.y * 5.31) >= mix(0.3, 0.9, smoothstep(60.0, 250.0, length(vView))) * k) return;
   // (far off a dab takes the SLOPE's kind, bloom.js o.fi2, not its drift's own: every dab its own kind made a confetti
   // from 420 m, SEEN by flora B; whole dabs cross over from 250 to 400 m, each by its own number)
   float farK = smoothstep(250.0, 400.0, length(vView));
