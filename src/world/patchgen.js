@@ -6,7 +6,7 @@ import { makeSample, NOLQ } from './surface.js';
 import { MODE } from '../data/mode.js';
 import { BODIES } from '../data/bodies.js';
 import { canopyOn, standAt } from './farstand.js';
-import { shoreField } from './shore.js';
+import { shoreField, SHORE_DEF } from './shore.js';
 
 export const PATCH_N = 32;                 // cells per patch edge (even, for geomorphing)
 const N = PATCH_N, V = N + 1, E = N + 3;   // E: sample grid with a one-vertex apron for normals
@@ -311,8 +311,19 @@ export function stepPatch(job, deadline) {
     //    most about 44 m wide (_riversOil: half width 2.5 m times 8.9 at its widest pool), so water found WIDE_R = 27 m to
     //    BOTH sides across the current is a pool. Asked of the surface itself (two samples), on a grid of about 6 m over
     //    the patch and laid between, so a patch at any level gives about the same answer.
-    // (Only with the switch: without it the byte stays 0, as it was, and nothing reads it.)
-    if (wturb && MODE.water && MODE.water.wpaint >= 1) {
+    // AND WHICH WATER IS THE SEA, into the other spare byte aTurb.z: 1 where the water stands at the sea's level (the sea, a
+    // fjord or a lagoon drowned to it, a river's last metres), 0 every other water (rivers, ponds, lakes stand above it).
+    // The paint uses the sea's own level there (?wsea=, v37's by default) and the rivers' and ponds' elsewhere (?wpaint=):
+    // the coordinator, 24 Nov. The sea's level is the surface's own (surface.js: the coast's and the islands' liquid is
+    // S.sea, 0 on a world that names none); within 0.15 m of it is the sea, 0.45 m above it is not, and between the paint
+    // breaks the change with noise. No samples: the level is already known at every vertex.
+    // (Only with the switch: without it both bytes stay 0, as they were, and nothing reads them.)
+    if (wturb && MODE.water && Math.max(MODE.water.wpaint, MODE.water.wsea || 0) >= 1) {
+      const seaL = S.sea == null ? 0 : S.sea;
+      for (let j = 0; j < V; j++) for (let i = 0; i < V; i++) {
+        const k = (j + 1) * E + (i + 1);
+        if (_lq[k] > -1e5) { const d = Math.abs(_lq[k] - seaL); wturb[(j * V + i) * 4 + 2] = d <= 0.15 ? 255 : d >= 0.45 ? 0 : Math.round(255 * (0.45 - d) / 0.3); }
+      }
       const st = (_stillSamp && _stillSamp.w.length >= S.nB) ? _stillSamp : (_stillSamp = makeSample(S.nB));
       const gs = Math.max(1, Math.round(6 / cellM)), G = Math.ceil((V - 1) / gs) + 1;
       if (_stillGrid.length < G * G) _stillGrid = new Float32Array(G * G);
@@ -368,26 +379,30 @@ export function stepPatch(job, deadline) {
       }
     }
     // THE SHORE'S DIRECTION for the sea's strokes (lane W2, the bodies of water; world/shore.js): one more attribute, aShore,
-    // only with the water's new paint (?wpaint >= 1) and only on a patch with sea in it: two bytes a vertex, the way toward
-    // land times how near it is (about 128: none), in the frame the current is handed over in. The paint turns the wind's
-    // waves toward it there, as a swell turns to meet a shore (render/materials.js WATER_FRAG). Never a byte pair of 0, 0:
-    // that is the attribute not bound, which the paint reads as none.
+    // only with the new paint ON THE SEA (?wsea >= 1: the sea is v37's by default, which then pays nothing here) and only on
+    // a patch with sea in it (aTurb.z, the water at the sea's level, written just above): four bytes a vertex, x y the way
+    // toward land times how near it is (about 128: none), in the frame the current is handed over in, z the narrowest
+    // crossing there (a byte of SHORE_DEF.open m: 255 open water), w spare. The paint turns the wind's waves toward the shore,
+    // as a swell turns to meet it, and lays short chop where the water is narrow across the wind (render/materials.js
+    // WATER_FRAG). Never x, y of 0, 0: that is the attribute not bound, which the paint reads as none.
     let wshore = null;
-    if (wturb && MODE.water && MODE.water.wpaint >= 1) {
-      const sea = S.sea == null ? 0 : S.sea, isSea = (k) => _lq[k] > -1e5 && Math.abs(_lq[k] - sea) < 0.3;
+    if (wturb && MODE.water && (MODE.water.wsea || 0) >= 1) {
+      const isSea = (j, i) => wturb[(j * V + i) * 4 + 2] > 0;
       let any = false;
-      for (let j = 0; j < V && !any; j++) for (let i = 0; i < V; i++) if (isSea((j + 1) * E + (i + 1))) { any = true; break; }
+      for (let j = 0; j < V && !any; j++) for (let i = 0; i < V; i++) if (isSea(j, i)) { any = true; break; }
       if (any) {
         const F = shoreField(S), so = _shoreOut;
-        wshore = new Uint8Array(V * V * 2).fill(128);
+        wshore = new Uint8Array(V * V * 4).fill(128);
+        for (let q = 2; q < wshore.length; q += 4) wshore[q] = 255;
         for (let j = 0; j < V; j++) for (let i = 0; i < V; i++) {
+          if (!isSea(j, i)) continue;
           const k = (j + 1) * E + (i + 1);
-          if (!isSea(k)) continue;
           const l0 = Math.sqrt(_px[k] * _px[k] + _py[k] * _py[k] + _pz[k] * _pz[k]);
           F.at(_px[k] / l0, _py[k] / l0, _pz[k] / l0, so);
-          const q = (j * V + i) * 2;
+          const q = (j * V + i) * 4;
           wshore[q] = Math.max(1, Math.min(255, Math.round(128 + 127 * so.lx)));
           wshore[q + 1] = Math.max(1, Math.min(255, Math.round(128 + 127 * so.ly)));
+          wshore[q + 2] = Math.max(0, Math.min(255, Math.round(255 * so.width / SHORE_DEF.open)));
         }
       }
     }

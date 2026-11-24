@@ -22,14 +22,14 @@ function off(dir, e, n) {
   return [x / k, y / k, z / k];
 }
 // the still byte of the water vertex nearest a place, from the level-7 patch it lies in (about 1.5 m between vertices)
-function stillAt(d, level = 7) {
+function stillAt(d, level = 7, byte = 3) {
   const f = dirToFace(d[0], d[1], d[2], {}), span = 2 / (1 << level);
   const ix = Math.floor((f.u + 1) / span), iy = Math.floor((f.v + 1) / span);
   const P = buildPatchData(S, f.face, level, ix, iy);
   if (!P.water || !P.water.turb) return null;
   const du = span / PATCH_N, V = PATCH_N + 1;
   const i = Math.round((f.u - (-1 + ix * span)) / du), j = Math.round((f.v - (-1 + iy * span)) / du);
-  return P.water.turb[(j * V + i) * 4 + 3];
+  return P.water.turb[(j * V + i) * 4 + byte];
 }
 
 test('with ?wpaint=0 the still byte is 0 everywhere, as before', () => {
@@ -37,6 +37,8 @@ test('with ?wpaint=0 the still byte is 0 everywhere, as before', () => {
   for (const p of [[0, 100], [100, 330], [-1720, -1240]]) {
     const v = stillAt(off(P0, p[0], p[1]));
     assert.ok(v === null || v === 0, 'still ' + v + ' at ' + p);
+    const o = stillAt(off(P0, p[0], p[1]), 7, 2);
+    assert.ok(o === null || o === 0, 'sea byte ' + o + ' at ' + p);
   }
 });
 
@@ -49,5 +51,16 @@ test('with ?wpaint=2: the sea still, the river running, the junction pond still'
     assert.ok(river !== null && river < 30, 'the main river by the landing keeps its current: ' + river);
     const pond = stillAt(off(P0, 100, 320));
     assert.ok(pond !== null && pond > 200, 'the junction pond (v37 painted a whorl there) is still: ' + pond);
+  } finally { waterFromSearch(''); }
+});
+
+test('the default (?wpaint=1, the sea on v37): the sea is told from the river and the pond', () => {
+  waterFromSearch('?look=oil');
+  try {
+    assert.equal(stillAt(off(P0, -1720, -1240), 7, 2), 255, 'the sea stands at the sea level');
+    const river = stillAt(off(P0, 30, 100), 7, 2), pond = stillAt(off(P0, 100, 320), 7, 2);
+    assert.ok(river !== null && river === 0, 'the main river by the landing is not the sea: ' + river);
+    assert.ok(pond !== null && pond === 0, 'nor the junction pond: ' + pond);
+    assert.ok(stillAt(off(P0, 100, 320)) > 200, 'and the pond is still still');
   } finally { waterFromSearch(''); }
 });

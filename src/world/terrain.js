@@ -182,7 +182,7 @@ export class PlanetTerrain {
       // render/materials.js, aTurb)
       if (d.water.turb) wg.setAttribute('aTurb', new THREE.BufferAttribute(d.water.turb, 4, true));
       if (d.water.w2) wg.setAttribute('aWater2', new THREE.BufferAttribute(d.water.w2, 4, true));      // (the water's runoff, ?runoff=1: patchgen.js; the water paint lane)
-      if (d.water.shore) wg.setAttribute('aShore', new THREE.BufferAttribute(d.water.shore, 2, true));   // (the shore's direction for the sea's strokes, ?wpaint >= 1: patchgen.js, world/shore.js; lane W2)
+      if (d.water.shore) wg.setAttribute('aShore', new THREE.BufferAttribute(d.water.shore, 4, true));   // (the shore's direction for the sea's strokes, ?wpaint >= 1: patchgen.js, world/shore.js; lane W2)
       wg.setIndex(new THREE.BufferAttribute(d.water.indices, 1));
       // THE WATER'S OWN BOUNDS, NOT THE PATCH'S. (MEASURED 2026-11-23 in the autumn wood: 41 of the frame's 232
       // draw calls were water, and the wood's water is a brook. A patch gets a water mesh as soon as ONE of its

@@ -15,11 +15,15 @@ import { WATER_BENCH } from '../world/waterhooks.js';
 import { WAKES2 } from '../physics/water.js';
 import { SPLASHES } from '../physics/splash.js';
 
-// The new paint is compiled in with the oil look unless ?wpaint=0 (read at use: MODE is set after this module runs). Its
-// level is the uniform: 1 the new strokes (the default since 24 Nov), 2 and the new colour (steps 2-3, under review).
+// The new paint is compiled in with the oil look when either water asks for it (read at use: MODE is set after this module
+// runs). Its level is a uniform, one for rivers and ponds (uWPaint, ?wpaint=: 1 the new strokes, the default) and one for
+// the sea and the water at its level (uWSea, ?wsea=, else as ?wpaint=: 0 v37's by default); 2 is the strokes and the new
+// colour (steps 2-3, under review). ?wpaint=0 alone puts both to 0 and nothing of this is compiled: v37's water exactly.
+const lv = (v) => Math.max(0, Math.min(2, v | 0));
 export function wpaintOn() {
-  const on = !!(MODE.oil && MODE.water && MODE.water.wpaint >= 1);
-  if (on) WPAINT.uWPaint.value = Math.min(2, MODE.water.wpaint);
+  const W = MODE.water;
+  const on = !!(MODE.oil && W && Math.max(W.wpaint, W.wsea || 0) >= 1);
+  if (on) { WPAINT.uWPaint.value = lv(W.wpaint); WPAINT.uWSea.value = lv(W.wsea || 0); }
   return on;
 }
 
@@ -46,8 +50,9 @@ export function runoffOn() {
 }
 export const RUNOFF_U = { uRunoff: { get value() { if (_ws) { _ro[0] = _ws.wet; _ro[1] = _ws.rise; _ro[2] = _ws.mud; } return _ro; }, set value(v) { /* (the world's) */ } } };
 
-// 1: the new strokes, 2: and the new colour, 0: v37's. The same object in every water material, so one write switches them all.
-export const WPAINT = { uWPaint: { value: 1 } };
+// 1: the new strokes, 2: and the new colour, 0: v37's; uWPaint on rivers and ponds, uWSea on the sea. The same object in every
+// water material, so one write switches them all.
+export const WPAINT = { uWPaint: { value: 1 }, uWSea: { value: 0 } };
 
 // The speed test's rows for the new paint (WATER-DESIGN.md 6): at the bank and at the shore, v37's paint against the
 // new one, each against its own view's "as set" row. Registered once, and only when the new paint is compiled in.
@@ -56,7 +61,7 @@ export function benchWPaint() {
   if (benched || !wpaintOn()) return;
   benched = true;
   for (const view of ['bank', 'shore']) {
-    WATER_BENCH.push({ name: 'v37 water paint', view, on: () => { WPAINT.uWPaint.value = 0; }, off: () => { WPAINT.uWPaint.value = Math.min(2, MODE.water.wpaint); } });
+    WATER_BENCH.push({ name: 'v37 water paint', view, on: () => { WPAINT.uWPaint.value = 0; WPAINT.uWSea.value = 0; }, off: () => { WPAINT.uWPaint.value = lv(MODE.water.wpaint); WPAINT.uWSea.value = lv(MODE.water.wsea || 0); } });
   }
 }
 

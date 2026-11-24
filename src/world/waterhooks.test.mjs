@@ -13,8 +13,12 @@ test('the switches: none of them is the game as it was', () => {
   const W = waterFromSearch('?look=oil&flow=1');
   assert.equal(W.on, false);
   for (const k of ['rivers', 'lakes', 'ponds', 'puddles', 'swell', 'falls', 'fjord', 'splash']) assert.equal(W[k], 0, k);
-  assert.equal(W.wpaint, 0, 'v37\'s water is the default until the sea from the air passes (the coordinator, 24 Nov)');
-  assert.equal(waterFromSearch('?wpaint=1').wpaint, 1);
+  assert.equal(W.wpaint, 1, 'the new strokes are the default on rivers and ponds (the coordinator, 24 Nov)');
+  assert.equal(W.wsea, 0, 'and v37\'s on the sea until the sea from the air passes');
+  let X = waterFromSearch('?wpaint=0'); assert.equal(X.wpaint, 0); assert.equal(X.wsea, 0, '?wpaint=0 alone: v37\'s water everywhere');
+  X = waterFromSearch('?wpaint=2'); assert.equal(X.wpaint, 2); assert.equal(X.wsea, 2, '?wpaint=2 alone: the new paint everywhere');
+  X = waterFromSearch('?wpaint=2&wsea=0'); assert.equal(X.wpaint, 2); assert.equal(X.wsea, 0);
+  X = waterFromSearch('?wsea=1'); assert.equal(X.wpaint, 1); assert.equal(X.wsea, 1);
   assert.equal(W.wakes, 1);
   const V = waterFromSearch('?rivers=tree&lakes=1&wpaint=2&wakes=2');
   assert.equal(V.on, true); assert.equal(V.rivers, 1); assert.equal(V.lakes, 1); assert.equal(V.wpaint, 2); assert.equal(V.wakes, 2);

@@ -17,6 +17,8 @@ test('shore: near land the field points toward it, its length the nearness (0..1
   F.at(...P0, o);
   assert.ok(wet(P0), 'the test point is sea');
   assert.ok(o.w > 0.3 && o.w <= 1 + 1e-9, 'near land: w ' + o.w.toFixed(2));
+  // the falls' strait is narrow: land within a few hundred metres both ways across
+  assert.ok(o.width > 100 && o.width < 1000, 'the strait is narrow: ' + o.width.toFixed(0) + ' m');
   // a few hundred metres along the way it points there is land
   const [ux, uy, uz, vx, vy, vz] = SH.frameOf(...P0), lx = o.lx / o.w, ly = o.ly / o.w;
   let found = false;
@@ -47,7 +49,7 @@ test('shore: none on land, over deep water or on water above the sea (a lake, a 
   let land = null;
   for (let k = 0; k < 400 && !land; k++) { const p = unit([P0[0] + k * 3 / R, P0[1] + k * 3 / R, P0[2]]); if (!wet(p)) land = p; }
   assert.ok(land, 'land found near the strait');
-  assert.deepEqual([...F._measure(...land)], [0, 0], 'no shore field on land');
+  assert.deepEqual([...F._measure(...land)].slice(0, 2), [0, 0], 'no shore field on land');
   // a lake or pond (water standing above the sea's level), if one is found near the landing
   const g = S.getSpawn(); let lake = null;
   for (let k = 0; k < 3000 && !lake; k++) {
@@ -55,5 +57,11 @@ test('shore: none on land, over deep water or on water above the sea (a lake, a 
     S.sample(p[0], p[1], p[2], st, false);
     if (st.lq !== SURF.NOLQ && st.lq > st.h && st.lq > 0.5) lake = p;
   }
-  if (lake) assert.deepEqual([...F._measure(...lake)], [0, 0], 'no shore field on water above the sea');
+  if (lake) assert.deepEqual([...F._measure(...lake)].slice(0, 2), [0, 0], 'no shore field on water above the sea');
+});
+
+test('shore: the paint decodes the crossing at the field\'s own scale', async () => {
+  const fs = await import('node:fs');
+  const src = fs.readFileSync(new URL('../render/materials.js', import.meta.url), 'utf8');
+  assert.ok(src.includes('vShore.z * ' + SH.SHORE_DEF.open + '.0'), 'materials.js reads the width byte as SHORE_DEF.open metres');
 });

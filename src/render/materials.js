@@ -1083,10 +1083,12 @@ varying vec2 vTurb;
 // (the water's new paint, ?wpaint=2: aTurb.w is how STILL the water is here, 0 a current .. 1 a pond, a lake, the sea,
 // as the mesher measured it: world/patchgen.js. A byte of 0 everywhere without the switch, and nothing reads it)
 varying float vStill;
-// (THE SHORE, lane W2: the way toward land times how near it is, two bytes about 128 in the current's frame; the sea only,
-// world/shore.js and patchgen.js. Not bound, it reads 0, 0, which is passed on as none)
-attribute vec2 aShore;
-varying vec2 vShore;
+// (aTurb.z: 1 where the water stands at the sea's level, the sea's own paint level is used there: uWSea)
+varying float vOpen;
+// (THE SHORE, lane W2: xy the way toward land times how near it is, about 128 in the current's frame; z the narrowest
+// crossing, a byte of 1500 m; the sea only, world/shore.js and patchgen.js. Not bound, it reads 0, 0: passed on as none)
+attribute vec4 aShore;
+varying vec4 vShore;
 #endif
 #ifdef PC_RUNOFF
 // (the water that comes and goes with the rain, ?runoff=1: x the depth that exists only in the wet, a byte of 0.6 m; y how
@@ -1163,7 +1165,8 @@ void main() {
     vTurb = aTurb.xy;
     #ifdef PC_WPAINT
       vStill = aTurb.w;
-      vShore = aShore.x + aShore.y < 0.002 ? vec2(128.0 / 255.0) : aShore;
+      vOpen = aTurb.z;
+      vShore = aShore.x + aShore.y < 0.002 ? vec4(128.0 / 255.0, 128.0 / 255.0, 1.0, 0.5) : aShore;
     #endif
   #endif
   vec4 mv = modelViewMatrix * vec4(p + pcRound(vBody), 1.0);
@@ -1199,7 +1202,9 @@ varying vec2 vTurb;      // x the water's own speed (0: the mesher gave none), y
 #ifdef PC_WPAINT
 uniform float uWPaint;   // the water's new paint (?wpaint=2): 1 on, 0 v37's (the speed test's row); render/waterchunk.js
 varying float vStill;    // how still the water is here, 0 a current .. 1 a pond, a lake, the sea (world/patchgen.js)
-varying vec2 vShore;     // the way toward land times its nearness, about 128/255 none (the sea only; world/shore.js, lane W2)
+uniform float uWSea;     // the same on the sea and the water at its level (0 v37's, the default; ?wsea=, else ?wpaint=)
+varying float vOpen;     // 1 water at the sea's level (the sea, a fjord, a lagoon), 0 rivers, ponds, lakes (world/patchgen.js)
+varying vec4 vShore;     // xy the way toward land times its nearness (about 128/255 none), z the narrowest crossing (1500 m a byte; the sea only; world/shore.js, lane W2)
 #endif
 #ifdef PC_RUNOFF
 uniform vec4 uRunoff;    // the world's wetness now, the streams' rise (m), the brown (world/waterstate.js)
@@ -1259,6 +1264,14 @@ void main() {
   vec4 r1 = texture(uNoise3D, vBody / 4.6 + drift);
   vec4 r2 = texture(uNoise3D, vBody / 1.35 - drift * 1.7);
   vec4 r3 = texture(uNoise3D, vBody / 17.0);
+  #ifdef PC_WPAINT
+  // WHICH PAINT HERE: the new strokes on rivers and ponds (uWPaint, 1 by default), v37's on the sea and the water at its level
+  // (uWSea, 0 by default: the look director, 24 Nov, found the open sea from the air a checker at the new strokes; the
+  // coordinator: the strokes the default where they passed, the sea on v37 until its own fix passes). vOpen is the
+  // mesher's (world/patchgen.js: water standing at the sea's level); where a river comes down to it the change is
+  // broken by the 17 m noise, so it is never a ruled line across the mouth.
+  float wpL = vOpen > 0.25 + 0.5 * r3.b ? uWSea : uWPaint;
+  #endif
   // PHYSICS' sea at this point: height, slope, crests, foam. What the brush cannot hold at
   // this distance is dropped (waves smaller than a pixel would shimmer): far water goes flat
   // and is given its whitecaps as a few anchored dabs instead.
@@ -1299,7 +1312,7 @@ void main() {
   // (THE WATER'S NEW PAINT, lane W3, ?wpaint=2: the sky as it is, not mixed with three tenths of white. From the air
   // the reflected ray points at the zenith, and the white made every water seen from above a pale grey: the design's
   // w06, w09, w15, w16. Until the look director's sky as painted (LOOK-AUDIT L9, pcSkyAt) is in, the keys' own sky.)
-  if (uWPaint > 1.5) skyc = skyT;
+  if (wpL > 1.5) skyc = skyT;
   #endif
   vec3 dark = pcDensity(uReflDark, 1.0 + (r3.g - 0.5) * 0.9);
   vec3 c = mix(dark, skyc, skyAmt);
@@ -1371,7 +1384,7 @@ void main() {
   // grey-beige. Now two metres of water from straight above shows a twentieth of its bed, half a metre two fifths, so
   // a brook and the shallows stay light and a river's middle and a lake go deep. And the shallows' own band (under
   // 0.42 m) is let go with the distance: round a submerged bump it is a ring, and from afar a thin pale line.)
-  if (uWPaint > 1.5) bedK = clamp((1.0 - fres) * 0.42 * exp(-vDep / 0.6) * (1.0 - 0.75 * smoothstep(80.0, 400.0, dist)) + shallow * 0.7 * (1.0 - 0.92 * smoothstep(30.0, 150.0, dist)), 0.0, 0.9);      // (and a thin stream far off takes the water's tone, not its pale bed: the look director)
+  if (wpL > 1.5) bedK = clamp((1.0 - fres) * 0.42 * exp(-vDep / 0.6) * (1.0 - 0.75 * smoothstep(80.0, 400.0, dist)) + shallow * 0.7 * (1.0 - 0.92 * smoothstep(30.0, 150.0, dist)), 0.0, 0.9);      // (and a thin stream far off takes the water's tone, not its pale bed: the look director)
   #endif
   c = mix(c, bed * mix(vec3(1.0), c, 0.45), bedK * (1.0 - vLiqP.y) * (1.0 - vLiqP.x * 0.8));
   // pigment pools at the water's edge
@@ -1379,7 +1392,7 @@ void main() {
   #ifdef PC_WPAINT
   // (the new paint: the pigment's band at the waterline is nine centimetres wide; beyond a few tens of metres it is
   // under a pixel, and it drew every shore and every submerged bump as a dark hairline, an outline)
-  if (uWPaint > 1.5) edgeK *= 1.0 - smoothstep(20.0, 80.0, dist);
+  if (wpL > 1.5) edgeK *= 1.0 - smoothstep(20.0, 80.0, dist);
   #endif
   c = pcDensity(c, 1.0 + edgeK);
   // bare-paper glints: broken dashes where ripples catch the light
@@ -1528,13 +1541,14 @@ void main() {
     vec2 wdx = pcGroundChartD(vBody, -dFdx(vToCam), uBodyR), wdy = pcGroundChartD(vBody, -dFdy(vToCam), uBodyR);
     vec3 wr1, wr2; vec2 wds; float wown;
     float wStill = 0.0;      // (how still the water is here, for the new colour below: the new paint's own, 0 in v37's)
+    float wChop = 0.0;       // (how much the sea here is a narrow strait's short chop: lane W2, world/shore.js; 0 elsewhere)
     // (and the churn's own chart, below: it is turned to the current on a far lower floor than the dashes are,
     // because white water must MOVE even in an eddy, where the body of the water is rightly laid still)
     vec2 ach = wch, adx = wdx, ady = wdy;
     #ifdef PC_WPAINT
     // (the lace's way, pace and octave in the new paint: set below)
     vec2 aDir = vec2(1.0, 0.0); float aSpd = 0.0; vec4 ao4 = vec4(1.0, 0.0, 0.0, 0.0); vec3 aoc3 = vec3(0.0);
-    if (uWPaint > 0.5) {
+    if (wpL > 0.5) {
       // THE WATER'S NEW PAINT (lane W3, ?wpaint=2; the strokes themselves in render/waterchunk.js pcWStrokes).
       // STILL WATER LAID STILL. How still the water is here comes from the mesher (vStill: a pond, a lake, the sea,
       // and a widened pool whose "current" turns round on itself -- the junction pond that was painted as a whorl);
@@ -1553,11 +1567,16 @@ void main() {
       // much, as a swell turns to meet a shore; the strokes then lie along the turned crests. Waves already running out to
       // sea are left as they are. Out in open water (vShore none) the wind's own crests, as before.
       vec3 D3w = pcPhysWaterDir(sdir); D3w -= up * dot(D3w, up); D3w = dot(D3w, D3w) > 1e-12 ? normalize(D3w) : Uf;
-      vec2 shm = vShore * (255.0 / 127.0) - (128.0 / 127.0);
+      vec2 shm = vShore.xy * (255.0 / 127.0) - (128.0 / 127.0);
       float shw = min(length(shm), 1.0);
+      // (THE FETCH, the look director: in a narrow strait with the wind across it the water is short chop, not long crests.
+      // The open water upwind is about the narrowest crossing (world/shore.js SHORE_DEF.open, 1500 m a byte), over how
+      // squarely the wind crosses it: across a strait, its width; along it, a few times that)
+      float fetchW = vShore.z * 1500.0;
       if (shw > 0.02) {
         vec3 nL = normalize(Uf * shm.x + cross(up, Uf) * shm.y);
         float cA = dot(D3w, nL), sA = dot(cross(D3w, nL), up);
+        fetchW /= max(abs(cA), 0.3);
         float ang = atan(sA, cA) * shw * smoothstep(-0.95, -0.6, cA);
         D3w = D3w * cos(ang) + cross(up, D3w) * sin(ang);
       }
@@ -1576,7 +1595,7 @@ void main() {
       // this paint, E4 at the phone's size). The squeeze is worked out from the way the rows stack and the way the eye
       // looks, both smooth over the water: the rows' own size on the screen is a derivative, and the octave's derivative
       // taken from it was blocky from one square of pixels to the next and frayed the strokes' ends.
-      vec3 f3 = Uf * fl.x + cross(up, Uf) * fl.y, k3 = kc3;
+      vec3 f3 = Uf * fl.x + cross(up, Uf) * fl.y, k3 = shw > 0.02 ? kc3 : cross(up, pcPhysWaterDir(sdir));      // (unturned: exactly as before)
       vec3 d3 = mix(dot(f3, f3) > 1e-6 ? normalize(f3) : k3, dot(k3, f3) < 0.0 ? -k3 : k3, still);
       float rowF = length(cross(cross(up, dot(d3, d3) > 1e-6 ? normalize(d3) : k3), Vd));
       float graze = 1.0 / max(rowF, 0.333);
@@ -1589,7 +1608,10 @@ void main() {
       // toward the coast here and there, and from the air their strokes were squares), so it is laid longer by as much,
       // up to three times -- the same care the rows' squeeze already has above (graze), for the other axis.
       float lenF = length(cross(dot(d3, d3) > 1e-6 ? normalize(d3) : k3, Vd));
-      float aspW = still > 0.5 ? 10.0 / max(lenF, 0.34) : 6.0;
+      // (and where the fetch is short, a few hundred metres, the strokes are short chop, three or four widths, broken and
+      // not joined into lines; they lengthen smoothly to the open sea's crests as the fetch grows: the look director)
+      wChop = vOpen * (1.0 - smoothstep(300.0, 900.0, fetchW));
+      float aspW = still > 0.5 ? mix(10.0, 3.5, wChop) / max(lenF, 0.34) : 6.0;
       pcWStrokes(wch, wdx, wdy, dS, v0 * (1.0 - still), wo4.x, aspW, woc3, wr1, wr2, wown);
       // (the lace: along the current wherever there is one, at the water's own pace, on its own octaves)
       aDir = coh > 0.02 ? fc : kc; aSpd = coh > 0.02 ? v0 : 0.0;
@@ -1645,7 +1667,7 @@ void main() {
     float wBodyD = 1.9, wBodyK = 0.55, wSunE = 56.0, wSunK = 0.6;
     vec3 wLightC = mix(skyc, vec3(1.0), 0.25);
     #ifdef PC_WPAINT
-    if (uWPaint > 1.5) {
+    if (wpL > 1.5) {
       // THE WATER'S BODY BY ITS DEPTH (the new paint): its own wash laid heavier the deeper it is -- a brook and the
       // shallows a lighter blue, a river's middle and a lake deep (the owner's aerial river sheets: deep blue in the
       // middle, lighter at the edges); the light strokes carry the sky as it is, not whitened; and THE SUN'S PATH
@@ -1667,7 +1689,7 @@ void main() {
     vec3 cdeep = pcDensity(c, 2.1) * vec3(0.90, 0.92, 1.0), clight = mix(c, wLightC, 0.45);
     float wThL = 0.62, wThD = 0.30;
     #ifdef PC_WPAINT
-    if (uWPaint > 1.5) {
+    if (wpL > 1.5) {
       // BROKEN COLOUR, NOT A MIXTURE (the new paint). v37 mixed the water's blue body into what it mirrors, pixel by
       // pixel, and laid its strokes a step lighter and darker than that mixture: under a golden sky a blue body and a
       // cream sky mixed make GREY, and from the air every water was grey (the design's w06, w09, w15, w16). Now the
@@ -1695,18 +1717,20 @@ void main() {
     }
     #endif
     #ifdef PC_WPAINT
-    if (uWPaint > 0.5 && uWPaint < 1.5) {
+    if (wpL > 0.5 && wpL < 1.5) {
       // THE SEA FROM THE AIR (E-W2, F's note): with the new strokes and v37's colour, still water far off kept v37's three
       // steps in near equal shares, the deep one very deep: where strokes of two cells and two octaves lie over one another
       // that read as a checker of dark and light blocks. Far still water is laid as the calmest thing on the map, as the
       // new colour already lays it: most strokes the body, few light ones, few deep ones, and those a closer step. And
       // its body a step deeper (the look director: v37's mid blue, value about 0.65 to 0.70, where the many light and
       // deep strokes of v37 had held it; with them few the body alone has to).
-      float sk = wStill * smoothstep(40.0, 220.0, dist) * liq;
-      c = mix(c, pcDensity(c, 1.45), sk);
-      wThL = mix(wThL, 0.80, sk); wThD = mix(wThD, 0.22, sk);
-      cdeep = mix(cdeep, pcDensity(c, 1.40) * vec3(0.93, 0.95, 1.0), sk);
-      clight = mix(clight, mix(c, wLightC, 0.36), sk);
+      // (the deeper body and the closer steps are THE SEA's, by the look director's ruling on the sea: so, vOpen, water at
+      //  the sea's level. Ponds, lakes and rivers keep the calmer values alone, as water-paint has them by default)
+      float sk = wStill * smoothstep(40.0, 220.0, dist) * liq, so = vOpen;
+      c = mix(c, pcDensity(c, 1.45), sk * so);
+      wThL = mix(wThL, mix(0.74, mix(0.80, 0.88, wChop), so), sk); wThD = mix(wThD, 0.22, sk);      // (in a strait's chop the light strokes fewer still)
+      cdeep = mix(cdeep, mix(pcDensity(c, 1.65) * vec3(0.92, 0.94, 1.0), pcDensity(c, 1.40) * vec3(0.93, 0.95, 1.0), so), sk);
+      clight = mix(clight, mix(c, wLightC, mix(0.40, 0.36, so)), sk);
     }
     #endif
     float wsp = pow(max(dot(reflect(-normalize(vToCam), up), uSunDirL), 0.0), wSunE) * wSunK * max(uDayness, uMoon) * (1.0 - uWx.x);
@@ -1721,7 +1745,7 @@ void main() {
     wMarkN = mix(wr2.y < wsp * 1.2 ? 1.0 : 0.0, wr1.y < wsp * 1.2 ? 1.0 : 0.0, wown);
     c = mix(w2, w1, wown);
     #ifdef PC_WPAINT
-    if (uWPaint > 1.5) {
+    if (wpL > 1.5) {
       // THE WEATHER ON THE WATER (the new colour, design 3.4 and 3.7). Under a closed sky the water takes the storm's grey
       // and goes darker than the land (v37 laid half its own blue over the storm glaze "whatever the sky gives it", and
       // the river stayed the brightest thing under a thunderhead: the design's w14). And RAIN RINGS: thin broken circles,
@@ -1760,7 +1784,7 @@ void main() {
       // far off, where it clamps to what the brush can hold -- which is why this cannot turn into a speckle.
       vec3 ar1, ar2; vec2 ads; float aown;
       #ifdef PC_WPAINT
-      if (uWPaint > 0.5) pcWStrokes(wch, wdx, wdy, aDir, aSpd, ao4.x, 9.0, aoc3, ar1, ar2, aown);      // (half again as long as the body's, as v37's lace was)
+      if (wpL > 0.5) pcWStrokes(wch, wdx, wdy, aDir, aSpd, ao4.x, 9.0, aoc3, ar1, ar2, aown);      // (half again as long as the body's, as v37's lace was)
       else
       #endif
       {
@@ -1770,7 +1794,7 @@ void main() {
       // (at full churn four strokes in five break, and they break to bare paper; a faintly stirred reach breaks a
       // few and breaks them only part of the way, or the first whisper of churn would be a sparkle of white specks)
       #ifdef PC_WPAINT
-      if (uWPaint > 1.5) {
+      if (wpL > 1.5) {
         // WHITE WATER IN BROKEN STROKES (the new colour; the water group's lead and the look director on the mountain
         // streams and the lips: at full churn v37's milk wash and four white strokes in five were one flat white, a
         // paper ribbon down a slope). Now no wash: the churn's strokes, running down the current, in three steps --
@@ -1808,7 +1832,7 @@ void main() {
   #ifdef PC_WPAINT
   // (the new paint: water is a glossy surface and reads darker than the land's haze at a distance in every one of the
   // owner's aerial references; from 60 m the air takes less of it, a third less from 450 m. To be agreed with the look director.)
-  if (uWPaint > 1.5) f *= 1.0 - 0.35 * smoothstep(60.0, 450.0, dist) * liq;
+  if (wpL > 1.5) f *= 1.0 - 0.35 * smoothstep(60.0, 450.0, dist) * liq;
   #endif
   c = pcAtmosV(c, f, vView);
   pcWrite(c, mix(mix(0.7, 0.22, white), 1.0, vLiqP.y), normalize(normalMatrix * up), -vView.z, 2.0);
@@ -1840,7 +1864,7 @@ export function makeWaterMaterial(bodyU, skyU) {
   if (runoffOn()) { m.defines.PC_RUNOFF = 1; m.uniforms.uRunoff = RUNOFF_U.uRunoff; }
   // (the water's new paint, ?wpaint=2 with the oil look: compiled in behind one uniform the speed test can turn off;
   // without the switch the program is v37's, to the letter. render/waterchunk.js)
-  if (wpaintOn()) { m.defines.PC_WPAINT = 1; m.uniforms.uWPaint = WPAINT.uWPaint; benchWPaint(); }
+  if (wpaintOn()) { m.defines.PC_WPAINT = 1; m.uniforms.uWPaint = WPAINT.uWPaint; m.uniforms.uWSea = WPAINT.uWSea; benchWPaint(); }
   m.userData.pcPainted = true;
   // (R1 W2.4: water drawn in this frame wants last frame's painting kept for the next: post.js finish)
   m.onBeforeRender = () => { PREV.water = true; };
