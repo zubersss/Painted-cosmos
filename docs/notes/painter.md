@@ -719,7 +719,25 @@ from 8 m with its crown over the eye, summer noon, 1024 x 480 (`A2_nearleaf_leaf
 C leafgrow): C clearly smaller leaves with more sky and branches between them across the crowns 6 to 12 m off
 (114,140 pixels, mean 7.6 of 255); B close to A, the nearest overhead pieces a little smaller (13,227 pixels, mean
 0.85, within the 64,382 / 2.1 that two grabs of the same state differ by as the leaves move in the wind). Neither
-goes default without the owner; the coordinator can put C to the owner on a phone check.
+goes default without the owner; the coordinator can put C to the owner on a phone check. F'S VERDICT (24 Nov):
+B no visible gain, keep it off and stop there; C a clear gain ("small separate dabs with the sky between them"), F
+recommends it to the coordinator, who sends it to the owner for a side-by-side phone check; OFF until the owner says.
+
+**THE CROWNS UNDER A STORM (`?stormleaf=1`, OFF; the coordinator after F's storm light, look-director e2b9c14, which
+steps the land a level down under a storm and leaves the crowns glowing).** MEASURED in the gallery under `wx=storm`
+(autumn stream, 1024 x 480): uStorm 0.9, overcast (uWx.x) 1.0, the light curve (uOilAir.z) 1. A FIRST TRY (the
+leaf's level taken a whole step down, 758824a) changed 10,204 pixels by at most 24 of 255, nothing to the eye: under
+that storm a lit leaf's level is already about 1.4, so it is painted almost wholly in the foliage shade
+(`pcShadeLeaf`), and that shade is the fair-weather one, a saturated red for an autumn leaf that does not know the
+weather; the land at the same levels takes pcTone's glaze and deep wash, a cool grey. (The first commit's reason,
+"a lit leaf stays at the local level", was wrong.) NOW: under a storm a crown is painted as the land is, a leaf's
+level held to the glaze (1) at a full storm and its shade the land's glaze and deep wash at its level instead of the
+foliage shade (`materials.js PROP_VERT uStormLeaf`, `flora.js STORMLEAF`); no storm, the same picture to the bit.
+The bark already goes through the land's paint (pcLit, pcLevel, pcTone). Its own switch, so it does not hang on F's
+uLookS (not in look-proto yet). A/B of the rebuilt step: rendering after the merge below.
+
+**MERGED look-proto v39.3 (87053ed, pull request 46, the pines live) into trees-near: f281556**, clean, nothing
+doubled; unit 328, world 124, physics 449 pass.
 
 **THE PINES AS POLES (24 Nov, the coordinator's urgent check and the first cure, `?pines=1`).**
 Not the split: on v39.1 the poles are the same with the one program (0.2 of 255; stills `A2_pines-v391_*`), and every
