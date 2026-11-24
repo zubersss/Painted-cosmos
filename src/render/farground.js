@@ -558,7 +558,10 @@ vec3 pcRockWash(vec3 c, float up, vec3 Bc, float strata, float dist, vec3 rnd, f
   float hB = length(Bc) - uBodyR;
   // (up the range, past the coast's height band, the rock begins at a gentler slope, about 30 degrees, from 80 m out:
   // the mountains' flanks were the pastel patches of the alpine wash, rose, lime and lilac, the audit's rainbow)
-  float kMt = smoothstep(uRockMH.x, uRockMH.y, hB) * smoothstep(0.05, 0.20, strata);
+  // (the mountain's family and its light planes only where the beds are WHOLE: a partly snowy place (patchgen.js reports
+  // part of its beds) took part rock and part wash, and the planes darkened the wash's red patch into soft dark red-brown
+  // smudges on the alpine ridges, SEEN by the look director)
+  float kMt = smoothstep(uRockMH.x, uRockMH.y, hB) * smoothstep(0.35, 0.50, strata);
   float far = mix(smoothstep(0.82, 0.67, up), smoothstep(0.87, 0.74, up), kMt) * smoothstep(80.0, 250.0, dist);
   float cl = smoothstep(0.66, 0.50, up) * smoothstep(0.05, 0.20, strata);
   float nr = textureLod(uNoise3D, Bc / 4.3 + 0.13, 0.0).g;
@@ -570,7 +573,7 @@ vec3 pcRockWash(vec3 c, float up, vec3 Bc, float strata, float dist, vec3 rnd, f
   gRock = max(far * uRockK * (1.0 - sn), gCliff);
   // (the planes only on BEDDED rock: a snow-laid place reports no beds (patchgen.js), and a snowfield turned from the sun
   // was laid in the deep shade plane and went dark at 1 km, SEEN; snow keeps the ordinary light)
-  gRockP = max(gCliff, far * uRockK * (1.0 - sn) * smoothstep(0.05, 0.20, strata));
+  gRockP = max(gCliff, far * uRockK * (1.0 - sn) * smoothstep(0.35, 0.50, strata));
   gGully = 0.0;
   if (gRock <= 0.0) return c;
   if (gCliff > 0.5) return pcCliffC(Bc, hB, rnd, c, gRockLw);
