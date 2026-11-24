@@ -524,25 +524,32 @@ whether the performance work is one more version or a redesign.** Their own row 
 
 ## 3. State right now (update this before you stop)
 
-**STATE 24 Nov, 18:30 (first account; the owner waking): TWELVE HELPER SESSIONS BUILDING, EACH ON ITS OWN BRANCH. `main` is v39.3; v39.4 is in its gate.**
-- v39.3 is LIVE (pull request #46, main 65f031a; look-proto 87053ed): THE WEATHER AND 3D CLOUDS by default in the oil look
-  (?weather=old, ?clouds3d=0; wxguard falls back to today's sky), THE WATER on Earth (rivers of the tree with the
-  river beside the first view, lakes, ponds, puddles, fjord, falls; ?rivers=old ?lakes=0 ?ponds=0 ?puddles=0 ?fjord=0
-  ?falls=0), PINES (?pines=0), CROWN MASS from the air (?crownmass=0), F's olive darks / sky limb (?skylimb=0) / air
-  keeps the darks (?airdark=0), C's canopy floor (?canfloor=0) and short uniform list (?uplist=0).
-- v39.4 IN ITS GATE (/home/user/wt-v394 c6014cd, scratchpad/gate394.sh, v394.log): THE MOUNTAINS (FV4 rock faces,
-  ?rockfield=0), F's storm light (?stormlight=0, ?stormsky=0) and water gold, W1's anvil shelf and mountain cloud,
-  A1's crown-mass follow-ups, B's tuft and comb (?tuft=0, ?comb=0). The off-set proof renders v39.3 and v39.4 with the
-  same switches (a single new part can share a switch with an older one: ?leafshade and ?goldsky are whole-look
-  switches, so a 'new parts off' render must be compared with the last version under the SAME switches).
-- v39.2 LIVE (#45), v39.1 LIVE (#44): see the log.
-- NEXT (v39.5 candidates): C's smudge clamp (farview 6cf9c7a) with B's line (already in v39.4), E's far water line
-  (?farwater, design-water a1f12fd) when F passes, W3's river grain (F's audit item 2), A1's far spruce (?farspruce),
-  A2's storm crowns (?stormleaf), B's drift patch, C's glades and crown shadows.
-- FOR THE OWNER: the three speed tests on the newest version (bench=trees, bench=air, bench=foot), and a side-by-side
-  phone look at A2's ?leafgrow=1 (smaller near leaves; it changes trees the owner approved, so it is the owner's word).
-- FOR THE OWNER ON WAKING: one speed-test run of bench=trees, bench=air and bench=foot on the newest version (A2
-  derives about 22 ms on foot for v39.1, never measured; only the phone can say), and the two visual checks.
+**STATE 24 Nov, 19:50 (first account; the owner awake since about 18:25): TWELVE HELPER SESSIONS BUILDING, EACH ON ITS OWN BRANCH. `main` is v39.4; v39.5 is being assembled.**
+- v39.4 is LIVE (pull request #47, main e42452a; look-proto c6014cd): THE MOUNTAINS (FV4 rock faces, one grey-violet
+  family per mountain, light planes by the sun's bearing, snow kept above the snowline; ?rockfield=0), F's land under a
+  storm (?stormlight=0, ?stormsky=0) and the water's gold (?goldsky=0), W1's anvil shelf and mountain cloud (inside the
+  weather: ?clouds3d=0, ?weather=old), A1's crown-mass follow-ups (?crownmass=0), B's grass tufts and combing (?tuft=0,
+  ?comb=0). Gate: watercolour 0 px; every new part off v39.3 vs v39.4 under the SAME switches 0 px (max 1); on foot and
+  the high river frame OPENED; boot clean; C saw this exact code at the alpine meadow from 420 m: no grey blot.
+- v39.3 LIVE (#46), v39.2 LIVE (#45), v39.1 LIVE (#44): see the log.
+- v39.5 BEING ASSEMBLED (/home/user/wt-v395, LOCAL branch v395 on c6014cd, not pushed; suites 328 / 144 / 449):
+  trees-far 3e46836 (the far spruce D the default, the far crowns under a storm at half), trees-near 8633bef,
+  design-flora d3e47d0 (the drift patch the default, ?driftpatch=0, with the poppy's centre), design-water fd868b1
+  (the far water line the default, ?farwater=0; the falls' own water, no switch of its own: ?falls=0; the lakes'
+  widths), farview 5221c6e (F passed all: planes on whole beds 62e62fa, the smudge clamp 6cf9c7a, far rock speckle,
+  snowy tops, noon cool lean, the far dab index fix, ?bloomfar off). WAITS ON A2: the storm crowns as the default tied
+  to F's ?stormlight (STORMLEAF is still 0 in code). Then: version v39.5, the gate (watercolour 0; the off-set
+  compared with v39.4 under the same switches: rockfield=0 does NOT turn off 3620305/263a2f5/e1f2439 if they sit
+  inside it, so read each part's switch before choosing the off-set), the PR.
+- BUG FOUND AND FIXED (v39.5): the far dabs' palette index was never written (farview d4cab64; a trailing comment
+  swallowed two statements). Live in v39.4 only behind ?bloomfar=1 (off).
+- NEXT AFTER v39.5: W3's river on foot (water-paint 2b869d8, F passed the look) cuts its cost first (+60 % of the
+  water's work at a bank; target about +30 %), then W3's new paint becomes the default as one commit with ?wpaint=0
+  and E-W2's sea fixes (v39.6). A1's far crown shadows (?farshadow=1, off; +66 to +98 draws from the air) wait on F, C's
+  canopy hook and a phone bench row. The live river at the landing from 10 m (staircase seams, a broad foam band:
+  B's still a7-aw10-before-after-v39.3-merge.jpg) is with E and W3.
+- FOR THE OWNER: the three speed tests on the newest version (bench=trees, bench=air, bench=foot) plus the water rows
+  (bench=water), and a side-by-side phone look at A2's ?leafgrow=1 (smaller near leaves; the owner's word).
 - DECISIONS THIS MORNING (log): water-paint held as a default until F passes E-W2/W3's sea fix (water-sea 9525b16);
   step 4 (wakes, splash) passed F; A2 found no 30 ms in the ground from the air (closed).
 - The owner's direction (24 Nov): 30 a second on the S23 Ultra, the view from the air good to a mile, much denser
