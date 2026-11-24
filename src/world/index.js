@@ -92,6 +92,17 @@ export function createWorld(scene) {
   // (NOT a glaze: the bubble is laid in MARKS with gaps between them, in the scene pass, the same path the leaves
   //  in the air take -- see world/timefx.js. It was built as a glaze first and was invisible for it.)
   if (timeFx) { scene.add(timeFx.mesh); scene.add(timeFx.rip); }
+  // (group D, design-weather 2579208, T2: a storm's rain shafts and its lightning, world/storms.js, behind ?rainshaft=1 /
+  //  ?bolts=1 (or ?wx2=1); the oil look only. Its switches live in physics/wx2.js, and BOTH modules are fetched only
+  //  when the address names one of those switches -- so on a branch or a game without them nothing is ever asked
+  //  for, and the game without the switches loads nothing new. D's patch imported wx2.js at the top, which would have
+  //  stopped the world loading wherever wx2.js is not yet merged: the look director's one change to it.)
+  let storms = null;
+  if (LOOK.oil && typeof location !== 'undefined' && /[?&](wx2|rainshaft|bolts)=/.test(location.search || '')) {
+    import('../physics/wx2.js').then(({ WX2 }) => (WX2.rainshaft || WX2.bolts ? import('./storms.js').then((m) => {
+      storms = m.makeStorms(null, { shafts: WX2.rainshaft, bolts: WX2.bolts }); scene.add(storms.shafts); scene.add(storms.bolts);
+    }) : null)).catch((e) => console.warn('storms.js: ' + e.message));
+  }
 
   const sun = new THREE.Object3D();
   sun.name = 'pc-sun';
@@ -875,6 +886,7 @@ export function createWorld(scene) {
         const psys = physics && physics.particles && physics.particles.system ? physics.particles.system : null;
         timeFx.update(cameraPos, active.root, _camL, bu, psys ? psys.times : null, active.id, psys ? psys.rips : null);
       }
+      if (storms) storms.update(cameraPos, active.root, _camL, bu, physics, active.id);
       skyU.uSkyHorizon.value.copy(tmpKey.horizon);
       skyU.uHaze.value.copy(tmpKey.haze);
       skyU.uCloudShade.value.copy(tmpKey.cloudShade);

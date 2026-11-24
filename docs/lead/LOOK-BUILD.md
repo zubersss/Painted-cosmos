@@ -106,6 +106,11 @@ its A).
   the limb (S 0.54 level, 0.36 looking down 29 degrees); at the golden hour A is flat beige, B a warm sky graded
   in bands; at 2,420 m the same (A S 0.10, B 0.54); at 1,020 m B is the same painted blue; at 3,520 m B is the
   turn begun, the sky deepening toward indigo (sky 0.38), the world a small ball below.
+- S4 at 420 m (A over B opened): the same picture but for a band of the painted blue now at the top of the frame;
+  the land does not move to the eye (the visibility grows 312 m there); S 0.10 -> 0.15, V over 0.90 5.1 -> 5.8 %
+  (both over C6 before this change). The sky at 420 m is still mostly the flat band: the remap is only a fifth in
+  at that height. Starting it lower (a dip of 10 degrees, Earth 62 m) would paint the sky from 150 m too; held,
+  for the coordinator's word, because it moves the over-the-wood view the owner has seen.
 - STILL WRONG, said plainly: under the thick air FV1 keeps to 1.76 km the land at the mile is pale and pastel
   (L5's job: a share of far paint kept and the air's hue); at 1,020 m a thin pale arc and some lilac wisps stand
   near the limb (the sky's own cloud layer seen from above and the low band's stepped edge; not yet traced); the
