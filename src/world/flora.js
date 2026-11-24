@@ -22,7 +22,7 @@ import { makePropMaterial, TREE_DEPTH, TREE_GUARD } from '../render/materials.js
 import { ImpostorAtlas, makeImpostorMaterial, impostorQuadGeometry, IMP, IMP_SHADOW, makeImpostorShadowMaterial, bakeTick } from '../render/impostor.js';
 import { treeCell, underCell, hasCell, TREE_LEVEL, UNDER_LEVEL } from './obstacles.js';
 import { QUALITY, G, LOOK, SCREEN, SHADOW, SHADOW_CROWD } from '../render/shared.js';
-import { SHADOW_LAYER, SHADOW_TIERS } from '../render/shadow.js';
+import { SHADOW_LAYER, SHADOW_TIERS, SHADOW_WHOLE, SHADOW_OPTS } from '../render/shadow.js';
 import { FELLED, FELL, felledAt, fallingOn, felledOn, fallTurn } from '../data/felled.js';
 
 // tier ranges in metres at quality 2; scaled by RANGE_SCALE at lower tiers
@@ -532,7 +532,10 @@ export class Flora {
       if (this._impSh) SHADOW_CROWD.add(mesh.userData.crowdEntry);
     }
     // (the oil look's cast shadows, render/shadow.js: trees, bushes and stones cast; blades and flowers do not)
-    if ((Array.isArray(mat) ? mat[0] : mat).userData.pcCasts) mesh.layers.enable(SHADOW_LAYER);
+    if ((Array.isArray(mat) ? mat[0] : mat).userData.pcCasts) {
+      mesh.layers.enable(SHADOW_LAYER);
+      if (Array.isArray(mat)) SHADOW_WHOLE.add(mesh);      // (a split tree: one draw in the shadow pass, unless ?shwhole=0)
+    }
     if (Array.isArray(mat) && mat.depthMats) { mesh.userData.pcDepthMats = mat.depthMats; TREE_DEPTH.meshes.add(mesh); }      // (?treedepth=1)
     mesh.count = 0;
     mesh.position.copy(chunk.origin);
@@ -1026,6 +1029,10 @@ export class Flora {
     if (on === now) return now;
     return this.setFarForm(on ? (FAR_BLOB ? 'blob' : 'cards') : 'lump') !== 'lump';
   }
+  // The split trees drawn whole in the shadow pass (render/shadow.js SHADOW_WHOLE; the default, ?shwhole=0 the old way),
+  // for the speed test's row: returns the setting before.
+  setShadowWhole(on) { const was = SHADOW_OPTS.whole; SHADOW_OPTS.whole = !!on; return was; }
+  get shadowWhole() { return SHADOW_OPTS.whole; }
   // THE FAR TREES' FORM, swapped while the game runs (the speed test, core/bench.js; 2026-11-24, trees lane T0):
   // 'cards' the tree of flat pieces that ships (138 triangles), 'blob' two crossed six-cornered cards (?fartree=blob:
   // 10 triangles, which prices on the phone what a quad's fragments cost against a mesh's triangles), 'lump' the old
@@ -1062,6 +1069,7 @@ export class Flora {
   _disposeChunk(chunk) {
     for (const m of chunk.meshes) {
       if (m.userData.crowdEntry) SHADOW_CROWD.delete(m.userData.crowdEntry);
+      SHADOW_WHOLE.delete(m);
       this.group.remove(m);
       TREE_DEPTH.meshes.delete(m);
       for (const k of SHARED) m.geometry.deleteAttribute(k);

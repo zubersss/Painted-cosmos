@@ -347,6 +347,7 @@ export function attachBench(pc) {
     const handBack = () => { const f = flora(); if (!f || !f.setHandover || !hand0) return; f.setHandover(hand0[0], hand0[1]); hand0 = null; };
     const form0 = (() => { const f = flora(); return f ? (f.farForm || (f.impWant || f.impOn ? 'impostor' : cards0 ? 'cards' : 'lump')) : 'cards'; })();
     // the rows themselves: [label, on, off]
+    const shw0 = (() => { const f = flora(); return f ? !!f.shadowWhole : true; })();      // (the shadow pass's whole-draw setting as the run starts: shWhole)
     const T0 = {
       leaves: ['near trees: leaves only', nearPart('leaves'), nearPart(null)],
       wood: ['near trees: wood only', nearPart('wood'), nearPart(null)],
@@ -371,6 +372,10 @@ export function attachBench(pc) {
       noFar: ['no far trees', () => show(/^pc-prop-far/, false), () => show(/^pc-prop-far/, true)],
       farFlat: ['far trees one flat colour', () => B({ flat: 3 }), () => B({ flat: 0 })],
       noNear: ['no near trees', () => show(/^pc-prop-tall/, false), () => show(/^pc-prop-tall/, true)],
+      // (T6, the shadow pass: a split tree (?trees2) one draw there, the default, against one a material, ?shwhole=0;
+      //  the row asks the other way from how the run started; flora.setShadowWhole)
+      shWhole: [shw0 ? 'split trees by part in shadow pass' : 'split trees whole in shadow pass',
+        () => { const f = flora(); if (f && f.setShadowWhole) f.setShadowWhole(!shw0); }, () => { const f = flora(); if (f && f.setShadowWhole) f.setShadowWhole(shw0); }],
     };
     const r = (row, tag) => [row[0] + tag, row[1], row[2]];
     // THE AIR ROWS: an "as set" that lifts the pin (it is the base the questions after it are set against), the
@@ -605,7 +610,7 @@ export function attachBench(pc) {
       [AS, null, null],
       T0.side, T0.order, T0.a2c, T0.noNear,
       [AS, null, null],
-      ...T2ROWS,
+      ...T2ROWS, T0.shWhole,
       [AS, null, null],
       T0.blob, T0.imp, T0.noFar, T0.farFlat, T0.farStill,
       [AS, null, null],
