@@ -60,6 +60,8 @@ vec3 pcRound(vec3 body) {
 // (materials.js FOG_VERT pcFogAmountV) and a leaf's paint, worked out once a leaf (materials.js PROP_VERT, which
 // includes the PAINT chunk below). Anything that includes VERT_PARS already has it: do not declare it again.)
 uniform vec4 uOilAir;
+uniform vec4 uLookF;   // the look director's switches and the night's two numbers (shared.js; also declared in FRAG_PARS)
+uniform vec4 uLookN;
 #endif
 `;
 
@@ -163,7 +165,20 @@ float pcGold() { return (1.0 - smoothstep(0.48, 0.86, dot(uSunDirW, uUpW))) * uD
 vec3 pcOilSunC() { return mix(pow(uLight, vec3(uOilA.z)), vec3(1.0, 0.84, 0.52), 0.75 * pcGold()); }
 // (the cool key with its green drawn down: a shade leans to violet and maroon, not to slate)
 vec3 pcOilShadeC() { return pow(uGlaze, vec3(uOilA.w)) * vec3(1.0, uOilD.z, 1.0); }
-vec3 pcBody(vec3 c) { return pcDensity(c, uOilA.y); }
+// THE NIGHT KEY'S PULL (L1, 2026-11-24): by the moon only (uMoon is 0 by day, so by day this is the colour untouched),
+// a colour goes part of the way to its own VALUE in the night key's own hue (the cool key with its green kept: blue on
+// Earth, teal on Neptune). pcBody takes it, so every paint built on a body colour -- pcTone's local and shade, AND the
+// foliage shade that leaves, blades and far crowns still build for themselves from pcBody (LOOK-AUDIT F4, until L2) --
+// is in the night's key; pcTone's lit paint, which is not built on pcBody, takes it in pcTone. uLookN.y is the world's
+// share (world/index.js); uLookF.x 0 is the night exactly as it was.
+vec3 pcNight(vec3 c) {
+  float nk = uMoon * uLookF.x;
+  if (nk <= 0.0) return c;
+  vec3 shC = pcOilShadeC();
+  vec3 kh = shC / max(dot(shC, vec3(0.3, 0.5, 0.2)), 1e-3);
+  return mix(c, clamp(vec3(dot(c, vec3(0.3, 0.5, 0.2))) * kh, 0.0, 1.0), uLookN.y * nk);
+}
+vec3 pcBody(vec3 c) { return pcDensity(pcNight(c), uOilA.y); }
 // WHICH WAY A SURFACE FACES, FOR THE LIGHT THAT KNOWS UP FROM DOWN (2026-11-22). THE CONTRACT, so a material and
 // this chunk cannot drift apart:
 //   WHAT IT IS. pcUp is dot(normalize(vBody), n) -- the body's own up against the normal the surface is shaded by.
@@ -186,8 +201,20 @@ vec3 pcBody(vec3 c) { return pcDensity(c, uOilA.y); }
 // would not compile the plants at all.)
 float pcUp = 0.5;
 vec3 pcTone(vec3 c, float level) {
-  vec3 b = pcBody(c);
   vec3 sunC = pcOilSunC(), shC = pcOilShadeC();
+  // THE NIGHT KEY (L1, 2026-11-24; docs/lead/LOOK-AUDIT.md F1; the pull itself is pcNight above). By the moon the oil look painted the day's picture: the
+  // lit paint below takes three tenths of the key's colour and none of its strength, so under Earth's night light
+  // (0.80, 0.86, 1.0) open ground was the body colour times (1.00, 1.03, 1.12) -- as bright as by day and a breath
+  // bluer -- and the last pass then excused every warm pixel from the night's grade, so lemon grass and orange leaves
+  // stood at full strength under a night sky (the stills: the autumn wood's median value 0.54 at 23:00 against 0.42 at
+  // the golden hour). Now, by the moon only (uMoon: 0 by day, so nothing here moves by day), a colour first goes part
+  // of the way to its own VALUE in the night key's own hue (the cool key with its green kept: blue on Earth, teal on
+  // Neptune), and the lit and local paints are laid at the night's own strength. Value order is kept, so snow and pale
+  // things stay the lightest; the lantern, which paints from the stroke's own colour (pcLamp), keeps its gold.
+  // uLookN is the world's (world/index.js); uLookF.x 0 is the night exactly as it was.
+  float nk = uMoon * uLookF.x;
+  c = pcNight(c);
+  vec3 b = pcDensity(c, uOilA.y);      // (pcBody of the colour already pulled: pcBody itself would pull it twice)
   // (the lights are laid in lighter, yellower paint than the local colour, as a painter mixes them: the body colour's
   // full weight under a warm light turned every sunlit leaf and every sunlit patch of the floor to one orange)
   // (the light's own colour takes three tenths of a lit paint, not four: under the golden hours' light every lit leaf
@@ -230,8 +257,8 @@ vec3 pcTone(vec3 c, float level) {
   // without their eye. On ?litcurve=0 the old paint comes back with the old curve.)
   vec3 g2 = mix(pcDensity(g1, 1.7), mix(g1, vec3(dot(g1, vec3(0.3, 0.5, 0.2))), 0.20) * 0.66, uOilAir.z);
   vec3 r = mix(g2, g1, clamp(level, 0.0, 1.0));
-  r = mix(r, loc, clamp(level - 1.0, 0.0, 1.0));
-  r = mix(r, lit, clamp(level - 2.0, 0.0, 1.0));
+  r = mix(r, loc * mix(1.0, uLookN.x, nk), clamp(level - 1.0, 0.0, 1.0));
+  r = mix(r, lit * mix(1.0, uLookN.x, nk), clamp(level - 2.0, 0.0, 1.0));
   return r;
 }
 vec3 pcToneWash(vec3 c, float level) {
@@ -406,6 +433,8 @@ uniform vec4 uOilD;
 uniform vec4 uOilS;
 uniform vec4 uOilG;
 uniform vec4 uOilAir;  // the air's ceiling and the light's four values (shared.js OIL.uOilAir; also declared in VERT_PARS)
+uniform vec4 uLookF;   // the look director's switches (shared.js OIL.uLookF; also declared in VERT_PARS)
+uniform vec4 uLookN;   // the night's two numbers for the world the eye is on (shared.js OIL.uLookN)
 uniform vec4 uOilL;    // x 1: the lighter paint (phones); y the speed test's flat modes (shared.js)
 uniform vec4 uOilPx;
 uniform mat4 uShM;

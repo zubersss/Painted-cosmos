@@ -46,7 +46,7 @@ its A).
 | --- | --- | --- | --- |
 | L0 | DONE | see git log (`[painter] L0`) | 7 stills (S1-S6 + S3 at night) against v37: 6 identical to the pixel, 1 with 2 pixels off by 1 of 255 (the 275 m night still); the shader text of all 36 materials of the autumn wood (comments and spaces taken out) identical, the 9 plant shaders with `pcFogAmountV` included, so those 2 pixels are the software renderer's run-to-run noise, not the change. Suites 325 / 65 / 416 pass. |
 | T1 | DONE | see git log (`[painter] T1`) | see the T1 section below; stills in docs/shots/painter/look-director/build/T1 (A = `?skyceil=0`, B = on) |
-| L1 | not started | | |
+| L1 | DONE | see git log (`[painter] L1`) | see the L1 section below; stills in docs/shots/painter/look-director/build/L1 (_A off, _B on) |
 | L2 + L7 | not started | | |
 | L3 | not started | | |
 
@@ -82,3 +82,35 @@ its A).
   fades into the sky's band at the limb and does not read as a cut-out, but the far-view group and L5 should look at
   this pair together. The ball in a pale sky at 3.5 km is the in-between of the climb; the weather group's orbit shell
   (their A8) takes over above 2.8 km.
+
+## L1, the night key: what was built and what was seen
+
+- `chunks.js`: `pcNight(c)` (by the moon only: the colour part of the way to its own value in the night key's hue;
+  `uLookN.y`), taken by `pcBody`, so every paint built on a body colour is in the night's key, including the five
+  private foliage shades of audit F4 (they call `pcBody`); `pcTone` pulls the colour once for its lit paint and lays
+  the lit and local paints at the night's strength (`uLookN.x`). `uLookF`, `uLookN` declared in VERT_PARS and
+  FRAG_PARS. `post.js`: the night's warm excuse taken from the lantern's reach (depth against `uLampV`, 4.5-6 m) and
+  region 8, not from the hue. `shared.js`: `OIL.uLookF` (x night key, y/z/w for L2, L3, L7) and `OIL.uLookN`.
+  `world/index.js`: per world 0.60 / 0.45, or 0.85 / 0.20 for a world with its own night key (Neptune); a look's
+  `oil.night.v` / `.c` overrides.
+- FOUND ON THE WAY: the first build left the autumn leaves at full orange by night, because at night most leaves fall
+  to the shade level, and the leaf shade is one of F4's private copies, which bypassed `pcTone`. Putting the pull in
+  `pcBody` reaches them without touching their lines (L2 then makes them one function).
+- The A/B is taken from ONE page, flipping `OIL.uLookF.x` between grabs. By day nothing moves (uMoon is 0); the only
+  day differences seen are on the stream (at most 3 of 255), which mirrors the previous frame, so two grabs in a row
+  differ there by themselves.
+
+**SEEN (26 stills, A = `uLookF.x` 0, B = on, each pair from one page; all opened), median V by lookstats:**
+- Autumn wood on foot at 23:00: lemon grass and orange leaves at full strength -> blue-green moonlit grass and dull
+  wine-red leaves; V 0.54 -> 0.32 (the golden hour is 0.42: the night is now the darker of the two); S(V<.3) 0.53 ->
+  0.45. At 275 m by night: V 0.67 -> 0.45, the crowns plum, the meadow blue-grey. The green wood: V 0.51 -> 0.27.
+  The coast: the bank from cream and orange to mauve-grey. Mars: the orange floor to a violet-blue (0.61 -> 0.35).
+  Pluto: a step down (0.60 -> 0.44), so its night parts from its day. NEPTUNE, the night the owner liked: 0.57 ->
+  0.56, by eye the same picture (its own gentler numbers).
+- By day nothing moves: S2 at noon identical to the pixel; S1 at 16.8 differs only on the stream (at most 3 of 255:
+  the water mirrors the previous frame). Dusk at 18.4 (moon 0.32): a breath darker (V 0.42 -> 0.40).
+- The lantern (the gallery's `models=1`, the explorer 5 m ahead): its warm pool stays gold on the bank with the key
+  on; the cloak keeps its blue.
+- LEFT AS IT IS (not this step): by night the stream is now the lightest and bluest thing in the wood, because water
+  is not painted through pcTone; group E's (LOOK-RULES R1.2c, C11). Neptune's lake by night is still the loud
+  green-and-navy field (audit, Neptune).

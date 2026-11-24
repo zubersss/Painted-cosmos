@@ -650,6 +650,8 @@ uniform vec2 uInTexel;   // 1 / the size the scene is drawn at
 uniform float uUpK;      // (the sharp read where the picture is enlarged: 0 off, else the bilinear ramp's gain; setSize)
 uniform vec2 uShaftN;    // (the light in the air: x the most taps a line of sight gets, y metres of air to a tap; x 0 off)
 uniform vec4 uFarC;      // (the far land: x its local contrast, y the reference's reach in scene pixels, z its colour push, w free)
+uniform vec4 uLookF;     // (the look director's switches, shared.js: x the night key)
+uniform vec4 uLampV;     // (the lantern in the eye's space, w how strong: render/index.js)
 varying vec2 vUv;
 ${AUX_DEC}
 const vec3 W = vec3(0.3, 0.5, 0.2);
@@ -770,7 +772,17 @@ void main() {
   if (uNight > 0.003 || uGrade != vec3(1.0)) lamp = step(7.95, aux.w);
   // (and by night what is warm is a light or is lit by one: the lantern's pool on the snow keeps its orange, as a
   // lamp's glass does; the night's cool key over it turned the pool to mustard)
-  lamp = max(lamp, smoothstep(0.10, 0.32, col.r - col.b) * uNight);
+  // (L1, 2026-11-24: the night key. The excuse was taken from the HUE -- every pixel redder than it is blue -- so every
+  // autumn leaf, every lemon blade and every sand bank kept its day colour at night, LOOK-AUDIT F1. It is now taken
+  // from the lantern's own reach: the place this pixel shows, from its depth, against the lantern's place in the
+  // eye's space, whole within 4.5 m and gone by 6 m, as pcLamp's pool is; and region 8 (a flame, a lamp) as above.
+  // uLookF.x 0 is the hue test as it was.)
+  if (uLookF.x > 0.5) {
+    if (uLampV.w > 0.01) {
+      vec3 vp = vec3((vUv * 2.0 - 1.0) * uTanHalf, -1.0) * vz;
+      lamp = max(lamp, (1.0 - smoothstep(4.5, 6.0, length(vp - uLampV.xyz))) * step(0.5, aux.w) * uNight);
+    }
+  } else lamp = max(lamp, smoothstep(0.10, 0.32, col.r - col.b) * uNight);
   col *= mix(uGrade, vec3(1.0), lamp);
   // lightning: for a frame or two everything light goes lighter
   col = mix(col, vec3(1.0), clamp(uWxSheet.y * smoothstep(0.25, 0.75, dot(col, W)) * 0.6, 0.0, 0.9));
@@ -951,7 +963,7 @@ export class Post {
       // (2026-11-22, the ten-step upgrade; the switches are at the top of this file and the reasons in OIL_FRAG)
       uInTexel: this.sheetUniforms.uInTexel, uUpK: { value: 0 },
       uShaftN: { value: new THREE.Vector2(16, 7) },
-      uFarC: { value: new THREE.Vector4(FARCON, FARPX, FARSAT, 0) } });
+      uFarC: { value: new THREE.Vector4(FARCON, FARPX, FARSAT, 0) }, uLookF: OIL.uLookF, uLampV: OIL.uLampV });
     this.mOil.name = 'oil-finish';
     this.debugView = 0;
     this.mCopy = fsMaterial(/* glsl */`

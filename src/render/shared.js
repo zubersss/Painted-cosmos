@@ -185,6 +185,18 @@ export const OIL = {
   // pattern's features, which is what stops the floor at 275 m being light-and-dark confetti that flickers as the
   // eye moves: chunks.js pcDappleS. (w held 0.085 and was read nowhere.)
   uOilPx: { value: new THREE.Vector4(0.0015, 720, 0.027 * _qn('stroke', 1), _qn('masses', 1)) },
+  // THE LOOK DIRECTOR'S SWITCHES (docs/lead/LOOK-BUILD.md; 2026-11-24). Uniforms, not defines, so that A and B of one
+  // still come from one page and the speed test can turn each off while it runs. 1 on, 0 the picture as it was.
+  //   x THE NIGHT KEY (L1, `?nightkey=`): by the moon a colour goes part of the way to its own value in the night
+  //     key's hue and the moonlit paint is laid at the night's own strength (chunks.js pcTone); the last pass excuses
+  //     from the night's grade only what the lantern lights and what is itself a light, not every warm pixel (post.js)
+  //   y, z, w: kept for L2 (one foliage shade), L3 (one light), L7 (quiet darks in the last pass)
+  uLookF: { value: new THREE.Vector4(_qn('nightkey', 1), _qn('leafshade', 1), _qn('onelight', 1), _qn('postdark', 1)) },
+  // THE NIGHT'S TWO NUMBERS for the world the eye is on (world/index.js sets them each frame from the world's look):
+  //   x how strong the moonlit paint is against the sunlit (a look's oil.night.v; 0.60, or 0.85 where the world has a
+  //     night key of its own, as Neptune's, which the owner liked as it was)
+  //   y how far a colour goes toward its own value in the night key's hue (oil.night.c; 0.45, or 0.20 likewise)
+  uLookN: { value: new THREE.Vector4(0.60, 0.45, 0, 0) },
 };
 
 // WHERE THE FIRE HAS BEEN, FOR THE GROUND'S OWN PAINT (the powers, fire; the paint itself is materials.js TERRAIN_FRAG).

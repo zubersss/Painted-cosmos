@@ -687,6 +687,9 @@ export function createWorld(scene) {
       wDay -= lost; wNight += lost * 0.24;
       blendKeys(look, wDay, (am ? wTwi : 0) + lost * 0.40, (am ? 0 : wTwi) + lost * 0.36, wNight);
       const dayness = 1 - wNight;
+      // (the night key's two numbers for this world, L1: a look's oil.night.v and .c, else 0.60 and 0.45, or 0.85 and
+      // 0.20 where the world has a night key of its own -- Neptune's teal night, which the owner liked as it was)
+      if (LOOK.oil) { const on = look.oil && look.oil.night, nv = on && on.v != null ? on.v : on ? 0.85 : 0.60, nc = on && on.c != null ? on.c : on ? 0.20 : 0.45; OIL.uLookN.value.set(nv, nc, 0, 0); }
       // ---- weather in the picture (PHYSICS' sky numbers; they belong to the air near the ground)
       // the sky numbers are eased over about two seconds before anything is painted from them
       // (PHYSICS' may move by 8 to 15 % a second: a wash must not jump). A forced sky, a first
