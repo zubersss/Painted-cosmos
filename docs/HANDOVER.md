@@ -511,6 +511,24 @@ whether the performance work is one more version or a redesign.** Their own row 
 
 ## 3. State right now (update this before you stop)
 
+**STATE 24 Nov (first account): SIX GROUPS IN DESIGN, NOTHING NEW BUILT YET. `main` is v37.**
+- The owner's direction (24 Nov): 30 a second on the S23 Ultra, the view from the air good to a mile, much denser
+  grass, flowers and more plants, flora before fauna; then four more groups at the owner's word. The v37 speed test
+  that drives it is in the log (24 Nov): as set about 89 ms (11 a second); near trees about 52 ms, far trees about
+  17-21, the plants' fragment work about 34; everything that is not a tree runs at the 60 cap.
+- GROUPS (the log says why they were merged so): A TREES (30 a second, always visible near the eye, far forms) and
+  C FAR VIEW (ground, rocks, mountains to a mile): local workflow `trees-far-design`. B FLORA (dense grass, flowers,
+  plants): helper session on branch `design-flora`. D WEATHER (clouds, wind, storms, rain falling): helper on
+  `design-weather`. E WATER (runoff, rivers, lakes, the sea, waterfalls, the player in water): helper on
+  `design-water`. F LOOK DIRECTOR (light and paint; owns chunks.js light, world/index.js light, post.js, shared.js;
+  reviews every group's stills): helper on `look-director`. Each writes its design to `docs/lead/` on its branch.
+- NEXT: when the designs are in, one plan in lanes on disjoint files; the build in helper sessions (own machines);
+  F reviews; staged merges into `look-proto` then `main` (item 41's gate); a speed-test row for every change.
+- PAUSED: the creatures (branch `creatures`, one snapshot) and the waterfall lane (branch `falls`, empty; its work
+  now belongs to group E). Working copies on the first account's machine: /home/user/look-proto,
+  /home/user/wt-creatures, /home/user/wt-falls (not in the repository).
+
+
 Head rewritten 2026-11-18, evening (the morning's text and the v12 text it replaced are in the log).
 
 **`main` IS AT v34 (23 Nov), pull request #34 merged: WATER THAT RUNS DOWNHILL AND POOLS, THREE FIXES TO THE
