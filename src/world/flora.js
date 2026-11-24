@@ -1033,6 +1033,10 @@ export class Flora {
   // for the speed test's row: returns the setting before.
   setShadowWhole(on) { const was = SHADOW_OPTS.whole; SHADOW_OPTS.whole = !!on; return was; }
   get shadowWhole() { return SHADOW_OPTS.whole; }
+  // The far impostors' crown mass (render/impostor.js PC_MASS; the default, ?crownmass=0 the old way), switched while the
+  // game runs for the speed test's row: only the impostor program is compiled again. Returns the setting before, or null.
+  setCrownMass(on) { const m = this.mats && this.mats.imp; if (!m) return null; const was = !!m.defines.PC_MASS; if (on) m.defines.PC_MASS = 1; else delete m.defines.PC_MASS; m.needsUpdate = true; return was; }
+  get crownMass() { const m = this.mats && this.mats.imp; return !!(m && m.defines.PC_MASS); }
   // The far impostors in the weather group's gust bands (render/impostor.js GUST, ?gustbands=1), for the speed test's row:
   // false keeps the bands off the crowns (the ground keeps them). Returns null where the impostors do not take them.
   setImpGust(on) { const u = this.mats && this.mats.imp && this.mats.imp.uniforms.uImpGust; if (!u) return null; const was = u.value > 0.5; u.value = on ? 1 : 0; return was; }
