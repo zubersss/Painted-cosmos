@@ -19,6 +19,14 @@ export default {
   seaLevel: 0,
   cloud: 0.45,
   deck: { height: 560 },
+  // THE WEATHER'S OWN HEIGHTS AND SHARES (group D, lane W1 CLOUDS; docs/lead/WEATHER-DESIGN.md 3 and 4.3). Read only in the
+  // oil look: by world/clouds.js (the 3D clouds, ?clouds3d=) and world/index.js skyCeiling (the sky stays a sky to
+  // `ceiling[0]` m over the land and is space by `ceiling[1]`). A world without this row keeps the defaults.
+  //   fair: the share of slots a fair sky holds where the cloud map says nothing (0.8 of `cloud`); base: a fair
+  //   cumulus' base over the land, morning and evening (m, where the map does not give one); alto, altoShare: the sky's
+  //   own flat cloud lifted to the altocumulus this far over the land, keeping this share of its cover; deck, valley,
+  //   towers, cumulus: switches and heights for the pieces as WEATHER-DESIGN 3 sets them (the map gives the deck's).
+  weather: { cumulus: 1, fair: 0.36, base: [300, 380], towers: 1, deck: [180, 260], valley: 1, alto: 1000, altoShare: 0.45, ceiling: [2800, 6000] },
   visibility: [185, 2600],   // metres at ground level, and from high up
   sky: EARTH_SKY,
   // (the oil look: Earth takes the look's golden hours whole: its wood is the owner's reference clip's)

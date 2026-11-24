@@ -65,6 +65,7 @@ uniform vec4 uOilG;
 uniform vec4 uOilS;         // x: how far the far air leans to the blue-violet of the owner's aerial references
 uniform vec4 uSkyOil;       // x cloud shaping, y the ceiling on the sky's value, z the cloud's lit side (the dials above)
 uniform vec4 uSkyAir;       // x: how far the lowest band is the land's own air   y: how high that band stands (dot(view, up))
+uniform vec4 uCloud3D;      // (the 3D clouds, world/clouds.js, set it) x 1 while they are drawn, y this shell's radius then (m), z its cover's share
 #endif
 
 vec3 dens(vec3 c, float d) { return clamp(c - (c - c * c) * (d - 1.0), 0.0, 1.0); }
@@ -395,15 +396,22 @@ void main() {
   }
 
   // ---- clouds: bare paper with soft violet undersides, on a shell around the planet
+  // (WITH THE 3D CLOUDS ON, world/clouds.js, WEATHER-DESIGN A4: the cumulus are real clouds over the land and this shell
+  // is the far background only, the altocumulus: it is lifted to their height and keeps a share of its cover. With them
+  // off the two numbers are the world's own, exactly as before.)
+  float cShellR = uCloud.x, cCover = uCloud.y;
+  #ifdef PC_OIL
+  if (uCloud3D.x > 0.5) { cShellR = uCloud3D.y; cCover = uCloud.y * uCloud3D.z; }
+  #endif
   float rc = length(uCamL);
   float b = dot(uCamL, d);
-  float disc = b * b - (rc * rc - uCloud.x * uCloud.x);
+  float disc = b * b - (rc * rc - cShellR * cShellR);
   float cloud = 0.0, shade = 0.0, body = 0.0, belly = 0.5;
   #ifdef PC_OIL
     float oilS1 = 0.0, oilS2 = 0.0;      // the cloud's half-tone and its belly in shadow: set here, painted further down
   #endif
-  if (uCloud.y > 0.001 && disc > 0.0) {
-    float tt = rc < uCloud.x ? (-b + sqrt(disc)) : (-b - sqrt(disc));
+  if (cCover > 0.001 && disc > 0.0) {
+    float tt = rc < cShellR ? (-b + sqrt(disc)) : (-b - sqrt(disc));
     if (tt > 0.0) {
       vec3 hp = uCamL + d * tt;
       vec3 q = hp / uCloud.z + vec3(uTime * uCloud.w, 0.0, uTime * uCloud.w * 0.6);
@@ -441,7 +449,7 @@ void main() {
       float c1 = texture(uNoise3D, q).r;
       float c2 = texture(uNoise3D, q * 2.7 + 0.31).g;
       float v = c1 * 0.82 + c2 * 0.18;
-      float th = 1.0 - uCloud.y;
+      float th = 1.0 - cCover;
       vec3 ql = q + normalize(uSunDirL + normalize(hp) * 0.85) * 0.14;
       float vl = texture(uNoise3D, ql).r * 0.82 + texture(uNoise3D, ql * 2.7 + 0.31).g * 0.18;
       // CLOUD LANES: the masses gather in broad lanes with clear sky between them, as theirs do. The lanes are waves
@@ -463,7 +471,7 @@ void main() {
       thO -= lobe * 0.055;
       float fwv = max(fwidth(v), 1e-4);
       // the silhouette, with an edge a pixel wide, as everything else in this look has
-      cloud = smoothstep(-fwv, fwv, v - (thO + 0.035)) * (rc < uCloud.x ? smoothstep(0.015, 0.20, e) : 1.0);
+      cloud = smoothstep(-fwv, fwv, v - (thO + 0.035)) * (rc < cShellR ? smoothstep(0.015, mix(0.20, 0.055, uCloud3D.x), e) : 1.0);
       float deep = clamp((v - thO - 0.035) / 0.16, 0.0, 1.0);          // how far into the mass this pixel lies (0 at its edge)
       float sh = clamp(0.5 - (v - vl) * 5.0 * uSkyOil.z, 0.0, 1.0) * (0.40 + 0.60 * deep);
       float fws = max(fwidth(sh), 1e-4);
@@ -476,12 +484,12 @@ void main() {
       float c2 = texture(uNoise3D, q * 2.7 + 0.31).g;
       float c3 = texture(uNoise3D, q * 7.3).b;
       float v = c1 * 0.60 + c2 * 0.28 + c3 * 0.12;
-      float th = 1.0 - uCloud.y;
+      float th = 1.0 - cCover;
       // crisp on the upper edge, wet and soft on the lower
       cloud = smoothstep(th - 0.02, th + 0.09, v);
       float toSun = texture(uNoise3D, q + uSunDirL * 0.09).r * 0.60 + texture(uNoise3D, (q + uSunDirL * 0.09) * 2.7 + 0.31).g * 0.28 + c3 * 0.12;
       shade = smoothstep(0.0, 0.10, toSun - v + 0.02) * smoothstep(th + 0.02, th + 0.16, v);
-      float fade = rc < uCloud.x ? smoothstep(0.015, 0.20, e) : 1.0;
+      float fade = rc < cShellR ? smoothstep(0.015, 0.20, e) : 1.0;
       cloud *= fade;
       body = smoothstep(th + 0.02, th + 0.30, v);
       belly = smoothstep(th + 0.06, th + 0.50, v + (c2 - 0.5) * 0.25);
@@ -642,6 +650,9 @@ void main() {
       vec3 ta = normalize(cross(up, vec3(0.31, 0.74, 0.59))), tb = cross(up, ta);
       vec4 wv4 = texture(uNoise3D, d * 0.7 + 0.37);
       float nightK = (1.0 - uAtmo.y) * (1.0 - uAtmo.x) * smoothstep(0.02, 0.10, e);
+      // (WEATHER-DESIGN A10: the streaks are the clear night's; under an overcast or a cloud they were painted over the
+      // storm deck at dusk, design still 17. With the 3D clouds on they keep to the clear sky.)
+      nightK *= mix(1.0, (1.0 - oc) * (1.0 - cloud), uCloud3D.x);
       if (nightK > 0.004) {
         for (int L = 0; L < 4; L++) {
           float fl = float(L);
@@ -731,6 +742,9 @@ export function makeSkyUniforms() {
     // to show the owner). y: how high that band stands, as dot(view, up) -- 0.075 is about four degrees over the
     // horizon, which is a painter's band low down and not a wall of one colour (?skyairtop=).
     uSkyAir: { value: new THREE.Vector4(_qn('skyair', 1), _qn('skyairtop', 0.075), 0, 0) },
+    // (the 3D clouds, world/clouds.js: x 1 while they are drawn, y the shell's radius then, z its cover's share; all 0:
+    // the sky as it was. Only the oil sky reads it.)
+    uCloud3D: { value: new THREE.Vector4(0, 0, 0, 0) },
     ...OIL,
   };
 }

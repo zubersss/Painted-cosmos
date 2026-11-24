@@ -20,6 +20,9 @@
 //     float pcCloudBase(d)    m above the datum;  float pcCloudTop(d)  m above the datum
 //     float pcCloudShadow(p)  0 lit .. 1 under cloud, SMOOTH (threshold it crisply in the caller: the crispness rule)
 //     uWxOn                   x 1 when the cloud map is live, y 1 when the wind map is live (0: the textures hold zeros)
+//     uCloudShadowV (mat4)    the eye's view space -> the shadow map's uv, every frame (for post.js, which works from a pixel's
+//                             view position): uv = (uCloudShadowV * vec4(viewPos, 1.0)).xy, outside 0..1 no shadow
+//   NOTE: render/shared.js has a WX of its own (the forced sky): where both are needed, import this one as WXF.
 //   The textures are read bilinearly inside a face and seamless across face edges (each face carries a border of
 //   its neighbours' texels), so any direction may be asked, in a vertex or a fragment shader.
 //
@@ -69,6 +72,7 @@ export const WX = {
   uCloudShadow: { value: blankShadow() },          // (clouds.js A6) 256 x 256, R 0 lit .. 1 shadow, smooth
   uCloudShadowM: { value: _noShadowM.clone() },    // body-local position -> shadow map uv (xy)
   uCloudShadowK: { value: 1 },                     // 0: no cloud shadow anywhere (the speed-test row)
+  uCloudShadowV: { value: _noShadowM.clone() },    // (additive) the eye's VIEW space -> the map's uv, set every frame: for a pass over the picture (post.js), which has view positions, not body ones
 };
 
 // THE ATLAS'S INDEX: for every atlas texel, the map texel it copies (its own inside a face; across the edge, the
