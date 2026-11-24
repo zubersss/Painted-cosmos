@@ -81,9 +81,11 @@ const VISTA = (() => {
 //   `?nearcull=` 0 shades every mark again, in view or not (G1; the speed test's row does the same). On with ?flora=old too.
 //   `?bladegreen=` 0 gives the blades the undergrowth's greens again instead of their own (`oil.flora.sward.leaf`, F10)
 //   `?tuft=`     0 lets each blade pick its own colour again instead of its tuft's (the look director's audit 2)
+//   `?driftpatch=` 0 lays a drift's heart past the near ring as many floor-sized heads again, not as a patch (audit 2)
+//   `?patchfloor=` 1 also brings the heads' floor down in the middle and far rings (0.55 and 0.4 of it; not yet seen)
 //   `?sheen=`    0 takes away the gusts' sheen on the blades (G4: needs PHYSICS' bend, so the game, or the gallery's &physics=1).
 const FLORA = (() => {
-  const f = { grass2: 1, cull: 1, sheen: 1, bloom: 0, blade: 1, tuft: 1 };
+  const f = { grass2: 1, cull: 1, sheen: 1, bloom: 0, blade: 1, tuft: 1, patch: 0, pfloor: 0 };
   try {
     const q = new URLSearchParams(location.search), on = (k) => !q.has(k) || (q.get(k) !== '0' && q.get(k) !== 'false');
     // THE ONE OPT-OUT (the owner, 24 Nov, through the coordinator: "No do make it look different"): the lane is ON by
@@ -99,6 +101,11 @@ const FLORA = (() => {
   if (!LOOK.oil) { f.grass2 = 0; f.cull = 0; f.sheen = 0; f.blade = 0; f.tuft = 0; }
   // (F1-F3: the flowers from world/bloom.js's map, ?bloom=0 off; read there, where the ground's colour reads it too)
   f.bloom = LOOK.oil ? bloomSwitches().bloom : 0;
+  try {
+    const q = new URLSearchParams(location.search), on = (k) => !q.has(k) || (q.get(k) !== '0' && q.get(k) !== 'false');
+    f.patch = f.bloom && on('driftpatch') ? 1 : 0;
+    f.pfloor = f.patch && q.get('patchfloor') === '1' ? 1 : 0;
+  } catch { f.patch = f.bloom; }
   return f;
 })();
 export { FLORA };
@@ -313,7 +320,7 @@ class Ring {
     // 0.66 to 1, so past about 25 m the band thins toward its rim instead of standing in rows behind one another: its
     // touches painted each pixel they covered 3.8 times at the autumn landing. The shader grows a touch as the band thins.)
     u.uNear.value.set(RANGE * (FLORA.grass2 && cfg.name === 'mid' ? 0.40 : 0.66), RANGE, this.now, pixel || 0.002);
-    if (u.uNearK) u.uNearK.value.w = cfg.name === 'mid' ? 0.85 : (cfg.name === 'far' ? 0.6 : 1);   // (a flower head's least size on screen, a share)
+    if (u.uNearK) u.uNearK.value.w = cfg.name === 'mid' ? (FLORA.pfloor ? 0.55 : 0.85) : (cfg.name === 'far' ? (FLORA.pfloor ? 0.4 : 0.6) : 1);   // (a flower head's least size on screen, a share)
     if (u.uNearK) u.uNearK.value.y = FLORA.bloom ? SEASON.t : 0;    // (the flowers' year: packYear above)
     // (the fade-in band is a tier's own where a ring says so: the vista ring is laid at two tiers whose reaches
     // differ by more than twice, and one band of metres cannot serve both -- at the middle tier it would fade in
@@ -772,7 +779,29 @@ class Ring {
         // takes a fifth of the share it takes near the eye; and from the far ring a white head is held a step under the
         // meadow's lightest grass, as at 150 m pale flecks read as the paper)
         const b1 = b, sh1 = sh, tone1 = tone, B2 = o.bloom2, mx2 = o.mix * 0.2;
-        for (let q = 0; q < nf; q++, k++) {
+        // THE DRIFT AS ONE PATCH (the look director's audit 2, ?driftpatch=0 off): past 15 m the heads were many
+        // floor-sized dots side by side, the same 4-5 px dot for every flower, an even rain of dots where the references
+        // show pools of colour with dots scattered round them. So where the drift is thick (its heart), the cell lays one
+        // to three broad touches in the drift's colour, standing in the sward and facing the eye, sized by the cell's
+        // COVER (the thing, not the pixel), with two heads (one in the far ring) left over them; where it is thin (its
+        // edge) the heads stay scattered as before. Fewer marks than the heads they replace.
+        let nh = nf;
+        if (FLORA.patch && nf >= 2) {
+          const cov = Math.min(1, o.dens * (two2 ? 1.5 : 1));
+          if (cov > 0.22) {
+            const np = Math.min(nf - 1, far ? (cov > 0.5 ? 2 : 1) : (cov > 0.6 ? 3 : cov > 0.38 ? 2 : 1));
+            const pc = b1.c, wj = far && Math.max(pc[0], pc[1], pc[2]) - Math.min(pc[0], pc[1], pc[2]) < 0.25 * Math.max(pc[0], pc[1], pc[2]) ? 0.8 : 1;
+            const st0 = b1.stalk ? 0.5 * (b1.stalk[0] + b1.stalk[1]) : 0.2;
+            for (let q = 0; q < np; q++, k++) {
+              const q1 = H(900 + q + ho), q2 = H(906 + q + ho), q3 = H(912 + q + ho), p = at(0.2 + 0.6 * q1, 0.2 + 0.6 * q2);
+              const dw = C * 0.5 * Math.sqrt(cov / np) * 0.75 * (0.85 + 0.3 * q3), jit = (0.94 + 0.12 * q2) * wj;
+              this.put(p[0], p[1], 0, 0, 0, dw * (0.45 + 0.15 * q1) * kh, dw, DAB + CRISP, q3, born, pc[0] * jit, pc[1] * jit, pc[2] * jit, st0 * 0.3, flex * 0.5, tone1);
+            }
+            left -= np;
+            nh = Math.min(nf - np, far ? 1 : 2);
+          }
+        }
+        for (let q = 0; q < nh; q++, k++) {
           const q1 = H(102 + q + ho), q2 = H(106 + q + ho), q3 = H(110 + q + ho), p = at(q1, q2);
           let jit = 0.94 + 0.12 * q2;
           // (some touches are the runner-up drift's, as in the near ring)
@@ -795,7 +824,7 @@ class Ring {
             this.put(p[0], p[1], 0, 0, 0, r0 * 2, r0, sh || (DAB + CRISP), q3, born, b.c[0] * jit, b.c[1] * jit, b.c[2] * jit, st0 * 0.85 * kh, flex, tone);
           }
         }
-        left -= nf;
+        left -= nh;
       }
       }
     }
