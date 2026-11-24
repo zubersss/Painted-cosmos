@@ -570,6 +570,13 @@ void main() {
   // the tree's own colour run (as PROP_VERT and PROP_FRAG lay it for the crowns)
   vec3 lA = uFarA[sp], lB = uFarB[sp], lC = uFarC[sp];
   vec4 famL = uFarFam[sp];
+  #if defined(PC_MASS) && defined(MASS_FAMK)
+    // (CROWN MASS: a warm broadleaf with no family run of its own -- the far yellow kind -- borrows the wood's run while
+    //  its own colour is yellow or orange (red over green: a summer lemon has them level) and the run is turned in, so
+    //  it takes its stand's colour as the rest do: the look director, 24 Nov, "the yellow crowns scattered through every
+    //  stand" were the confetti left)
+    if (famL.a <= 0.0 && uFarA[sp].r - uFarA[sp].g > 0.05) { vec4 fw = uFarFam[MASS_FAMK]; if (fw.a > 0.0) famL = fw; }
+  #endif
   if (famL.a > 0.0) {
     float tf = fract(inst.z * 9.73 + 0.37);
     #ifdef PC_MASS
@@ -644,7 +651,7 @@ uniform vec4 uImpAtlas;
 uniform float uCanopy;
 #ifdef PC_MASS
 uniform vec4 uMassK;      // x the autumn cap's drop (light levels), y the one tone's end (px), z where the crown mass begins (px), w the one tone's start (px)
-uniform vec4 uMassK2;     // x the share of trees in their stand's colour (vertex), y a warm crown's paint (1: as it was)
+uniform vec4 uMassK2;     // x the share of trees in their stand's colour (vertex), y a warm crown's paint (1: as it was), z how far a tree strays on its run inside its stand (1: as it was), w the crown width (px) under which its bark is laid as its shaded leaves
 #endif
 varying vec3 vBody;
 varying vec3 vView;
@@ -691,7 +698,21 @@ void main() {
   vec4 a11 = texelFetch(uImpTex, ivec2(clamp(i0 + vec2(1.0, 1.0), lo, hi)), li);
   vec4 o4 = step(vec4(0.002), vec4(a00.a, a10.a, a01.a, a11.a));
   float cover = mix(mix(o4.x, o4.y, fq.x), mix(o4.z, o4.w, fq.x), fq.y);
-  if (cover < (uOilG.z > 0.5 ? 0.25 : 0.5)) discard;
+  float cut = uOilG.z > 0.5 ? 0.25 : 0.5;
+  bool fill = false;
+  #ifdef PC_MASS
+    // (CROWN MASS: a small crown is one patch, not a sieve -- the look director, 24 Nov: "the dark gaps between strokes
+    //  inside small crowns (the near-black pixel specks) are what keeps the pattern short: under about 8 px let the gaps
+    //  take the crown's shaded tone instead of the floor's dark". A gap here is where the next coarser level of the same
+    //  view holds tree: there it is laid, in the crown's shaded tone (below), and the outline grows by under half a texel.)
+    if (cover < cut && cover > 0.0 && vMass.x < 8.0) {
+      int lj = min(li + 1, int(uImpK.w + 0.5));
+      float T2 = uImpK.z * exp2(-float(lj));
+      vec2 tc2 = vTile.xy * vec2(textureSize(uImpTex, lj)) + clamp(vQuad * T2, vec2(0.5), vec2(T2) - 0.5);
+      if (texelFetch(uImpTex, ivec2(tc2), lj).a > 0.002) { fill = true; cover = cut; }
+    }
+  #endif
+  if (cover < cut) discard;
   // (the nearest texel that is tree)
   vec4 t = fq.x < 0.5 ? (fq.y < 0.5 ? a00 : a01) : (fq.y < 0.5 ? a10 : a11);
   if (t.a < 0.002) t = o4.x > 0.5 ? a00 : o4.y > 0.5 ? a10 : o4.z > 0.5 ? a01 : a11;
@@ -707,6 +728,13 @@ void main() {
   float id = e.r / 255.0;
   float qx = floor(e.g / 4.0), az = (e.g - qx * 4.0) / 3.0;
   float qy = floor(e.b / 4.0), cls = e.b - qy * 4.0;
+  if (fill && cls < 0.5) cls = 1.0;      // (a gap filled in a small crown is leaf, whatever texel stands beside it)
+  #ifdef PC_MASS
+    // (and in a small crown its bark -- the near-black specks between its strokes, MEASURED: filling the empty gaps left
+    //  them at 1.0 percent of the 150 m wood -- is laid as its shaded leaves, so the crown is one patch with a shaded side)
+    bool barkLeaf = cls < 0.5 && vMass.x < uMassK2.w;
+    if (barkLeaf) { cls = 1.0; fill = true; }
+  #endif
   vec2 o = vec2(qx, qy) / 63.0 * 2.0 - 1.0;
   vec3 n = vec3(o, 1.0 - abs(o.x) - abs(o.y));
   if (n.z < 0.0) n.xy = (1.0 - abs(n.yx)) * vec2(n.x >= 0.0 ? 1.0 : -1.0, n.y >= 0.0 ? 1.0 : -1.0);
@@ -766,7 +794,9 @@ void main() {
     #ifdef PC_MASS
       bool mass = vMass.x < uMassK.z && cls < 2.5;
       vec3 rcm = mass ? vec3(fract(vInst.z * 3.1), fract(vInst.z * 7.3), fract(vInst.z * 11.7)) : r3;
-      float hue = vInst.x + (mass ? 0.0 : (id - 0.5) * 1.7);
+      // (and inside its stand a tree strays only uMassK2.z of its own way along the run: at full stray an orange stand
+      //  held yellow trees scattered through it, the look director's "yellow crowns scattered through every stand")
+      float hue = mass ? vInst.x * uMassK2.z : vInst.x + (id - 0.5) * 1.7;
       vec3 cs = mix(vLA, vLB, clamp(0.5 + hue * 0.5, 0.0, 1.0));
       cs = mix(cs, vLC, mass ? 0.0 : clamp(azL * 0.55 + (r3.y - 0.5) * 0.6, 0.0, 1.0));
     #else
@@ -826,6 +856,7 @@ void main() {
         else lv = fm > mix(0.60, 0.75, canopy) ? lcm : (fm > mix(0.35, 0.55, canopy) ? max(lcm - 1.0, 0.0) : max(lcm - 2.0, 0.0));
         float one = 1.0 - smoothstep(uMassK.w, uMassK.y, vMass.x);
         if (one > 0.0) lv = mix(lv, max(lcm - 1.0, 0.0) + vMass.y, one);
+        if (fill) lv = min(lv, max(lcm - 1.0, 0.0));      // (a filled gap: the crown's shaded tone)
       }
     #endif
     #ifdef PC_GUST
@@ -886,12 +917,13 @@ export function makeImpostorMaterial(bodyU, atlas, farMat, farcrown = FARCROWN) 
   //  uniform anywhere -- and only with ?gustbands=1, read from the address as the weather's contract asks)
   // (CROWN MASS: IMP_FRAG. Its uniforms always, so the speed test can switch it either way while the game runs:
   //  flora.setCrownMass)
-  own.uMassK = { value: new THREE.Vector4(0.0, 7.0, 30.0, 4.0) }; own.uMassK2 = { value: new THREE.Vector4(1.0, 0.65, 0, 0) };
+  own.uMassK = { value: new THREE.Vector4(0.0, 7.0, 30.0, 4.0) }; own.uMassK2 = { value: new THREE.Vector4(1.0, 0.65, 0.35, 10.0) };
   const gust = GUSTBANDS && !!PHYS.uPhysGust;
   if (gust) Object.assign(own, PHYS, { uImpGust: { value: 1 } });      // (the whole PHYS block by reference, as with the lean: FLORA_GLSL is compiled for the bands)
   const m = new THREE.ShaderMaterial({
     name: 'pc-prop-far-impostor',
     defines: Object.assign({ PC_IMPOSTOR: 1, PC_IMP_NV: Math.max(1, atlas.n), PC_NFAR: fu.uFarA.value.length }, _q && _q.get('impdebug') === '1' ? { PC_IMP_DEBUG: 1 } : null, wind ? { PC_PHYS: 1 } : null, gust ? { PC_GUST: 1 } : null, CROWNMASS ? { PC_MASS: 1 } : null,
+      fu.uFarFam.value.findIndex((v) => v.x + v.y + v.z > 0.01) >= 0 ? { MASS_FAMK: fu.uFarFam.value.findIndex((v) => v.x + v.y + v.z > 0.01) } : null,
       IMP.small > 0 ? { PC_IMP_SMALL: 1, IMPS_T: IMP.small.toFixed(1) } : null),
     uniforms: makePaintUniforms(bodyU, own),
     vertexShader: IMP_VERT,
