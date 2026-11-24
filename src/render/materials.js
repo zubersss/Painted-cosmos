@@ -2045,6 +2045,7 @@ void main() {
         lA = mix(lA, pa, famL.a); lB = mix(lB, pb, famL.a);
         lC = mix(lC0, mix(pb, lC0, 0.55) * vec3(0.92, 0.80, 0.84), famL.a);
       }
+      { float tsL = fract(inst.z * 9.73 + 0.37); lA = pcSummerTree(lA, tsL, uLookG.y); lB = pcSummerTree(lB, tsL, uLookG.y); lC = pcSummerTree(lC, tsL, uLookG.y); }      // (each summer tree its own green: chunks.js)
       float twigL = step(1.5, kindL);
       float hueL = inst.x + (hL - 0.5) * 1.7;
       vec3 cs = mix(lA, lB, clamp(0.5 + hueL * 0.5, 0.0, 1.0));
@@ -2352,6 +2353,7 @@ void main() {
       leafA = mix(leafA, pa, famO.a); leafB = mix(leafB, pb, famO.a);
       leafC = mix(leafC, mix(pb, leafC, 0.55) * vec3(0.92, 0.80, 0.84), famO.a);
     }
+    { float tsO = fract(vInst.z * 9.73 + 0.37); leafA = pcSummerTree(leafA, tsO, uLookG.y); leafB = pcSummerTree(leafB, tsO, uLookG.y); leafC = pcSummerTree(leafC, tsO, uLookG.y); }      // (each summer tree its own green: chunks.js)
     float snowyO = step(0.5, kindO) * step(kindO, 1.5), twigO = step(1.5, kindO);
     // (a leaf at the lens is a slab across the picture: within two and a half to four and a half metres of the eye, each
     // leaf by its own number, the leaves of a tree are not laid, whole: the eye stands in a ragged window. Of a tree of
@@ -2810,7 +2812,8 @@ void main() {
   #endif
   vec3 nV = normalize(vNV);
   if (!seenFront) nV = -nV;
-  if (uOilL.y > 1.5 && uOilL.y < 2.5) { pcWrite(uBarkB, 1.0, nV, -vView.z, 3.0); return; }
+  // (2: the plants one flat colour; 7: the near bark one flat colour -- the split's wood is all bark)
+  if ((uOilL.y > 1.5 && uOilL.y < 2.5) || (uOilL.y > 6.5 && uOilL.y < 7.5)) { pcWrite(uBarkB, 1.0, nV, -vView.z, 3.0); return; }
   vec3 sunV = normalize((viewMatrix * vec4(uSunDirW, 0.0)).xyz);
   ${SKYUP('dot(nV, mat3(viewMatrix) * uUpW)')}
   float seed = vInst.z;
@@ -3413,6 +3416,7 @@ uniform vec3 uOrigin;
 uniform vec3 uCamLocal;
 uniform vec4 uNear;     // x full density out to here (m), y nothing beyond here, z now (s), w one pixel at 1 m (tangent)
 uniform vec4 uNear2;    // x, y the ring fades in between these distances (m), z how soft its marks are left
+uniform float uNearCut; // (the speed test only, core/bench.js: the share of the marks folded away whole, by number; 0 none)
 uniform float uTime;
 uniform vec4 uWx;
 #ifdef PC_OIL
@@ -3455,6 +3459,14 @@ void main() {
   // every stroke has its own range (so the sward thins with distance) and grows in after it is laid
   float range = mix(uNear.x, uNear.y, fract(h * 7.31));
   float vis = (1.0 - smoothstep(range * 0.72, range, di)) * smoothstep(0.0, 0.7, uNear.z - iPar.w) * smoothstep(uNear2.x, uNear2.y, di);
+  // (the speed test's 'half the near grass': a share of the marks folded to nothing here, before any is rasterised, so
+  //  the row prices a mark whole. By PLACE, in half-metre cells of the ground, so that a plant of several marks -- a
+  //  stalk, its leaf, its heads, which stand within a few centimetres of one root -- goes whole, but for the rare one
+  //  that straddles a cell's edge (the flora lane's ask). At 0, the default, nothing here is worked out at all.)
+  if (uNearCut > 0.0) {
+    vec3 cq = floor(iRoot * 2.0);
+    vis *= step(uNearCut, fract(sin(dot(cq, vec3(12.9898, 78.233, 37.719))) * 43758.5453));
+  }
   #ifdef PC_OIL
   // G1, THE MARKS THE EYE CANNOT SEE (2026-11-24, docs/lead/FLORA-DESIGN.md 6.1). A ring is one draw of every mark round
   // the eye, and every mark used to be shaded whole -- the bend field read three times a vertex, the air -- in view or
@@ -3708,6 +3720,9 @@ void main() {
         r3o = fract(r3o + h1 * vec3(0.37, 0.61, 0.83));      // (each blade of the tuft its own number: its own tone)
       }
       vec3 nVo = normalize(vNV);
+      // (the speed test's 'near grass one flat colour', shared.js uOilL.y 8: every mark keeps its shape, its light and
+      //  paint are not worked out -- the gap to 'as set' is what the sward's paint costs a pixel)
+      if (uOilL.y > 7.5 && uOilL.y < 8.5) { pcWrite(vCol, 0.0, nVo, -vView.z, 4.0 + vS.z * 0.9); return; }
       // (a blade, a pebble, a frost needle faces the sky its own way: chunks.js pcUp, as the ground under it does.
       // A blade stands up, so it sees about half the sky and takes the ground's warm bounce on its side; the floor
       // it stands on faces the sky whole. That is the difference this term is for.)
@@ -3804,6 +3819,7 @@ export function makeNearMaterial(bodyU) {
       uNear: { value: new THREE.Vector4(5, 13, 0, 0.002) }, uNear2: { value: new THREE.Vector4(0.8, 2.6, 0, 0) },
       // (the flora lane: nearground.js FLORA sets them; 0 is each package off, the ring as it was. Read only in the oil look)
       uNearK: { value: new THREE.Vector4(0, 0, 0, 0) }, uNearL: { value: new THREE.Vector4(0, 0, 0, 0) },
+      uNearCut: { value: 0 },
     }, PHYS)),
     vertexShader: NEAR_VERT, fragmentShader: NEAR_FRAG,
     side: THREE.DoubleSide,

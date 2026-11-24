@@ -613,6 +613,7 @@ export function createWorld(scene) {
       // and come back to has gone on turning, as it should have. setSeason does nothing at all unless the season
       // has moved, and nothing ever on a world whose look gives its plants only one dress.
       if (st.flora) st.flora.setSeason(isActive ? stepSeason(dt) : SEASON.t);
+      if (isActive && LOOK.oil) OIL.uLookG.value.y = (LOOK.treeVar || 0) * (1 - Math.min(1, Math.max(0, SEASON.t)));      // (each summer tree its own green: chunks.js pcSummerTree)
       // One shared time slice per frame. When terrain and flora both have work they take
       // turns at going first, so no frame pays for a full slice of each.
       // (when frames are already very slow, as in software rendering, building is given a

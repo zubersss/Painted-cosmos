@@ -359,7 +359,19 @@ will put the new flora in front of the owner behind one switch once told. O and 
 **PROVED** (bc04da1, five gallery views, each world settled before the grab: the autumn wood at 16.8, the alpine meadow at
 11, the green wood at night, the autumn wood from 420 m, the meadow in the watercolour game): `?flora=old` on design-flora
 against look-proto 0d5533b with no switch: 0 pixels differ in all five.
-**Branch state:** design-flora = look-proto 0d5533b + this lane's seven files (`git diff origin/look-proto` shows only them).
+**Branch state:** design-flora = look-proto v39 d9d9ed7 + this lane's seven files (`git diff origin/look-proto` shows only
+them); ?flora=old proved against v39 too (0 pixels, five views). The coordinator merged design-flora into look-proto for the
+next release after batch 1 of the final set (ACCEPTED by the coordinator, PASS by the look director).
+**THE FINAL SET** (`final-<place>-<height>-<season>-old-new.jpg`, ?flora=old above, the default below, ?season=0.15 and 0.85,
+the f-* cameras): the autumn landing, the meadow (and from 150 m), the green wood, the coast, the wetland, at 1.8 m and 10 m.
+Folded in while it was taken: under v39's brighter light the yellow, scarlet and white heads a step deeper for C6; past the
+near ring the runner-up kind a fifth of its share (the look director: no confetti at 10-30 m) and whites from the far ring a
+step deeper (no paper flecks at 150 m); a yellow cup's upper part its own yellow deeper, no gold (the coordinator: near
+buttercups leaned orange), the marsh marigold and yellow flag the same; the cotton grass a soft grey-white, fewer. Every
+still of the set inside C6 but the landing at 10 m in autumn, 4.2 % (4.9 % in the old picture) and the coast (25 %, 30 % in
+the old: its cliffs and sea). A2 (trees near) counted the lane at the landing: 26,928 marks against 12,967, 357k fragments
+against 272k (the rebuilt middle band halves today's 176k to 92k); its rows in ?bench=foot price it on the phone. A2's hooks
+(NEAR_VERT uNearCut, NEAR_FRAG flat mode 8) are to be kept when they reach look-proto.
 A lesson recorded: af83f25 copied data/looks/earth.js from a scratch copy older than a merge and dropped the look director's
 `airTop` (found by the 420 m proof, fixed in 2f779d8); never copy a whole shared file over a merge, apply the lane's diff. ASKED OF THE FAR-VIEW LANE through the coordinator: a ground dab that takes a drift's colour WHOLE
 (pointillist) from `bloomAt`, the one thing that would make drifts read from 150 m and a mile.
@@ -372,7 +384,23 @@ FV7 of `docs/lead/FARVIEW-DESIGN.md`. A second session (A2, branch `trees-near`)
 the same time: this lane touches only the far parts of `flora.js`, `florakit.js`, the plant material's far branch,
 `render/impostor.js`, `render/shadow.js` and new rows in `core/bench.js`.
 
-**State (update this line every step):** (24 Nov, about 12:45) URGENT FIX DONE for v39.1 (the coordinator): during
+**State (update this line every step):** (24 Nov, about 14:35) SMALL CROWNS ARE THE DEFAULT (`?impsmall=0` the old
+way), after F passed them with its colour fixes; look-director at 64f1742 merged into trees-far on the coordinator's
+word (8f3848d; the impostor.js conflict kept my azL line and added F's pcSummerTree line). SEEN on the real branch,
+phone settings, autumn wood 15.4 h, roof on (`A1_small_default_*`): 1 km, the impostor zone hue 92 S 0.36 V 0.56 with
+?impsmall=0, hue 85 S 0.46 V 0.68 by default, C's roof past the reach hue 77 S 0.46 V 0.74; 150 m V 0.48 -> 0.51,
+pixels under V 0.3 29 -> 26 percent; the same to 2/255 as the scratch measurement. Goes into v39.3. Before that: look-proto v39 (d9d9ed7) merged into trees-far and
+pushed (my far trees compile under the new light: guard not tripped, swap 21 ms). NEXT, ON THE COORDINATOR'S WORD
+"v39.2 is on look-proto" (it carries F's colour fixes, look-director up to 64f1742): merge origin/look-proto, make the
+small crowns the default (IMP.small 12, ?impsmall=0 the opt-out), run the 1 km seam check F asked for (hue and
+saturation of the impostor zone against C's roof), push, tell F and the coordinator. Do NOT merge look-director into
+trees-far (the coordinator). MEASURED under v39, phone settings, 1 km, roof on: rule off V 0.65 S 0.35 hue 80, rule on V
+0.75 S 0.42 hue 78, the roof past the reach V 0.68 S 0.37 hue 70 (the new air lifts the darks: no pixel under V 0.3
+either way). The same with F's colour fixes is being measured in a scratch copy (`ld`, never pushed). T6 extra (the
+coordinator): the split trees drawn whole in the shadow pass behind `?shwhole=1` (OFF), row 'split trees whole in
+shadow pass'; MEASURED on foot with ?trees2=1: 226 -> 207 draws (every visible casting split mesh), picture
+byte-identical; the default is the coordinator's call. The bake fix's 1-2/255 difference: accepted by the coordinator.
+Scratch worktrees removed. URGENT FIX DONE for v39.1 (the coordinator): during
 the bake over frames the far wood was gone; now today's far trees stand in until the bake is done and hand over in that
 frame (flora.js impWant / impOn, _impReady; impostor.js step(), onReady, bakeTick), the bake counts as busy from the
 frame it is asked for. SEEN, gallery autumn wood 16.8 h on foot, phone settings: mid-bake (step 5 of 78, not ready,
@@ -478,6 +506,36 @@ it the same way. SEEN at the phone's settings, autumn wood 16.8 h: under v39's l
 is 0.30 of 255 at 5 m and at 10 m (0.31 with `?light=old`, as before the merge); the new light itself moves the
 picture by 1.7, so the wood follows it; `?light=old&trees2=0` is pixel-identical to the still before the merge. Stills
 `A2_*-v39_*`. (The cards' own program, `CARD_FRAG`, does not take the one light: cards are dropped.)
+
+**ON FOOT TO UNDER 33 ms (the coordinator's job, 24 Nov, after the ground from the air was found to hold no 30 ms:
+the v38.2 table had the whole 400 m frame at 17.9 ms with impostors, ground included).** DERIVED from the phone's own
+rows: v39.1 (split trees + impostors) is about 22 ms on foot (40.3 split - 18.5 old far trees + 0.7 impostors; and
+'no trees' was at the 16.7 cap in v37, so all that is not a tree fits under 16.7). Never timed together: the owner's
+next table decides. Built for that table: `?bench=foot` (core/bench.js), the frame on foot without the trees'
+questions, and THE NEAR GRASS AND FLOWERS' FIRST ROWS (in the full table too): 'no near grass or flowers', 'near
+grass: half its marks' (`materials.js NEAR_VERT uNearCut`, folded away before any is rasterised, by place in
+half-metre cells so a flower plant of several marks goes whole, the flora lane's ask; at 0, the default, not worked
+out at all), 'near grass one flat colour' (`uOilL.y` 8 in `NEAR_FRAG`). Also fixed: my wood
+program honours the flat mode 7, so 'near bark one flat colour' measures the split's bark. SEEN: the default still
+pixel-identical to before; each mode acts (half: fewer blades and leaves; flat: every mark in its flat wash; bark flat).
+The speed test's panel now lists the three tests (trees, air, foot) with their addresses and how to send each.
+STANDING BY (24 Nov, 13:10) for the owner's three tables (bench=trees, bench=air, bench=foot on v39.2): no cut is
+built until they show where the on-foot frame goes. COUNTED (Node, landing, phone tier 1, 936 x 442, on foot): the near grass today 12,967 marks (fine ring 6,941, middle
+4,333, vista 1,693), 38,901 triangles, 272k fragments rasterised, 107k pixels covered, about 110k painted after the
+depth test; the flora lane's branch (design-flora e55f6cc) 26,928 marks (fine 15,608, carpet 6,460, middle 3,167),
+80,784 triangles, 357k fragments, about 172k painted after the depth test.
+
+**COUNTED AT THE LANDING after v39 (Node, the scratch copy of `tools/overdraw.mjs`, `where=spawn`, phone tier 1, the
+counter's 787 x 443 = 0.348 Mpixel at fov 55, on foot; `?trees2=0` against the default):** near wood 71,504 -> 39,920
+triangles, near leaves 47,110 both, middle trees unchanged (wood 21,310, leaves 34,356: the middle tree never had hair);
+the whole frame 1,509,543 -> 1,477,959. Wood fragments rasterised (only the faces seen are drawn now): near 111,117 ->
+56,581, middle 39,873 -> 24,250. Tree fragments painted: the old program discards, so it cannot test depth first
+(about 379k: every fragment of the near and middle trees); the split, with the depth test first in three's own order,
+about 148k (simulated). DRAW CALLS: near 11 -> 22, middle 18 -> 36 in the colour pass, and as many again for each of
+those meshes inside the shadow square (three draws a mesh with two materials group by group even under the shadow
+pass's one material): up to +58 a frame. All of that was already in the phone's 40.3 ms; since then only +3,128 near
+wood triangles (the sides kept), 0.2 % of the frame. (A shadow-only mesh of one material per split mesh would take the
+shadow pass back to one draw a tree mesh; not built: the shadow pass is A1's.)
 
 **What is built (the oil look only; `?trees2=0` puts every tree back as it was):**
 - THE DEFAULT (was `?trees2=1`): the near AND middle trees drawn by TWO SHORT PROGRAMS (`materials.js` `WOOD_FRAG`,

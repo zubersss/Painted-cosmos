@@ -128,6 +128,17 @@ const dens = (c, d) => Math.max(0, Math.min(1, c - (c - c * c) * (d - 1)));   //
 // painter's licence, one number for all of them.
 const BLOOM_HEAD = 2.5;   // (2.0 until the coordinator's note, 24 Nov: "a poppy at 2 m should read as a poppy")
 // (the colour takes the low 18 bits; pure white would carry into the year's bits above them, so it stops one short)
+// (the look director on the final set: the stones by the water and on stony ground came out near-black discs; with the lane
+// on they are a step under the ground they lie on, light greys and ochres, never dark: half or more of the way to the
+// ground's colour, and no channel's top under 0.62. ?grass2=0 / ?flora=old: as they were.)
+function stoneC(c, gr, gg, gb, m, out) {
+  if (!FLORA.grass2) { out[0] = lerp(c[0], gr, m); out[1] = lerp(c[1], gg, m); out[2] = lerp(c[2], gb, m); return out; }
+  const k = Math.max(m, 0.55);
+  let r = lerp(c[0], gr, k), g = lerp(c[1], gg, k), b = lerp(c[2], gb, k);
+  const v = Math.max(r, g, b); if (v < 0.62) { const f = 0.62 / Math.max(v, 1e-3); r = Math.min(1, r * f); g = Math.min(1, g * f); b = Math.min(1, b * f); }
+  out[0] = r; out[1] = g; out[2] = b; return out;
+}
+const _stc = [0, 0, 0];
 const packTone = (c) => Math.min(262143, 1 + Math.round(Math.max(0, Math.min(1, c[0])) * 63) * 4096 + Math.round(Math.max(0, Math.min(1, c[1])) * 63) * 64 + Math.round(Math.max(0, Math.min(1, c[2])) * 63));
 // (the year, ?bloomyear=0 off) a kind's flowering window, `season: [from, to]` on SEASON.t (0 high summer, 1 deep autumn),
 // in sevenths, in the six bits above the colour: when it comes into flower times 8, plus how far before the end of the
@@ -457,7 +468,8 @@ class Ring {
       for (let k = 0; k < ns; k++) {
         const q1 = H(61 + k), q2 = H(64 + k), q3 = H(67 + k), c = st.rock[q3 < 0.45 ? 0 : 1];
         const w = 0.05 + 0.13 * q2 * q2;
-        this.put((q1 - 0.5) * 0.5, (q3 - 0.5) * 0.5, 0, 0, 0, w * (0.9 + 0.6 * q1), w, DAB, q2, born, lerp(c[0], gr, 0.25), lerp(c[1], gg, 0.25), lerp(c[2], gb, 0.25), 0, 0);
+        const sc = stoneC(c, gr, gg, gb, 0.25, _stc);
+        this.put((q1 - 0.5) * 0.5, (q3 - 0.5) * 0.5, 0, 0, 0, w * (0.9 + 0.6 * q1), w, DAB, q2, born, sc[0], sc[1], sc[2], 0, 0);
       }
       left -= ns;
       if (st.leaf && left > 0) {       // moss: a dark, saturated touch lying on the bank
@@ -566,7 +578,7 @@ class Ring {
       } else {                     // a pebble: a squat dab, darker than its ground
         len = 0.035 + 0.065 * q3; wid = 0.06 + 0.09 * q4; mid = 0.93;
         const c = st.rock ? st.rock[q5 < 0.4 ? 0 : 1] : null;
-        if (c) { cr = lerp(c[0], gr, 0.5); cg = lerp(c[1], gg, 0.5); cb = lerp(c[2], gb, 0.5); } else { const k2 = 1.3 + 0.8 * q5; cr = dens(gr, k2); cg = dens(gg, k2); cb = dens(gb, k2 + 0.1); }
+        if (c) { const sc = stoneC(c, gr, gg, gb, 0.5, _stc); cr = sc[0]; cg = sc[1]; cb = sc[2]; } else { const k2 = 1.3 + 0.8 * q5; cr = dens(gr, k2); cg = dens(gg, k2); cb = dens(gb, k2 + 0.1); }
       }
       this.put(ou, ov, 0, tilt, q2 * 6.2832 + 1.7, len, wid, mid, q3 * 0.61 + q1 * 0.39, born, cr, cg, cb, curl, flex);
     }
@@ -641,8 +653,21 @@ class Ring {
       if (sh === SHAPES.cushion) {
         // a low dome of leaves with its flowers on top: one mark (its leaves the mark's colour, its flowers its second)
         const r0 = (b.head[0] + (b.head[1] - b.head[0]) * q3) * 1.3, bc = b.body || lc;
-        this.put(ou, ov, 0, 0.05 * q5, la, r0 * 1.4, r0, SHAPES.cushion, q1 * 0.61 + q2 * 0.39, born, bc[0], bc[1], bc[2], 0, 0.3, packTone(b.c) + yr);
-        used++; continue;
+        // (the look director on the final set: the thrift "read as dark green buns with a pink rim": its leaves grey-green,
+        // one colour, and the flowers ON TOP as small dabs; ?grass2=0 / ?flora=old keeps the cushion as it was)
+        const top = FLORA.grass2;
+        this.put(ou, ov, 0, 0.05 * q5, la, r0 * 1.4, r0, SHAPES.cushion, q1 * 0.61 + q2 * 0.39, born, bc[0], bc[1], bc[2], 0, 0.3, (top ? packTone(bc) : packTone(b.c)) + yr);
+        used++;
+        if (top) {
+          const nf = 3 + Math.floor(q4 * 4);
+          for (let f = 0; f < nf && used < room; f++) {
+            const qa = H(700 + p * 9 + f), qb = H(720 + p * 9 + f), an = qa * 6.2832, rr = Math.sqrt(qb) * r0 * 0.55;
+            const hr = 0.010 + 0.006 * H(740 + p * 9 + f);
+            this.put(ou + Math.cos(an) * rr, ov + Math.sin(an) * rr, 0, 0, 0, hr * 2, hr, DAB + CRISP, qa, born, b.c[0], b.c[1], b.c[2], r0 * (0.75 - 0.5 * (rr / r0) * (rr / r0)), 0.3, yr);
+            used++;
+          }
+        }
+        continue;
       }
       const L = (b.stalk[0] + (b.stalk[1] - b.stalk[0]) * q3) * (1.15 + 0.25 * tall);
       // the stalk, and one short leaf at its foot when there is room
@@ -729,13 +754,19 @@ class Ring {
       if (o.kind >= 0 && o.dens > 0.03 && left > 1) {
         const b = o.bloom, sh = SHAPES[b.shape] || 0, v = o.dens * (far ? 10 : 9) * (two2 ? 1.5 : 1), yr = win ? packWin(win) : packYear(b), tone = (b.eye ? packTone(b.eye) : 0) + yr;
         const nf = Math.min(cap, left - 1, Math.floor(v) + (H(100 + ho) < v - Math.floor(v) ? 1 : 0));
-        const b1 = b, sh1 = sh, tone1 = tone, B2 = o.bloom2, mx2 = o.mix;
+        // (the look director on the final set: past the near ring "the heads are many tiny dots of every colour side by
+        // side, which starts to read as confetti; let each drift keep to one or two kinds at that distance": the runner-up
+        // takes a fifth of the share it takes near the eye; and from the far ring a white head is held a step under the
+        // meadow's lightest grass, as at 150 m pale flecks read as the paper)
+        const b1 = b, sh1 = sh, tone1 = tone, B2 = o.bloom2, mx2 = o.mix * 0.2;
         for (let q = 0; q < nf; q++, k++) {
-          const q1 = H(102 + q + ho), q2 = H(106 + q + ho), q3 = H(110 + q + ho), p = at(q1, q2), jit = 0.94 + 0.12 * q2;
+          const q1 = H(102 + q + ho), q2 = H(106 + q + ho), q3 = H(110 + q + ho), p = at(q1, q2);
+          let jit = 0.94 + 0.12 * q2;
           // (some touches are the runner-up drift's, as in the near ring)
           const two = B2 && H(114 + q + ho) < mx2, b = two ? B2 : b1, sh = two ? (SHAPES[B2.shape] || 0) : sh1;
           const tone = two ? (B2.eye ? packTone(B2.eye) : 0) + (win ? yr : packYear(B2)) : tone1;
           const st0 = b.stalk ? b.stalk[0] + (b.stalk[1] - b.stalk[0]) * q3 : 0.2;
+          if (far) { const mxc = Math.max(b.c[0], b.c[1], b.c[2]), mnc = Math.min(b.c[0], b.c[1], b.c[2]); if (mxc - mnc < 0.25 * mxc) jit *= 0.8; }
           if (sh === SHAPES.cushion) {
             const r0 = (b.head[0] + (b.head[1] - b.head[0]) * q1) * 1.3 * kw, bc = b.body || b.c;
             this.put(p[0], p[1], 0, 0, 0, r0 * 1.4, r0, SHAPES.cushion, q3, born, bc[0], bc[1], bc[2], 0, 0, packTone(b.c) + (win ? yr : packYear(b)));
@@ -791,7 +822,7 @@ class Ring {
       const w = (0.05 + 0.42 * q3 * q3 * q3) * (far ? 2.2 : 1);
       const c = st.rock ? st.rock[q4 < 0.74 ? 0 : 1] : null, m = q4 < 0.74 ? 0.35 : 0.6;
       let cr, cg, cb;
-      if (c) { cr = lerp(c[0], gr, m); cg = lerp(c[1], gg, m); cb = lerp(c[2], gb, m); } else { const k2 = 1.15 + 0.5 * q4; cr = dens(gr, k2); cg = dens(gg, k2); cb = dens(gb, k2 + 0.1); }
+      if (c) { const sc = stoneC(c, gr, gg, gb, m, _stc); cr = sc[0]; cg = sc[1]; cb = sc[2]; } else { const k2 = 1.15 + 0.5 * q4; cr = dens(gr, k2); cg = dens(gg, k2); cb = dens(gb, k2 + 0.1); }
       this.put(p[0], p[1], 0, 0, 0, w * (0.55 + 0.8 * q1), w, DAB + (q4 > 0.8 ? CRISP : 0), q3, born, cr, cg, cb, 0, 0);
     }
     left -= nst;
