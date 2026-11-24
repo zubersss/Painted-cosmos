@@ -49,7 +49,9 @@ THE NOON LIT PLANE (v39.6, the look director's ruling), BEHIND ?noonlit=N (OFF b
 in two values by the face's dot with the sun at the dab (0.6 of a level less under 0.80), and its colour the family's
 violet times the warm lean, N the strength. MEASURED lit rock S median: 150 m noon 0.052 (off), 0.049 (N 3: cooler,
 not more coloured), 0.112 (N 7: the near mountain lavender, the warm/cool split gone); 1 km noon 0.035 to 0.040 (the
-air rules there); 420 m at 16.8 h pixel-identical. Waiting for the look director to choose. Averaging the violet and
+air rules there); 420 m at 16.8 h pixel-identical. RULED by the look director: keep the VALUE SPLIT ONLY, as part of
+?rockfield (on); the colour part and ?noonlit removed (next commit after 5b9400e). It changes 0.48 per cent of pixels at
+150 m noon and 0.34 at 420 m; 16.8 h identical. Averaging the violet and
 the warm tone first cancelled to neutral (no change at all): multiplied now. 87b25e8: A1's far crown shadow hook in
 pcCanopyAt behind ?farshadow=1. NEXT: the glades from the air (LOOK-AUDIT-2 finding 1, C's part), and B's ask on
 ?bloomfar: fewer flower dabs near the eye (a third below 60 m) (DONE dba551d).
