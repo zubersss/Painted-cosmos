@@ -72,6 +72,9 @@ the phone prices both in one run.
   (`PC_WOOD_FLIP`): B2 against B at the phone's settings, mean difference 0.13 of 255. FOUND ON THE WAY: every tube
   in the kits is wound with its front facing INWARD, so today's bark is lit with its normals pointing into the trunk
   (the sun side painted as the shade side). Told to the look director; not changed.
+- THE GREEN WOOD (the birches, noon, phone settings, 5-45 m): `?trees2=1` equals today (mean difference 0.31-0.96 of
+  255). The first still after the camera's jump from the spawn differs in its leaves as much as its bark in BOTH A
+  and B (a settling transient after the jump, not the programs); taken after a warm-up frame, 5 m is 0.34.
 - THE SWITCH OFF IS THE PICTURE BEFORE, TO THE BIT (LOOK-RULES R6.1): the look director's S1 (the stream at 16.8 h,
   1024 x 480) drawn by this branch with no `?trees2` against the same still from the commit the lane started from
   (`a54173a`, served from a worktree): 0 of 491,520 pixels differ. S1 and S2 with `?trees2=1`: lookstats identical,
