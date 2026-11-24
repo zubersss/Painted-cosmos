@@ -506,7 +506,7 @@ vec3 pcCliffC(vec3 Bc, float hB, vec3 rnd, vec3 c, float w) {
   // (a gully and a bed are told apart only while a dab is smaller than they are: a far dab bigger than a bed drew a
   // random bed's tone, and the far slopes were a confetti of cream, umber and slate, SEEN at 400 m and 1 km. Past that
   // they go to the rock's mean, lit and shaded by the face's own facing alone.)
-  float kB = smoothstep(0.18, 0.5, w / uRockB.x), kG = smoothstep(0.12, 0.35, w / uRockB.y);
+  float kB = smoothstep(0.45, 0.95, w / uRockB.x), kG = smoothstep(0.25, 0.55, w / uRockB.y);      // (from 0.18 of a bed the beds were faint from the sea at 68 m already, SEEN)
   gGully = smoothstep(0.55, 0.70, nG.r + 0.25 * (nS.g - 0.5)) * (1.0 - 0.7 * kG);
   float hb = hB + 9.0 * (nS.b - 0.5) + 0.8 * (nG.a - 0.5);
   float q = hb / uRockB.x + 0.38 * sin(hb / (uRockB.x * 2.7));
