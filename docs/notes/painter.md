@@ -44,7 +44,15 @@ drifts smoothly from point to point, and the dabs' own small drift. Now the land
 number (white, or pale blue) with a value step of its own (a little lighter or darker), and the ground between takes the
 snow's white. Ramp measure on the ridge (steps over 0.005 that are over 0.03): 23 to 31 per cent; the small steps left
 are most likely the air's smooth fade with distance (not measured apart). 5221c6e: the ?bloomfar index slip fixed.
-A1 (trees far) took the far crowns' shadows from my list; I keep the glades. FV6(b) ?bloomfar: the ground
+A1 (trees far) took the far crowns' shadows from my list; I keep the glades.
+THE NOON LIT PLANE (v39.6, the look director's ruling), BEHIND ?noonlit=N (OFF by default): at a high sun the lit plane
+in two values by the face's dot with the sun at the dab (0.6 of a level less under 0.80), and its colour the family's
+violet times the warm lean, N the strength. MEASURED lit rock S median: 150 m noon 0.052 (off), 0.049 (N 3: cooler,
+not more coloured), 0.112 (N 7: the near mountain lavender, the warm/cool split gone); 1 km noon 0.035 to 0.040 (the
+air rules there); 420 m at 16.8 h pixel-identical. Waiting for the look director to choose. Averaging the violet and
+the warm tone first cancelled to neutral (no change at all): multiplied now. 87b25e8: A1's far crown shadow hook in
+pcCanopyAt behind ?farshadow=1. NEXT: the glades from the air (LOOK-AUDIT-2 finding 1, C's part), and B's ask on
+?bloomfar: fewer flower dabs near the eye (a third below 60 m). FV6(b) ?bloomfar: the ground
 between the dabs takes no drift under 150 m (1ed9553, B's ask). B's flower line landed (design-flora dd86fb3); F passed it with 6cf9c7a.
 Scratch: `wt37` = main at v37.1.
 

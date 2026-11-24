@@ -48,6 +48,10 @@ export const CANOPY_FLOOR = (() => { try { const q = new URLSearchParams(locatio
 export const CANOPY_DEBUG = (() => { try { return new URLSearchParams(location.search).get('candebug') === '1'; } catch (e) { return false; } })();
 // ?farshadow=1 (A1's far crowns' shadows, render/shadow.js FAR_SHADOW on trees-far; the same rule read here): the canopy's
 // dabs read the shadow map too (PC_FAR_SHADOW in pcCanopyAt). Off by default.
+// ?noonlit=N (v39.6, the look director's ruling on the noon lit plane; OFF by default until passed): the lit plane in two
+// values by the face's dot with the sun, and its colour the family's violet times the warm lean, N its strength (3 or 7
+// tried). The shader's PC_NOONLIT and PC_LITN.
+export const ROCK_NOONLIT = (() => { try { const q = new URLSearchParams(location.search); const v = q.has('noonlit') ? +q.get('noonlit') : 0; return isFinite(v) && v > 0 ? Math.min(v, 12) : 0; } catch (e) { return 0; } })();
 export const CANOPY_FARSHADOW = (() => { try { const v = new URLSearchParams(location.search).get('farshadow'); return v === '1' || v === 'true'; } catch (e) { return false; } })();
 
 // THE VERTEX SHADER'S PART: the stand rides in the far wash's spare byte (patchgen.js), morphed as everything else is.
@@ -637,7 +641,16 @@ float pcRockPlanes(float lvl, vec3 nV, float sunny) {
   // to the sun's colour, the side and the away planes to the cool violet shade key, so the two sides read by hue as well
   // as by value even with the sun behind the eye, gRockT for pcRockTemp)
   float s1 = smoothstep(-0.20, -0.10, b), s2 = smoothstep(0.50, 0.60, b);
+  // (THE NOON LIT PLANE IN TWO VALUES, the look director's ruling for v39.6: with the sun high and behind the eye every face
+  // in view is the lit plane, one value, and the mountain had no form; a painter lights the gentle tops that meet the sun
+  // squarely and keeps the steeper faces 0.6 of a level down, by the face's own dot with the sun at the dab. At a high sun
+  // only (kN), so a low sun keeps its planes as they were.)
+  float kN = smoothstep(0.55, 0.85, dot(gSunV, upV));
+  #ifdef PC_NOONLIT
+  float lp = max(pcLevel(0.75, 0.02) - mix(mix(2.4, 1.8, s1), 0.5, s2) - 0.5 * gGully * (1.0 - s2) - 0.6 * s2 * kN * (1.0 - smoothstep(0.76, 0.84, d)), 0.0);
+  #else
   float lp = max(pcLevel(0.75, 0.02) - mix(mix(2.4, 1.8, s1), 0.5, s2) - 0.5 * gGully * (1.0 - s2), 0.0);
+  #endif
   gRockT = mix(mix(-1.0, -0.75, s1), 0.8, s2);
   lp = mix(min(lp, 1.0), lp, sunny);
   return mix(lvl, lp, gRockP);
@@ -656,7 +669,16 @@ vec3 pcRockTemp(vec3 k) {
   // low sun as before, up to the noon key with the sun overhead)
   float kN = smoothstep(0.55, 0.85, dot(gSunV, normalize(vUpV)));
   vec3 cool = mix(vec3(0.86, 0.84, 1.25), vec3(0.82, 0.80, 1.34), kN);
+  // (and at noon the lit plane's colour is the family's own grey-violet with the warm lean, not a near-neutral warm grey:
+  // rock S median 0.035 at 420 m noon, MEASURED, aimed at about 0.12 to 0.16 by the look director, never pastel)
+  #ifdef PC_NOONLIT
+  vec3 fam = 0.5 * (uRockM0 + uRockM2); fam = fam / max(dot(fam, vec3(0.3, 0.5, 0.2)), 1e-3);
+  // (the family's violet first and the warm lean laid over it: averaged, the two cancelled to a neutral grey, SEEN)
+  vec3 litN = (vec3(1.0) + (fam - vec3(1.0)) * PC_LITN) * wC;
+  vec3 t = gRockT > 0.0 ? mix(vec3(1.0), mix(wC, litN, kN), gRockT) : mix(vec3(1.0), cool, -gRockT);
+  #else
   vec3 t = gRockT > 0.0 ? mix(vec3(1.0), wC, gRockT) : mix(vec3(1.0), cool, -gRockT);
+  #endif
   return clamp(k * mix(vec3(1.0), t, gRockP), 0.0, 1.0);
 }
 #endif`;
