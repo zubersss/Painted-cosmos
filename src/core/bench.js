@@ -665,6 +665,10 @@ export function attachBench(pc) {
         // (the far view's canopy painted into the ground, FV2: render/farground.js; the same picture as ?canopy=0)
         ['canopy painted off (FV2)', async () => { try { (await import('../render/farground.js')).CANOPY_BENCH.off = true; } catch { /* none */ } },
           async () => { try { (await import('../render/farground.js')).CANOPY_BENCH.off = false; } catch { /* none */ } }],
+        // (the ground's short uniform list, world/terrain.js UPLIST, the far-view lane: off = three re-sends the ground
+        //  material's whole uniform list every patch, as before 24 Nov; derived 1 to 2 ms of main-thread time on the phone)
+        ['ground uniforms re-sent whole every patch', async () => { try { (await import('../world/terrain.js')).UPLIST.on = false; } catch { /* none */ } },
+          async () => { try { (await import('../world/terrain.js')).UPLIST.on = true; } catch { /* none */ } }],
         T0.a2c,
         ['no shadows at all', () => B({ shadow: false }), () => B({ shadow: true })],
       ]),
