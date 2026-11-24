@@ -18,15 +18,32 @@ export default {
   seed: 'earth-7',
   seaLevel: 0,
   cloud: 0.45,
+  // (group D, the weather, with ?stormland=1: HOW STORMY the land is. One number for the owner to turn; it sets how
+  //  many storms grow on a stormy afternoon and how far they drift. MEASURED over 200 game days at the spawn:
+  //    1    storms on 71 % of days, one in sight of the wood on 65 %, one over the wood on 24 % (as tuned)
+  //    0.5  in sight on 43 %, over the wood on 11 %
+  //    1.5  in sight on 67 %, over the wood on 36 %
+  //    0    no storms born from the land at all.   physics/weather.js STORMLAND.)
+  storms: 1,
   deck: { height: 560 },
   visibility: [185, 2600],   // metres at ground level, and from high up
   sky: EARTH_SKY,
   // (the oil look: Earth takes the look's golden hours whole: its wood is the owner's reference clip's)
   // (and in the oil look the explorer lands in the autumn wood: the first site and the first autumn site change places)
   // (rivers: the oil look's river system, src/world/surface.js _riversOil: channels that split and rejoin, pools, side streams)
-  // (airTop: the far-view design's FV1 on this world -- the ground's air, the cloud deck, the relief's rounding and the
-  // visibility follow the horizon's dip; world/index.js AIRTOP. Earth is the only world it has been looked at on.)
-  oil: { gold: 1, sites: { 0: 'autumn_woodland', 4: 'temperate_forest' }, rivers: 1, riverAt: [53.82, -8.34, -2.78], leaves: 0.5, airTop: 1 },
+  oil: { gold: 1, sites: { 0: 'autumn_woodland', 4: 'temperate_forest' }, rivers: 1, riverAt: [53.82, -8.34, -2.78], leaves: 0.5,
+    // (?rivers=tree, world/rivers.js: the landing keeps a brook -- catchment added four nodes up the drainage tree from it)
+    springs: [{ at: 'landing', up: 4, acc: 30 }],
+    // (the bodies of water, world/hydro.js; each read only behind its own switch, ?lakes= ?ponds= ?puddles= ?fjord=:
+    //  lakeK: the share of a filled basin's hills drowned where it is deepest (the tallest stand as islands);
+    //  ponds: the chance a 120 m cell of low wood holds a small still pond (0.25: about 80 on Earth, 4 within 800 m of the
+    //  landing, none within 80 m of a clearing); puddles: the hollows on near-level wood floor hold water after rain (1);
+    //  fjords: of the rivers 8 m wide and more that reach the coast's wall, every second one is drowned to the sea's level
+    //  for 300 to 600 m between walls, 40 to 90 m wide and 12 m deep, the river falling into its head)
+    lakeK: 0.78, ponds: 0.25, puddles: 1, fjords: { every: 2, len: [300, 600], width: [40, 90], depth: 12, minW: 8 },
+    // (airTop: the far-view design's FV1 on this world -- the ground's air, the cloud deck, the relief's rounding and the
+    // visibility follow the horizon's dip; world/index.js AIRTOP. Earth is the only world it has been looked at on.)
+    airTop: 1 },
   flora: {
     tall: [
       { kit: 'broadleaf', scale: 1.25, vary: 1, bark: [[0.975, 0.965, 0.945], [0.27, 0.24, 0.26]], leaf: [[0.76, 0.85, 0.42], [0.58, 0.75, 0.36], [0.40, 0.58, 0.42]], barkP: [0.675, 0, 1.3, 0.25], leafP: [0.85, 0.34, 1.0, 0.28], wind: 0.10, far: [13.5, 11.8, 0], obs: [0.34, 11.5],
