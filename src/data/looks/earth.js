@@ -38,7 +38,7 @@ const FLORA_TF = {      // the green wood: carpets under the open canopy, campio
     { kind: 'ivy-leaved cyclamen', shape: 'cup', c: M('roseMadder', 'cobaltViolet', 0.3), head: [0.012, 0.018], stalk: [0.06, 0.12], heads: [1, 3], drift: 10, peak: 20, share: 0.8, hab: { canopy: [0.05, 0.4] }, edge: -0.1, season: [0.45, 1], bold: 1 },
     { kind: 'autumn hawkbit', shape: 'rayed', c: K('lemonYellow', 'lemonYellow'), eye: pig('quinGold'), head: [0.014, 0.021], stalk: [0.14, 0.34], heads: [1, 2], drift: 11, peak: 14, share: 0.8, hab: { canopy: [0.45, 0.05] }, season: [0.4, 1], bold: 1 },
     // (the coordinator, 24 Nov: the bold kinds near the eye in every place; in the green wood's open glades, the ox-eye)
-    { kind: 'ox-eye daisy', shape: 'rayed', c: D('neutralTint', 0.75), eye: M('quinGold', 'lemonYellow', 0.3), head: [0.020, 0.030], stalk: [0.25, 0.50], heads: [1, 2], drift: 10, peak: 14, share: 0.9, hab: { canopy: [0.45, 0.05] }, season: [0, 0.65], bold: 1 },
+    { kind: 'ox-eye daisy', shape: 'rayed', c: D('neutralTint', 0.70), eye: M('quinGold', 'lemonYellow', 0.3), head: [0.020, 0.030], stalk: [0.25, 0.50], heads: [1, 2], drift: 10, peak: 14, share: 0.9, hab: { canopy: [0.45, 0.05] }, season: [0, 0.65], bold: 1 },
   ],
 };
 const FLORA_AW = {      // the autumn wood: violet against the gold and yellow-green is the floor's own complement
@@ -63,16 +63,17 @@ const FLORA_AW = {      // the autumn wood: violet against the gold and yellow-g
 // buttercups butter-yellow, not orange": a glaze of lemon on lemon (hue 50) mixed three tenths back to lemon, hue 51,
 // highest channel 0.88; the asters held violet, hue 255 or more, never the cloak's blue. Under the new light of v39 the
 // meadow at 1.8 m measured V > 0.90 4.8 % (2.7 of it yellow): the buttercups' and hawkbits' yellow is the glaze of lemon on
-// lemon itself (0.86, hue 50) and the meadow buttercup a little fewer, heads [1, 2], peak 13, share 0.75.)
+// lemon itself (0.86, hue 50) and the meadow buttercup a little fewer, heads [1, 2], peak 13, share 0.75; retaken, 4.1 %
+// (yellow 1.9, white 1.3, red 0.9): the poppy's scarlet a quarter alizarin, the ox-eye D 0.70.)
 const FLORA_AM = {      // the alpine meadow: gentian and pinks on the high turf, globe flower in the damp, ox-eye on the dry
   sward: { floor: 0.08 },
   blooms: [
     { kind: 'gentian', shape: 'cup', c: mixc(K('cobaltViolet', 'cobaltViolet'), pig('ultramarine'), 0.2), head: [0.012, 0.019], stalk: [0.04, 0.10], heads: [1, 1], drift: 6, peak: 20, share: 0.8, hab: { height: [120, 380] }, season: [0, 0.55], bold: 1 },
     { kind: 'alpine aster', shape: 'rayed', c: M('cobaltViolet', 'roseMadder', 0.15), eye: M('quinGold', 'lemonYellow', 0.3), head: [0.014, 0.021], stalk: [0.10, 0.20], heads: [1, 1], drift: 8, peak: 12, share: 0.45 },
-    { kind: 'ox-eye daisy', shape: 'rayed', c: D('neutralTint', 0.75), eye: M('quinGold', 'lemonYellow', 0.3), head: [0.020, 0.030], stalk: [0.25, 0.50], heads: [1, 2], drift: 10, peak: 16, share: 1.0, hab: { wet: [0.6, 0.0] }, season: [0, 0.6], bold: 1 },
+    { kind: 'ox-eye daisy', shape: 'rayed', c: D('neutralTint', 0.70), eye: M('quinGold', 'lemonYellow', 0.3), head: [0.020, 0.030], stalk: [0.25, 0.50], heads: [1, 2], drift: 10, peak: 16, share: 1.0, hab: { wet: [0.6, 0.0] }, season: [0, 0.6], bold: 1 },
     { kind: 'globe flower', shape: 'cup', c: K('lemonYellow', 'lemonYellow'), eye: mixc(K('lemonYellow', 'lemonYellow'), K('lemonYellow', 'quinGold'), 0.4), head: [0.016, 0.024], stalk: [0.25, 0.45], heads: [1, 1], drift: 9, peak: 10, share: 0.6, hab: { wet: [0.0, 0.5] }, season: [0, 0.45] },
     { kind: 'alpine pink', shape: 'cushion', c: pig('roseMadder'), body: M('sapGreen', 'hookersGreen', 0.5), head: [0.05, 0.10], stalk: [0, 0], heads: [1, 1], drift: 7, peak: 6, share: 0.5, season: [0, 0.7] },
-    { kind: 'alpine poppy', shape: 'cup', c: pig('cadScarlet'), eye: M('alizarin', 'sepia', 0.5), head: [0.020, 0.032], stalk: [0.20, 0.40], heads: [1, 2], drift: 10, peak: 14, share: 1.0, season: [0, 0.85], bold: 1 },
+    { kind: 'alpine poppy', shape: 'cup', c: M('cadScarlet', 'alizarin', 0.25), eye: M('alizarin', 'sepia', 0.5), head: [0.020, 0.032], stalk: [0.20, 0.40], heads: [1, 2], drift: 10, peak: 14, share: 1.0, season: [0, 0.85], bold: 1 },
     { kind: 'meadow buttercup', shape: 'cup', c: K('lemonYellow', 'lemonYellow'), eye: mixc(K('lemonYellow', 'lemonYellow'), K('lemonYellow', 'quinGold'), 0.4), head: [0.011, 0.017], stalk: [0.25, 0.50], heads: [1, 2], drift: 10, peak: 13, share: 0.75, season: [0, 0.7], bold: 1 },
     // (the year: the high meadow's autumn, pale violet crocus cups out of the turf, and the hawkbit's yellow)
     { kind: 'autumn crocus', shape: 'cup', c: M('cobaltViolet', 'roseMadder', 0.3), eye: D('cobaltViolet', 0.45), head: [0.014, 0.022], stalk: [0.05, 0.12], heads: [1, 1], drift: 9, peak: 14, share: 0.8, season: [0.55, 1], bold: 1 },
