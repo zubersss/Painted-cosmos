@@ -1761,8 +1761,11 @@ void main() {
       // and a few whole dark troughs (to about 0.42). Ponds and lakes keep the calm values (so 0).
       vec3 rfS = reflect(-normalize(vToCam), up), shS = uSunDirL - up * dot(uSunDirL, up); rfS -= up * dot(rfS, up);
       float sunS = (dot(rfS, rfS) > 1e-8 && dot(shS, shS) > 1e-8 ? smoothstep(-0.1, 0.8, dot(normalize(rfS), normalize(shS))) : 0.0) * max(uDayness, uMoon);
-      float thLs = mix(0.85, 0.78, sunS) + 0.03 * wChop;
-      wThL = mix(wThL, mix(0.74, thLs, so), sk); wThD = mix(wThD, mix(0.22, 0.16, so), sk);
+      // (and more of them the farther: each far stroke covers more of the sea, so fewer carried the sparkle -- the look
+      //  director: 400 m read flatter than v37 while 150 m was right)
+      float fdS = smoothstep(200.0, 600.0, dist);
+      float thLs = mix(0.85, 0.78, sunS) - 0.08 * fdS + 0.03 * wChop;
+      wThL = mix(wThL, mix(0.74, thLs, so), sk); wThD = mix(wThD, mix(0.22, 0.16 + 0.08 * fdS, so), sk);
       vec3 lS = mix(c, wLightC, mix(0.62, 0.85, sunS)); float mS = max(lS.r, max(lS.g, lS.b)); lS *= mS > 0.90 ? 0.90 / mS : 1.0;
       cdeep = mix(cdeep, mix(pcDensity(c, 1.65) * vec3(0.92, 0.94, 1.0), pcDensity(c, 1.85) * vec3(0.92, 0.94, 1.0), so), sk);
       clight = mix(clight, mix(mix(c, wLightC, 0.40), lS, so), sk);
