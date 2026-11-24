@@ -72,6 +72,10 @@ the phone prices both in one run.
   (`PC_WOOD_FLIP`): B2 against B at the phone's settings, mean difference 0.13 of 255. FOUND ON THE WAY: every tube
   in the kits is wound with its front facing INWARD, so today's bark is lit with its normals pointing into the trunk
   (the sun side painted as the shade side). Told to the look director; not changed.
+- THE SWITCH OFF IS THE PICTURE BEFORE, TO THE BIT (LOOK-RULES R6.1): the look director's S1 (the stream at 16.8 h,
+  1024 x 480) drawn by this branch with no `?trees2` against the same still from the commit the lane started from
+  (`a54173a`, served from a worktree): 0 of 491,520 pixels differ. S1 and S2 with `?trees2=1`: lookstats identical,
+  mean difference 0.72 and 0.18 of 255 (`A2_split_S1-*`, `A2_split_S2-*`).
 - Cards with the denser spray (SPRAY.pres 0.9): still sparser than today at 5 m (`A2_cards-pres09_*`); more cards would
   close it at more cost. Left there until the phone says cards are worth anything.
 
