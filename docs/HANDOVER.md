@@ -534,23 +534,20 @@ whether the performance work is one more version or a redesign.** Their own row 
 
 ## 3. State right now (update this before you stop)
 
-**STATE 24 Nov, 19:50 (first account; the owner awake since about 18:25): TWELVE HELPER SESSIONS BUILDING, EACH ON ITS OWN BRANCH. `main` is v39.4; v39.5 is being assembled.**
-- v39.4 is LIVE (pull request #47, main e42452a; look-proto c6014cd): THE MOUNTAINS (FV4 rock faces, one grey-violet
-  family per mountain, light planes by the sun's bearing, snow kept above the snowline; ?rockfield=0), F's land under a
-  storm (?stormlight=0, ?stormsky=0) and the water's gold (?goldsky=0), W1's anvil shelf and mountain cloud (inside the
-  weather: ?clouds3d=0, ?weather=old), A1's crown-mass follow-ups (?crownmass=0), B's grass tufts and combing (?tuft=0,
-  ?comb=0). Gate: watercolour 0 px; every new part off v39.3 vs v39.4 under the SAME switches 0 px (max 1); on foot and
-  the high river frame OPENED; boot clean; C saw this exact code at the alpine meadow from 420 m: no grey blot.
+**STATE 24 Nov, 20:40 (first account; the owner awake and running the speed tests): TWELVE HELPER SESSIONS BUILDING, EACH ON ITS OWN BRANCH. `main` is v39.5.**
+- v39.5 is LIVE (pull request #48, main c862641; look-proto 1cb697c), shipped on a FAST gate at the owner's word
+  ("merge everything into the game ... rn"): the far view after v39.4 (all inside ?rockfield: planes on whole beds, the
+  smudge clamp, far rock speckle, snowy tops, noon cool lean, snow in flat touches), the far spruce (?farspruce=0), the
+  crowns under a storm far and near (?impstorm=0, ?stormleaf=0; follow ?stormlight), the drift patch with the poppy's
+  centre (?driftpatch=0), the far water line (?farwater=0), the falls' own water (?falls=0 only), the LIVE RIVER SEAM
+  FIX at the landing's confluence (E, F "ship it"), and OFF with their bench rows: A1's far crown shadows, cached, with
+  C's hook (?farshadow=1: F passed the look and recommends it as the default after the owner's phone run prices it),
+  ?leafgrow=1, ?bloomfar=1 (with the far dab index fix). Fast gate: suites 328 / 144 / 449, all.mjs static+unit,
+  one oil render on foot OPENED (the flower patches in the middle distance, nothing missing, console clean), boot
+  clean on / and /?look=oil ('v39.5 (24 Nov)'). AFTER-RELEASE CHECKS RUNNING (scratchpad/post395.sh, post395.log):
+  watercolour 0 px vs v39.4, the high river frame, the same-switch off-set vs v39.4. Read them; fix forward if any fails.
+- v39.4 LIVE (#47, e42452a): the mountains, the land under a storm, the water's gold, the anvil, tufts and comb.
 - v39.3 LIVE (#46), v39.2 LIVE (#45), v39.1 LIVE (#44): see the log.
-- v39.5 BEING ASSEMBLED (/home/user/wt-v395, LOCAL branch v395 on c6014cd, not pushed; suites 328 / 144 / 449):
-  trees-far 3e46836 (the far spruce D the default, the far crowns under a storm at half), trees-near 8633bef,
-  design-flora d3e47d0 (the drift patch the default, ?driftpatch=0, with the poppy's centre), design-water fd868b1
-  (the far water line the default, ?farwater=0; the falls' own water, no switch of its own: ?falls=0; the lakes'
-  widths), farview 5221c6e (F passed all: planes on whole beds 62e62fa, the smudge clamp 6cf9c7a, far rock speckle,
-  snowy tops, noon cool lean, the far dab index fix, ?bloomfar off). WAITS ON A2: the storm crowns as the default tied
-  to F's ?stormlight (STORMLEAF is still 0 in code). Then: version v39.5, the gate (watercolour 0; the off-set
-  compared with v39.4 under the same switches: rockfield=0 does NOT turn off 3620305/263a2f5/e1f2439 if they sit
-  inside it, so read each part's switch before choosing the off-set), the PR.
 - BUG FOUND AND FIXED (v39.5): the far dabs' palette index was never written (farview d4cab64; a trailing comment
   swallowed two statements). Live in v39.4 only behind ?bloomfar=1 (off).
 - NEXT AFTER v39.5: W3's river on foot (water-paint 2b869d8, F passed the look) cuts its cost first (+60 % of the
