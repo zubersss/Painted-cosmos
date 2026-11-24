@@ -38,10 +38,16 @@ export default {
     //  24 Nov: the owner's first view is a wide stream under the maples, and the first thing they see must not have less
     //  water. Catchment added sixteen nodes up the drainage tree from the landing, growing over ten of them, so the river
     //  widens down to it as a river does: 18.8 m wide by the landing, in its S-bends. And `keep`: it bends round the landing,
-    //  its water's edge at least 12 m off, so the landing stays dry with the river past it -- measured: centre line 22 m, the
-    //  water's edge 16 m from the landing)
+    //  its water's edge at least r off, so the landing stays dry with the river past it. r was 12 (the water 15.5 m off): in
+    //  the game's own first view that put the river behind the ship, less water than v39.1's stream beside the explorer
+    //  (docs/shots/painter/water-default/first-view-v391-vs-v392.jpg); now 3, the water 6.5 m off)
     springs: [{ at: 'landing', up: 16, acc: 1100, ramp: 10 }],
-    keep: [{ at: 'landing', r: 12 }],
+    keep: [{ at: 'landing', r: 3 }],
+    // (the first view's facing at the landing the world chooses, [yaw from north toward east, pitch], degrees: the river
+    //  from beside the explorer into the distance on the right, the ship on the left -- surface.js getSpawn; the game's camera
+    //  takes it as a look's spawn yaw. Chosen by a count of the water in the camera's view at every facing: 46 here against
+    //  about 41 for v39.1's first view and 22 for the v39.2 candidate's)
+    face: [100, -6.9],
     // (the bodies of water, world/hydro.js; each read only behind its own switch, ?lakes= ?ponds= ?puddles= ?fjord=:
     //  lakeK: the share of a filled basin's hills drowned where it is deepest (the tallest stand as islands);
     //  ponds: the chance a 120 m cell of low wood holds a small still pond (0.25: about 80 on Earth, 4 within 800 m of the

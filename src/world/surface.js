@@ -1266,6 +1266,10 @@ class Surface {
     if (!best && cands.length) best = at(cands[0].i, cands[0].j, [0, 0, 0]);
     if (!best) best = [s0.x, s0.y, s0.z];
     this._spawn = { x: best[0], y: best[1], z: best[2] };
+    // (the oil look may give the first view's facing at the landing chosen here, without fixing the spot: a look's oil.face =
+    //  [yaw from north toward east, pitch], degrees; the game's camera takes it as it takes a fixed spawn's)
+    const fc = MODE.oil && this.look.oil && this.look.oil.face;
+    if (fc) { this._spawn.yaw = fc[0] * D2R; this._spawn.pitch = (fc[1] || 0) * D2R; }
     if (isForest) this.clearings.push({ x: best[0], y: best[1], z: best[2], r: 11 });
     // (a stand of kelp or crystal is opened round the first landing too: the first view is not a wall a metre from the eye)
     else if (this.biomes[s0.b].tall) this.clearings.push({ x: best[0], y: best[1], z: best[2], r: 15 });

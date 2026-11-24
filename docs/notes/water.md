@@ -212,6 +212,20 @@ build only where the look asks: 221040b).
   12.5 m off; 28 of the 800 old bank places stand in water now (up to 1.24 m) and the save's nudge, widened to 24 m, brings
   all 28 back on dry ground (moved up to 13.5 m).
 
+- THE OWNER'S FIRST VIEW IN THE GAME (24 Nov 14:00-14:47; the coordinator held v39.2 on it). The gallery's cam=trees lost
+  the river, so the GAME page was opened on a fresh start (/?look=oil&fresh=1&save=0, 1280x720, the camera as the game
+  places it). v39.1 (main 038b885): the stream beside the explorer on the left, 6.4 % of the frame water. The v39.2 candidate
+  (2d40220): the river behind the ship on the right, 1.8 %: LESS, against the coordinator's ruling. Why: the game faces the
+  camera toward the ship, which it parks on the flattest dry ground 16 m off (sim.js spawnOn), and keep r 12 had moved the
+  river and so the ship. FIX (earth.js oil + one optional field in surface.js getSpawn): `keep` r 3 (the water 6.5 m from
+  the landing, still dry) and `oil.face: [100, -6.9]`, the first view's yaw and pitch at the landing the world already
+  chooses (same spot, same ground, no pad; only with MODE.oil; the watercolour game's spawn has no yaw: 0 of 1,568,000
+  values differ). The facing was chosen by counting the water in the camera's view at every facing for keep 12, 8, 5, 3
+  and 2 (a ray count from 5 m behind the explorer, +-44 degrees): 46 at keep 3 and yaw 100, about 41 for v39.1, 22 for the
+  candidate; the ship's likely berth stays in frame on the left. SEEN in the game: `first-view-fix-game.jpg` (the river from
+  beside the explorer into the distance on the right, a riffle, the ship on the left, a meadow of yellow flowers): 8.5 %
+  water-blue and 2.8 % white churn, against 6.4 % for v39.1; the three side by side `first-view-3.jpg`.
+
 ### THE SPEED TEST'S FALLS VIEW AND ?bench=water (24 Nov, this session; lane 0, the coordinator's order)
 
 `src/core/bench.js`: a water part may PLACE its own view: a WATER_BENCH row with `place(S)` returning { dir, yaw (degrees),
