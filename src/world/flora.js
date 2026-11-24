@@ -123,10 +123,12 @@ const PHONE_TS = 0.30;
 // on foot. From the air every kind is an impostor.
 const IMP_FOOT = (() => { try { const v = new URLSearchParams(location.search).get('impfoot'); return v === 'all' || v === 'none' ? v : 'conifers'; } catch { return 'conifers'; } })();
 const IMP_AIR = 40;
-// THE FAR SPRUCE (the look director's order 3 after crown mass, 24 Nov; A2's ?pines). OFF BY DEFAULT until the look
-// director rules between the two ways below; both act only where the spruce's spec carries needleTop (?pines,
-// kits/spruce.js), so ?pines=0 is the old far spruce whatever is asked here.
-//   ?farspruce=near   the atlas bakes the spruce from its near tree, as today, and its crown is never painted under
+// THE FAR SPRUCE (the look director's order 3 after crown mass, 24 Nov; A2's ?pines). 'near' IS THE DEFAULT: the look
+// director chose it from the sheets A1_farspruce_*_ABCD (24 Nov: "D keeps A's clean dense cones and lifts them from
+// near-black to deep green ... B is shards, C loses the darks"). Both ways act only where the spruce's spec carries
+// needleTop (?pines, kits/spruce.js), so ?pines=0 is the old far spruce whatever is asked here; ?farspruce=0 the old
+// far spruce with ?pines.
+//   near (default)    the atlas bakes the spruce from its near tree, as today, and its crown is never painted under
 //                     V 0.24, as the middle spruce's needles are from 20 m out (materials.js PROP_VERT): today's dense
 //                     cone in the references' deep green, not near-black. (SEEN, 24 Nov: the clean dense cones kept.)
 //   ?farspruce=bough  its two layers are baked from its BY-BOUGH MIDDLE tree (seeds 13 and 12 at lod 1, 650 triangles),
@@ -135,7 +137,7 @@ const IMP_AIR = 40;
 //                     at 2.2 a pole with green sprays that all but vanishes from the air; at 4, ?farsprucek=4, the
 //                     density rule's growth, its fewer larger needle cards are big flat green shards.)
 // (From the air only: on foot the spruce keeps today's far spike.)
-const FAR_SPRUCE = (() => { try { const v = new URLSearchParams(location.search).get('farspruce'); return v === 'near' || v === 'bough' ? v : ''; } catch { return ''; } })();
+const FAR_SPRUCE = (() => { try { const v = new URLSearchParams(location.search).get('farspruce'); return v === '0' || v === 'off' ? '' : v === 'bough' ? 'bough' : 'near'; } catch { return 'near'; } })();
 const FAR_SPRUCE_V = 0.24;
 const FAR_SPRUCE_K = (() => { try { const v = +new URLSearchParams(location.search).get('farsprucek'); return v > 0 ? Math.min(4, v) : 2.2; } catch { return 2.2; } })();
 const HAND = (() => {
@@ -400,7 +402,7 @@ export class Flora {
         //  better on the skyline than their impostors, 24 Nov; ?impfoot=all makes every kind an impostor on foot,
         //  ?impfoot=none none)
         sp.footCards = IMP_FOOT === 'none' || (IMP_FOOT !== 'all' && sp.far[2] >= 0.5);
-        // (the spruce with ?pines and ?farspruce=near or bough: FAR_SPRUCE above; with neither, as before)
+        // (the spruce with ?pines: FAR_SPRUCE above, its near tree floored at V 0.24 by default; ?farspruce=0 as before)
         const spec = this.tall[i], pine = !!FAR_SPRUCE && !!(spec && spec.needleTop) && !!TALL_KITS[spec.kit], byBough = pine && FAR_SPRUCE === 'bough';
         sp.impByBough = byBough;
         geos.push(byBough ? sp.base.geo1 : sp.geo0[0]);
