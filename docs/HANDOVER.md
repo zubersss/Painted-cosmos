@@ -481,10 +481,16 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
   soft far off. So: give the room to SHARPNESS (the ladder, v27), and buy more of it by cutting the script, not by
   cutting what is drawn. **Do not cut content for speed on this phone until a table says content costs something.**
 
+**THE OWNER, 24 Nov, about 10:35 (latest, overrides the line below about the live look): MAKE IT LOOK DIFFERENT.**
+*"No do make it look different i give you access"* The owner gives the session leave to CHANGE THE LIVE LOOK: work
+that is good and reviewed (by the coordinator's own eye and the look director) is made the DEFAULT, not hidden behind an
+opt-in switch. Each change keeps one opt-out switch (e.g. ?light=old, ?flora=old) so the owner can compare on waking.
+Still not made default on trust: anything that might not DRAW on the owner's phone (the split trees, the impostors)
+without a guard that falls back to today's form if the phone cannot compile it.
+
 **THE OWNER, 24 Nov, about 10:25 (latest): EIGHT HOURS OF AUTOMATIC WORK.** *"Im gonna he asleep for 8 hours do
 automatic work till then continue working"* The session keeps every helper moving, reviews their stills, merges what
-passes into `look-proto` in stages and ships to `main` under item 41's gate, with the live game's look unchanged unless
-a switch is asked for (each new look goes behind ONE opt-in switch the owner can compare on waking). The owner's two
+passes into `look-proto` in stages and ships to `main` under item 41's gate, (superseded at 10:35: see the line above). The owner's two
 checks by eye on the phone (?look=oil&trees2=1 and ?look=oil&fartree=impostor) are still asked; nothing that depends
 on them is made the default before they answer.
 
