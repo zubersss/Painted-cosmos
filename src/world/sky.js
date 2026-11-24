@@ -66,7 +66,7 @@ uniform vec4 uOilG;
 uniform vec4 uOilS;         // x: how far the far air leans to the blue-violet of the owner's aerial references
 uniform vec4 uSkyOil;       // x cloud shaping, y the ceiling on the sky's value, z the cloud's lit side (the dials above)
 uniform vec4 uSkyAir;       // x: how far the lowest band is the land's own air   y: how high that band stands (dot(view, up))
-uniform vec4 uCloud3D;      // (the 3D clouds, world/clouds.js, set it) x 1 while they are drawn, y this shell's radius then (m), z its cover's share
+uniform vec4 uCloud3D;      // (the 3D clouds, world/clouds.js, set it) x how far they have taken over (0..1; 0 on the ground in the hybrid), y this shell's radius then (m), z its cover's share, w 1 while they are drawn
 uniform vec4 uCirrus;       // (world/clouds.js) xyz the wind aloft's way at the eye (unit, body-local), w the world's own cirrus share
 uniform vec4 uRainbow;      // (world/clouds.js) x 1 where a rainbow may stand, y how far along the view the rain is looked for (m)
 // (the look director's audit, LOOK-AUDIT.md "D", folded into lane W1 and on with the 3D clouds, ?skyfix=0 off; world/clouds.js
@@ -349,7 +349,9 @@ void main() {
     // to the horizon, where the air itself takes over, and gone under a closed sky, where there is cloud to look at.
     sky = pcSkyStrokes(sky, d, up, max(uSkyOil.w, uSkyFix.y) * (1.0 - oc) * smoothstep(-0.02, 0.10, e) * (1.0 - uAtmo.x), n2);
     // (A4: the high cloud, with the 3D clouds on: the map's high cover at the cirrus' height along the view, or the world's own)
-    if (uCloud3D.x > 0.5) {
+    // (only once the 3D clouds have taken over, from the air: seen from the ground in the hybrid, rework 2, they read as
+    // pale ghost shapes over the painted sky, not as mare's tails)
+    if (uCloud3D.x > 0.5 && uCirrus.w >= 0.0) {
       vec3 hd = normalize(uCamL + d * 2200.0);
       float hk = max(pcWxField2(hd).g * uWxOn.x, uCirrus.w);
       sky = pcCirrus(sky, d, up, hk * (1.0 - oc) * smoothstep(0.02, 0.22, e) * uAtmo.y * (1.0 - uAtmo.x), n2, sunE);
@@ -493,7 +495,13 @@ void main() {
   // off the two numbers are the world's own, exactly as before.)
   float cShellR = uCloud.x, cCover = uCloud.y;
   #ifdef PC_OIL
-  if (uCloud3D.x > 0.5) { cShellR = uCloud3D.y; cCover = uCloud.y * uCloud3D.z; }
+  // (THE HYBRID, the coordinator of 24 Nov: x is how far the 3D cumulus have taken over, by the eye's height over the land;
+  // 0 on the ground, where this shell's cloud is the sky exactly as it was. The first half thins it away as the eye climbs
+  // toward it -- it lies some 400 m over the land -- and the second brings it back lifted, as the altocumulus with its share)
+  if (uCloud3D.x > 0.0) {
+    if (uCloud3D.x < 0.5) cCover = uCloud.y * (1.0 - smoothstep(0.0, 0.5, uCloud3D.x));
+    else { cShellR = uCloud3D.y; cCover = uCloud.y * uCloud3D.z * smoothstep(0.5, 1.0, uCloud3D.x); }
+  }
   #endif
   float rc = length(uCamL);
   float b = dot(uCamL, d);
@@ -538,6 +546,9 @@ void main() {
       //    wherever the shell is seen so nearly edge-on that a lobe would be smaller than a pixel, which is where
       //    grain and flicker come from.
       q *= mix(1.0, 5.0, uSkyOil.x);
+      // (lifted as the altocumulus behind the 3D clouds, its masses twice the size: at the sky's own size, seen from the air
+      // it was a confetti of small flakes over the whole sky, the 600 m stills of rework 2)
+      q *= mix(1.0, 0.5, step(0.5, uCloud3D.x));
       float c1 = texture(uNoise3D, q).r;
       float c2 = texture(uNoise3D, q * 2.7 + 0.31).g;
       float v = c1 * 0.82 + c2 * 0.18;
@@ -563,7 +574,7 @@ void main() {
       thO -= lobe * 0.055;
       float fwv = max(fwidth(v), 1e-4);
       // the silhouette, with an edge a pixel wide, as everything else in this look has
-      cloud = smoothstep(-fwv, fwv, v - (thO + 0.035)) * (rc < cShellR ? smoothstep(0.015, mix(0.20, 0.055, uCloud3D.x), e) : 1.0);
+      cloud = smoothstep(-fwv, fwv, v - (thO + 0.035)) * (rc < cShellR ? smoothstep(0.015, mix(0.20, 0.055, step(0.5, uCloud3D.x)), e) : 1.0);
       float deep = clamp((v - thO - 0.035) / 0.16, 0.0, 1.0);          // how far into the mass this pixel lies (0 at its edge)
       float sh = clamp(0.5 - (v - vl) * 5.0 * uSkyOil.z, 0.0, 1.0) * (0.40 + 0.60 * deep);
       float fws = max(fwidth(sh), 1e-4);
@@ -760,7 +771,7 @@ void main() {
       float nightK = (1.0 - uAtmo.y) * (1.0 - uAtmo.x) * smoothstep(0.02, 0.10, e);
       // (WEATHER-DESIGN A10: the streaks are the clear night's; under an overcast or a cloud they were painted over the
       // storm deck at dusk, design still 17. With the 3D clouds on they keep to the clear sky.)
-      nightK *= mix(1.0, (1.0 - oc) * (1.0 - cloud), uCloud3D.x);
+      nightK *= mix(1.0, (1.0 - oc) * (1.0 - cloud), step(0.5, uCloud3D.x));
       if (nightK > 0.004) {
         for (int L = 0; L < 4; L++) {
           float fl = float(L);

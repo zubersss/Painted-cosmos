@@ -40,6 +40,8 @@ function rig(body = 'earth') {
 test('fair cumulus over the autumn wood, at real heights over the land, inside the budget from the ground and from a kilometre', () => {
   OIL.uOilPx.value.x = PHONE_RAD;
   G.uTime.value = 30;
+  // (the worst case for the budget: the 3D cumulus from the ground as well, ?cloudhybrid=0)
+  const hy = CLOUDS.hybrid; CLOUDS.hybrid = false;
   for (const alt of [2, 150, 1000]) {
     const { root, skyU, sun } = rig();
     const { d, g, cam } = station('autumn_woodland', alt);
@@ -63,6 +65,26 @@ test('fair cumulus over the autumn wood, at real heights over the land, inside t
     assert.ok(skyU.uCloud3D.value.y > g + 800);
     void d;
   }
+  CLOUDS.hybrid = hy;
+});
+
+test('the hybrid: from the ground the painted sky keeps its cloud and only clouds caught on mountains are 3D; from the air the 3D cumulus', () => {
+  OIL.uOilPx.value.x = PHONE_RAD;
+  G.uTime.value = 30;
+  assert.equal(CLOUDS.hybrid, true, 'on by default');
+  const counts = [];
+  for (const alt of [2, 450, 1000]) {
+    const { root, skyU, sun } = rig();
+    const { cam } = station('autumn_woodland', alt);
+    const cl = createClouds(null);
+    cl.update(0.016, cam, root, sun, null, skyU);
+    counts.push(cl.stats.clouds);
+    console.log(`  ${alt} m up: taken over ${skyU.uCloud3D.value.x.toFixed(2)}, ${cl.stats.clouds} clouds, ${cl.stats.tris} triangles`);
+    if (alt === 2) assert.equal(skyU.uCloud3D.value.x, 0, 'the sky exactly as it was on the ground');
+    if (alt === 1000) { assert.equal(skyU.uCloud3D.value.x, 1); assert.ok(cl.stats.clouds > 10, 'cumulus from the air'); }
+    assert.equal(skyU.uCloud3D.value.w, 1);
+  }
+  assert.ok(counts[0] < counts[2], 'fewer 3D cumulus from the ground than from the air');
 });
 
 test('the same moment gives the same clouds; the field drifts with the painter\'s clock and holds while it is held', () => {

@@ -55,13 +55,24 @@ const _gf = (v) => { const s = (+v).toFixed(4); return s; };
 
 export const CLOUDS = {
   mode: Math.max(0, _qn('clouds3d', 1)),
-  lobeBend: Math.max(0, Math.min(1, _qn('cloudlobes', 0.85))),
+  // (0.85 shaded a whole cumulus as one smooth lump: from the air at 1 km every cloud was a single flat tone; at 0.62 each
+  // lobe keeps its own lit and turned-away side, the cauliflower's heads, while the whole still faces the light)
+  lobeBend: Math.max(0, Math.min(1, _qn('cloudlobes', 0.62))),
   slot: Math.max(80, _qn('cloudslot', 380)),
   fair: _qs && _qs.has('cloudfair') ? Math.max(0, Math.min(1, _qn('cloudfair', 0.35))) : null,
   size: Math.max(0.2, _qn('cloudsize', 1)),
   deck: _qn('deck', 1) > 0,                      // ?deck=0: no deck (A3)
   valley: _qn('valleycloud', 1),
-  skyfix: _qn('skyfix', 1) > 0,                  // ?skyfix=0: the look director's audit items in sky.js left as they were                 // ?valleycloud=0: none; a number over 1 forces that much cover (0..1 as v - 1), for looking (A5)
+  skyfix: _qn('skyfix', 1) > 0,
+  // THE HYBRID (the coordinator, 24 Nov): from the ground today's painted sky is the cover, and the 3D cumulus come in with
+  // height, between airH[0] and airH[1] metres over the land under the eye (the owner's mile, the sea of cloud); storms and
+  // clouds caught on mountains are drawn from anywhere. ?cloudhybrid=0: the 3D cumulus from the ground as well.
+  hybrid: _qn('cloudhybrid', 1) > 0,
+  airH: [250, 700],
+  // (A4 the high cloud: OFF by default, ?cirrus=1 on. Seen in rework 2 from the ground and from 1 km, the strokes read as pale
+  // ghost shapes with tails over the painted sky, not as mare's tails)
+  cirrus: _qn('cirrus', 0) > 0,
+  skyStrokes: _qn('skystrokes', 0) > 0,                  // ?skyfix=0: the look director's audit items in sky.js left as they were                 // ?valleycloud=0: none; a number over 1 forces that much cover (0..1 as v - 1), for looking (A5)
   rebuild: 0.5,           // s between rebuilds of the instances (the drift itself is the group's turn, every frame; a lobe grows over tens of seconds, so twice a second is smooth)
   maxLobes: 6144,         // instances a level of detail holds at most
   sagPx: 2.2,             // how far a lobe's outline may stand off the true round, in pixels, before the next level is taken (its noise hides that much)
@@ -121,6 +132,9 @@ varying vec3 vUp;
 varying vec2 vAirSun;      // x the cloud's air, y how much of the sun reaches this point (the planet's shadow)
 varying vec3 vNV;          // the painted normal in view space (for the scene's second target)
 varying float vAxis;       // how far from the cloud's own upright axis, in units of its thickness (the core of its base is 0)
+varying vec3 vPosA;        // the place from the planet's centre, drifting frame (for the lightning's light: no derivative of it)
+varying vec3 vNL;          // the lobe's OWN normal, not bent: each head's own turned-away side
+varying float vCrease;     // how far the lobe's own surface faces into its cloud (a crease between heads where it shows)
 void main() {
   vec3 dir = normalize(position);
   vec3 up = normalize(uAnchorD + iB.xyz);
@@ -142,6 +156,8 @@ void main() {
   vec3 cen = iB.xyz - up * iB.w * 0.90;
   vec3 nl = normalize(off + up * dot(off, up) * (1.0 - iD.x));
   vec3 np = normalize(mix(nl, normalize(p - cen), uCloudBend));
+  vNL = nl;
+  vCrease = dot(nl, normalize(p - cen));
   // (the flat base is told in the fragment by its height, which is exactly 0 across it: a vertex pressed onto the base and
   // given the base's normal bent every triangle of a shelf lobe's side down with it, and the coarse far lobes, a triangle
   // or two tall, were all belly whichever way the sun stood: the grey saucers of the reworked stills)
@@ -159,10 +175,29 @@ void main() {
   float miss = length(pb + uCloudSun * max(tc, 0.0)) - uGroundR;
   vAirSun = vec2(iD.w, tc > 0.0 ? smoothstep(-20.0, 60.0, miss) : 1.0);
   vRel = p - uCamD;
+  vPosA = uAnchorD + p;
   vec4 mv = modelViewMatrix * vec4(p, 1.0);
   vView = mv.xyz;
   gl_Position = projectionMatrix * mv;
   ${VERT_END}
+}
+`;
+
+// THE LIGHTNING IN THE CLOUD (WEATHER-DESIGN A2 and C4): the flashes of the storms near the eye (the cloud map's
+// fields.cloud.flashes, the weather group's), each a light inside its cloud a few hundred metres over the base, lighting
+// the strokes within about 300-450 m of it to a pale cool flat tone for the flash's own moment -- some strokes and not others,
+// as a flash lights a cloud from inside in patches; never a glow. uFlash[i]: xyz the light, drifting frame from the
+// planet's centre; w its strength now (0..1).
+const FLASH_GLSL = /* glsl */`
+uniform vec4 uFlash[4];
+float pcCloudFlash(vec3 pa) {
+  float f = 0.0;
+  for (int i = 0; i < 4; i++) {
+    vec4 L = uFlash[i];
+    if (L.w <= 0.0) continue;
+    f = max(f, L.w * (1.0 - smoothstep(150.0, 600.0, length(pa - L.xyz))));
+  }
+  return f;
 }
 `;
 
@@ -185,6 +220,10 @@ varying vec3 vUp;
 varying vec2 vAirSun;
 varying vec3 vNV;
 varying float vAxis;
+varying vec3 vPosA;
+varying vec3 vNL;
+varying float vCrease;
+${FLASH_GLSL}
 vec3 pcCloudDens(vec3 c, float d) { return clamp(c - (c - c * c) * (d - 1.0), 0.0, 1.0); }
 // (the sky's ceiling on value, sky.js pcSkyCap, copied: nothing in a cloud goes paper-white)
 vec3 pcCloudCap(vec3 c, float k) {
@@ -233,13 +272,28 @@ void main() {
   // cumulus; the lower sides a step deeper; the flat base one darker shelf, the belly, deeper at its core only in a storm.
   // (and the sides lifted: light scattered through the cloud keeps a cumulus' turned-away flank a half-tone, not its belly;
   // only the flat base goes to the belly. Without it a field of cumulus seen from below was grey shelves with a cream cap)
+  // (the far lift only for a cloud seen from below, where a far cumulus is its lit shape over a thin base; seen from above
+  // or level it kept every far cloud in the lit tone, the flat cream shapes of the 1 km stills)
+  float lookUp = smoothstep(-0.02, 0.06, dot(vdir, upV));
   float x = (lam * 0.5 + 0.5) * mix(0.40, 1.0, sunK) + 0.18 * max(dot(nS, upV), 0.0) * uAtmo.y * mix(0.5, 1.0, sunK)
-          + 0.12 * (1.0 - abs(dot(nS, upV))) * uAtmo.y + 0.14 * smoothstep(1200.0, 3500.0, dist) * uAtmo.y * (1.0 - st);
+          + 0.08 * (1.0 - abs(dot(nS, upV))) * uAtmo.y + 0.14 * smoothstep(1200.0, 3500.0, dist) * uAtmo.y * (1.0 - st) * lookUp;
   x -= (1.0 - smoothstep(0.0, 0.40, hS)) * 0.10 * (1.0 - down);
+  // EACH HEAD'S OWN SHADED SIDE (rework 2b): a cumulus lit from the front and above is still a cauliflower -- every head
+  // turns a side from the sun, in the half-tone, however lit the whole. Read from the lobe's own normal (the bent one
+  // faces the whole cloud to the light: from 1 km, front-lit, every cloud was one flat lit tone)
+  float lamL = dot(normalize(PC_AT(vNL, ds)), sun);
+  x = mix(x, min(x, 0.46), smoothstep(0.02, -0.28, lamL) * (1.0 - down) * uAtmo.y);
+  // and THE CREASES between heads: where a lobe's own surface turns in toward its cloud and still shows, it lies between
+  // two heads, out of the light -- the half-tone. Front-lit (the sun behind the eye), this is what still draws a
+  // cumulus' heads: from 600 m it was one flat light shape with a bumpy outline
+  float crease = smoothstep(0.10, -0.25, PC_AT(vCrease, ds)) * (1.0 - down);
+  x = mix(x, min(x, 0.44), crease);
   float core = 1.0 - smoothstep(0.35, 0.75, PC_AT(vAxis, ds));
   x = mix(x, 0.22 - 0.16 * core * st, down);
-  float xN = x + (rndN.z - 0.5) * 0.10;
-  x += (rnd.z - 0.5) * 0.10;
+  // (rework 2: flat tones in the body, broken only at the edges -- a stroke's own jitter small, so the strokes of one tone
+  // do not alternate with the next across the body as stripes)
+  float xN = x + (rndN.z - 0.5) * 0.04;
+  x += (rnd.z - 0.5) * 0.04;
   // (a cloud's outline against the sky is never its deepest paint: the thin edge a step lighter than the body behind it.
   // There is no line drawn round anything: a lit edge is a tone of the strokes, not a rim)
   float side = 1.0 - abs(dot(nS, vdir));
@@ -249,39 +303,58 @@ void main() {
   float backlit = smoothstep(0.2, 0.7, dot(sun, vdir)) * sunK * uAtmo.y;
   float edgeX = mix(0.40, 0.56, backlit);
   x = mix(x, max(x, edgeX), sil); xN = mix(xN, max(xN, edgeX), sil);
-  // (and a stroke in six or so in the base takes the half-tone: the light the land throws back up into it)
-  x = mix(x, max(x, 0.40), down * step(rnd.x, 0.16)); xN = mix(xN, max(xN, 0.40), down * step(rndN.x, 0.16));
+  // (and a stroke in six or so near the base's edge takes the half-tone: the light the land throws back up into it; the core
+  // of the base stays one flat tone)
+  float baseRing = smoothstep(0.5, 0.85, PC_AT(vAxis, ds));
+  x = mix(x, max(x, 0.40), down * baseRing * step(rnd.x, 0.16)); xN = mix(xN, max(xN, 0.40), down * baseRing * step(rndN.x, 0.16));
   // THE TONES (the look director's palette, 24 Nov): the lit top in THE LIGHT'S OWN COLOUR, warm at the golden hours;
   // the half-tone the sky's own blue-grey a step under it; the belly that blue-grey a further step down, the zenith key's
   // hue, never violet; the deep only inside a storm. About 0.82, 0.70 and 0.58 in luminance by day: three value steps.
   vec3 sunC = mix(pow(uLight, vec3(uOilA.z)), vec3(1.0, 0.84, 0.52), 0.75 * pcGold());
   vec3 zh = uSkyZenith / max(dot(uSkyZenith, vec3(0.3, 0.5, 0.2)), 1e-3);
-  vec3 cTop = mix(vec3(0.82), sunC * 0.84, 0.50);
-  // (a LIGHT half-tone: with the sun behind a cloud, as most stations look, its turned-away flank is what the eye sees, and
-  // at 0.70 a field of cumulus read as grey bodies under cream caps; 0.77 keeps the step and lets the lit top lead)
-  vec3 cHalf = mix(mix(vec3(1.0), zh, 0.20) * 0.77, uSkyHorizon * 0.80, 0.20);
-  vec3 cBase = mix(vec3(1.0), zh, 0.30) * 0.62;
+  // (REWORK 2, the coordinator of 24 Nov: next to the painted sky the clouds read as grey saucers. A painter's fair cumulus
+  // stays LIGHT even backlit: its shade a soft lavender-grey a step or two under the sky's own horizon value, the lit edges
+  // near white, the whole cloud lighter than the blue round it. Built from the painted sky cloud's own tones (sky.js: its
+  // lit top, and its half-tone made from the world's cloud-shadow key): the light near white in the light's colour, the lit
+  // top, the half-tone that lavender lifted a third of the way to the horizon, the belly one step under it.)
+  vec3 cTopA = mix(vec3(0.78, 0.78, 0.785), uSkyHorizon, 0.18);
+  vec3 cLav = pcCloudDens(uCloudShade, 1.85);
+  cLav = mix(cLav, vec3(dot(cLav, vec3(0.3, 0.5, 0.2))), 0.12);
+  // (the light's colour a quarter in by day: at 0.4 the lit tops at noon were cream against the blue; the golden hours'
+  // own wash, below, warms them then)
+  vec3 cLight = mix(vec3(0.95), sunC * 0.95, 0.18);
+  vec3 cTop = mix(cTopA * 1.01, sunC * 0.82, 0.25);
+  vec3 cHalf = mix(cLav, uSkyHorizon, 0.35);
+  vec3 cBase = pcCloudDens(cHalf, 1.25);
+  cLight = mix(cLight, cTop, st);
   // a storm: the shade goes to the world's heavy-weather pigment, slate and indigo, and only there a deep tone; the
   // lit flank keeps the light (the coordinator: a dark slate tower with a sunlit flank)
   vec3 cDeep = mix(cBase * 0.82, pcCloudDens(uStormWash, 1.30), 0.8);
   cHalf = mix(cHalf, pcCloudDens(mix(uStormWash, cHalf, 0.35), 1.05), st * 0.75);
   cBase = mix(cBase, pcCloudDens(uStormWash, 1.18), st * 0.85);
   cTop = mix(cTop, cTop * 0.92, st);
-  vec3 c1 = x > 0.48 ? cTop : x > 0.32 ? cHalf : (x > 0.10 || st < 0.05) ? cBase : cDeep;
-  vec3 c2 = xN > 0.48 ? cTop : xN > 0.32 ? cHalf : (xN > 0.10 || st < 0.05) ? cBase : cDeep;
+  vec3 c1 = x > 0.86 ? cLight : x > 0.56 ? cTop : x > 0.32 ? cHalf : (x > 0.10 || st < 0.05) ? cBase : cDeep;
+  vec3 c2 = xN > 0.86 ? cLight : xN > 0.56 ? cTop : xN > 0.32 ? cHalf : (xN > 0.10 || st < 0.05) ? cBase : cDeep;
   vec3 c = mix(c2, c1, own);
-  float topK = mix(step(0.48, xN), step(0.48, x), own);
+  float topK = mix(step(0.56, xN), step(0.56, x), own);
   // THE GOLDEN HOURS, as the sky lays them over its own cloud (sky.js: the whole sky warms, most of all low down): the lit
   // top takes nearly all of it, the shade under half, so the form stays while the cloud goes warm with its sky.
   {
     float sunE = dot(sun, upV);
-    float gold = (1.0 - smoothstep(0.48, 0.86, sunE)) * uAtmo.y * (1.0 - uAtmo.x) * (1.0 - uWxSky.x) * uOilG.w;
+    // (how golden the hour is, read from THE SKY'S OWN WARMTH, its horizon key, not the sun's height: on this small world
+    // the sun at 13:00 stands low enough that the height-based wash laid gold on the clouds under a plain blue sky -- the
+    // cream clouds of the 1 km stills of rework 2)
+    float gold = smoothstep(0.0, 0.16, uSkyHorizon.r - uSkyHorizon.b) * uAtmo.y * (1.0 - uAtmo.x) * (1.0 - uWxSky.x) * uOilG.w;
     float eV = dot(vdir, upV);
     c = mix(c, vec3(0.92, 0.80, 0.58), gold * mix(0.80, 0.45, smoothstep(0.0, 0.7, eV)) * mix(0.42, 0.90, topK));
   }
   // by night a cloud is a flat shape a step lighter than the sky it lies in, with no lit side (sky.js, the oil night)
   vec3 nightC = mix(mix(uSkyZenith, uSkyHorizon, 0.5), uSkyHorizon, 0.30) * (0.92 + 0.10 * hS);
   c = mix(nightC, c, uAtmo.y);
+  // the lightning's light, asked at the stroke's centre: a stroke is lit whole or not at all
+  // (a cloud lit in whole HEADS, each lobe by its own number: stroke by stroke it was a scatter of flecks)
+  float flS = PC_AT(pcCloudFlash(vPosA), ds);
+  c = mix(c, vec3(0.84, 0.86, 0.96), step(0.25 + 0.45 * fract(vK.w * 5.31), flS));
   // THE CLOUD'S OWN AIR: a far cloud goes toward the sky's low band in flat steps, one step for the whole cloud (the
   // land's air, pcFogAmount, would swallow it: the ground's visibility is a few hundred metres, a cloud's kilometres)
   vec3 farC = mix(uSkyHorizon, vec3(0.48, 0.50, 0.63), uOilS.x * 0.6);
@@ -370,6 +443,7 @@ varying vec3 vPosD;
 varying vec4 vDeck;
 varying float vSun;
 varying vec3 vUpV;
+${FLASH_GLSL}
 vec3 pcShDens(vec3 c, float d) { return clamp(c - (c - c * c) * (d - 1.0), 0.0, 1.0); }
 vec3 pcShCap(vec3 c, float k) {
   if (k >= 0.999) return c;
@@ -418,9 +492,13 @@ void main() {
   // under it, a further step for the belly in the zenith key's hue, a deep only in a storm)
   vec3 sunC = mix(pow(uLight, vec3(uOilA.z)), vec3(1.0, 0.84, 0.52), 0.75 * pcGold());
   vec3 zh = uSkyZenith / max(dot(uSkyZenith, vec3(0.3, 0.5, 0.2)), 1e-3);
-  vec3 cTop = mix(vec3(0.82), sunC * 0.84, 0.50);
-  vec3 cHalf = mix(mix(vec3(1.0), zh, 0.20) * 0.70, uSkyHorizon * 0.74, 0.20);
-  vec3 cBase = mix(vec3(1.0), zh, 0.30) * 0.58;
+  // (rework 2, as the lobes: the painted sky cloud's lit top and its lavender half-tone, lifted toward the horizon; the
+  // ceiling's belly one step under it. Only a storm takes them down to its slate)
+  vec3 cLav = pcShDens(uCloudShade, 1.85);
+  cLav = mix(cLav, vec3(dot(cLav, vec3(0.3, 0.5, 0.2))), 0.12);
+  vec3 cTop = mix(mix(vec3(0.78, 0.78, 0.785), uSkyHorizon, 0.18) * 1.08, sunC * 0.86, 0.40);
+  vec3 cHalf = mix(cLav, uSkyHorizon, 0.30);
+  vec3 cBase = pcShDens(cHalf, 1.30);
   vec3 cDeep = cBase;
   float st = clamp(max(vDeck.z, uWxSky.y * (1.0 - uShellK.x)), 0.0, 1.0);
   // (a storm's ceiling a step lighter than its heaviest pigment: the sky is the light of a rain picture and its darks stay
@@ -449,12 +527,16 @@ void main() {
   // the valley cloud: a low white mist, lit, its shade a little cool (no belly: it is seen from above and from its side)
   if (uShellK.x > 0.5) c = mix(c, mix(cTop, cHalf, step(0.62, thick + jit) * 0.5), 0.75);
   {
-    float gold = (1.0 - smoothstep(0.48, 0.86, se)) * uAtmo.y * (1.0 - uAtmo.x) * (1.0 - uWxSky.x) * uOilG.w;
+    float gold = smoothstep(0.0, 0.16, uSkyHorizon.r - uSkyHorizon.b) * uAtmo.y * (1.0 - uAtmo.x) * (1.0 - uWxSky.x) * uOilG.w;
     float eV = dot(normalize(vRel), up);
     c = mix(c, vec3(0.92, 0.80, 0.58), gold * mix(0.80, 0.45, smoothstep(0.0, 0.7, abs(eV))) * 0.6 * (1.0 - 0.6 * st));
   }
   vec3 nightC = mix(mix(uSkyZenith, uSkyHorizon, 0.5), uSkyHorizon, 0.30) * (0.90 + 0.12 * thick);
   c = mix(nightC, c, uAtmo.y);
+  // (the ceiling lit in its own MASSES, whole: the thick of the sheet first. Stroke by stroke it read as a scatter of pale
+  // flecks, close to grain)
+  float flS = PC_AT(pcCloudFlash(vPosD), ds);
+  c = mix(c, vec3(0.84, 0.86, 0.96), step(0.20 + 0.45 * (1.0 - PC_AT(hm, ds)), flS));
   // the sheet's own air, in flat steps of the distance (the land's air would swallow it)
   float af = floor(min(0.45, 0.55 * (1.0 - exp(-dist / 8000.0))) * 5.0 + 0.5) / 5.0;
   vec3 farC = mix(uSkyHorizon, vec3(0.48, 0.50, 0.63), uOilS.x * 0.6);
@@ -471,7 +553,7 @@ function makeShellMaterial(skyU, own, kind) {
     name: kind ? 'pc-cloud-valley' : 'pc-cloud-deck',
     uniforms: makePaintUniforms(defaultBodyUniforms(), {
       uCamD: own.uCamD, uAnchorD: own.uAnchorD, uCloudSun: own.uCloudSun, uGroundR: own.uGroundR, uDeckWind: own.uDeckWind,
-      uShellK: own.uShellK,
+      uShellK: own.uShellK, uFlash: own.uFlash,
       uSkyZenith: skyU.uSkyZenith, uSkyHorizon: skyU.uSkyHorizon, uCloudShade: skyU.uCloudShade, uStormWash: skyU.uStormWash,
       uWxSky: skyU.uWxSky, uSkyOil: skyU.uSkyOil, uAtmo: skyU.uAtmo,
     }),
@@ -555,29 +637,35 @@ function makeTemplate(slot, gen, aspect) {
   const L = [];
   const H = (j) => hash(slot, gen * 131 + j, 77);
   let j = 0;
+  // (rework 2: IRREGULAR outlines, not saucers. The shelf drawn out along a way of its own, its lobes at uneven reaches and
+  // sizes, a lobe or two left out, the heap off the middle: each cumulus its own shape from any side)
+  const elA = H(j++) * Math.PI, elK = 1 + 0.6 * H(j++), ec = Math.cos(elA), es = Math.sin(elA);
+  const hx = (H(j++) - 0.5) * 0.36, hz = (H(j++) - 0.5) * 0.36;
+  const shape = (o) => { const u = o.x * ec + o.z * es, v = -o.x * es + o.z * ec, U = u * elK, V = v / Math.sqrt(elK); o.x = U * ec - V * es; o.z = U * es + V * ec; return o; };
   // the shelf
-  const ns = 6 + Math.floor(H(j++) * 3), a0 = H(j++) * Math.PI * 2;
+  const ns = 6 + Math.floor(H(j++) * 3), a0 = H(j++) * Math.PI * 2, skip = Math.floor(H(j++) * ns * 1.6);
   for (let i = 0; i < ns; i++) {
-    const a = a0 + (i + (H(j++) - 0.5) * 0.5) * Math.PI * 2 / ns, rg = 0.58 * (0.8 + 0.4 * H(j++));
-    L.push({ x: Math.cos(a) * rg, z: Math.sin(a) * rg, y: 0.0, r: 0.44 * (0.85 + 0.3 * H(j++)), sq: 0.55, k: 0 });
+    const a = a0 + (i + (H(j++) - 0.5) * 0.7) * Math.PI * 2 / ns, rg = 0.58 * (0.6 + 0.65 * H(j++)), rr = 0.44 * (0.72 + 0.5 * H(j++));
+    if (i === skip) continue;
+    L.push(shape({ x: Math.cos(a) * rg, z: Math.sin(a) * rg, y: 0.0, r: rr, sq: 0.55, k: 0 }));
   }
-  L.push({ x: 0, z: 0, y: 0.04, r: 0.55, sq: 0.55, k: 0 });
+  L.push(shape({ x: hx * 0.4, z: hz * 0.4, y: 0.04, r: 0.55, sq: 0.55, k: 0 }));
   // the body: one tier for a fair cumulus, more for a tower
   const nb = Math.max(1, Math.min(5, Math.round(aspect / 0.9)));
   for (let t = 0; t < nb; t++) {
     const f = (t + 1) / (nb + 1), n = 4 + Math.floor(H(j++) * 2), b0 = H(j++) * Math.PI * 2;
     for (let i = 0; i < n; i++) {
       const a = b0 + (i + (H(j++) - 0.5) * 0.6) * Math.PI * 2 / n, rg = (0.34 - 0.10 * f) * (0.7 + 0.6 * H(j++));
-      L.push({ x: Math.cos(a) * rg, z: Math.sin(a) * rg, y: 0.18 + 0.50 * f + (H(j++) - 0.5) * 0.05, r: (0.40 - 0.06 * f) * (0.85 + 0.3 * H(j++)), sq: 0.9, k: 1 });
+      L.push(shape({ x: Math.cos(a) * rg + hx * f, z: Math.sin(a) * rg + hz * f, y: 0.18 + 0.50 * f + (H(j++) - 0.5) * 0.05, r: (0.40 - 0.06 * f) * (0.75 + 0.5 * H(j++)), sq: 0.9, k: 1 }));
     }
   }
   // the heap: smaller lobes round the middle, building upward, and the cap
   const nh = 3 + Math.floor(H(j++) * 3);
   for (let i = 0; i < nh; i++) {
     const a = H(j++) * Math.PI * 2, rg = 0.22 * H(j++);
-    L.push({ x: Math.cos(a) * rg, z: Math.sin(a) * rg, y: 0.62 + 0.18 * H(j++), r: 0.24 + 0.08 * H(j++), sq: 0.95, k: 2 });
+    L.push({ x: Math.cos(a) * rg + hx, z: Math.sin(a) * rg + hz, y: 0.62 + 0.18 * H(j++), r: 0.22 + 0.12 * H(j++), sq: 0.95, k: 2 });
   }
-  L.push({ x: (H(j++) - 0.5) * 0.2, z: (H(j++) - 0.5) * 0.2, y: 0.80, r: 0.26 + 0.06 * H(j++), sq: 0.95, k: 3 });
+  L.push({ x: hx + (H(j++) - 0.5) * 0.2, z: hz + (H(j++) - 0.5) * 0.2, y: 0.80, r: 0.26 + 0.06 * H(j++), sq: 0.95, k: 3 });
   // (the order: the shelf, the body, the heap, as built)
   return L;
 }
@@ -697,6 +785,7 @@ export function createClouds(scene) {
   const own = {
     uCamD: { value: new THREE.Vector3() }, uAnchorD: { value: new THREE.Vector3() }, uCloudSun: { value: new THREE.Vector3(0, 1, 0) },
     uCloudBend: { value: CLOUDS.lobeBend }, uGroundR: { value: 4000 }, uDeckWind: { value: new THREE.Vector3(1, 0, 0) },
+    uFlash: { value: [new THREE.Vector4(), new THREE.Vector4(), new THREE.Vector4(), new THREE.Vector4()] },
   };
   const deck = new Sheet('pc-cloud-deck', 32, 0), valley = new Sheet('pc-cloud-valley', 24, 1);
   for (const sh of [deck, valley]) {
@@ -754,6 +843,25 @@ export function createClouds(scene) {
     bodyId = id; R = BODIES[id].radius; slots = makeSlots(id); tpl.clear(); groundCache.clear(); Q.identity(); lastT = null;
     if (group.parent !== root) { if (group.parent) group.parent.remove(group); root.add(group); }
   }
+  // the highest land within 180 m of a place (five places), cached by the place to 90 m (the slots drift with the wind, so
+  // a slot's own number would keep the land it stood over when it was first asked)
+  function mountTop(k, x, y, z) {
+    const key = 'm' + Math.round(x * R / 90) + ',' + Math.round(y * R / 90) + ',' + Math.round(z * R / 90);
+    if (groundCache.size > 60000) groundCache.clear();
+    let g = groundCache.get(key);
+    if (g == null) {
+      const l = Math.hypot(x, y, z) || 1, ux = x / l, uy = y / l, uz = z / l;
+      let ex = uz, ez = -ux; const el = Math.hypot(ex, ez) || 1; ex /= el; ez /= el;
+      const nx = uy * ez, ny = uz * ex - ux * ez, nz = -uy * ex, a = 180 / R;
+      g = -1e9;
+      for (const [p, q] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const s = sampleSurfacePure(bodyId, ux + (ex * p + nx * q) * a, uy + ny * q * a, uz + (ez * p + nz * q) * a);
+        if (s && s.radius) g = Math.max(g, s.radius - R);
+      }
+      groundCache.set(key, g);
+    }
+    return g;
+  }
   function groundAt(k, x, y, z) {
     let g = groundCache.get(k);
     if (g == null) { const s = sampleSurfacePure(bodyId, x, y, z); g = s && s.radius ? s.radius - R : 0; groundCache.set(k, g); }
@@ -785,6 +893,10 @@ export function createClouds(scene) {
     // read as specks round the globe, the first stills of the hand-over.)
     const c0 = wx.ceiling ? wx.ceiling[0] : 2800;
     const handK = smooth(c0 * 0.8, c0 * 1.4, camR - Rg);
+    // (the hybrid: how far the 3D cumulus have taken over from the sky's own painted cloud, by the eye's height)
+    const airK = CLOUDS.hybrid ? smooth(CLOUDS.airH[0], CLOUDS.airH[1], camR - Rg) : 1;
+    const eyeG = Rg - R;
+    self.stats.airK = airK;
     // the wind aloft at the eye, in the drifting frame (what the towers lean along)
     let we = 2.5, wn = 0.8;
     if (W) { W.at(upx, upy, upz, _wOut); we = _wOut.aloftE; wn = _wOut.aloftN; }
@@ -817,6 +929,24 @@ export function createClouds(scene) {
         thick = 0;
         base = groundAt(k, _w.x, _w.y, _w.z) + baseF[0] + (baseF[1] - baseF[0]) * hash(k, 9, 1);
       }
+      // (the hybrid, below the air: a cumulus is drawn in 3D only where it is CAUGHT ON A MOUNTAIN -- the land under it
+      // standing 120 to 320 m and more over the land under the eye -- its base brought down onto the slopes so the summit
+      // stands up into it, and the range holding a little more cloud than the plain, as ranges do)
+      let keep = airK;
+      if (keep < 1) {
+        const gS = W && W.land && W.land.ready ? cubeAt(W.land.H2, W.N, _w.x, _w.y, _w.z) : groundAt(k, _w.x, _w.y, _w.z);
+        // (120 to 320 m: Earth's ranges stand some 400 m over the wood at most -- 444 m within 4 km of the landing, measured --
+        // and 220 to 520 m caught almost none)
+        const mK = smooth(120, 320, gS - eyeG);
+        if (mK > 0) {
+          // (the base from the HIGHEST land under the cloud's footprint, 180 m round the slot: from the land at the slot
+          // alone, on a steep range the cloud stood inside the rock and none showed, the first mountain stills)
+          const gM = mountTop(k, _w.x, _w.y, _w.z);
+          cover = Math.min(0.95, cover + 0.22 * mK); base = Math.min(base, gM - 50 + 90 * hash(k, 9, 3)); thick = Math.min(thick, 500);
+        }
+        keep = Math.max(keep, mK);
+        if (keep <= 0.001) continue;
+      }
       const L0 = CLOUDS.life[0], L1 = CLOUDS.life[1];
       const life = L0 + (L1 - L0) * hash(k, 3, 5);
       const ph = hash(k, 4, 5) * life;
@@ -827,7 +957,7 @@ export function createClouds(scene) {
       // sky above 2 degrees, the land left out): the world's fair 0.45 covers 19 per cent of it, 0.55 about 30, 0.75 about
       // half, the design's 4.4 criterion 1: fair at most 25, building 30 to 60)
       const own = hash(k, gen, 11);
-      const s = env * smooth(own - 0.12, own + 0.12, cover * (0.62 + 0.45 * smooth(0.40, 0.80, cover)));
+      const s = env * smooth(own - 0.12, own + 0.12, keep * cover * (0.62 + 0.45 * smooth(0.40, 0.80, cover)));
       if (s < 0.04) continue;
       // its size: a fair cumulus 70 to 150 m across the base's radius, more under a fuller sky; its thickness the map's
       // (towers in a storm's cell) or a fair one's
@@ -870,10 +1000,16 @@ export function createClouds(scene) {
         const base = W ? _cOut.base : groundAt(-1 - i, c.x, c.y, c.z) + _cOut.base;
         const T = Math.max(700, _cOut.top - _cOut.base) * (0.55 + 0.45 * c.w);
         const Rc = Math.min(520, Math.max(160, c.r * 0.30)) * (0.6 + 0.4 * c.w);
-        const La = (1000 + 900 * hash(c.i, c.gen, 7)) * (0.4 + 0.6 * c.w);
+        // (the anvil grows as the storm matures and outlives the tower: weather.js lays a land storm's stage, 0 cumulus, a
+        // quarter towering, a half mature, then decay; a storm with no stage is taken as mature)
+        const stg = c.stage != null ? c.stage : 0.5;
+        const La = (1000 + 900 * hash(c.i, c.gen, 7)) * (0.4 + 0.6 * c.w) * (0.25 + 0.75 * smooth(0.25, 0.55, stg));
         const rb = R + base, bx = sx * rb, by = sy * rb, bz = sz * rb;
         const dist = Math.hypot(bx + sx * T * 0.5 - camD.x, by + sy * T * 0.5 - camD.y, bz + sz * T * 0.5 - camD.z);
-        clouds.push({ k: -1 - c.i, cb: 1 + c.i, gen: c.gen, s: c.w, Rc, T, La, storm: 1, bx, by, bz, sx, sy, sz, dist, aspect: T / Rc });
+        // (the anvil streams along the storm's OWN drift, the cell's anvilE / anvilN, which on a day of swinging wind aloft can
+        // be far from the wind at the eye; a cell without them takes the eye's)
+        clouds.push({ k: -1 - c.i, cb: 1 + c.i, gen: c.gen, s: c.w, Rc, T, La, storm: 1, bx, by, bz, sx, sy, sz, dist, aspect: T / Rc,
+          ae: c.anvilE != null ? c.anvilE : null, an: c.anvilN != null ? c.anvilN : null });
       }
     }
     clouds.sort((a, b) => a.dist - b.dist);
@@ -911,8 +1047,9 @@ export function createClouds(scene) {
       let ex = uz, ey = 0, ez = -ux; const el = Math.hypot(ex, ez) || 1; ex /= el; ez /= el;
       const nx = uy * ez - uz * ey, ny = uz * ex - ux * ez, nz = ux * ey - uy * ex;
       // the wind aloft's way here, and the lean: the shear, along it (a tower leans downwind by up to a third of its height)
-      const ws = Math.hypot(we, wn) || 1, lean = Math.min(0.35, 0.025 * ws) * (cl.cb ? 0.4 : 1);
-      const ax = (ex * we + nx * wn) / ws, ay = (ey * we + ny * wn) / ws, az = (ez * we + nz * wn) / ws;
+      const cwe = cl.ae != null && Math.hypot(cl.ae, cl.an) > 0.3 ? cl.ae : we, cwn = cl.ae != null && Math.hypot(cl.ae, cl.an) > 0.3 ? cl.an : wn;
+      const ws = Math.hypot(cwe, cwn) || 1, lean = Math.min(0.35, 0.025 * ws) * (cl.cb ? 0.4 : 1);
+      const ax = (ex * cwe + nx * cwn) / ws, ay = (ey * cwe + ny * cwn) / ws, az = (ez * cwe + nz * cwn) / ws;
       const bxw = uy * az - uz * ay, byw = uz * ax - ux * az, bzw = ux * ay - uy * ax;     // across the wind
       const lx = ax * lean, ly = ay * lean, lz = az * lean;
       // how many lobes: as many as are larger than a few pixels at this distance (a storm keeps them all)
@@ -996,7 +1133,9 @@ export function createClouds(scene) {
     deck.u.uShellK.value.y = R; valley.u.uShellK.value.y = R;
     own.uAnchorD.value.copy(anchor);
     // the sky's own shell becomes the far background, the altocumulus, a kilometre over the land under the eye (sky.js uCloud3D)
-    if (skyU.uCloud3D) skyU.uCloud3D.value.set(1, Rg + (wx.alto != null ? wx.alto : 1000), wx.altoShare != null ? wx.altoShare : 0.45, 0);
+    // (x: how far the 3D cumulus have taken over, 0 on the ground in the hybrid: the sky's own cloud exactly as it was;
+    // w: 1 while this module draws, for what the sky adds with it whatever the height -- the high cloud)
+    if (skyU.uCloud3D) skyU.uCloud3D.value.set(airK, Rg + (wx.alto != null ? wx.alto : 1000), wx.altoShare != null ? wx.altoShare : 0.45, 1);
     // the high cloud lies the way the wind aloft blows (sky.js A4), and a rainbow may stand where the map has rain (A9)
     if (skyU.uCirrus) {
       let ex = upz, ez = -upx; const el = Math.hypot(ex, ez) || 1; ex /= el; ez /= el;
@@ -1004,12 +1143,14 @@ export function createClouds(scene) {
       _w2.set(ex * we + nx * wn, ny * wn, ez * we + nz * wn).applyQuaternion(Q);      // (drifting frame -> the body's)
       if (_w2.lengthSq() < 1e-8) _w2.set(1, 0, 0);
       _w2.normalize();
-      skyU.uCirrus.value.set(_w2.x, _w2.y, _w2.z, wx.cirrus != null ? wx.cirrus : 0.25);
+      skyU.uCirrus.value.set(_w2.x, _w2.y, _w2.z, CLOUDS.cirrus ? (wx.cirrus != null ? wx.cirrus : 0.25) : -1);
     }
     if (skyU.uRainbow) skyU.uRainbow.value.set(C && wx.rainbow !== 0 ? 1 : 0, 1500, 0, 0);
     // the look director's audit items in the sky (sky.js uSkyFix; ?skyfix=0 leaves the sky as it was): on with the clouds,
     // and from the air the sky laid in brush strokes, from 150 m up to their full from 800 m
-    if (skyU.uSkyFix) skyU.uSkyFix.value.set(CLOUDS.skyfix ? 1 : 0, CLOUDS.skyfix ? 0.45 * smooth(150, 800, camR - Rg) : 0, 0, 0);
+    // (y, the sky laid in strokes from the air: OFF in rework 2 -- from 1 km the strokes read as dark blue blotches over the
+    // sky, seen with ?skyfix=0 against 1. ?skystrokes=1 brings them back for the look director)
+    if (skyU.uSkyFix) skyU.uSkyFix.value.set(CLOUDS.skyfix ? 1 : 0, CLOUDS.skyfix && CLOUDS.skyStrokes ? 0.45 * smooth(150, 800, camR - Rg) : 0, 0, 0);
     own.uGroundR.value = R + (look.weather && look.weather.shadowGround != null ? look.weather.shadowGround : 250);
     self.stats.clouds = clouds.length; self.stats.lobes = meshes.reduce((a, M) => a + M.n, 0); self.stats.tris = tris;
     self.stats.ms = performance.now() - t0;
@@ -1081,14 +1222,17 @@ export function createClouds(scene) {
   });
   if (SHARED.PREPASSES) SHARED.PREPASSES.push((renderer, sc) => self.renderShadow(renderer, sc));
 
+  // (for a still of the lightning: a list shaped as fields.cloud.flashes, { n, 0: { x, y, z, base, kind, flash01 } }, used in
+  //  place of the map's while set; null in play)
+  self.flashTest = null;
   self.update = function update(dt, camL, root, sunL, fields, skyU) {
     if (!LOOK.oil || !CLOUDS.mode) return;
     // (the speed test's row 'weather: clouds as before': the sky's own flat cloud back in their place)
-    if (self.enabled === false) { group.visible = false; if (skyU && skyU.uCloud3D) skyU.uCloud3D.value.x = 0; if (skyU && skyU.uRainbow) skyU.uRainbow.value.x = 0; if (skyU && skyU.uSkyFix) skyU.uSkyFix.value.set(0, 0, 0, 0); return; }
+    if (self.enabled === false) { group.visible = false; if (skyU && skyU.uCloud3D) { skyU.uCloud3D.value.x = 0; skyU.uCloud3D.value.w = 0; } if (skyU && skyU.uRainbow) skyU.uRainbow.value.x = 0; if (skyU && skyU.uSkyFix) skyU.uSkyFix.value.set(0, 0, 0, 0); return; }
     const id = root && root.name && root.name.startsWith('body-') ? root.name.slice(5) : null;
     if (!id || !BODIES[id]) return;
     const look = getLook(id);
-    if (!(BODIES[id].atmosphereHeight > 0) || !(look.cloud > 0.01 || (look.weather && look.weather.cumulus))) { group.visible = false; if (skyU && skyU.uCloud3D) skyU.uCloud3D.value.x = 0; if (skyU && skyU.uRainbow) skyU.uRainbow.value.x = 0; if (skyU && skyU.uSkyFix) skyU.uSkyFix.value.set(0, 0, 0, 0); return; }
+    if (!(BODIES[id].atmosphereHeight > 0) || !(look.cloud > 0.01 || (look.weather && look.weather.cumulus))) { group.visible = false; if (skyU && skyU.uCloud3D) { skyU.uCloud3D.value.x = 0; skyU.uCloud3D.value.w = 0; } if (skyU && skyU.uRainbow) skyU.uRainbow.value.x = 0; if (skyU && skyU.uSkyFix) skyU.uSkyFix.value.set(0, 0, 0, 0); return; }
     group.visible = true;
     if (id !== bodyId || group.parent !== root) setBody(id, root);
     if (!mat) {
@@ -1154,6 +1298,21 @@ export function createClouds(scene) {
     shState.has = true;
     own.uCamD.value.copy(camL).applyQuaternion(_qi).sub(anchor);
     for (const sh of [deck, valley]) sh.u.uCamD.value.copy(camL).applyQuaternion(_qi).sub(sh.anchor);
+    // the lightning: the four brightest flashes near the eye, a light in their clouds a few hundred metres over the base
+    {
+      const Cf = self.flashTest ? self.flashTest : fields && fields.cloud && fields.cloud.flashes ? fields.cloud.flashes : null, F = own.uFlash.value;
+      for (const v of F) v.w = 0;
+      if (Cf && Cf.n) {
+        const pick = [];
+        for (let i = 0; i < Cf.n; i++) if (Cf[i].flash01 > 0.02) pick.push(Cf[i]);
+        pick.sort((a, b) => b.flash01 - a.flash01);
+        for (let i = 0; i < Math.min(4, pick.length); i++) {
+          const f = pick[i], h = R + (f.base || 300) + (f.kind === 'ic' ? 650 : 280);
+          _w2.set(f.x, f.y, f.z).normalize().multiplyScalar(h).applyQuaternion(_qi);
+          F[i].set(_w2.x, _w2.y, _w2.z, f.flash01);
+        }
+      }
+    }
     // the eye in a cloud: the deepest it stands inside any lobe near it (the near air whites out, world/index.js)
     let inK = 0;
     const cd = _v.copy(camL).applyQuaternion(_qi);
