@@ -542,6 +542,9 @@ export const PHYS = {
   uPhysBranchClock: { value: new THREE.Vector4() },
   // (group D, ?farwind=1) the far field of the plants (physics flora.js FloraField.far) and where it lies; w = 0: off, never read
   uPhysFar: { value: blank() }, uPhysFarMap: { value: new THREE.Vector4(0, 0, 1, 0) },
+  // (group D, ?gustbands=1) the gust bands seen from the air (physics flora.js GUSTBAND): xyz direction x strength
+  // (body axes), w m run. syncPhysFlora copies it from F.uniforms like the others; no material reads it unless PC_GUST.
+  uPhysGust: { value: new THREE.Vector4(0, 0, 0, 0) },
 };
 let _physV = -1, _physP = -1, _physF = null, _physFV = -1;
 export function syncPhysFlora(F) {
