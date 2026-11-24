@@ -628,6 +628,64 @@ A separate session builds W1 CLOUDS once the look director's sky ceiling (touch 
   - Reading the band per vertex would barely save anything: the far ground's mesh has about 216,000 vertices in this
     view against 518,000 pixels.
 
+- **W3.12c, the look director's review (ACCEPTED with one change, made):**
+  - The sheen is a GREYING AND COOLING, not a lightening. Half the saturation, a touch toward the sky's blue-grey, and a
+    lift of at most 0.06 that never reaches a stroke already over V 0.80. On the lemon floor the first step had pushed
+    light strokes past white (cream fog).
+  - The patch is re-based on v39.2's materials.js (aa699c1). Rendered on the release with the hooks applied locally: it
+    compiles, with no errors. Alpine meadow from 150 m (`W3.12c_*`):
+    - 9.0 % of the picture changes;
+    - on the changed pixels, V 0.421 to 0.425, S 0.306 to 0.193, V over 0.90 from 0.4 % to 0.1 %;
+    - the green strokes go sage-grey in patches.
+  - Crowns: one band value per WHOLE tree (A1's impostors and C's canopy), never per dab. Not for the near and middle
+    trees, whose leaves already move.
+
+### W3.13: THE WEATHER RELEASE FOR v39.3 (the coordinator, 24 Nov; built on design-weather, aa699c1)
+
+- **Why on design-weather:** the coordinator asked for a branch named weather-release. This session's brief allows
+  pushing only design-weather, so the release is design-weather at aa699c1. The coordinator gates and merges that commit.
+- **What it is:**
+  - look-proto c7d8d9e (v39.2), merged clean.
+  - weather-clouds 1aad10e: the clouds lane, with the guard on every cloud program. Only the notes file clashed; both
+    lanes' hand-overs are kept.
+  - The look director's storms hook (1de2bf6), already in v39.2.
+  - **91cf7a8 THE FLIP** and **ed198bd THE CLOUDS' FLIP** (W1's two lines, with the look director's leave).
+  - weather-clouds c4b612e (the anvil wedge and the mountain cloud, accepted by the look director) is for v39.4.
+- **The flip is the OIL LOOK's default only.** As first written it switched the new weather on in every page, which
+  would have changed the watercolour game. Now wx2.js, kitmat.js and audio.js all read `?look=oil` exactly as shared.js
+  LOOK.oil does. The storm hook and the 3D clouds were oil-only already.
+  - In the oil look: `?weather=old` turns all of the new weather off; `?clouds3d=0` turns off only the 3D clouds.
+  - Rainmap and gustbands stay off.
+  - The bench row 'weather: the old weather (?weather=old)' turns the 3D clouds off and back on with the rest.
+- **Suites:** physics 443 (one run of three had one failure: powers.test.mjs 'the cost', a timing budget; alternating
+  with a v39.2 copy it failed 1 time in 6 on the release and 6 in 6 on v39.2: it flakes on this machine, not caused by
+  the release); world and looks 129 (183 with the plant kits); unit 328.
+- **Proofs (gallery, temperate wood streamside, noon, t=30, `?impfail=bake` on both sides):**
+  - With physics off: **watercolour identical to v39.2 (0 pixels)**. **Oil with `?weather=old&clouds3d=0`: 828 pixels
+    differ, by at most 2 levels**, against 823 between two loads of the release itself, so that is the method's own
+    floor (`release/v39.3_gallery_*_A_B_diff.jpg`).
+  - With physics on, the plants and the water move with the real time between frames, so no two loads match. I opened
+    the differences: they are in the grass, the falling leaves and the ripples only.
+  - Why `?impfail=bake`: in v39.2's gallery the far trees' stand-ins never finish baking in this software browser
+    (`world.busy` stays 1 for thousands of frames), so the page never says ready.
+  - The coordinator's own t=0 gate found 63,300 pixels; the cause was on their side (`?leafshade=0` also turns off v39's
+    leaf-shade quieting). Before their note came, I had read through all 22 source files the release changes and found
+    nothing that reaches the near plants under `?weather=old&clouds3d=0`.
+- **Seen, the default in the game** (`release/v39.3_game_default_*.jpg`, `index.html?look=oil...&time=12`, no weather
+  switch):
+  - Read in the loaded game: every new-weather switch on but rainmap and gustbands; the clouds and storms modules
+    loaded; no errors. A game day is 1,692 s.
+  - Noon draws correctly. Golden hour (18:00) is an orange evening with long shadows and a peach-lit cloud mass.
+  - A land storm passes 70 m from the landing at game time 3,653 s:
+    - at 990 m, a slate-violet ceiling with lighter seams comes over the wood;
+    - overhead, a thunderstorm of 10.8 mm/h: slanting rain, a darker sky, the explorer's hood up, leaves blowing.
+  - The look director's pair, noon at the landing, `?clouds3d=0` over the default
+    (`release/v39.3_game_noon_pair_*.jpg`):
+    - Nearly the same picture: the canopy hides most of the sky. With `?clouds3d=0` the sky is the old painted flat
+      cloud and the clouds module is never loaded.
+    - The default shows a patch of blue at the top right between its clouds.
+    - A game load is not repeatable to the pixel, so this pair is for the eye. The pixel proof is the gallery's.
+
 ## NEXT
 
 1. **The look director's second review** of the veils (W3.6), and their decision on region (a glaze keeping the region

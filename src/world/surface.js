@@ -985,7 +985,7 @@ class Surface {
     o.top = top;
     const c = this._ctx; c.x = x; c.y = y; c.z = z; c.baseReady = false;
     c.fu = 0; c.fv = 0; c.dr = null;
-    c.still = 0; c.bank = 0; c.cap = 0; c.capOnly = 0; c.swell = 0; c.lvR = NaN; c.turbW = NaN; c.fspdW = 0;
+    c.still = 0; c.bank = 0; c.cap = 0; c.capOnly = 0; c.swell = 0; c.lvR = NaN; c.turbW = NaN; c.fspdW = 0; c.rsd = 1e9; c.rhw = 0;
     const b = this._b;
     let h = 0;
     const gw = this._gw, gl = this._gl;
@@ -1060,6 +1060,7 @@ class Surface {
     o.fu = c.fu; o.fv = c.fv;
     // (the water's own fields: written EVERY time -- the sample object is shared by every call, docs/lead/WATER-DESIGN.md)
     o.still = c.still; o.bank = c.bank; o.cap = c.cap; o.swell = c.swell;
+    if (this.rivers) { o.rsd = c.rsd; o.rhw = c.rhw; }   // (the far view's water line, world/rivers.js; only while the rivers are attached)
     // WHERE THE WATER FALLS, IT IS WHITE. (The owner, 23 Nov: waterfalls. The drainage field already knows how
     // steeply the water SURFACE drops here and how much country drains through, and patchgen.js was built with a
     // socket for exactly these two and nothing has ever filled it -- see its own note at :60.)
