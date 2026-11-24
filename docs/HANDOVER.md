@@ -511,7 +511,7 @@ whether the performance work is one more version or a redesign.** Their own row 
 
 ## 3. State right now (update this before you stop)
 
-**STATE 24 Nov, 08:15 (first account): NINE HELPER SESSIONS BUILDING, EACH ON ITS OWN BRANCH. `main` is v37.1.**
+**STATE 24 Nov, 08:40 (first account): TEN HELPER SESSIONS BUILDING, EACH ON ITS OWN BRANCH. `main` is v37.1.**
 - The owner's direction (24 Nov): 30 a second on the S23 Ultra, the view from the air good to a mile, much denser
   grass, flowers and more plants, flora before fauna. The v37 speed test that drives it is in the log (24 Nov): as
   set about 89 ms (11 a second); near trees about 52 ms, far trees about 17-21, the plants' fragment work about 34;
@@ -531,8 +531,10 @@ whether the performance work is one more version or a redesign.** Their own row 
     each place lacks) wait for the trees lanes' flora.js changes.
   - C FAR VIEW, branch `farview` (session_01R5Bri2AMBsFiRcxvUUZMvu): canopy painted into the ground (FV2), floor
     and far colour follow the year (FV3), rock faces, strata and snow from afar (FV4).
-  - D WEATHER, branch `design-weather` (session_01R5Bri2bBgFSfCmxpKKuURT): W2 wind map landed (?windmap=1); then W3
-    storms and rain (the rain field for E). A W1 clouds session starts when W3's interface lands.
+  - D WEATHER, branch `design-weather` (session_01R5Bri2bBgFSfCmxpKKuURT): W2 wind complete (?windmap=1, ?nearmap=1,
+    ?farwind=1); W3.1 the cloud and rain map (?cloudmap=1) and E's rain field landed; now W3.2 storms born from the land.
+  - D-W1 CLOUDS, branch `weather-clouds` (session_01R5Bri2WCHjprh5TfZSAsMU; = look-proto + design-weather + look-director):
+    wxfield.js, then 3D cumulus, the deck, cloud shadows, high cloud.
   - E WATER, branch `design-water` (session_01R5Bri3QABGWhztzAc3keGn): lane 0 (hooks, MODE.water, two water views in
     the speed test), W1 rivers, then FV5 water from the air. Two more water sessions (W2 bodies of water; W3 paint
     and W4 the player) start when lane 0 lands.
