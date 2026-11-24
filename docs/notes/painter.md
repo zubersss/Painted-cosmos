@@ -478,8 +478,19 @@ thinning's start follows the picture's height (flora.js: ts = range scale x pict
 at 480 lines, the audit's size, a near tree thins from 6.5 m (0.24 x 90 x 0.3) and grows each kept leaf 1.3 times at
 10 m and 1.65 at 15 m; on a picture 720 to 1440 lines tall it would thin from about 8.6 to 13 m (worked out from the
 code, not rendered). So the audit's near leaves at 7-15 m are larger than a phone at full size shows them. The maple's
-near leaves already have six corners (kitbuild.js leafCards `round`): F's option (2) is in place for it. Open: F's
-ruling on what to do next (reported 24 Nov, late).
+near leaves already have six corners (kitbuild.js leafCards `round`): F's option (2) is in place for it.
+F'S RULING (24 Nov, late): the owner's phone DRAWS 1028 x 480 or 936 x 372 in the oil look (LOOK-AUDIT.md), so the
+480-line picture, thinning growth included, IS what the owner sees and approved ("crisp flat leaf pieces"); the shards
+finding is F's, not the owner's, and is not pushed over the owner's word. Done on that ruling (9b778fd): (B) ?nearleaf
+reaches 5 m (0.55 at 1.0 m, smoothstep to 1.0 at 5 m); (C) `?leafgrow=1`, AN OPTION FOR THE OWNER: a thinned
+broadleaf's kept leaf grows at most 1.15 times within 15 m of the eye (today up to 1.65 at 15 m), back to today's by
+25 m, before the near tree hands over at 27 m (`uLeafGrow`; the needle kinds untouched; `?leafgrow=<1 to 2.4>` another
+most). SEEN, the shader compiles (103 tree materials, no program failed), one page, the switches flipped live, a maple
+from 8 m with its crown over the eye, summer noon, 1024 x 480 (`A2_nearleaf_leafgrow_maple8m_*`, A none, B nearleaf,
+C leafgrow): C clearly smaller leaves with more sky and branches between them across the crowns 6 to 12 m off
+(114,140 pixels, mean 7.6 of 255); B close to A, the nearest overhead pieces a little smaller (13,227 pixels, mean
+0.85, within the 64,382 / 2.1 that two grabs of the same state differ by as the leaves move in the wind). Neither
+goes default without the owner; the coordinator can put C to the owner on a phone check.
 
 **THE PINES AS POLES (24 Nov, the coordinator's urgent check and the first cure, `?pines=1`).**
 Not the split: on v39.1 the poles are the same with the one program (0.2 of 255; stills `A2_pines-v391_*`), and every
