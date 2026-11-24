@@ -633,7 +633,12 @@ vec3 pcRockTemp(vec3 k) {
   if (gRockP <= 0.0) return k;
   vec3 wC = uRockM3 / max(dot(uRockM3, vec3(0.3, 0.5, 0.2)), 1e-3);
   wC = vec3(1.0) + (wC - vec3(1.0)) * 2.2;
-  vec3 t = gRockT > 0.0 ? mix(vec3(1.0), wC, gRockT) : mix(vec3(1.0), vec3(0.86, 0.84, 1.25), -gRockT);
+  // (AT NOON the side and turned-away planes lean further to the cool violet, the look director after v39.4: with the sun
+  // high their shade is shallow and the rock read as one grey, S median 0.07 at the noon views, MEASURED; 1.25 blue at a
+  // low sun as before, up to the noon key with the sun overhead)
+  float kN = smoothstep(0.55, 0.85, dot(gSunV, normalize(vUpV)));
+  vec3 cool = mix(vec3(0.86, 0.84, 1.25), vec3(0.82, 0.80, 1.34), kN);
+  vec3 t = gRockT > 0.0 ? mix(vec3(1.0), wC, gRockT) : mix(vec3(1.0), cool, -gRockT);
   return clamp(k * mix(vec3(1.0), t, gRockP), 0.0, 1.0);
 }
 #endif`;

@@ -32,7 +32,12 @@ step-deeper share, and on near-white snow those read as pale mint, peach and lil
 nearly hueless: min channel 0.80 to 0.90, chroma under 0.08 to 0.16) is one paint: pastel share of the ridge 9.6 to 2.4
 per cent. Tried and NOT kept: the shed faces' snow kept whole in 70 m patches (patchgen; diff in scratch
 `shedpatch.diff`: no help with the confetti, and at 1 km a summit face lost its snow) and a sharper snow band in the
-alpine recipe (no visible difference)). Still to do: a stronger cool side plane at noon. FV6(b) ?bloomfar: the ground
+alpine recipe (no visible difference)). THE NOON COOL LEAN (next commit after 263a2f5): with the sun over about 33
+deg the side and turned-away planes lean further to the cool violet (1.25 to 1.34 blue at the sun overhead; off at a
+low sun, 16.8 h unchanged). HONEST: at the look director's audit views (sun behind the eye) almost no face is a side
+plane, so it changes nothing there (0.07 per cent of pixels even at a stronger trial value; rock S median stays 0.035
+at 420 m noon by my box); where a shaded face shows at noon (alpine meadow 420 m) its S goes 0.32 to 0.36. A stronger
+value (1.48) made that face a loud ultramarine (S 0.42): not kept. What is weak at those views is the LIT plane. FV6(b) ?bloomfar: the ground
 between the dabs takes no drift under 150 m (1ed9553, B's ask). B's flower line landed (design-flora dd86fb3); F passed it with 6cf9c7a.
 Scratch: `wt37` = main at v37.1.
 
