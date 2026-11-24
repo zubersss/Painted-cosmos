@@ -62,12 +62,14 @@ const NO_GROUPS = Object.freeze([]);
 // the list). The ground already asks the map for each stroke (chunks.js pcSunAtSoft): a stroke on a crown's shadow side
 // lies in the shade whole, one light level down -- a pool cut along the strokes, never a darkening laid over them. What
 // is NOT reached: the canopy painted into the ground (render/farground.js) lights its own dabs. ?farshadow=1 on (OFF by
-// default until the look director passes it); ?farshr= the square's half-size in metres.
+// default until the look director passes it); ?farshr= the square's half-size in metres; ?farshlen= how long the far
+// crowns' shadows are against the true length (1; render/impostor.js, the shadow twin).
 export const FAR_SHADOW = (() => {
   try {
     const q = new URLSearchParams(location.search), v = q.get('farshadow'), r = +q.get('farshr');
-    return { on: v === '1' || v === 'true', R: isFinite(r) && r >= 200 && r <= 3000 ? r : 860, cache: q.get('farshcache') !== '0' };
-  } catch (e) { return { on: false, R: 860, cache: true }; }
+    const l = q.has('farshlen') ? +q.get('farshlen') : 1;
+    return { on: v === '1' || v === 'true', R: isFinite(r) && r >= 200 && r <= 3000 ? r : 860, cache: q.get('farshcache') !== '0', len: isFinite(l) && l > 0.1 ? Math.min(l, 1) : 1 };
+  } catch (e) { return { on: false, R: 860, cache: true, len: 1 }; }
 })();
 const FAR_AHEAD = 0.75;      // (the square's middle this many of its half-sizes ahead of the eye: from 0.25 behind to 1.75 ahead)
 // (the kept far map: how far the square's middle may drift, in texels, before it is drawn whole again (64: 54 m with the
@@ -310,16 +312,19 @@ export class ShadowMap {
     const keep = farSh && FAR_SHADOW.cache && this._ensureFarKeep();
     let cx, cy, cz, kept = false;
     if (keep) {
-      const K0 = this._farKeep, sig = this._crowdSig();
+      const K0 = this._farKeep, sig = this._crowdSig(), nC = this._crowdN;
       // (a crown that came or went, or the sun's move, waits FAR_MINAGE frames: in flight the far tiles are built a few a
-      //  frame and the list changed nearly every frame, MEASURED, so the map was drawn whole every second frame)
+      //  frame and the list changed nearly every frame, MEASURED, so the map was drawn whole every second frame. But not a
+      //  change of more than a fifth of the far crowns, or from none: the map kept from before the impostors were baked
+      //  was empty, and it was kept, FOUND in a still)
       const hard = K0 && K0.R === this.R && K0.D === D && K0.age < FAR_MAXAGE && K0.c.distanceTo(c) < FAR_STEP * tx;
-      if (hard && (K0.age < FAR_MINAGE || (K0.sig === sig && K0.Z.dot(Z) > FAR_SUNCOS))) {
+      const small = K0 && K0.n > 0 && Math.abs(nC - K0.n) < 0.2 * K0.n;
+      if (hard && ((K0.age < FAR_MINAGE && small) || (K0.sig === sig && K0.Z.dot(Z) > FAR_SUNCOS))) {
         kept = true; K0.age++;
         X.copy(K0.X); Y.copy(K0.Y); Z.copy(K0.Z); cx = K0.cx; cy = K0.cy; cz = K0.cz;
       } else {
         cx = Math.round(c.dot(X) / tx) * tx; cy = Math.round(c.dot(Y) / tx) * tx; cz = c.dot(Z);
-        this._farKeep = { R: this.R, D, sig, age: 0, Z: Z.clone(), X: X.clone(), Y: Y.clone(), c: c.clone(), cx, cy, cz };
+        this._farKeep = { R: this.R, D, sig, n: nC, age: 0, Z: Z.clone(), X: X.clone(), Y: Y.clone(), c: c.clone(), cx, cy, cz };
       }
     } else {
       this._farKeep = null;
@@ -362,7 +367,10 @@ export class ShadowMap {
       this._drawCrowd(renderer, cam, camera, 2, box);
       this._farRect = this._rectOf(box, cam);
     } else {
-      // (only what moves: its last patch put back from the kept copy, then drawn where it is now)
+      // (only what moves: its last patch put back from the kept copy, then drawn where it is now. The scene is not drawn
+      //  here, and it was the drawing that placed every object for the frame -- render/index.js then lets the scene pass
+      //  take the places as they are -- so they are placed here)
+      if (scene.matrixWorldAutoUpdate === true) scene.updateMatrixWorld();
       const last = this._farRect;
       if (last) this._copyKeep(renderer, true, last);
       renderer.setRenderTarget(this.rt);
@@ -504,6 +512,7 @@ export class ShadowMap {
   _crowdSig() {
     let a = 0, b = 0;
     for (const e of SHADOW_CROWD) { if (!e.viewCull) continue; const m = e.mesh; if (!m || !m.visible || !m.parent) continue; a += m.count; b = (b + m.id * 31 + m.count) % 1000000007; }
+    this._crowdN = a;
     return a + ':' + b;
   }
   dispose() { if (this._farKeepRT) this._farKeepRT.dispose(); if (this._copyMat) this._copyMat.dispose(); if (this.rt) this.rt.dispose(); if (this.mat) this.mat.dispose(); if (this.rtAir) this.rtAir.dispose(); if (this.airMat) this.airMat.dispose(); }

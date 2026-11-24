@@ -628,7 +628,39 @@ FV7 of `docs/lead/FARVIEW-DESIGN.md`. A second session (A2, branch `trees-near`)
 the same time: this lane touches only the far parts of `flora.js`, `florakit.js`, the plant material's far branch,
 `render/impostor.js`, `render/shadow.js` and new rows in `core/bench.js`.
 
-**State (update this line every step):** (24 Nov, about 20:10) F CHOSE C (the far shadows WITH the canopy hook) on two
+**State (update this line every step):** (24 Nov, about 22:30) C SET THE HOOK'S LEVEL TO 0.40 (farview 5b9400e). RENDERED on a
+scratch merge with it, 16 h (sun 25 deg up: a 14 m tree's shadow 30 m long), 150 m: land under V 0.3 off 10.7, at 0.33
+16.5, at 0.40 13.4 percent; near-black 0.94 / 1.34 / 1.02; the pools lighter umber-grey (A1_farshadow_16h_150m_zoom_040).
+BUT the open lime clearing in that zoom is GROUND, not the painted canopy (seen with ?candebug=1), so 0.40 does not reach
+it: its lit share 44 percent off, 22 at true length. A shadow-length dial ?farshlen= (default 1, the twin's crown height
+scaled; 73c33a0) at 0.75 / 0.6 lifts it only to 23 / 27 percent (A1_farshadow_16h_150m_zoom_len): the clearing
+is narrower than the shadows. Asked F: accept (a low sun shades a small clearing), or a lighter ground shade under far
+shadows (C's / F's ground code).
+Before: v39.5 LIVE (look-proto 1cb697c) with the far spruce, the storm
+crowns and ?farshadow (09e929d, 9267b3b: WITHOUT the fixes of ee22d1f -- told the coordinator: in flight with ?farshadow=1
+the world would stand still between whole draws; the bench row's number is a little too good). THE AIR VIEW'S COST (the
+coordinator's next job; C does the glades): (1) caadb47, ON, no picture change: a far tree out of range, behind the eye or
+outside the view's sides runs none of the impostor vertex shader (30 / 28 / 48 percent of the trees in drawn far meshes at
+150 m / 420 m / 1 km); (2) ?impminpx=4, OFF, bench row impMinPx at 400 m: far trees IN LEAF under 4 px are not drawn and
+the painted canopy stands for them (conifers kept: with them the dark spikes and the slope trees went, SEEN); MEASURED
+trees in view cut 2,408 / 5,550 / 4,427 of 22,412 / 27,135 / 10,291 (0.7 / 3.3 / 18.7 percent of impostor pixels); picture
+change 0.04 / 0.23 / 0.41 of 255 (A1_impminpx4_{420m,1km}_zoom_AB). F PASSED the look at 4 px; its default waits for the
+bench row like ?farshadow. F asked the two priced together too: bench row farShMinPx at 400 m (both on, only when the run
+starts with both off). The v39.5 farshadow row is a lower bound (9267b3b's kept frames skip a placing walk): re-run on v39.6.
+Before: F PASSED THE FAR SHADOWS (with the cache and C's hook) on
+one change: the hook's level 0.40 instead of 0.33, so the sunlit glades stay bright at a low sun. ASKED C to set it (C's
+line, farview); then render the 16 h pair at 150 m on a scratch merge to confirm. F recommends ?farshadow as the DEFAULT
+once the owner's phone run has the bench row (the 16 MB target and the +130-call redraws are the phone's to judge).
+Before: C PUT THE CANOPY HOOK IN (farview 87b25e8, under
+PC_FAR_SHADOW, set only with ?farshadow=1). RENDERED on a scratch merge of trees-far + 87b25e8 (never pushed), F's views,
+autumn noon: land under V 0.3 150 m 9.7 -> 14.6 percent, 420 m 0.90 -> 1.25, 1 km 0.61 -> 0.72 -- the same as my
+working-copy rows (14.64, 1.25). FOUND AND FIXED on the way (the first merge render showed nothing): the kept far map drawn
+at page load, before the impostors were on the casters' list, was empty and was KEPT, as a change of the list waited 30
+frames; now a change of more than a fifth of the far crowns, or from none, draws it whole at once. And on a kept frame the
+scene is placed by the pass itself (render/index.js lets the scene pass skip placing when the shadow pass has drawn).
+Kept against drawn every frame on the merge: 0.31 of 255. The 16 h pair was not touched by the bug (the eye had moved
+first, which draws the map whole).
+Before: F CHOSE C (the far shadows WITH the canopy hook) on two
 conditions: (1) OFF by default until the owner's speed test has a number from the bench row OR the far crowns' part of the
 map is cached; (2) a 16 h pair at 150 m and 420 m. BOTH DONE: (1) THE FAR MAP KEPT (shadow.js FAR_SHADOW.cache, default on
 with ?farshadow; ?farshcache=0 draws it every frame): the square keeps its place, axes and depth while its middle drifts

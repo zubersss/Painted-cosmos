@@ -68,6 +68,12 @@ const CROWNMASS = !(_q && _q.get('crownmass') === '0');
 //  step (the look director's ?stormlight, which scales both). 0.5: SEEN under wx=storm from 150 m, a full step made the
 //  wood one violet-maroon mass, crowns and floor alike; half keeps the crowns red against the storm's grey floor.
 //  ?impstorm= 0 to 1 to judge another; 0 the crowns as before.)
+// (THE SMALLEST FAR CROWN DRAWN, IMP_VERT: under this many pixels across a far tree in leaf is not drawn at all and the
+//  canopy painted into the ground (render/farground.js, C's), which lies under the impostors from 60 m out, stands for it.
+//  Not the conifers (the tapering kinds, flora.js opts.small): the painted canopy lays only about half of them dark and
+//  none on the mountain's slopes, so from 420 m their dark spikes went with them (SEEN, 24 Nov).
+//  0 (the default): every tree, as before. ?impminpx= to judge; flora.setImpMinPx while the game runs.)
+export const IMP_MINPX = (() => { const v = _q ? +_q.get('impminpx') : 0; return isFinite(v) && v > 0 ? Math.min(v, 12) : 0; })();
 const IMP_STORM = (() => { const v = _q ? _q.get('impstorm') : null; const n = v == null || v === '' ? NaN : +v; return isFinite(n) ? Math.max(0, Math.min(1, n)) : 0.5; })();
 // (the weather group's gust bands seen from the air, ?gustbands=1 ONLY (the coordinator kept them out of ?wx2's
 //  defaults until the look director passes them; D, 24 Nov): read from the address here, never imported, the contract
@@ -225,7 +231,8 @@ function hook() {
 
 // The atlas for one world: `variants` = [{ geo, layer }], the kit geometries in layer order. opts.floors: per layer,
 // the least brightness (V) its crown is painted at, 0 for none but the common floor; opts.leafK: per layer, how much
-// larger its leaves are drawn, 0 for the density rule below (both flora.js FAR_SPRUCE).
+// larger its leaves are drawn, 0 for the density rule below (both flora.js FAR_SPRUCE); opts.small: per layer, true if a
+// crown of it too small to draw may be left to the painted canopy (IMP_MINPX: the trees in leaf, not the conifers).
 export class ImpostorAtlas {
   constructor(geos, opts = {}) {
     this.geos = geos;
@@ -239,7 +246,7 @@ export class ImpostorAtlas {
     // is framed on the cylinder seen from its direction, which wastes far fewer texels than the ball did (a poplar is
     // seven metres across and fifteen high): see viewRect.
     this.cr = []; this.ch = [];
-    const floors = opts.floors || [], leafKs = opts.leafK || [];
+    const floors = opts.floors || [], leafKs = opts.leafK || [], smalls = opts.small || [];
     for (const g of geos) {
       if (!g.boundingBox) g.computeBoundingBox();
       const b = g.boundingBox, cx = (b.min.x + b.max.x) / 2, cy = (b.min.y + b.max.y) / 2, cz = (b.min.z + b.max.z) / 2;
@@ -280,7 +287,7 @@ export class ImpostorAtlas {
         this.leafK.push(own > 0 ? own : Math.min(IMP.leafHi, Math.max(IMP.leafLo, Math.sqrt(IMP.dens / dens))));
       }
       this.cr.push(new THREE.Vector4(cx, cy, cz, rc));
-      this.ch.push(new THREE.Vector4(hh, Math.hypot(rc, hh), floors[this.ch.length] || 0, 0));
+      this.ch.push(new THREE.Vector4(hh, Math.hypot(rc, hh), floors[this.ch.length] || 0, smalls[this.ch.length] ? 1 : 0));
     }
     this.texture = null; this.ready = false; this.renderer = null;
     this.uniforms = {
@@ -472,6 +479,7 @@ uniform vec3 uOrigin;
 uniform vec3 uCamLocal;
 uniform vec4 uLod;
 uniform vec3 uWashIn;
+uniform float uImpMinPx;  // under this many pixels across a far crown is not drawn (IMP_MINPX; 0 every one)
 uniform vec4 uOilPx;
 uniform vec3 uSunDirL;
 uniform vec4 uImpK;       // x baked (0: nothing is drawn yet), y views to a side, z texels to a view, w the coarsest level
@@ -517,7 +525,7 @@ flat varying vec3 vDepth;
 flat varying vec2 vKB;    // x the kind (twigs, snow), y the light of a crown seen against the sun
 flat varying float vVF;   // the least brightness its crown is painted at (uImpH.z of its layer; 0: only the common floor)
 #ifdef PC_MASS
-flat varying vec3 vMass;  // x the crown's width on the screen (px), y the share of its seen face that its sunward side lights, z its autumn (the family run's weight)
+flat varying vec3 vMass;  // x the crown's width on the screen (px of a 480-line picture, R3.9), y the share of its seen face that its sunward side lights, z its autumn (the family run's weight)
 uniform vec4 uMassK2;     // x the share of trees that take their stand's colour, y a warm crown's paint (1: as it was, lower: deeper)
 #endif
 #ifdef PC_GUST
@@ -538,6 +546,22 @@ void main() {
   vec2 HR = uImpH[ly].xy;   // the cylinder's half height, the ball's radius
   vVF = uImpH[ly].z;
   mat3 ir = mat3(im);
+  // NOTHING WORKED OUT FOR A TREE THAT IS NOT DRAWN (the air view's cost, 24 Nov). A far mesh is culled whole by three,
+  // but every tree in a mesh that is drawn ran all of this shader: from 1 km up, of the 75,725 trees in the far meshes
+  // shown, 10,291 stood in the view and in range (MEASURED in the gallery). So a tree out of its range (vis 0), behind the
+  // eye, or wholly outside the view's sides -- its crown's ball, half as large again, against each plane -- leaves at
+  // once, its quad put outside the clip box. Nothing drawn changes.
+  {
+    float rS = HR.y * max(length(ir[0]), length(ir[1])) * 1.5 + 1.0;
+    vec4 cc = projectionMatrix * modelViewMatrix * vec4(io + ir * CR.xyz + pcRound(io + uOrigin), 1.0);
+    float kx = rS * sqrt(projectionMatrix[0][0] * projectionMatrix[0][0] + 1.0), ky = rS * sqrt(projectionMatrix[1][1] * projectionMatrix[1][1] + 1.0);
+    // (and a crown under uImpMinPx pixels across, where the painted canopy stands for it: IMP_MINPX)
+    bool tiny = uImpMinPx > 0.0 && uImpH[ly].w > 0.5 && 2.0 * CR.w * length(ir[0]) < uImpMinPx * (max(uOilPx.y, 1.0) / 480.0) * di * uOilPx.x;
+    if (vis <= 0.0 || tiny || cc.w < -rS || cc.x - cc.w > kx || -cc.x - cc.w > kx || cc.y - cc.w > ky || -cc.y - cc.w > ky) {
+      gl_Position = vec4(0.0, 0.0, 2.0, 1.0);
+      return;
+    }
+  }
   mat3 iv = inverse(ir);
   // the nearest baked view, from the eye's direction in the kit's own space (render/impostor.js viewCell)
   vec3 d = normalize(iv * (uCamLocal - io) - CR.xyz);
@@ -634,7 +658,7 @@ void main() {
   //  made fewer specks: the specks are the turned crowns' own lit strokes, a paler third colour in a wood of 2 to 5 px
   //  crowns of lit and dark strokes. What the far bands should be is with the look director.)
   #ifdef PC_GUST
-    float gPx = 2.0 * hwv.x * length(ir[0]) / max(di * uOilPx.x, 1e-4);      // (the crown's width on the screen, px)
+    float gPx = 2.0 * hwv.x * length(ir[0]) / max(di * uOilPx.x, 1e-4) * (480.0 / max(uOilPx.y, 1.0));      // (the crown's width on the screen, px of a 480-line picture: R3.9)
     float gK = smoothstep(4.0, 10.0, gPx);
     float gTh = 0.375 + (fract(inst.z * 4.37 + 0.11) - 0.5) * 0.45 * gK;
     float gT = step(gTh, pcGustBand(io + uOrigin)) * uImpGust;
@@ -654,7 +678,11 @@ void main() {
   vDepth = ir * (dc * HR.y);
   vKB = vec2(uFarKind[sp], pow(max(dot(normalize(io - uCamLocal), uSunDirL), 0.0), 1.5));
   #ifdef PC_MASS
-    vMass = vec3(2.0 * hwv.x * length(ir[0]) / max(di * uOilPx.x, 1e-4), clamp(0.5 + 0.5 * dot(vSunK, dc), 0.0, 1.0), famL.a);
+    // (THE CROWN'S WIDTH IN PIXELS OF A 480-LINE PICTURE, LOOK-RULES R3.9, the look director, 24 Nov: every threshold of the
+    //  look written in pixels -- crown mass 30, one tone 4 to 7, bark as leaves 30, the filled gaps 8, the gust's small
+    //  crowns 4 to 10, ?impminpx -- is a size at 480 lines, so the design does not change with the picture's size and a
+    //  step of the dynamic resolution never flips a crown from strokes to a patch. At 480 lines the factor is 1, exactly.)
+    vMass = vec3(2.0 * hwv.x * length(ir[0]) / max(di * uOilPx.x, 1e-4) * (480.0 / max(uOilPx.y, 1.0)), clamp(0.5 + 0.5 * dot(vSunK, dc), 0.0, 1.0), famL.a);
   #endif
   vFog = pcFogAmountV(di * pcFogBank(vBody));
   gl_Position = projectionMatrix * mv;
@@ -961,6 +989,7 @@ export function makeImpostorMaterial(bodyU, atlas, farMat, farcrown = FARCROWN) 
   // (CROWN MASS: IMP_FRAG. Its uniforms always, so the speed test can switch it either way while the game runs:
   //  flora.setCrownMass)
   own.uImpStorm = { value: IMP_STORM };
+  own.uImpMinPx = { value: IMP_MINPX };
   own.uMassK = { value: new THREE.Vector4(0.0, 7.0, 30.0, 4.0) }; own.uMassK2 = { value: new THREE.Vector4(1.0, 0.65, 0.35, 30.0) };
   const gust = GUSTBANDS && !!PHYS.uPhysGust;
   if (gust) Object.assign(own, PHYS, { uImpGust: { value: 1 } });      // (the whole PHYS block by reference, as with the lean: FLORA_GLSL is compiled for the bands)
@@ -1008,6 +1037,9 @@ uniform vec4 uImpAtlas;
 uniform vec4 uImpC[PC_IMP_NV];
 uniform vec4 uImpH[PC_IMP_NV];
 uniform vec4 uShK;
+uniform float uImpMinPx;
+uniform vec4 uOilPx;
+uniform float uImpShLen;  // how long a far crown's shadow is against the true one (FAR_SHADOW.len: the crown's height over its foot scaled)
 varying float vS;
 varying vec2 vQuad;
 flat varying vec4 vTile;
@@ -1018,10 +1050,13 @@ void main() {
   float di = distance(io, uCamLocal);
   float j = 1.0 + (aInst.z - 0.5) * uLod.z;
   float vis = step(uLod.x * j, di) * (1.0 - smoothstep(uLod.y * j * uLod.w, uLod.y * j, di)) * uImpK.x;
+  if (vis <= 0.0) { gl_Position = vec4(0.0, 0.0, 2.0, 1.0); return; }      // (out of its range: nothing worked out, as IMP_VERT)
   int ly = int(aInst2.y + 0.5);
   vec4 CR = uImpC[ly];
   vec2 HR = uImpH[ly].xy;
   mat3 ir = mat3(im);
+  // (a crown too small to be drawn casts nothing either: IMP_MINPX)
+  if (uImpMinPx > 0.0 && uImpH[ly].w > 0.5 && 2.0 * CR.w * length(ir[0]) < uImpMinPx * (max(uOilPx.y, 1.0) / 480.0) * di * uOilPx.x) { gl_Position = vec4(0.0, 0.0, 2.0, 1.0); return; }
   vec3 d = normalize(inverse(ir) * uSunDirL);
   vec3 dh = vec3(d.x, max(d.y, 0.0), d.z);
   dh /= abs(dh.x) + dh.y + abs(dh.z) + 1e-6;
@@ -1036,6 +1071,10 @@ void main() {
   float sinE = clamp(dc.y, 0.0, 1.0);
   vec2 hwv = vec2(CR.w, HR.x * sqrt(1.0 - sinE * sinE) + CR.w * sinE);
   vec3 lp = CR.xyz + rt * (position.x * hwv.x) + up * (position.y * hwv.y);
+  // (a shorter shadow, FAR_SHADOW.len under 1: the crown drawn into the map as if its height over its foot were that much
+  //  less, so its shadow along the ground is that much shorter -- the look director, 24 Nov: at a low sun the sunlit side
+  //  of a clearing must stay bright)
+  lp.y *= uImpShLen;
   vec3 wp = (im * vec4(lp * vis, 1.0)).xyz;
   vec4 mv = modelViewMatrix * vec4(wp, 1.0);
   vS = -mv.z * uInv;
@@ -1082,7 +1121,7 @@ export function makeImpostorShadowMaterial(impMat, uInv) {
       uInv, uSunDirL: u.uSunDirL, uImpK: u.uImpK, uImpAtlas: u.uImpAtlas, uImpC: u.uImpC, uImpH: u.uImpH, uImpTex: u.uImpTex,
       // (with the far crowns' shadows, ?farshadow=1, the WHOLE crown casts: the ground reads the map taken down to a patch
       //  of some metres there, and a third of the strokes made a shade too thin to cross its threshold)
-      uShK: OIL.uShK, uThinLeaf: { get value() { return FAR_SHADOW.on ? 0 : 0.66; } },
+      uShK: OIL.uShK, uThinLeaf: { get value() { return FAR_SHADOW.on ? 0 : 0.66; } }, uImpMinPx: u.uImpMinPx, uOilPx: OIL.uOilPx, uImpShLen: { get value() { return FAR_SHADOW.len; } },
     },
     vertexShader: IMP_SH_VERT, fragmentShader: IMP_SH_FRAG, side: THREE.DoubleSide,
   });
