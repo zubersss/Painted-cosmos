@@ -456,7 +456,16 @@ Branch `water-bodies` = lane 0 + look-proto v37.1 + `origin/design-water` (W1's 
   F now owns the sky's gold on the water generally (look-director cbf7f41, ?goldsky).
 - The lab (tools/lab.mjs serve) hit the machine's two-hour limit twice; later stills come from tools/shot.mjs one-offs with
   the scratch helper and sunview.js (scratch only).
-- NEXT: W3's pointed ends, then the full sheet and the strait crop to F; after the branches meet (the coordinator's call): the pool's pcThinLayer to W3's
+- **LAKE WIDTHS for the paint (5377ec9, W3's ask; F's condition: lakes wider than ~150 m take the sea's level, ponds keep
+  the strokes):** _buildLakes keeps each basin's id per node (lakeComp, halo too) and its core's width, the narrow axis of
+  the ellipse of the core's area and shape (2 sqrt(A r / pi)); S.hydro.lakeWidthAt(x, y, z) answers it at load (0 where no
+  lake: ponds, tarns, puddles). Not a sample field: surface.js untouched. Earth: 13 lakes, 212 to 958 m, 12 over 150 m.
+  Suites 325 / 108 / 445 (the commit message says 107: written before the run).
+- F accepted the gold sun path; for the full sheet: W3's pointed ends to cure the square slabs; and at golden hour the sea's
+  troughs toward violet by pcGold() -- W3 chose option (b), mine, after W3's golden-hour wash change lands.
+- NEXT: W3's push (pointed ends, pcWCellC(wL, asp), wLow, gWLens around the pcWStrokes call: merge with care at my aspW /
+  lenF / kG lines), the violet troughs, then the full sheet, the strait crop and the 18.3 h sun view to F; after the
+  branches meet (the coordinator's call): the pool's pcThinLayer to W3's
   pcWStrokes, pcFallMilk and the FALL_ colours into waterchunk.js.
 - Camera places for the falls views: `fallsView(S)` and the scratch `fallcams.mjs` (sea60, sea150, air400, bank, E7).
 
