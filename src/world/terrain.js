@@ -104,6 +104,8 @@ export class PlanetTerrain {
     // otherwise show a metre-wide sawtooth at the lip under one's feet
     this.maxLevel = opts.maxLevel != null ? opts.maxLevel : Math.max(4, Math.round(Math.log2((Math.PI * 0.5 * this.R) / (PATCH_N * 0.75))) + (this.S.look.fine ? 1 : 0));
     this.material = makeTerrainMaterial(bodyUniforms);
+    // (the far view's water line, ?farwater=1, mirrors the sky as the water does: the sky's own zenith and horizon)
+    if (this.material.defines && this.material.defines.PC_FARWATER && skyUniforms) { this.material.uniforms.uSkyZenith = skyUniforms.uSkyZenith; this.material.uniforms.uSkyHorizon = skyUniforms.uSkyHorizon; }
     this.waterMaterial = makeWaterMaterial(bodyUniforms, skyUniforms);
     this.group = new THREE.Group();
     this.group.name = 'terrain-' + bodyId;

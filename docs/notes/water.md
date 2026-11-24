@@ -284,6 +284,13 @@ showed NO water with the water branch (`docs/shots/painter/water-air/gate-high-a
   eye it narrows to nothing from 500 m to 250 m, no cross-fade. SEEN (`farwater-F-notes-1km-1600.jpg`, before | after): 1 km a
   continuous darker blue-grey line into the lake; 1.6 km FAINT in the haze (value 0.59 against the land's 0.74 at 1 km, the
   air greying it to saturation 0.07), where the pale line read more. Asked F to choose the value for the far end.
+- F's SECOND WORD (17:58): darker loses it; water far off MIRRORS THE SKY. Made: the line is the lake's own colour by the angle,
+  the water's own paint's sky (v37's WATER_FRAG: horizon to zenith along the reflected ray, three tenths of white, the liquid's
+  wash and the mirror's share; terrain.js binds the sky's uSkyZenith and uSkyHorizon with the switch), a step deeper and bluer
+  as the lake's strokes average, and looking nearly straight down the water's body (darker than the land). MEASURED in the
+  same frames (the purest line pixels against the lake's water): 1 km line hue 208 S 0.20 V 0.75, lake 206 0.17 0.71; 1.6 km
+  line 210 0.17 0.72, lake 222 0.15 0.72. SEEN (`farwater-lake-colour-1km-1600.jpg`, darker | the lake's colour): 1 km a blue
+  line into the lake in the lake's own colour; 1.6 km subtler, a winding line of the same blue. Not yet: the gold toward a low sun.
 
 ### THE SPEED TEST'S FALLS VIEW AND ?bench=water (24 Nov, this session; lane 0, the coordinator's order)
 

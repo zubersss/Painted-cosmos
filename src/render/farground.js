@@ -566,17 +566,28 @@ float pcFarWater(vec3 fw, float aa, float dist, float br) {
   aa = max(aa, 0.05);
   return (1.0 - smoothstep(hwE - aa, hwE + aa, abs(sd))) * step(0.75, hw) * step(0.05, hwE) * (1.0 - smoothstep(41.0, 46.0, dc));
 }
-// the ground's paint c with the river laid over it. ITS VALUE (the look director, 24 Nov): the lake's own hue -- water seen
-// from above takes the sky's tone, as the water's paint does -- and a step DARKER than the land beside it, so it reads as
-// water and not as a road or a crack: its value set to 0.70 of the paint it lies on, in any light and in a dark wood too
+// the ground's paint c with the river laid over it. ITS COLOUR (the look director, 24 Nov, after a darker try lost it): water
+// far off mirrors the sky, so it is the LAKE'S OWN COLOUR at that distance, by the angle -- the water's own paint's sky
+// (WATER_FRAG, v37's: the sky from horizon to zenith along the reflected ray, three tenths of white, the liquid's wash taken
+// in and the mirror's share of it) -- pale blue toward grazing, the zenith's deeper blue looking down; and looking nearly
+// straight down, the water's body, a step darker than the land beside it. The liquid: the landing wood's (the autumn
+// woodland's, looks/earth.js: the rivers of the tree are drawn only on a wood). The air is laid over it after, as over the lake.
+uniform vec3 uSkyZenith;
+uniform vec3 uSkyHorizon;
 vec3 pcFarWaterLay(vec3 c, float dist) {
   float br = 0.82 + 0.36 * texture(uNoise3D, vBody / 85.0).r;      // (riffles narrower, reaches wider, over about 100 m)
   float k = pcFarWater(vFarW, fwidth(vFarW.x) * 72.0, dist, br);
   if (k <= 0.0) return c;
-  // (the hue: the sky's tone pulled halfway to the lakes' blue, for the air laid over it afterwards greys it: SEEN, the sky's
-  //  tone alone at 0.82 of the land read grey-green and was lost in the wood's texture from 1 km, 17:45)
-  vec3 w = mix(mix(uHaze, vec3(1.0), 0.30), vec3(0.45, 0.62, 0.86), 0.5);
-  float lw = dot(w, vec3(0.299, 0.587, 0.114)), lc = dot(c, vec3(0.299, 0.587, 0.114));
-  return mix(c, w * (0.70 * lc / max(lw, 1e-3)), k);
+  float re = clamp(dot(normalize(vUpV), normalize(-vView)), 0.0, 1.0);   // (the reflected ray's height: 1 looking straight down)
+  const vec3 liq = vec3(0.68, 0.78, 0.84);
+  vec3 skyc = mix(mix(uSkyHorizon, uSkyZenith, clamp(re * 1.2, 0.0, 1.0)), vec3(1.0), 0.30);
+  vec3 mir = mix(pcDensity(liq, 1.0), pcDensity(skyc * mix(vec3(1.0), liq, 0.35), 1.12), 0.72);
+  // (and a step deeper and bluer: the water's own paint averages its light and dark strokes to this; with the sky's alone
+  //  the line came out a step lighter and greyer than the lake beside it, SEEN 18:10: V 0.81 S 0.11 against V 0.71 S 0.17)
+  mir *= vec3(0.74, 0.78, 0.82);
+  vec3 bodyW = mix(mix(uHaze, vec3(1.0), 0.30), vec3(0.45, 0.62, 0.86), 0.5);
+  float lw = dot(bodyW, vec3(0.299, 0.587, 0.114)), lc = dot(c, vec3(0.299, 0.587, 0.114));
+  bodyW *= 0.70 * lc / max(lw, 1e-3);
+  return mix(c, mix(mir, bodyW, smoothstep(0.80, 0.93, re)), k);
 }
 #endif`;
