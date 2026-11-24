@@ -377,12 +377,9 @@ export function attachBench(pc) {
       ['trees cast no shadow', () => treeMeshes((o) => o.layers.disable(2)), () => treeMeshes((o) => o.layers.enable(2))],
       ['no light in the air', () => B({ shaft: false }), () => B({ shaft: true })],
       [lite0 ? 'the full paint' : 'the lighter paint', () => B({ lite: !lite0 }), () => B({ lite: lite0 })],
-      // (the water's rows, at the bank and at the shore: see THE WATER VIEWS above)
-      ...waterRows,
       // (back to the size the device really draws, so the four rows below are measured from IT and not from
-      //  whatever sharper size the questions above had to be asked at: see MK at the top of this file; and back at the
-      //  landing, if the water's rows took the explorer away)
-      [AS, async () => { if (waterRows.length) await goView(null); await sharpen(1); }, null],
+      //  whatever sharper size the questions above had to be asked at: see MK at the top of this file)
+      [AS, () => sharpen(1), null],
       // (EIGHTH FORM, 2026-11-18) ROWS THAT MAKE THE GAME WORK HARDER, not easier. The owner's first believable table
       // read 16.7 ms = 60.0 a second on eleven rows running: that is the phone's own screen refusing to go faster, not
       // the game's speed, and under such a cap no row can be told from another. These rows raise the picture's
@@ -393,6 +390,11 @@ export function attachBench(pc) {
       ['every pixel the screen has', () => sharpen(kWhole), () => sharpen(1)],
       ['every pixel, full paint', async () => { await sharpen(kWhole); B({ lite: !lite0 }); }, async () => { B({ lite: lite0 }); await sharpen(1); }],
       [AS + ', last', null, null],
+      // (THE WATER'S ROWS LAST, at the device's own size: they move the explorer two kilometres, and the world must build
+      //  round it there, so everything above is in the table whatever happens at the shore. Each wait has its own limit --
+      //  the world settled in 30 s, the arrival veil in 40 s, a steady picture in 8 s (40 s while nothing is drawn) -- so a
+      //  view costs at most about two minutes and the test cannot hang on it.)
+      ...waterRows,
     ];
     const rows = [];
     let r0 = null, base = null;
@@ -430,6 +432,8 @@ export function attachBench(pc) {
         + ' they cannot be trusted. Run it again without touching the phone, and wait for the wood to finish'
         + ' building before you start.';
     }
+    // the explorer back at the landing, if the water's rows took it away
+    if (waterRows.length) await goView(null);
     // the picture is the phone's own again (it was held through the run: see sharpen above)
     if (pc.game && typeof pc.game.holdPictureSize === 'function') pc.game.holdPictureSize(0, 0);
     el.textContent = head(r0) + '\n' + rows.join('\n') + '\ndone. (+ / - ms: against the "as set" row before it)' + warn;
