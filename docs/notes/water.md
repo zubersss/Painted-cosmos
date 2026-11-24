@@ -226,7 +226,15 @@ Branch `water-bodies` = lane 0 + look-proto v37.1 + `origin/design-water` (W1's 
   The game boots with every water switch (`game-landing-allwater-B.jpg`).
 - Camera places for the falls views: `fallsView(S)` and the scratch `fallcams.mjs` (sea60, sea150, air400, bank, E7, close25,
   pool); the lakes' in the scratch `lshots.sh` (E4, E5, lake 11, ponds); the fjord's in `fjcams.mjs`.
-- NEXT: what the look director's review asks; W3's curtain fix and bench.js's falls view when they land (then the phone's row).
+- **THE REVIEW OF 24 NOV (688c2b6).** F: PASS for the falls, three notes, all done (the curtain is W3's; a broken lip;
+  few whites near V 0.92, the body milk and pale blue). The coordinator: LAKES SIT IN THE WOOD, the largest about a
+  kilometre across: each basin drowns only its deepest core, at most `lakeArea` 0.75 km2 (`_buildLakes`, per node
+  `lakeF0`); basin 6 now 0.76 km2 of its 5.6, lake 11 whole with its island (`lakes-cores-AB-E4-E5-L11.jpg`). The sheet in
+  ropes with slate gaps painted (not cut out), widening and fraying, a 1.6 m run and a 0.35 m brink at the lip, a spray
+  cloud of small pale dabs (`falls-ropes-68m-29m-B1-scratchcurtainfix.jpg`, taken with W3's curtain lines in a scratch
+  copy only). The fjord: the wide mouth nearest the landing stays a fall. `c.cap` / `c.swell` by the max rule (runnels).
+  RULE from F: do not show the owner the 68 m falls view until W3's curtain lines land.
+- NEXT: F's second look; W3's curtain fix and bench.js's falls view when they land (then the phone's row).
 
 ## Stations and tools
 
