@@ -511,23 +511,45 @@ whether the performance work is one more version or a redesign.** Their own row 
 
 ## 3. State right now (update this before you stop)
 
-**STATE 24 Nov (first account): SIX GROUPS IN DESIGN, NOTHING NEW BUILT YET. `main` is v37.**
+**STATE 24 Nov, 08:15 (first account): NINE HELPER SESSIONS BUILDING, EACH ON ITS OWN BRANCH. `main` is v37.1.**
 - The owner's direction (24 Nov): 30 a second on the S23 Ultra, the view from the air good to a mile, much denser
-  grass, flowers and more plants, flora before fauna; then four more groups at the owner's word. The v37 speed test
-  that drives it is in the log (24 Nov): as set about 89 ms (11 a second); near trees about 52 ms, far trees about
-  17-21, the plants' fragment work about 34; everything that is not a tree runs at the 60 cap.
-- GROUPS (the log says why they were merged so): A TREES (30 a second, always visible near the eye, far forms) and
-  C FAR VIEW (ground, rocks, mountains to a mile): local workflow `trees-far-design`. B FLORA (dense grass, flowers,
-  plants): helper session on branch `design-flora`. D WEATHER (clouds, wind, storms, rain falling): helper on
-  `design-weather`. E WATER (runoff, rivers, lakes, the sea, waterfalls, the player in water): helper on
-  `design-water`. F LOOK DIRECTOR (light and paint; owns chunks.js light, world/index.js light, post.js, shared.js;
-  reviews every group's stills): helper on `look-director`. Each writes its design to `docs/lead/` on its branch.
-- NEXT: when the designs are in, one plan in lanes on disjoint files; the build in helper sessions (own machines);
-  F reviews; staged merges into `look-proto` then `main` (item 41's gate); a speed-test row for every change.
+  grass, flowers and more plants, flora before fauna. The v37 speed test that drives it is in the log (24 Nov): as
+  set about 89 ms (11 a second); near trees about 52 ms, far trees about 17-21, the plants' fragment work about 34;
+  everything that is not a tree runs at the 60 cap.
+- v37.1 is live (24 Nov, pull request #38): the oil look's snow world (Neptune) no longer crashes on load.
+- ALL DESIGNS IN, on these branches' docs/lead/: TREES-DESIGN.md and FARVIEW-DESIGN.md (on r2), FLORA-DESIGN.md
+  (design-flora), WEATHER-DESIGN.md (design-weather), WATER-DESIGN.md (design-water), LOOK-RULES.md and
+  LOOK-AUDIT.md (look-director).
+- THE BUILDERS (helper sessions on this account, Opus 5.5, tag painted-cosmos-helper; each pushes to its own
+  branch, sends A/B stills to F and reports to the coordinator; none merges):
+  - A1 TREES FAR, branch `trees-far` (session_01R5Bri1GA9riShvfh4TrjW4): speed-test rows first (T0 + the skeptic's
+    rows + held air views FV7), far trees as painted impostors (T1), hand-over distances (T4), cheaper shadows (T6).
+  - A2 TREES NEAR, branch `trees-near` (session_01R5Brhzact8R71BoSBFN7bK): near and middle trees as leaf clusters
+    (T2, T3), a depth pass first (T5), a speed-test row each.
+  - B FLORA, branch `design-flora` (session_01R5Bri3fPxQ8GrgfQiYdQ8T): steps 1-4 landed (rows, cull, carpet ring,
+    greens, middle band); now flowers from one bloom map (bloom.js); then FV6 meadows from the air; O/F4 (plants
+    each place lacks) wait for the trees lanes' flora.js changes.
+  - C FAR VIEW, branch `farview` (session_01R5Bri2AMBsFiRcxvUUZMvu): canopy painted into the ground (FV2), floor
+    and far colour follow the year (FV3), rock faces, strata and snow from afar (FV4).
+  - D WEATHER, branch `design-weather` (session_01R5Bri2bBgFSfCmxpKKuURT): W2 wind map landed (?windmap=1); then W3
+    storms and rain (the rain field for E). A W1 clouds session starts when W3's interface lands.
+  - E WATER, branch `design-water` (session_01R5Bri3QABGWhztzAc3keGn): lane 0 (hooks, MODE.water, two water views in
+    the speed test), W1 rivers, then FV5 water from the air. Two more water sessions (W2 bodies of water; W3 paint
+    and W4 the player) start when lane 0 lands.
+  - F LOOK DIRECTOR, branch `look-director` (session_01R5Brhzz2JPPF6Ecz6XRQHx): L0 landed (one air text,
+    bit-identical); now the sky ceiling with FV1 folded in (the sky stays a sky to a mile), then L1 night, L2+L7
+    shade and darks, L3 one light, L5/L6 the far air (released). L4 (the morning) waits for the owner.
+- WHO OWNS WHAT (the overlaps): F alone edits chunks.js, post.js, shared.js, world/index.js (others ask through the
+  coordinator). flora.js and florakit.js: A1 the far tiers, A2 the near and middle tiers and kits, B the small plants
+  and grass. surface.js: C the colour recipes and far colour, B one bloomTint call, E small water hooks.
+- NEXT for the coordinator: read each report and still; route stills to F; merge lanes into `look-proto` in stages
+  as they are reviewed, then into `main` under item 41's gate with a version bump; send the owner the links and a
+  speed test with the new rows.
 - PAUSED: the creatures (branch `creatures`, one snapshot) and the waterfall lane (branch `falls`, empty; its work
   now belongs to group E). Working copies on the first account's machine: /home/user/look-proto,
   /home/user/wt-creatures, /home/user/wt-falls (not in the repository).
-
+- FOR A SESSION ON THE OTHER ACCOUNT: these helpers cannot be messaged from there; their work is safe on their
+  branches. Read each branch's docs/notes/painter.md hand-over and docs/lead/ files to pick a lane up.
 
 Head rewritten 2026-11-18, evening (the morning's text and the v12 text it replaced are in the log).
 
