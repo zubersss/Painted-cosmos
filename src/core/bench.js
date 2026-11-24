@@ -528,7 +528,7 @@ export function attachBench(pc) {
         ['storm: no rain shafts or bolts', () => show(/^pc-storm-/, false), () => show(/^pc-storm-/, true)],
       ] : []),
       // (group D, ?gustbands=1: the gust bands seen from the air. Off, the physics hands the shaders a zero strength and
-      //  pcGustBand returns before its two noise reads: the gap is their cost, about two texture reads a ground stroke.)
+      //  pcGustBand returns before its noise read: the gap is its cost, one texture read a pixel of growth ground.)
       ...(WX2.gustbands ? [
         ['weather: no gust bands seen from the air', () => { WX2.gustbands = false; }, () => { WX2.gustbands = WX0.gustbands; }],
       ] : []),
