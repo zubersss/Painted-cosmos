@@ -611,19 +611,19 @@ export const BLOOM_VERT_DECL = /* glsl */`
 attribute vec4 aBloom;
 attribute vec4 aBloomP;
 varying float vBloomK;
-flat varying float vBloomI;
+flat varying vec2 vBloomI;
 #endif
 `;
 export const BLOOM_VERT_MAIN = /* glsl */`
 #ifdef PC_BLOOMF
   vBloomK = mix(aBloom.x, aBloomP.x, m);
-  vBloomI = m > 0.5 ? aBloomP.y : aBloom.y;      // (an index is not interpolated: the triangle's first vertex names it)
+  vBloomI = m > 0.5 ? aBloomP.yz : aBloom.yz;    // (an index is not interpolated: the triangle's first vertex names it; y the drift's kind, z the slope's)
 #endif
 `;
 export const BLOOM_FRAG = /* glsl */`
 #ifdef PC_BLOOMF
 varying float vBloomK;
-flat varying float vBloomI;
+flat varying vec2 vBloomI;
 uniform vec3 uBloomPal[16];
 uniform float uBloomOn;     // 1 on a world whose flowers bloom.js hands over (farstand.js bloomFarOn), else 0
 float gBloom = 0.0;         // this dab is a flower's (set in pcGroundAt, read in pcGroundPaint)
@@ -636,7 +636,10 @@ void pcBloomAt(vec2 dsA, vec3 rnd) {
   if (uBloomOn < 0.5) return;
   float k = clamp(vBloomK + gBkdx * dsA.x + gBkdy * dsA.y, 0.0, 1.0);
   if (k <= 0.02 || fract(rnd.z * 23.17 + rnd.y * 5.31) >= 0.9 * k) return;
-  gBloomC = pcBloomPal(vBloomI);
+  // (far off a dab takes the SLOPE's kind, bloom.js o.fi2, not its drift's own: every dab its own kind made a confetti
+  // from 420 m, SEEN by flora B; whole dabs cross over from 250 to 400 m, each by its own number)
+  float farK = smoothstep(250.0, 400.0, length(vView));
+  gBloomC = pcBloomPal(fract(rnd.x * 7.13 + rnd.z * 3.7) < farK ? vBloomI.y : vBloomI.x);
   gBloom = 1.0;
 }
 #endif

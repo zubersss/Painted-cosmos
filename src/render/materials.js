@@ -901,7 +901,7 @@ void main() {
       bareC = mix(bareC, canM.rgb, canM.a);
     #endif
     #ifdef PC_BLOOMF
-      bareC = mix(bareC, pcBloomPal(vBloomI), 0.45 * vBloomK * uBloomOn);      // (the ground between the dabs takes a share of the drift)
+      bareC = mix(bareC, pcBloomPal(mix(vBloomI.x, vBloomI.y, step(325.0, dist))), 0.45 * vBloomK * uBloomOn);      // (the ground between the dabs takes a share of the drift)
     #endif
     float lvl0 = pcLevel(mix(min(x0, 0.44) - 0.10 * vPar.z, x0, sun0), 0.05);
     #ifdef PC_ROCKF
