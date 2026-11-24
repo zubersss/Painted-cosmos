@@ -364,16 +364,42 @@ class Hydro {
       const lipE = smoothstep(tLip - 3 * hwc, tLip, t);
       dep[k] = o.depth * (1 - lipE) + o.lipDepth * lipE;
     }
+    // THE WALL'S LINE. The coast's wall need not cross the cut square: near the lip it may lie a few metres nearer or farther
+    // on either side. So, across the cut every 1.5 m, the ground is walked along the corridor's last direction from a few
+    // stations back until it drops to the sea: wallT[i] is where the wall stands at offset wallD[i]. Past it the cut stops
+    // (the sea is untouched), and the fall's top edge follows the same line.
+    const kS = Math.max(0, n - Math.max(4, Math.ceil((hw + o.bankMax) / o.step) + 2));
+    const pS = [S0.st[kS * 3], S0.st[kS * 3 + 1], S0.st[kS * 3 + 2]], lS = [S0.lf[kS * 3], S0.lf[kS * 3 + 1], S0.lf[kS * 3 + 2]];
+    const tE = [S0.tg[(n - 1) * 3], S0.tg[(n - 1) * 3 + 1], S0.tg[(n - 1) * 3 + 2]];
+    const span = hw + o.bankMax + 1.5, wallD = [], wallT = [];
+    for (let d = -span; d <= span + 1e-6; d += 1.5) {
+      const q0 = move(pS, lS, d, R), td = tangent(q0, tE);
+      let tw = tLip + 30, prevIn = true;
+      for (let a = 0; a <= tLip - S0.arc[kS] + 30; a += 1) {
+        const sh = this._h(move(q0, td, a, R));
+        const inLand = sh.h >= sea + o.seaFoot + 1;
+        if (!inLand && prevIn && a > 0) { tw = S0.arc[kS] + a - 0.5; break; }
+        prevIn = inLand;
+      }
+      wallD.push(d); wallT.push(tw);
+    }
+    const wallAt = (d) => {
+      const f = (d + span) / 1.5, i = Math.max(0, Math.min(wallD.length - 2, Math.floor(f))), u = Math.max(0, Math.min(1, f - i));
+      return wallT[i] + (wallT[i + 1] - wallT[i]) * u;
+    };
     for (let k = 0; k < n; k++) {
       const p = [S0.st[k * 3], S0.st[k * 3 + 1], S0.st[k * 3 + 2]], l = [S0.lf[k * 3], S0.lf[k * 3 + 1], S0.lf[k * 3 + 2]];
       const e = lv[k] - o.edge;
       const s0 = this._shelf(p, l, hw + 6);
       const b = Math.max(o.bankMin, Math.min(o.bankMax, (Math.max(s0[0], s0[2]) - e) * o.bankK));
-      const s1 = this._shelf(p, l, hw + b);
       B[k] = b;
-      // (never lower than the cut's own water, nor than natural water standing beside it: a levee where the land is low)
+      const s1 = this._shelf(p, l, hw + b);
+      // (never lower than the cut's own water, nor than natural water standing beside it: a levee where the land is low;
+      //  and where the measuring point fell past the wall on the sea side the shelf is carried from the station before)
       TL[k] = Math.max(s1[0], lv[k] + 0.6, s1[1] + 0.3);
       TR[k] = Math.max(s1[2], lv[k] + 0.6, s1[3] + 0.3);
+      if (k > 0 && S0.arc[k] > wallAt(hw + b) - 1.5) TL[k] = TL[k - 1];
+      if (k > 0 && S0.arc[k] > wallAt(-(hw + b)) - 1.5) TR[k] = TR[k - 1];
     }
     const lip = [S0.st[(n - 1) * 3], S0.st[(n - 1) * 3 + 1], S0.st[(n - 1) * 3 + 2]];
     const dir = [S0.tg[(n - 1) * 3], S0.tg[(n - 1) * 3 + 1], S0.tg[(n - 1) * 3 + 2]];
@@ -381,7 +407,11 @@ class Hydro {
     const lipD = o.lipDepth + 0.015 * m.width;
     const fall = { kind: 'sea', lip, dir, across, width: hw * 2, top: lv[n - 1], foot: sea, floor: tr.foot, drop: lv[n - 1] - sea, speed: Math.sqrt(9.81 * lipD), lipDepth: lipD, mouth: m };
     this.falls.push(fall);
-    return Object.assign(S0, { kind: 'fall', hw, lv, TL, TR, B, dep, t0: S0.arc[0], tLip, reach: hw + o.bankMax + 2, fall });
+    // the fall's top edge along the wall: for each place across the sheet (u, -1..1), how far past the centre's lip it starts
+    const edgeU = [], edgeT = [];
+    for (let i = 0; i <= 8; i++) { const u = -1 + i / 4; edgeU.push(u); edgeT.push(Math.max(-6, Math.min(6, wallAt(u * hw) - tLip))); }
+    fall.edgeU = edgeU; fall.edgeT = edgeT;
+    return Object.assign(S0, { kind: 'fall', hw, lv, TL, TR, B, dep, wallD, wallT, wallSpan: span, t0: S0.arc[0], tLip, reach: hw + o.bankMax + 2, fall });
   }
 
   // A FJORD: the corridor and the river's own last reach drowned to the sea's level between steep walls; the river falls into
@@ -504,13 +534,12 @@ class Hydro {
     const q = this._near(c.x, c.y, c.z);
     if (q.i < 0) return;
     const C = this.cors[q.i];
-    if (q.t > C.tLip) {
-      // past the lip, in the notch to the sea: the wood's berm is not raised there (its water is not the sea's)
-      if (q.t < C.tLip + 4 && Math.abs(q.d) < C.hw + C.B[C.n - 1]) b.lq = NOLQ;
+    const g = this._cutGround(C, q);
+    if (g === null) {
+      // just past the wall, in the cut's notch: the wood's berm is not raised there (its water is not the sea's)
+      if (q.t > C.tLip - 8 && q.t < C.tLip + 10 && Math.abs(q.d) < C.hw + C.B[C.n - 1] && this._pastWall(C, q)) b.lq = NOLQ;
       return;
     }
-    const g = this._cutGround(C, q);
-    if (g === null) return;
     b.h += (g - b.h) * this._w;
     b.lq = this._lv[0];
     c.bank = Math.max(c.bank, this._bank);
@@ -518,15 +547,23 @@ class Hydro {
     if (C.kind === 'fjord') c.still = Math.max(c.still, 0.8);
   }
 
+  _pastWall(C, q) {
+    if (!C.wallT) return q.t > C.tLip;
+    const ff = (q.d + C.wallSpan) / 1.5, i = Math.max(0, Math.min(C.wallD.length - 2, Math.floor(ff))), u = Math.max(0, Math.min(1, ff - i));
+    return q.t > C.wallT[i] + (C.wallT[i + 1] - C.wallT[i]) * u;
+  }
+
   // the cut's ground at the point q of corridor C; null outside it. Sets this._lv[0] (its water level), this._w (how much the
   // cut applies: it eases in over the river's own last metres), this._bank (0 shelving .. 1 a cut bank).
   _cutGround(C, q) {
-    if (q.t > C.tLip || q.t < C.t0) return null;
+    if (q.t > C.tLip + (C.wallT ? 6 : 0) || q.t < C.t0) return null;
     const k = q.k, f = q.f < 0 ? 0 : q.f > 1 ? 1 : q.f, k1 = Math.min(C.n - 1, k + 1);
     const Bk = C.B[k] + (C.B[k1] - C.B[k]) * f;
     const hw = C.HW ? C.HW[k] + (C.HW[k1] - C.HW[k]) * f : C.hw;
     const a = Math.abs(q.d);
     if (a >= hw + Bk) return null;
+    // (past the coast's wall at this place across: the sea, untouched)
+    if (C.wallT && this._pastWall(C, q)) return null;
     const lv = C.lv[k] + (C.lv[k1] - C.lv[k]) * f;
     const T = q.d >= 0 ? C.TL[k] + (C.TL[k1] - C.TL[k]) * f : C.TR[k] + (C.TR[k1] - C.TR[k]) * f;
     const dep = C.dep[k] + (C.dep[k1] - C.dep[k]) * f;
