@@ -8,6 +8,7 @@ import { MODE } from '../data/mode.js';
 import { FLORA_GLSL } from '../physics/flora.glsl.js';
 import { WATER_GLSL } from '../physics/water.js';
 import { VERT_PARS, VERT_END, FRAG_PARS, FOG_BANK, PAINT } from './chunks.js';
+import { WATERCHUNK_GLSL, WPAINT, wpaintOn, benchWPaint } from './waterchunk.js';      // (the water's new paint, ?wpaint=2: lane W3)
 
 // THE LOOK AT THREE HUNDRED YARDS (the owner, 2026-11-22: "better lighting ... i want things to look high quality and
 // fully rendered even from 300 yards away" -- 275 m). What this file does for that is on three dials, read once from
@@ -1006,6 +1007,9 @@ export function makeTerrainMaterial(bodyU) {
 // ------------------------------------------------------------------------------------------
 // Water
 // ------------------------------------------------------------------------------------------
+// (the new paint's base pace, ?wpaint=2: the water's own speed where the mesher measured one, else the middle of v33's
+// band; each cell keeps a sixth of spread either way, render/waterchunk.js. ?flow=0 keeps v33's fixed band)
+const FLOW_V0 = FLOWSPD > 0 ? `vTurb.x > 0.002 ? vTurb.x * ${FLOW_VMAX} : 1.15` : '1.15';
 const WATER_VERT = /* glsl */`
 ${VERT_PARS}
 attribute float aDepth;
@@ -1027,6 +1031,11 @@ varying vec2 vFlow;      // the current (surface.js _riversOil), two bytes about
 // fixed dash rate it had); y how aerated the water is, 0 clear .. 1 the foot of a fall.
 attribute vec4 aTurb;
 varying vec2 vTurb;
+#ifdef PC_WPAINT
+// (the water's new paint, ?wpaint=2: aTurb.w is how STILL the water is here, 0 a current .. 1 a pond, a lake, the sea,
+// as the mesher measured it: world/patchgen.js. A byte of 0 everywhere without the switch, and nothing reads it)
+varying float vStill;
+#endif
 #endif
 varying vec3 vWake;
 #ifdef PC_POWERS
@@ -1085,6 +1094,9 @@ void main() {
   #ifdef PC_OIL
     vFlow = aLiqP.zw;
     vTurb = aTurb.xy;
+    #ifdef PC_WPAINT
+      vStill = aTurb.w;
+    #endif
   #endif
   vec4 mv = modelViewMatrix * vec4(p + pcRound(vBody), 1.0);
   vView = mv.xyz;
@@ -1116,10 +1128,17 @@ varying vec2 vLiqP;
 #ifdef PC_OIL
 varying vec2 vFlow;      // the current (surface.js _riversOil), two bytes about 128/255; 0, 0: still water
 varying vec2 vTurb;      // x the water's own speed (0: the mesher gave none), y how aerated it is (world/patchgen.js)
+#ifdef PC_WPAINT
+uniform float uWPaint;   // the water's new paint (?wpaint=2): 1 on, 0 v37's (the speed test's row); render/waterchunk.js
+varying float vStill;    // how still the water is here, 0 a current .. 1 a pond, a lake, the sea (world/patchgen.js)
+#endif
 #endif
 varying vec3 vWake;
 #define PC_PHYS_NO_WAKE
 ${WATER_GLSL}
+#if defined(PC_OIL) && defined(PC_WPAINT)
+${WATERCHUNK_GLSL}
+#endif
 
 // Mirror the painting itself: march the reflected ray through last frame's depth.
 // Returns uv and a confidence.
@@ -1392,8 +1411,54 @@ void main() {
     // chart's derivatives come from a position measured from the eye: chunks.js pcGroundChartD.)
     vec2 wch = pcGroundChart(vBody, uBodyR);
     vec2 wdx = pcGroundChartD(vBody, -dFdx(vToCam), uBodyR), wdy = pcGroundChartD(vBody, -dFdy(vToCam), uBodyR);
-    vec2 woc = pcStrokeOct(dist * 1.1, uOilPx.z * 1.1);
     vec3 wr1, wr2; vec2 wds; float wown;
+    // (and the churn's own chart, below: it is turned to the current on a far lower floor than the dashes are,
+    // because white water must MOVE even in an eddy, where the body of the water is rightly laid still)
+    vec2 ach = wch, adx = wdx, ady = wdy;
+    #ifdef PC_WPAINT
+    // (the lace's way, pace and octave in the new paint: set below)
+    vec2 aDir = vec2(1.0, 0.0); float aSpd = 0.0; vec4 ao4 = vec4(1.0, 0.0, 0.0, 0.0); vec3 aoc3 = vec3(0.0);
+    if (uWPaint > 0.5) {
+      // THE WATER'S NEW PAINT (lane W3, ?wpaint=2; the strokes themselves in render/waterchunk.js pcWStrokes).
+      // STILL WATER LAID STILL. How still the water is here comes from the mesher (vStill: a pond, a lake, the sea,
+      // and a widened pool whose "current" turns round on itself -- the junction pond that was painted as a whorl);
+      // where two currents disagree across a triangle (an eddy, at a meeting of waters) it is still as well, by
+      // v33's own test. Still water's strokes lie ALONG THE CRESTS OF THE WIND'S WAVES (PHYSICS' wave direction, turned
+      // by the sea map toward a shore: the same way the sea's far swell is laid, below), long and level, and do not
+      // run; where the water has a current they lie along it and run with it at its own pace, as v33 made them.
+      vec2 fl = vFlow * (255.0 / 127.0) - (128.0 / 127.0);
+      float coh = vFlow.x + vFlow.y > 0.004 ? dot(fl, fl) : 0.0;
+      vec3 Uf = normalize(abs(up.y) < 0.9 ? vec3(-up.z, 0.0, up.x) : vec3(0.0, up.z, -up.y));
+      vec2 fc = pcGroundChartD(vBody, Uf * fl.x + cross(up, Uf) * fl.y, uBodyR);
+      fc = dot(fc, fc) > 1e-12 ? normalize(fc) : vec2(1.0, 0.0);
+      vec2 kc = pcGroundChartD(vBody, cross(up, pcPhysWaterDir(sdir)), uBodyR);
+      kc = dot(kc, kc) > 1e-12 ? normalize(kc) : vec2(1.0, 0.0);
+      float still = max(vStill, 1.0 - smoothstep(0.30, 0.56, coh));
+      vec2 dS = mix(fc, dot(kc, fc) < 0.0 ? -kc : kc, still);
+      dS = dot(dS, dS) > 1e-6 ? normalize(dS) : kc;
+      float v0 = ${FLOW_V0};
+      // NO SIZE JUMP: two octaves, each stroke of the finer one there or not by its own number (pcWStrokes). And where
+      // the rows are squeezed on the screen (seen low, the rows stacked away from the eye) the strokes are laid larger,
+      // by how much the rows are squeezed, up to three times: sized by the distance alone the rows went under two
+      // pixels and the finer octave's thinning strokes were dotted lines, a lattice of specks (the first stills of
+      // this paint, E4 at the phone's size). The squeeze is worked out from the way the rows stack and the way the eye
+      // looks, both smooth over the water: the rows' own size on the screen is a derivative, and the octave's derivative
+      // taken from it was blocky from one square of pixels to the next and frayed the strokes' ends.
+      vec3 f3 = Uf * fl.x + cross(up, Uf) * fl.y, k3 = cross(up, pcPhysWaterDir(sdir));
+      vec3 d3 = mix(dot(f3, f3) > 1e-6 ? normalize(f3) : k3, dot(k3, f3) < 0.0 ? -k3 : k3, still);
+      float rowF = length(cross(cross(up, dot(d3, d3) > 1e-6 ? normalize(d3) : k3), Vd));
+      float graze = 1.0 / max(rowF, 0.333);
+      vec4 wo4 = pcStrokeOct4(dist * graze * 1.1, uOilPx.z * 1.1);
+      vec3 woc3 = vec3(wo4.w - wo4.z, dFdx(wo4.w), dFdy(wo4.w));
+      pcWStrokes(wch, wdx, wdy, dS, v0 * (1.0 - still), wo4.x, 6.0, woc3, wr1, wr2, wown);
+      // (the lace: along the current wherever there is one, at the water's own pace, on its own octaves)
+      aDir = coh > 0.02 ? fc : kc; aSpd = coh > 0.02 ? v0 : 0.0;
+      ao4 = pcStrokeOct4(dist * graze * 1.1, uOilPx.z * 0.40);
+      aoc3 = vec3(ao4.w - ao4.z, dFdx(ao4.w), dFdy(ao4.w));
+    } else
+    #endif
+    {
+    vec2 woc = pcStrokeOct(dist * 1.1, uOilPx.z * 1.1);
     // (long thin dashes, and the deep ones well deeper: short and all pale, a stream was a strip of pale flat patches,
     // "low-poly ice": the critic)
     // THE CURRENT (the owner, 2026-11-16: "the rivers should be moving with the flow of the current same for the art
@@ -1410,9 +1475,6 @@ void main() {
     // of the look moves until the number arrives.
     float flowV = 1.15;      // (never read unless a current turns the chart below; the middle of v33's band)
     vec2 sch = wch, sdx = wdx, sdy = wdy;
-    // (and the churn's own chart, below: it is turned to the current on a far lower floor than the dashes are,
-    // because white water must MOVE even in an eddy, where the body of the water is rightly laid still)
-    vec2 ach = wch, adx = wdx, ady = wdy;
     if (vFlow.x + vFlow.y > 0.004) {
       vec2 fl = vFlow * (255.0 / 127.0) - (128.0 / 127.0);
       float coh = dot(fl, fl);
@@ -1436,6 +1498,7 @@ void main() {
       }
     }
     pcThinLayer(sch, sdx, sdy, woc.x, 11.0, vBody, 60.0, 4.0, wr1, wds, wown, wr2);
+    }
     // (water is deeper and bluer than the air over it: looking toward the sun a stream took the pale sky whole and a
     // wide share of its dashes were the sun's own, and the river was a pale gravel road through the grass: the stills
     // of 2026-11-16. Its body is half the water's own wash laid heavy and blue, whatever the sky gives it, and the sun's path is a narrow run of marks.)
@@ -1464,9 +1527,15 @@ void main() {
       // then the lace: a share of the fine strokes is bare white, the share growing with the churn, and the milk
       // shows between them. A smaller base width in pcStrokeOct gives finer strokes NEAR and exactly the same ones
       // far off, where it clamps to what the brush can hold -- which is why this cannot turn into a speckle.
-      vec2 aoc = pcStrokeOct(dist * 1.1, uOilPx.z * 0.40);
       vec3 ar1, ar2; vec2 ads; float aown;
+      #ifdef PC_WPAINT
+      if (uWPaint > 0.5) pcWStrokes(wch, wdx, wdy, aDir, aSpd, ao4.x, 9.0, aoc3, ar1, ar2, aown);      // (half again as long as the body's, as v37's lace was)
+      else
+      #endif
+      {
+      vec2 aoc = pcStrokeOct(dist * 1.1, uOilPx.z * 0.40);
       pcThinLayer(ach, adx, ady, aoc.x, 16.0, vBody, 60.0, 4.0, ar1, ads, aown, ar2);
+      }
       // (at full churn four strokes in five break, and they break to bare paper; a faintly stirred reach breaks a
       // few and breaks them only part of the way, or the first whisper of churn would be a sparkle of white specks)
       float ath = 1.0 - aer * 0.78;
@@ -1499,6 +1568,9 @@ export function makeWaterMaterial(bodyU, skyU) {
   });
   // (the powers, ?powers=1: the water is compiled with the parted channel; without the flag its program is as it was)
   if (MODE.powers) { m.defines.PC_POWERS = 1; m.uniforms.uPwChanA = G.uPwChanA; m.uniforms.uPwChanB = G.uPwChanB; }
+  // (the water's new paint, ?wpaint=2 with the oil look: compiled in behind one uniform the speed test can turn off;
+  // without the switch the program is v37's, to the letter. render/waterchunk.js)
+  if (wpaintOn()) { m.defines.PC_WPAINT = 1; m.uniforms.uWPaint = WPAINT.uWPaint; benchWPaint(); }
   m.userData.pcPainted = true;
   // (R1 W2.4: water drawn in this frame wants last frame's painting kept for the next: post.js finish)
   m.onBeforeRender = () => { PREV.water = true; };

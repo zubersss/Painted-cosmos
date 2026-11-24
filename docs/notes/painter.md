@@ -4,6 +4,48 @@ Branch: `cosmos` (shared with PILOT and PHYSICS, one working tree). Commits: `to
 This file was rewritten by the second PAINTER agent (the first ran out of working context). The
 first agent's record of M1 is kept at the end ("Earlier answers").
 
+## Hand-over of THE WATER'S PAINT and THE PLAYER AND THE WORLD (water group, lanes W3 and W4; branch `water-paint`)
+
+A helper session of the coordinator, kept current after every step (the container can restart). The design is
+`docs/lead/WATER-DESIGN.md` (3.4, 3.6, 3.7, 5.3, 5.4 are these lanes; 6 the speed-test rows). Everything is behind
+`?wpaint=2` / `?wakes=2` / `?splash=1` with the oil look; without them the game is v37 exactly (checked: the bank view
+at 936 x 372 with `&t=5`, before and after, 0 pixels differ).
+
+**The order** (the coordinator's brief): 1 still water and the stroke octaves; 2 the night (the water through the look
+director's night pull); 3 colour, far shine and water from the air (FV5, with group C); 4 the player's wakes and
+splashes; 5 rain on water.
+
+**Step 1, DONE (24 Nov), `?wpaint=2`:**
+- `src/render/waterchunk.js` (new; its `pcWStrokes(ch, wdx, wdy, d, spd, w0, asp, oc, out rnd, out rndN, out own)` is
+  the interface the falls' material may include): the water's strokes in TWO octaves, each stroke of the finer one
+  there or not by its own number, asked at its centre (no size jump: the circle at E12 and the line across the river at
+  E2 are gone); and cells (26 m, or 66 strokes' widths when the strokes are larger) each with its own way and pace, a
+  stroke belonging to the cell its centre lies in or just past the edge of, two cells' strokes overlapping by their
+  numbers along an edge (no edge drawn, no stroke cut: the wood grain at E4 is gone). Nothing in it takes a
+  derivative, so it runs inside a branch. One uniform `uWPaint` (1 new, 0 v37) for the speed test; its rows
+  ("v37 water paint" at the bank and the shore) register themselves in `WATER_BENCH`.
+- `WATER_FRAG` (materials.js): the new branch under `#ifdef PC_WPAINT` + `uWPaint`; still water's strokes lie along
+  the crests of PHYSICS' waves (`pcPhysWaterDir(pcPhysSeaDir)`; in the gallery, which runs no physics, that is a fixed
+  way), do not run; a current's run with it as v33 made them. Strokes 6 times as long as wide (11 was a river-length
+  streak from the air); laid larger where the rows are squeezed on the screen (up to 3x), from the angle, not from a
+  derivative. `WATER_VERT`: `vStill = aTurb.w`.
+- `patchgen.js` water section: the still byte `aTurb.w` (only with the switch): the sample's own `still`, 1 where there
+  is no current, and 1 where water reaches 27 m to BOTH sides across its current (two surface samples on a 6 m grid):
+  v37's river is at most about 44 m wide, so that is a pool. This is what found the junction pond (E3) that v37 painted
+  as a whorl; measured in Node, a turn of the current or its coherence over 8 to 14 m could not tell it from the river.
+  One new float per sample in the sampling loop (`_col` slot 21, `s.still`).
+- SEEN (A/B, opened): E3, E4, E12, E2 at the phone's settings (936 x 372, tier 1, lighter paint) and E3, E12, E2 at
+  desktop top tier (1280 x 720, tier 2); stills in `docs/shots/painter/water-paint/s1-*`.
+- MEASURED (software, this machine; phone DERIVED by the design's method, 14 ns a water pixel): bank view (water 24 %
+  of the picture) the new paint adds 23 % of the water's own cost: about +0.27 ms on the phone (0.13 to 0.55); the sea
+  from above (all water) +2 to +6 %: about +0.1 to +0.2 ms at a shore. No draw call, no memory; patch build no
+  measurable change (4.8 against 4.3 ms a patch, 16 patches, after warm-up).
+- NOT fixed, and now plainly visible where the whorl was: thin pale contour lines in the pond and the wide water (E3,
+  E4), the BED showing through where the water is under 0.42 m deep round submerged bumps (`WATER_FRAG` "the bed shows
+  through"); v37 has them too, masked by the whorl. It is the water's colour: step 3 (body by depth).
+- Tools (scratch, not committed): `tools/lab.mjs` with the design's camera helper (its appendix A) and a script that
+  opens a page once and grabs each station with `uWPaint` 1 and 0 (no recompile between A and B).
+
 ## Hand-over of THE OIL LOOK, prototype on branch `look-proto` (READ THIS FIRST; kept current)
 
 Branch: `look-proto`, cut from `main` at `5e85754`. Nothing here is live. The plan, the owner's instructions, the sort of
