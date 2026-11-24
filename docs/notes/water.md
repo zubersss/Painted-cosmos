@@ -463,9 +463,19 @@ Branch `water-bodies` = lane 0 + look-proto v37.1 + `origin/design-water` (W1's 
   Suites 325 / 108 / 445 (the commit message says 107: written before the run).
 - F accepted the gold sun path; for the full sheet: W3's pointed ends to cure the square slabs; and at golden hour the sea's
   troughs toward violet by pcGold() -- W3 chose option (b), mine, after W3's golden-hour wash change lands.
-- NEXT: W3's push (pointed ends, pcWCellC(wL, asp), wLow, gWLens around the pcWStrokes call: merge with care at my aspW /
-  lenF / kG lines), the violet troughs, then the full sheet, the strait crop and the 18.3 h sun view to F; after the
-  branches meet (the coordinator's call): the pool's pcThinLayer to W3's
+- **W3's POINTED ENDS merged (water-paint 2b869d8 into water-sea 9afdeb1; conflicts: both wChop and wLow; my aspW with
+  wChop then W3's gWLens around pcWStrokes; W3's CS 27 layout + my shore import) and the VIOLET TROUGHS (848b04e): the sea's
+  trough tint toward (1.02, 0.89, 1.0) by 0.8 pcGold(); troughs density 1.72 (the merged v39.2 sky had laid them under
+  0.42).** MEASURED on the same code (new / v37 sd): strait 150 0.113 / 0.157, coast 150 0.133 / 0.157, strait 400 0.133 /
+  0.160, coast 400 0.118 / 0.129; p95 0.87-0.89, p5 0.40-0.48. PROVEN: default against 2b869d8's own files, at most 2 of 255.
+  NOT GOOD: near the eye the shortest chop (3 widths) with W3's lens taper breaks into small jagged bits -- W3 to choose (a)
+  no taper under some aspect, (b) chop back to 3.5. The full sheet, crop and 18.3 h sun view with F
+  (`sea-full-sheet-pointed-ends-v37-now.jpg`, `sea-strait150-crop-pointed-ends-v37-now.jpg`,
+  `sea-sunpath-1830-pointed-violet.jpg` on water-sea). W3 takes water-sea 848b04e into the coordinator's one default commit
+  on v39.4 (with lakeWidthAt for lakes over 150 m on the sea's level).
+- The stills since the lab's limit: scratch multishot.mjs (one page load, several views; page screenshots, which read a
+  little differently from the lab's readPixels grabs: compare only like with like).
+- NEXT: F's verdict on the full sheet; W3's word on the jagged chop; after the branches meet (the coordinator's call): the pool's pcThinLayer to W3's
   pcWStrokes, pcFallMilk and the FALL_ colours into waterchunk.js.
 - Camera places for the falls views: `fallsView(S)` and the scratch `fallcams.mjs` (sea60, sea150, air400, bank, E7).
 
