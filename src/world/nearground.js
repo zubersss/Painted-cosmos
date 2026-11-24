@@ -150,7 +150,7 @@ function stoneC(c, gr, gg, gb, m, out) {
   const v = Math.max(r, g, b); if (v < 0.62) { const f = 0.62 / Math.max(v, 1e-3); r = Math.min(1, r * f); g = Math.min(1, g * f); b = Math.min(1, b * f); }
   out[0] = r; out[1] = g; out[2] = b; return out;
 }
-const _stc = [0, 0, 0], _cuv = [1, 0], _pcol = [0, 0, 0];
+const _stc = [0, 0, 0], _cuv = [1, 0];
 // A BLADE'S TONE (the look director's audit 2: "marks take their colour from the PIXEL, not the THING"; from 10 to 30 m
 // the sward was a speckle of three greens, blade by blade). With ?tuft on, a TUFT takes one of the three colours (or is a
 // dark accent tuft, one in seven) and its blades differ only by a value step; off, each blade picks its own as before.
@@ -799,14 +799,12 @@ class Ring {
         let nh = nf, patched = false, np0 = 0;
         if (FLORA.patch && nf >= 2) {
           const cov = Math.min(1, o.dens * (two2 ? 1.5 : 1));
-          if (cov > 0.22) {
+          // (a WHITE drift keeps its heads: SEEN 24 Nov, its patches read as pale blue-grey puddles, then, made cream and flat,
+          // as pebbles: a plain disc loses the daisy's eye, which is what makes it a daisy. Only a coloured drift is pooled.)
+          const c1 = b1.c, pale = Math.max(c1[0], c1[1], c1[2]) - Math.min(c1[0], c1[1], c1[2]) < 0.25 * Math.max(c1[0], c1[1], c1[2]);
+          if (cov > 0.22 && !pale) {
             const np = Math.min(nf - 1, far ? (cov > 0.5 ? 2 : 1) : (cov > 0.6 ? 3 : cov > 0.38 ? 2 : 1));
-            // (a white drift seen whole takes a fifth of its eyes' colour: SEEN 24 Nov at 1.8 m, white patches alone read as pale
-            // blue-grey puddles, where a field of daisies reads cream)
-            const c1 = b1.c, pale = Math.max(c1[0], c1[1], c1[2]) - Math.min(c1[0], c1[1], c1[2]) < 0.25 * Math.max(c1[0], c1[1], c1[2]);
-            let pc = c1;
-            if (pale && b1.eye) { pc = _pcol; pc[0] = lerp(c1[0], b1.eye[0], 0.2); pc[1] = lerp(c1[1], b1.eye[1], 0.2); pc[2] = lerp(c1[2], b1.eye[2], 0.2); }
-            const wj = far && pale ? 0.8 : 1;
+            const pc = c1, wj = 1;
             const st0 = b1.stalk ? 0.5 * (b1.stalk[0] + b1.stalk[1]) : 0.2;
             const c0 = at(0.3 + 0.4 * H(918 + ho), 0.3 + 0.4 * H(919 + ho)), dw0 = far ? 0.20 + 0.18 * cov : 0.09 + 0.05 * cov;
             for (let q = 0; q < np; q++, k++) {
