@@ -72,7 +72,11 @@ export const CLOUDS = {
   // (A4 the high cloud: OFF by default, ?cirrus=1 on. Seen in rework 2 from the ground and from 1 km, the strokes read as pale
   // ghost shapes with tails over the painted sky, not as mare's tails)
   cirrus: _qn('cirrus', 0) > 0,
-  skyStrokes: _qn('skystrokes', 0) > 0,                  // ?skyfix=0: the look director's audit items in sky.js left as they were                 // ?valleycloud=0: none; a number over 1 forces that much cover (0..1 as v - 1), for looking (A5)
+  skyStrokes: _qn('skystrokes', 0) > 0,
+  // (the coordinator, 24 Nov: from the ground in the hybrid, the 3D cumulus field the air would show is still laid into the
+  // shadow map, unseen, so the clouds' shadows sweep the land, and they are the very clouds the player rises into.
+  // ?cloudshadow=0: none; the speed test's row 'weather: no unseen cloud shadow field (fair)' sets world.clouds.shadowField)
+  shadowField: _qn('cloudshadow', 1) > 0,                  // ?skyfix=0: the look director's audit items in sky.js left as they were                 // ?valleycloud=0: none; a number over 1 forces that much cover (0..1 as v - 1), for looking (A5)
   rebuild: 0.5,           // s between rebuilds of the instances (the drift itself is the group's turn, every frame; a lobe grows over tens of seconds, so twice a second is smooth)
   maxLobes: 6144,         // instances a level of detail holds at most
   sagPx: 2.2,             // how far a lobe's outline may stand off the true round, in pixels, before the next level is taken (its noise hides that much)
@@ -259,6 +263,9 @@ void main() {
   // (the ends ragged, as a loaded knife leaves them: cut straight, the deep strokes on a near tower were rectangles)
   vec2 uvS; float pxW;
   pcThinLayerUV(ch + vK.w * 53.0, dcx, dcy, oc.x, 3.0, q * r + vK.w * 9.0, 30.0, 1.5, 0.12, rnd, ds, own, rndN, uvS, pxW);
+  // (a cloud the eye is close to thins BY WHOLE STROKES, from 280 m in (from 450 m a near cloud at 600 m read as lace), so it is passed through rather than standing as a
+  // flat sheet in front of the camera -- the look director's review of the 1 km stills)
+  if (fract(rnd.x * 7.13 + rnd.y * 3.31) > 0.25 + 0.75 * smoothstep(100.0, 280.0, dist)) discard;
   // the light, asked at the stroke's centre (the normal and the height carried there)
   vec3 nS = normalize(PC_AT(n, ds));
   float hS = clamp(PC_AT(vK.y, ds), 0.0, 1.0);
@@ -287,11 +294,11 @@ void main() {
   // turns a side from the sun, in the half-tone, however lit the whole. Read from the lobe's own normal (the bent one
   // faces the whole cloud to the light: from 1 km, front-lit, every cloud was one flat lit tone)
   float lamL = dot(normalize(PC_AT(vNL, ds)), sun);
-  x = mix(x, min(x, 0.46), smoothstep(0.02, -0.28, lamL) * (1.0 - down) * uAtmo.y);
+  x = mix(x, min(x, 0.46), smoothstep(0.15, -0.15, lamL) * (1.0 - down) * uAtmo.y);
   // and THE CREASES between heads: where a lobe's own surface turns in toward its cloud and still shows, it lies between
   // two heads, out of the light -- the half-tone. Front-lit (the sun behind the eye), this is what still draws a
   // cumulus' heads: from 600 m it was one flat light shape with a bumpy outline
-  float crease = smoothstep(0.22, -0.15, PC_AT(vCrease, ds)) * (1.0 - down);
+  float crease = smoothstep(0.35, 0.02, PC_AT(vCrease, ds)) * (1.0 - down);
   x = mix(x, min(x, 0.44), crease);
   float core = 1.0 - smoothstep(0.35, 0.75, PC_AT(vAxis, ds));
   x = mix(x, 0.22 - 0.16 * core * st, down);
@@ -329,7 +336,9 @@ void main() {
   // own wash, below, warms them then)
   vec3 cLight = mix(vec3(0.95), sunC * 0.95, 0.18);
   vec3 cTop = mix(cTopA * 1.01, sunC * 0.82, 0.25);
-  vec3 cHalf = mix(cLav, uSkyHorizon, 0.35);
+  // (a CLEAR step under the lit top, about 0.10 in value: at 0.35 toward the horizon it was a breath under it, and from
+  // 600 m at noon a cumulus read as one pale tone, the look director's review)
+  vec3 cHalf = mix(cLav, uSkyHorizon, 0.20);
   vec3 cBase = pcCloudDens(cHalf, 1.25);
   cLight = mix(cLight, cTop, st);
   // a storm: the shade goes to the world's heavy-weather pigment, slate and indigo, and only there a deep tone; the
@@ -357,9 +366,14 @@ void main() {
   vec3 nightC = mix(mix(uSkyZenith, uSkyHorizon, 0.5), uSkyHorizon, 0.30) * (0.92 + 0.10 * hS);
   c = mix(nightC, c, uAtmo.y);
   // the lightning's light, asked at the stroke's centre: a stroke is lit whole or not at all
-  // (a cloud lit in whole HEADS, each lobe by its own number: stroke by stroke it was a scatter of flecks)
-  float flS = PC_AT(pcCloudFlash(vPosA), ds);
-  c = mix(c, vec3(0.84, 0.86, 0.96), step(0.25 + 0.45 * fract(vK.w * 5.31), flS));
+  // (a cloud lit in whole HEADS, each lobe by its own number, in two value steps falling off from the light: stroke by
+  // stroke it was a scatter of flecks)
+  {
+    float flS = PC_AT(pcCloudFlash(vPosA), ds) - 0.35 * fract(vK.w * 5.31);
+    vec3 flC = vec3(0.84, 0.86, 0.96);
+    c = mix(c, mix(c, flC, 0.5), step(0.05, flS));
+    c = mix(c, flC, step(0.35, flS));
+  }
   // THE CLOUD'S OWN AIR: a far cloud goes toward the sky's low band in flat steps, one step for the whole cloud (the
   // land's air, pcFogAmount, would swallow it: the ground's visibility is a few hundred metres, a cloud's kilometres)
   vec3 farC = mix(uSkyHorizon, vec3(0.48, 0.50, 0.63), uOilS.x * 0.6);
@@ -522,9 +536,12 @@ void main() {
     // FROM BELOW (the review of 24 Nov: a storm's ceiling broken into two or three big masses with lighter gaps): the big
     // field that cuts the gaps sets the masses -- where it runs thin a lighter seam, a half-tone, even where the sheet is
     // closed; its body the belly; the rolls only move a stroke a step either way; a deep only in a storm's heaviest
-    float hS2 = PC_AT(hm, ds);
-    float x = smoothstep(0.30, 0.62, hS2) * 0.8 + (mS - 0.5) * 0.35 + jit;
-    c = x > 0.72 && st > 0.05 ? cDeep : x > 0.34 ? cBase : cHalf;
+    // (the masses' edges crisp and SMOOTH, a pixel wide from fwidth as the sky's own bands (sky.js tq): told stroke by
+    // stroke, seen far and flat the light and dark bands stepped like a staircase in pixel blocks -- the look director)
+    float xC = smoothstep(0.30, 0.62, hm) * 0.8 + (m - 0.5) * 0.35;
+    float fwx = max(fwidth(xC), 1e-4);
+    float kB = smoothstep(0.34 - fwx, 0.34 + fwx, xC), kD = smoothstep(0.72 - fwx, 0.72 + fwx, xC) * step(0.05, st);
+    c = mix(mix(cHalf, cBase, kB), cDeep, kD);
     // the gaps' own edges, where the sun is over the sheet: a step lighter (the light comes through them), never a line
     float thin = (1.0 - smoothstep(0.0, 0.10, eS)) * step(0.0, se) * sunK * uAtmo.y * (1.0 - 0.7 * st);
     c = mix(c, cHalf, step(0.5, thin + (rnd.x - 0.5) * 0.4));
@@ -543,10 +560,16 @@ void main() {
   }
   vec3 nightC = mix(mix(uSkyZenith, uSkyHorizon, 0.5), uSkyHorizon, 0.30) * (0.90 + 0.12 * thick);
   c = mix(nightC, c, uAtmo.y);
-  // (the ceiling lit in its own MASSES, whole: the thick of the sheet first. Stroke by stroke it read as a scatter of pale
-  // flecks, close to grain)
-  float flS = PC_AT(pcCloudFlash(vPosD), ds);
-  c = mix(c, vec3(0.84, 0.86, 0.96), step(0.20 + 0.45 * (1.0 - PC_AT(hm, ds)), flS));
+  // (the ceiling lit in its own MASSES, the thick of the sheet first, in TWO VALUE STEPS falling off from the light: near
+  // it the pale cool flash tone, further out half-way to it -- one flat pale zone over a third of the sky, the look
+  // director's review; stroke by stroke, a scatter of flecks. Its edges a pixel wide, as the masses')
+  {
+    float fl = pcCloudFlash(vPosD) - 0.45 * (1.0 - hm);
+    float fwf = max(fwidth(fl), 1e-4);
+    vec3 flC = vec3(0.84, 0.86, 0.96);
+    c = mix(c, mix(c, flC, 0.5), smoothstep(0.02 - fwf, 0.02 + fwf, fl));
+    c = mix(c, flC, smoothstep(0.30 - fwf, 0.30 + fwf, fl));
+  }
   // the sheet's own air, in flat steps of the distance (the land's air would swallow it)
   float af = floor(min(0.45, 0.55 * (1.0 - exp(-dist / 8000.0))) * 5.0 + 0.5) / 5.0;
   vec3 farC = mix(uSkyHorizon, vec3(0.48, 0.50, 0.63), uOilS.x * 0.6);
@@ -813,6 +836,15 @@ export function createClouds(scene) {
     g.instanceCount = 0;
     return { lod, g, mesh: null, n: 0 };
   });
+  // (the unseen field for the shadow map alone: the coarsest lobe, on the shadow's layer only, so the scene's camera never
+  // draws it)
+  const shadowOnly = (() => {
+    const g = icosphere(1), cap = 2048;
+    const mk = () => { const a = new THREE.InstancedBufferAttribute(new Float32Array(cap * 4), 4); a.setUsage(THREE.DynamicDrawUsage); return a; };
+    g.setAttribute('iA', mk()); g.setAttribute('iB', mk()); g.setAttribute('iC', mk()); g.setAttribute('iD', mk());
+    g.instanceCount = 0;
+    return { lod: LODS[0], g, mesh: null, n: 0, cap };
+  })();
   const anchor = new THREE.Vector3();
   // A6: the shadow map's target, its camera (placed in the body's own frame, carried to the scene at each render), and the
   // matrix from a body-local place to the map
@@ -905,6 +937,7 @@ export function createClouds(scene) {
     const handK = smooth(c0 * 0.8, c0 * 1.4, camR - Rg);
     // (the hybrid: how far the 3D cumulus have taken over from the sky's own painted cloud, by the eye's height)
     const airK = CLOUDS.hybrid ? smooth(CLOUDS.airH[0], CLOUDS.airH[1], camR - Rg) : 1;
+    const shadowField = CLOUDS.shadowField && self.shadowField !== false && self.shadowK > 0 && airK < 1;
     const eyeG = Rg - R;
     self.stats.airK = airK;
     // the wind aloft at the eye, in the drifting frame (what the towers lean along)
@@ -959,7 +992,7 @@ export function createClouds(scene) {
         // a storm cell -- is drawn from the ground too: the weather group's land storm at 3750 s came from 3.5 km away
         // as nothing at all, the hybrid's first game stills)
         if (C) keep = Math.max(keep, smooth(350, 800, thick) * smooth(0.25, 0.6, conv));
-        if (keep <= 0.001) continue;
+        if (keep <= 0.001 && !shadowField) continue;
       }
       const L0 = CLOUDS.life[0], L1 = CLOUDS.life[1];
       const life = L0 + (L1 - L0) * hash(k, 3, 5);
@@ -971,7 +1004,10 @@ export function createClouds(scene) {
       // sky above 2 degrees, the land left out): the world's fair 0.45 covers 19 per cent of it, 0.55 about 30, 0.75 about
       // half, the design's 4.4 criterion 1: fair at most 25, building 30 to 60)
       const own = hash(k, gen, 11);
-      const s = env * smooth(own - 0.12, own + 0.12, keep * cover * (0.62 + 0.45 * smooth(0.40, 0.80, cover)));
+      const share = smooth(own - 0.12, own + 0.12, cover * (0.62 + 0.45 * smooth(0.40, 0.80, cover))), sk = keep > 0.001 ? smooth(own - 0.12, own + 0.12, keep * cover * (0.62 + 0.45 * smooth(0.40, 0.80, cover))) : 0;
+      // (a cloud the hybrid does not show is laid into the shadow map only, at the size the air would show it)
+      const hidden = env * sk < 0.04 && shadowField && keep < 1;
+      const s = env * (hidden ? share : sk);
       if (s < 0.04) continue;
       // its size: a fair cumulus 70 to 150 m across the base's radius, more under a fuller sky; its thickness the map's
       // (towers in a storm's cell) or a fair one's
@@ -1007,7 +1043,8 @@ export function createClouds(scene) {
         const tt = -(camD.x * tx + camD.y * ty + camD.z * tz) / (tx * tx + ty * ty + tz * tz);
         if (tt > 0 && tt < 1) { const mx = camD.x + tx * tt, my = camD.y + ty * tt, mz = camD.z + tz * tt; if (mx * mx + my * my + mz * mz < R * R) continue; }
       }
-      clouds.push({ k, gen, s, Rc, T, storm, bx, by, bz, sx, sy, sz, dist, aspect: T / Rc });
+      if (hidden && dist > 4500) continue;      // (the shadow map covers the ground within some 3.5 km ahead of the eye)
+      clouds.push({ k, gen, s, Rc, T, storm, bx, by, bz, sx, sy, sz, dist, aspect: T / Rc, hidden });
     }
     // THE THUNDERSTORMS: the cloud map's convective cells of the storm kind, each a column from the base to the top
     // (the map's own thickness at its core, about 1.8 km on Earth) with an anvil fanned downwind at the top
@@ -1043,15 +1080,17 @@ export function createClouds(scene) {
     let tris = 0;
     const budget = (QUALITY.level | 0) >= 2 ? Infinity : CLOUDS.budget;
     // one lobe into the level of detail its size on the screen asks for
+    shadowOnly.n = 0;
+    let hid = false;
     const emit = (px, py, pz, r, cx, cy, cz, baseD, ex, ey, ez, nx, ny, nz, pa, seed, squash, T, storm, air) => {
       const dl = Math.hypot(px - camD.x, py - camD.y, pz - camD.z);
-      if (dl < r * 0.8) { lobes.push(px, py, pz, r); return; }      // (the eye inside it: not drawn, the near air whites out)
+      if (!hid && dl < r * 0.8) { lobes.push(px, py, pz, r); return; }      // (the eye inside it: not drawn, the near air whites out)
       // the level of detail: the coarsest whose outline stays within CLOUDS.sagPx of the true round on the screen
       const pr = r / Math.max(dl - r, 1) / rad;
       let li = 0; while (li < LODS.length - 1 && pr * LODS[li].sag > CLOUDS.sagPx) li++;
       if (tris > budget) li = 0;
-      const M = meshes[li];
-      if (M.n >= CLOUDS.maxLobes) return;
+      const M = hid ? shadowOnly : meshes[li];
+      if (M.n >= (M.cap || CLOUDS.maxLobes)) return;
       const q = M.n * 4, A = M.g.attributes.iA.array, B = M.g.attributes.iB.array, Cc = M.g.attributes.iC.array, D = M.g.attributes.iD.array;
       A[q] = px - anchor.x; A[q + 1] = py - anchor.y; A[q + 2] = pz - anchor.z; A[q + 3] = r;
       B[q] = cx - anchor.x; B[q + 1] = cy - anchor.y; B[q + 2] = cz - anchor.z; B[q + 3] = baseD;
@@ -1060,6 +1099,7 @@ export function createClouds(scene) {
       Cc[q] = ex * ca + nx * sa; Cc[q + 1] = ey * ca + ny * sa; Cc[q + 2] = ez * ca + nz * sa; Cc[q + 3] = seed;
       D[q] = squash; D[q + 1] = T; D[q + 2] = storm; D[q + 3] = air;
       M.n++;
+      if (hid) return;
       tris += M.g.index.count / 3;
       if (dl < 600 + r) lobes.push(px, py, pz, r);
     };
@@ -1079,9 +1119,11 @@ export function createClouds(scene) {
       // how many lobes: as many as are larger than a few pixels at this distance (a storm keeps them all)
       const pxR = cl.Rc / Math.max(cl.dist, 1) / rad;
       // (a cloud under two pixels across its radius is not drawn: the air has taken it by then)
-      if (pxR < 2 + 4 * handK) continue;
+      hid = !!cl.hidden;
+      if (!hid && pxR < 2 + 4 * handK) continue;
       let nl = cl.cb ? t.lobes.length : Math.max(pxR < 4 ? 1 : 2, Math.min(t.lobes.length, Math.round(t.lobes.length * smooth(6, 60, pxR))));
       if (!cl.cb && tris > budget * 1.25) nl = Math.min(nl, 3);
+      if (hid) nl = Math.min(t.lobes.length, 8);
       const cxA = cl.bx + ux * cl.T * 0.45, cyA = cl.by + uy * cl.T * 0.45, czA = cl.bz + uz * cl.T * 0.45;
       const baseD = cl.T * 0.45;
       const air = Math.round(Math.min(0.45, 0.55 * (1 - Math.exp(-cl.dist / 8000))) * 5) / 5;
@@ -1108,13 +1150,16 @@ export function createClouds(scene) {
         emit(px, py, pz, r, cxA, cyA, czA, baseD, ex, ey, ez, nx, ny, nz, pa, seed, sqz, cl.T, cl.storm, air);
       }
     }
-    for (const M of meshes) {
+    hid = false;
+    for (const M of [...meshes, shadowOnly]) {
       for (const k of ['iA', 'iB', 'iC', 'iD']) { const a = M.g.attributes[k]; a.clearUpdateRanges(); a.addUpdateRange(0, M.n * 4); a.needsUpdate = true; }
       M.g.instanceCount = M.n;
       if (M.mesh) M.mesh.visible = M.n > 0;
     }
+    self.stats.shadowLobes = shadowOnly.n;
     group.position.set(0, 0, 0);
     for (const M of meshes) if (M.mesh) M.mesh.position.copy(anchor);
+    if (shadowOnly.mesh) shadowOnly.mesh.position.copy(anchor);
     // THE SHEETS (A3 the deck, A5 the valley cloud), every second rebuild: the map itself refreshes twice a second
     {
       const ws = Math.hypot(we, wn) || 1;
@@ -1177,7 +1222,7 @@ export function createClouds(scene) {
     // sky, seen with ?skyfix=0 against 1. ?skystrokes=1 brings them back for the look director)
     if (skyU.uSkyFix) skyU.uSkyFix.value.set(CLOUDS.skyfix ? 1 : 0, CLOUDS.skyfix && CLOUDS.skyStrokes ? 0.45 * smooth(150, 800, camR - Rg) : 0, 0, 0);
     own.uGroundR.value = R + (look.weather && look.weather.shadowGround != null ? look.weather.shadowGround : 250);
-    self.stats.clouds = clouds.length; self.stats.lobes = meshes.reduce((a, M) => a + M.n, 0); self.stats.tris = tris;
+    self.stats.clouds = clouds.reduce((a, c) => a + (c.hidden ? 0 : 1), 0); self.stats.lobes = meshes.reduce((a, M) => a + M.n, 0); self.stats.tris = tris;
     self.stats.ms = performance.now() - t0;
 
   }
@@ -1197,6 +1242,7 @@ export function createClouds(scene) {
       const sheetM = (sh) => new THREE.ShaderMaterial({ name: 'pc-cloud-shadow-sheet', uniforms: { uNoise3D: G.uNoise3D, uAnchorD: sh.u.uAnchorD, uShellK: sh.u.uShellK }, vertexShader: SHADOW_SHEET_VERT, fragmentShader: SHADOW_SHEET_FRAG, side: THREE.DoubleSide });
       shState.mats = new Map();
       for (const M of meshes) shState.mats.set(M.mesh, lobeM);
+      if (shadowOnly.mesh) shState.mats.set(shadowOnly.mesh, lobeM);
       shState.mats.set(deck.mesh, sheetM(deck));
       shState.mats.set(valley.mesh, sheetM(valley));
     }
@@ -1282,6 +1328,12 @@ export function createClouds(scene) {
         M.mesh.visible = false;
         group.add(M.mesh);
       }
+      shadowOnly.mesh = new THREE.Mesh(shadowOnly.g, mat);
+      shadowOnly.mesh.name = 'pc-cloud-shadowfield';
+      shadowOnly.mesh.frustumCulled = false;
+      shadowOnly.mesh.layers.set(CLOUD_LAYER);      // (the shadow's layer ONLY: never in the picture)
+      shadowOnly.mesh.visible = false;
+      group.add(shadowOnly.mesh);
     }
     // THE DRIFT: the whole field turns about the planet's centre with the wind aloft at the eye, on the painter's clock
     // (a held picture holds still)
