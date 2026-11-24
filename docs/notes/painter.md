@@ -190,8 +190,13 @@ shows water that exists only in the wet as deep as `WATERSTATE.wet` fills it (th
 by `rise x swell`, and lays the brown of a swollen stream by `mud x swell` over its strokes. `uRunoff` reads
 `world/waterstate.js` every frame (fetched only with the switch). SEEN: `s5-runoff-runnel-dry-wet.jpg` (a runnel 24 m from
 the landing: a dry gully, then running after rain; 3 % of the picture changed).
-STILL TO DO, asked by E and F: white water as broken foam strokes (not a flat white: E's mountain streams, F's three
-points); Neptune's aurora path on the lake (F agreed; where the aurora hangs asked of F); the far water byte for C.
+WHITE WATER (E's mountain streams, F's three points), behind `?wpaint=2`: no milk wash; the churn's strokes down the current
+in three steps -- a few of bare foam (V about 0.9), more of a pale grey-blue milk, the rest left out so the water and its
+wet bed show; and a thin stream far off takes the water's tone, not its pale bed (the bed-by-depth term fades from 80 to
+400 m). SEEN at E2's lip with `&aer=3` (`s6-E2-lip-white-water-ab.jpg`, `-crop-ab.jpg`; A = `?wpaint=1`): A a flat white
+band, B broken foam and milk with the blue between. Not seen on E's mountain streams (`?mount=1` is on design-water, not
+merged here).
+STILL TO DO: Neptune's aurora path on the lake (F agreed; where the aurora hangs asked of F); the far water byte for C.
 
 NOT done of FV5: shore-tangent dashes (they would bring the whorl back; the design lays still water along the wind)
 and the shore hairline (the owner's rule: no outlines) -- both said to C; the current made visible from 400 m.

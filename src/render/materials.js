@@ -1365,7 +1365,7 @@ void main() {
   // grey-beige. Now two metres of water from straight above shows a twentieth of its bed, half a metre two fifths, so
   // a brook and the shallows stay light and a river's middle and a lake go deep. And the shallows' own band (under
   // 0.42 m) is let go with the distance: round a submerged bump it is a ring, and from afar a thin pale line.)
-  if (uWPaint > 1.5) bedK = clamp((1.0 - fres) * 0.42 * exp(-vDep / 0.6) + shallow * 0.7 * (1.0 - 0.92 * smoothstep(30.0, 150.0, dist)), 0.0, 0.9);
+  if (uWPaint > 1.5) bedK = clamp((1.0 - fres) * 0.42 * exp(-vDep / 0.6) * (1.0 - 0.75 * smoothstep(80.0, 400.0, dist)) + shallow * 0.7 * (1.0 - 0.92 * smoothstep(30.0, 150.0, dist)), 0.0, 0.9);      // (and a thin stream far off takes the water's tone, not its pale bed: the look director)
   #endif
   c = mix(c, bed * mix(vec3(1.0), c, 0.45), bedK * (1.0 - vLiqP.y) * (1.0 - vLiqP.x * 0.8));
   // pigment pools at the water's edge
@@ -1710,6 +1710,7 @@ void main() {
     if (aer > 0.012) {
       // the body first: churned water carries so much air that the bed and the mirror stop showing through it, and
       // its colour goes to a pale MILK of its own wash. Not to white: a flat white area is not water, it is paper.
+      vec3 cUnder = c;      // (the water and its bed under the churn: the new paint's broken white leaves it showing)
       c = mix(c, mix(vec3(0.90, 0.94, 0.95), pcDensity(vLiq.rgb, 1.25), 0.30), aer * 0.66);
       // then the lace: a share of the fine strokes is bare white, the share growing with the churn, and the milk
       // shows between them. A smaller base width in pcStrokeOct gives finer strokes NEAR and exactly the same ones
@@ -1725,8 +1726,23 @@ void main() {
       }
       // (at full churn four strokes in five break, and they break to bare paper; a faintly stirred reach breaks a
       // few and breaks them only part of the way, or the first whisper of churn would be a sparkle of white specks)
+      #ifdef PC_WPAINT
+      if (uWPaint > 1.5) {
+        // WHITE WATER IN BROKEN STROKES (the new colour; the water group's lead and the look director on the mountain
+        // streams and the lips: at full churn v37's milk wash and four white strokes in five were one flat white, a
+        // paper ribbon down a slope). Now no wash: the churn's strokes, running down the current, in three steps --
+        // a few of bare foam (value about 0.9), more of a pale grey-blue milk, and the rest left out, so the water and
+        // the wet bed under it show between them; the more the churn, the more foam and milk.
+        vec3 foamC = vec3(0.89, 0.92, 0.94), milkC = mix(cUnder, vec3(0.72, 0.80, 0.86), 0.80);
+        float tF = 1.0 - 0.24 * aer, tM = 1.0 - 0.66 * aer;
+        vec3 a1 = ar1.x > tF ? foamC : (ar1.x > tM ? milkC : cUnder), a2 = ar2.x > tF ? foamC : (ar2.x > tM ? milkC : cUnder);
+        c = mix(a2, a1, aown);
+      } else
+      #endif
+      {
       float ath = 1.0 - aer * 0.78;
       c = mix(c, vec3(1.0), mix(step(ath, ar2.x), step(ath, ar1.x), aown) * (0.30 + 0.70 * aer));
+      }
     }
   }
   #endif
