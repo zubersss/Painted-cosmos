@@ -520,6 +520,9 @@ whether the performance work is one more version or a redesign.** Their own row 
 - v38 is live (24 Nov, pull request #39): the speed test asks the trees (?look=oil&bench=trees) and the air
   (?look=oil&bench=air) and holds two water views in ?bench=1; nothing in the picture changed. WAITING FOR THE OWNER'S
   TABLES from bench=trees and bench=air: they decide the near trees' form (A2: split against cards) and price the far.
+  ANSWERED the same morning (speed test 10, in the log): the near trees' cost is the WOOD (bark program about 31 ms,
+  back faces 15, vertex wind 9.5; leaves 18.5; alpha-to-coverage free), so A2's split goes ahead and cards are last;
+  from the air the far trees are the whole cost (111-135 ms; as crossed cards 28-32 ms), so A1's impostors come first.
 - ALL DESIGNS IN, on these branches' docs/lead/: TREES-DESIGN.md and FARVIEW-DESIGN.md (on r2), FLORA-DESIGN.md
   (design-flora), WEATHER-DESIGN.md (design-weather), WATER-DESIGN.md (design-water), LOOK-RULES.md and
   LOOK-AUDIT.md (look-director).
