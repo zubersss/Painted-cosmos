@@ -580,6 +580,17 @@ A separate session builds W1 CLOUDS once the look director's sky ceiling (touch 
     third of that.
   - Speed-test row: 'weather: no gust bands seen from the air' (live).
 - **Suites:** physics 443, world and looks 103, unit 328.
+- **Agreed after (24 Nov, messages):**
+  - **A1 (far crowns):** one `pcGustBand(foot)` per tree in the impostor's vertex stage, flat over the crown; each
+    tree turns at its own threshold (`step(0.15 + 0.7 * seed, band)`), its cap light one level up with a slightly
+    silvery hue, the same target as the ground. Under `PC_GUST` A1 declares `uniform sampler3D uNoise3D;` above
+    FLORA_GLSL in that vertex shader (the noise is declared in the fragment stage only), takes PHYS when gusts are on,
+    and follows my switch.
+  - **C (far ground):** sent the ground patch. It takes no ground-sample slot and no attribute (a fragment-stage read
+    at the stroke's centre). Asked C whether C's far ground past the mesh needs the same step.
+  - Both land with or after F's `uPhysGust` binding, never before.
+  - **W1 asked:** the 16 m/s anvil in its game test was the drift before the cap (881c97d came after the c359e12 it
+    merged); for a land cell the anvil is the capped drift.
 
 ## NEXT
 
