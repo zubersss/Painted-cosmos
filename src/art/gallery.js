@@ -18,7 +18,7 @@ import { BODIES, BODY_IDS } from '../data/bodies.js';
 import { LOOKS } from '../data/looks.js';
 import { findVantage } from './vantage.js';
 import { gaitOf, strideBob, EXPLORER_BODY } from '../physics/explorer.js';
-import { MODE } from '../data/mode.js';
+import { MODE, waterFromSearch } from '../data/mode.js';
 import { makeFires, clearBurns, FUEL } from '../physics/fire.js';
 import { makeTimes, castTime, stepTimes, TIMEPOWER } from '../physics/times.js';
 import { makeWinds, castRip, stepWinds } from '../physics/powers.js';
@@ -34,9 +34,17 @@ if (P.has('powers') && P.get('powers') !== '0') MODE.powers = true;
 // (the animals, ?beasts=N, and the water that runs downhill, ?flow=1: both before the world is made. The gallery
 //  loads in seconds where the game takes minutes, so this is where they are looked at first.)
 if (P.has('beasts')) MODE.beasts = Math.max(0, Math.min(3, parseInt(P.get('beasts'), 10) || 0));
+// (the water's switches first: the drainage field below is built for the rivers' routing when ?rivers=tree is asked)
+waterFromSearch(location.search);
 if (P.has('flow') && P.get('flow') !== '0') {
   const { ensureDrainage } = await import('../world/drainage.js');
   ensureDrainage(P.get('body') || 'earth', P.has('pool') ? { bias: +P.get('pool') } : undefined);
+}
+// (the water's parts, ?rivers=tree ?lakes= ...: data/mode.js, world/waterhooks.js; before the world is made, as above)
+if (MODE.water.on) {
+  const WH = await import('../world/waterhooks.js');
+  await WH.loadWater();
+  WH.ensureWater(P.get('body') || 'earth');
 }
 
 const canvas = document.getElementById('c');

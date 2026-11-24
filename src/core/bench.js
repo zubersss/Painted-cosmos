@@ -227,6 +227,80 @@ export function attachBench(pc) {
       if (pc.settle) await Promise.race([pc.settle(12), wait(20000)]);
     };
     const AS = 'as set';
+    // ---- THE WATER VIEWS (docs/lead/WATER-DESIGN.md, section 6) -------------------------------------------------------
+    // The view this test is held at, the landing, has NO WATER in it: 0.0 % of its pixels, measured 24 Nov in a copy of
+    // that view (936 x 372). So no row taken there can measure the water, and v37's "no water drawn -0.6 ms" was noise.
+    // Two places on Earth are held instead for the water's rows: the landing brook's BANK, looking upstream (water about a
+    // fifth of the picture in the painter's copy of it), and a sea SHORE at the waterline, looking out (about three
+    // quarters). The explorer is put there and held there exactly as it is held at the landing (`pin`), the world is let
+    // build round it, and each water row is set against ITS view's own "as set" row. Its "as set" rows are not counted in
+    // the check that the landing's agree with each other: a different picture is not a disagreement. A water lane adds
+    // its own rows from its own file (world/waterhooks.js WATER_BENCH). Worlds other than Earth: no water rows.
+    const landing = pin;
+    const WV = {
+      bank: { dir: [0.196307, 0.620916, 0.758899], e: 0, n: 0, yaw: 20, pitch: -0.12, find: true },
+      shore: { dir: [0.19461, 0.62161, 0.75877], e: -1720, n: -1202, yaw: 185, pitch: -0.10 },
+    };
+    const frameAt = (u) => {      // east = (0, 1, 0) x up, north = up x east: the frame sim.js and the gallery use
+      let ex = u[2], ey = 0, ez = -u[0]; const el = Math.hypot(ex, ey, ez) || 1; ex /= el; ey /= el; ez /= el;
+      return { e: [ex, ey, ez], n: [u[1] * ez - u[2] * ey, u[2] * ex - u[0] * ez, u[0] * ey - u[1] * ex] };
+    };
+    const goView = async (name) => {
+      const S = pc.sim;
+      if (!S || !landing) return;
+      if (!name) pin = landing;
+      else {
+        const v = WV[name], R0 = 4000, l0 = Math.hypot(...v.dir), u = v.dir.map((a) => a / l0), F = frameAt(u);
+        const sm = S.sampler(S.bodyId), at = (b, B, e, nn) => { const q = [0, 1, 2].map((i) => b[i] + (B.e[i] * e + B.n[i] * nn) / R0); const ql = Math.hypot(...q); return q.map((a) => a / ql); };
+        const wetAt = (q) => { const s2 = sm({ x: q[0], y: q[1], z: q[2] }); return s2.liquidRadius > s2.radius; };
+        let d = at(u, F, v.e, v.n), yaw = v.yaw;
+        // (the BANK is wherever the nearest water to that spot is: the rivers move with ?rivers=tree. Walk out from it to the
+        //  nearest water, stand two metres back from its edge, and look the way the water runs longest, as the painter's
+        //  gallery stands on a bank)
+        if (v.find) {
+          let bestR = 1e9, bestA = 0;
+          for (let a = 0; a < 48; a++) {
+            const an = (a / 48) * Math.PI * 2;
+            for (let rr = 2; rr < 320 && rr < bestR; rr += rr < 60 ? 1.5 : 4) if (wetAt(at(u, F, v.e + Math.sin(an) * rr, v.n + Math.cos(an) * rr))) { bestR = rr; bestA = an; break; }
+          }
+          if (bestR < 1e9) {
+            const r0 = Math.max(0, bestR - 2);
+            d = at(u, F, v.e + Math.sin(bestA) * r0, v.n + Math.cos(bestA) * r0);
+            const B = frameAt(d);
+            let bs = -1;
+            for (let a = 0; a < 48; a++) {
+              const an = (a / 48) * Math.PI * 2;
+              let sc = 0;
+              for (let rr = 4; rr < 70; rr += 3) if (wetAt(at(d, B, Math.sin(an) * rr, Math.cos(an) * rr))) sc += 1 + rr * 0.02;
+              if (sc > bs) { bs = sc; yaw = an * 180 / Math.PI + 6; }
+            }
+          }
+        }
+        const g = sm({ x: d[0], y: d[1], z: d[2] }), r = Math.max(g.radius, g.liquidRadius || 0);
+        const G = frameAt(d), cy = Math.cos(yaw * Math.PI / 180), sy = Math.sin(yaw * Math.PI / 180);
+        const f = { x: G.n[0] * cy + G.e[0] * sy, y: G.n[1] * cy + G.e[1] * sy, z: G.n[2] * cy + G.e[2] * sy };
+        pin = { t: landing.t, p: { x: d[0] * r, y: d[1] * r, z: d[2] * r }, v: { x: 0, y: 0, z: 0 }, fwd: { ...f }, view: { ...f }, pitch: v.pitch, boom: landing.boom };
+      }
+      putBack();
+      await wait(600);
+      if (pc.settle) await Promise.race([pc.settle(12), wait(30000)]);
+      // (a move of two kilometres is taken by the world for an ARRIVAL, and the picture is veiled until the land is laid
+      //  (world/index.js, render/shared.js SHEET.laid): a row timed under the veil would time the veil. Wait for it.)
+      try {
+        const SHEET = (await import('../render/shared.js')).SHEET, t0 = performance.now();
+        while (SHEET.laid < 1 && performance.now() - t0 < 40000) await wait(250);
+      } catch { /* no painter's sheet: nothing to wait for */ }
+    };
+    const waterRows = [];
+    if (pc.sim && pc.sim.bodyId === 'earth') {
+      let extra = [];
+      try { extra = (await import('../world/waterhooks.js')).WATER_BENCH || []; } catch { extra = []; }
+      for (const view of ['bank', 'shore']) {
+        waterRows.push([AS + ', ' + view + ' view', () => goView(view), null, { alone: true }]);
+        waterRows.push([view + ' view: no water drawn', () => show(/^pc-water/, false), () => show(/^pc-water/, true)]);
+        for (const r of extra) if (r && r.view === view) waterRows.push([view + ' view: ' + r.name, r.on, r.off]);
+      }
+    }
     // ---- IS THIS DEVICE HELD AT ITS REFRESH? (see MK at the top of this file) ----------------------------------
     // Two questions, because one is not enough: a device that is really drawing shows a spread in its frame times
     // AND goes faster when it is given fewer pixels. One held at its refresh does neither, and nor does one whose
@@ -303,9 +377,12 @@ export function attachBench(pc) {
       ['trees cast no shadow', () => treeMeshes((o) => o.layers.disable(2)), () => treeMeshes((o) => o.layers.enable(2))],
       ['no light in the air', () => B({ shaft: false }), () => B({ shaft: true })],
       [lite0 ? 'the full paint' : 'the lighter paint', () => B({ lite: !lite0 }), () => B({ lite: lite0 })],
+      // (the water's rows, at the bank and at the shore: see THE WATER VIEWS above)
+      ...waterRows,
       // (back to the size the device really draws, so the four rows below are measured from IT and not from
-      //  whatever sharper size the questions above had to be asked at: see MK at the top of this file)
-      [AS, () => sharpen(1), null],
+      //  whatever sharper size the questions above had to be asked at: see MK at the top of this file; and back at the
+      //  landing, if the water's rows took the explorer away)
+      [AS, async () => { if (waterRows.length) await goView(null); await sharpen(1); }, null],
       // (EIGHTH FORM, 2026-11-18) ROWS THAT MAKE THE GAME WORK HARDER, not easier. The owner's first believable table
       // read 16.7 ms = 60.0 a second on eleven rows running: that is the phone's own screen refusing to go faster, not
       // the game's speed, and under such a cap no row can be told from another. These rows raise the picture's
@@ -321,7 +398,7 @@ export function attachBench(pc) {
     let r0 = null, base = null;
     const bases = [];      // (2026-11-19) every "as set" row, so the table can say when it disagrees with itself
     for (let k = 0; k < steps.length; k++) {
-      const [name, on, off] = steps[k];
+      const [name, on, off, opt] = steps[k];
       el.textContent = head(r0) + '\n' + rows.join('\n') + '\n... ' + (k + 1) + ' of ' + steps.length + ': ' + name;
       if (on) await on();
       const ok = await calm();
@@ -339,7 +416,7 @@ export function attachBench(pc) {
       const d = base && !isBase ? r.mean - base.mean : null;
       rows.push(String(k + 1).padStart(2) + ' ' + (name + ' ').padEnd(27, '.') + ' ' + r.mean.toFixed(1).padStart(5) + ' ms = ' + r.fps.toFixed(1).padStart(5) + ' a second' +
         (d == null ? '          ' : '  ' + ((d >= 0 ? '+' : '') + d.toFixed(1)).padStart(6) + ' ms') + '  (middle ' + r.mid.toFixed(0) + ', longest ' + r.worst.toFixed(0) + ', script ' + r.script.toFixed(1) + (r.calls < DRAWS ? ', NOTHING DRAWN' : ok ? '' : ', NOT SETTLED') + ')');
-      if (isBase) { base = r; bases.push(r.mean); }
+      if (isBase) { base = r; if (!(opt && opt.alone)) bases.push(r.mean); }
     }
     // DO THE BASELINES AGREE? Every + / - in this table is measured against the "as set" row before it, so if those
     // rows disagree with each other the whole table is noise however steady each row looked on its own. At v22 they
