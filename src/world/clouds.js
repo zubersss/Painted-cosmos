@@ -39,7 +39,7 @@
 //   ?deck=0       no deck (A3);  ?valleycloud=0 no valley cloud (A5; 1.6 forces a cover of 0.6, for looking before the map
 //                 carries its valley channel)
 import * as THREE from 'three';
-import { G, OIL, LOOK, register, ensureGlobals } from '../render/shared.js';
+import { G, OIL, LOOK, QUALITY, register, ensureGlobals } from '../render/shared.js';
 import * as SHARED from '../render/shared.js';
 import { WX } from './wxfield.js';
 import { makePaintUniforms, defaultBodyUniforms } from '../render/materials.js';
@@ -76,6 +76,11 @@ export const CLOUDS = {
   rebuild: 0.5,           // s between rebuilds of the instances (the drift itself is the group's turn, every frame; a lobe grows over tens of seconds, so twice a second is smooth)
   maxLobes: 6144,         // instances a level of detail holds at most
   sagPx: 2.2,             // how far a lobe's outline may stand off the true round, in pixels, before the next level is taken (its noise hides that much)
+  // (the phone's budget, WEATHER-DESIGN 4.5 about 120k: at quality levels under 2 (the phone), once the nearest clouds have
+  // spent this many triangles the rest take the coarsest lobe, and past 1.25 times it a far cloud keeps only its first
+  // three lobes; the far field still costs some 30k after it, so 95k lands near 120k. MEASURED before it: a building sky
+  // from the air was 159k-190k at the phone's pixel angle. ?cloudtris=)
+  budget: Math.max(20000, _qn('cloudtris', 95000)),
   life: [150, 360],       // s: a cumulus' life (the painter's clock)
 };
 
@@ -496,11 +501,16 @@ void main() {
   // ceiling's belly one step under it. Only a storm takes them down to its slate)
   vec3 cLav = pcShDens(uCloudShade, 1.85);
   cLav = mix(cLav, vec3(dot(cLav, vec3(0.3, 0.5, 0.2))), 0.12);
-  vec3 cTop = mix(mix(vec3(0.78, 0.78, 0.785), uSkyHorizon, 0.18) * 1.08, sunC * 0.86, 0.40);
+  vec3 cTop = mix(mix(vec3(0.78, 0.78, 0.785), uSkyHorizon, 0.18) * 1.01, sunC * 0.82, 0.25);
   vec3 cHalf = mix(cLav, uSkyHorizon, 0.30);
   vec3 cBase = pcShDens(cHalf, 1.30);
   vec3 cDeep = cBase;
   float st = clamp(max(vDeck.z, uWxSky.y * (1.0 - uShellK.x)), 0.0, 1.0);
+  // (a THICK deck is dark beneath whatever the storm field says: the weather group's land storm at 980 m, its front still
+  // a cumulus by the map, came as a pale lavender bank. From 250 m of thickness to 600 the belly goes a step deeper)
+  float thickK = smoothstep(250.0, 600.0, vDeck.y) * (1.0 - uShellK.x);
+  cBase = mix(cBase, pcShDens(mix(cBase, uStormWash, 0.35), 1.45), thickK);
+  cDeep = mix(cDeep, pcShDens(mix(cDeep, uStormWash, 0.5), 1.55), thickK);
   // (a storm's ceiling a step lighter than its heaviest pigment: the sky is the light of a rain picture and its darks stay
   // over the wood's, PAINTER 16/17)
   cDeep = mix(cDeep, pcShDens(uStormWash, 1.18), st);
@@ -945,6 +955,10 @@ export function createClouds(scene) {
           cover = Math.min(0.95, cover + 0.22 * mK); base = Math.min(base, gM - 50 + 90 * hash(k, 9, 3)); thick = Math.min(thick, 500);
         }
         keep = Math.max(keep, mK);
+        // (and a TOWERING cumulus of the map -- thick and convective, a storm in its early stages, before the map names it
+        // a storm cell -- is drawn from the ground too: the weather group's land storm at 3750 s came from 3.5 km away
+        // as nothing at all, the hybrid's first game stills)
+        if (C) keep = Math.max(keep, smooth(350, 800, thick) * smooth(0.25, 0.6, conv));
         if (keep <= 0.001) continue;
       }
       const L0 = CLOUDS.life[0], L1 = CLOUDS.life[1];
@@ -1027,6 +1041,7 @@ export function createClouds(scene) {
     for (const M of meshes) M.n = 0;
     lobes = [];
     let tris = 0;
+    const budget = (QUALITY.level | 0) >= 2 ? Infinity : CLOUDS.budget;
     // one lobe into the level of detail its size on the screen asks for
     const emit = (px, py, pz, r, cx, cy, cz, baseD, ex, ey, ez, nx, ny, nz, pa, seed, squash, T, storm, air) => {
       const dl = Math.hypot(px - camD.x, py - camD.y, pz - camD.z);
@@ -1034,6 +1049,7 @@ export function createClouds(scene) {
       // the level of detail: the coarsest whose outline stays within CLOUDS.sagPx of the true round on the screen
       const pr = r / Math.max(dl - r, 1) / rad;
       let li = 0; while (li < LODS.length - 1 && pr * LODS[li].sag > CLOUDS.sagPx) li++;
+      if (tris > budget) li = 0;
       const M = meshes[li];
       if (M.n >= CLOUDS.maxLobes) return;
       const q = M.n * 4, A = M.g.attributes.iA.array, B = M.g.attributes.iB.array, Cc = M.g.attributes.iC.array, D = M.g.attributes.iD.array;
@@ -1064,7 +1080,8 @@ export function createClouds(scene) {
       const pxR = cl.Rc / Math.max(cl.dist, 1) / rad;
       // (a cloud under two pixels across its radius is not drawn: the air has taken it by then)
       if (pxR < 2 + 4 * handK) continue;
-      const nl = cl.cb ? t.lobes.length : Math.max(pxR < 4 ? 1 : 2, Math.min(t.lobes.length, Math.round(t.lobes.length * smooth(6, 60, pxR))));
+      let nl = cl.cb ? t.lobes.length : Math.max(pxR < 4 ? 1 : 2, Math.min(t.lobes.length, Math.round(t.lobes.length * smooth(6, 60, pxR))));
+      if (!cl.cb && tris > budget * 1.25) nl = Math.min(nl, 3);
       const cxA = cl.bx + ux * cl.T * 0.45, cyA = cl.by + uy * cl.T * 0.45, czA = cl.bz + uz * cl.T * 0.45;
       const baseD = cl.T * 0.45;
       const air = Math.round(Math.min(0.45, 0.55 * (1 - Math.exp(-cl.dist / 8000))) * 5) / 5;
