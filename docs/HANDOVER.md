@@ -524,25 +524,23 @@ whether the performance work is one more version or a redesign.** Their own row 
 
 ## 3. State right now (update this before you stop)
 
-**STATE 24 Nov, 15:30 (first account; the owner asleep since 10:25, hourly check-ins until about 18:25): TWELVE HELPER SESSIONS BUILDING, EACH ON ITS OWN BRANCH. `main` is v39.2.**
-- v39.2 is LIVE (pull request #45, main e8f655d; look-proto c7d8d9e): each summer tree its own green (?treevar=0), the
-  year in the far colour and the floor (FV3, ?groundseason=0), the far small crowns (?impsmall=0), split trees whole in
-  the shadow pass (?shwhole=0), the final flora set (?flora=old), ?bench=foot with the start-up note. Gate: watercolour
-  0 pixels; all new parts off 0 pixels; on foot, from high, summer from high OPENED.
-- THE WATER WAS PULLED from v39.2 (the first gate's cam=high showed no water from the air: the far canopy covers the
-  new rivers; and the first view had less water than v39.1): E fixed the first view (design-water 05aa102: 8.5 % water
-  against 6.4 %), the air next (E with C, A1). E owns the ground-sample slots: when design-water meets look-proto, CS
-  25, water still 23, C's snow 24 (written and read), W3's runoff 25-26.
-- v39.1 is LIVE (pull request #44): split near trees and impostor far trees with compile guards, F's L5, golden-hour
-  sky, summer canopy, flora batch 1.
-- v39.3 PLAN: D's 'weather-release' (W1's clouds and D's storms as the default, ?clouds3d=0 and ?weather=old, wxguard
-  on every program; F gave leave for the CLOUDS3D line) + the water once it reads from the air + W3's river strokes if
-  they cure the grain + C's canopy floor (160b92c/8a1e04d) and short uniform list (A2 adds its bench row) + A2's pines
-  (?pines) if F passes + C's cliff/rock faces if F passes the air sheets.
-- F's FRESH-EYES AUDIT (look-director 70558d0, docs/lead/LOOK-AUDIT-2.md; final three still to come): colour up close is
-  on the references; the MARKS are wrong: (1) from the air the wood is confetti (C or A1); (2) the river on foot is grain
-  (W3, top job); (3) mountains are rainbow polygons (C, top job). Also leaf cards as shards (A2), the light has no design
-  and the storm leaves the land lit (F).
+**STATE 24 Nov, 18:30 (first account; the owner waking): TWELVE HELPER SESSIONS BUILDING, EACH ON ITS OWN BRANCH. `main` is v39.3; v39.4 is in its gate.**
+- v39.3 is LIVE (pull request #46, main 65f031a; look-proto 87053ed): THE WEATHER AND 3D CLOUDS by default in the oil look
+  (?weather=old, ?clouds3d=0; wxguard falls back to today's sky), THE WATER on Earth (rivers of the tree with the
+  river beside the first view, lakes, ponds, puddles, fjord, falls; ?rivers=old ?lakes=0 ?ponds=0 ?puddles=0 ?fjord=0
+  ?falls=0), PINES (?pines=0), CROWN MASS from the air (?crownmass=0), F's olive darks / sky limb (?skylimb=0) / air
+  keeps the darks (?airdark=0), C's canopy floor (?canfloor=0) and short uniform list (?uplist=0).
+- v39.4 IN ITS GATE (/home/user/wt-v394 c6014cd, scratchpad/gate394.sh, v394.log): THE MOUNTAINS (FV4 rock faces,
+  ?rockfield=0), F's storm light (?stormlight=0, ?stormsky=0) and water gold, W1's anvil shelf and mountain cloud,
+  A1's crown-mass follow-ups, B's tuft and comb (?tuft=0, ?comb=0). The off-set proof renders v39.3 and v39.4 with the
+  same switches (a single new part can share a switch with an older one: ?leafshade and ?goldsky are whole-look
+  switches, so a 'new parts off' render must be compared with the last version under the SAME switches).
+- v39.2 LIVE (#45), v39.1 LIVE (#44): see the log.
+- NEXT (v39.5 candidates): C's smudge clamp (farview 6cf9c7a) with B's line (already in v39.4), E's far water line
+  (?farwater, design-water a1f12fd) when F passes, W3's river grain (F's audit item 2), A1's far spruce (?farspruce),
+  A2's storm crowns (?stormleaf), B's drift patch, C's glades and crown shadows.
+- FOR THE OWNER: the three speed tests on the newest version (bench=trees, bench=air, bench=foot), and a side-by-side
+  phone look at A2's ?leafgrow=1 (smaller near leaves; it changes trees the owner approved, so it is the owner's word).
 - FOR THE OWNER ON WAKING: one speed-test run of bench=trees, bench=air and bench=foot on the newest version (A2
   derives about 22 ms on foot for v39.1, never measured; only the phone can say), and the two visual checks.
 - DECISIONS THIS MORNING (log): water-paint held as a default until F passes E-W2/W3's sea fix (water-sea 9525b16);
