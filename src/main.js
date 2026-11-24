@@ -20,6 +20,7 @@
 //                                    them is loaded
 //   bench=1                          a speed test on this device: the same view drawn ten ways, the table left on the
 //                                    screen (src/core/bench.js); no start card, the resolution controller off
+//   bench=trees | bench=air[,metres] the speed test's tree questions alone (on foot and from the air), or its air table
 import * as THREE from 'three';
 import { loadProviders } from './core/providers.js';
 import { Game } from './core/game.js';
