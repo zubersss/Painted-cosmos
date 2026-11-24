@@ -15,7 +15,7 @@ on branch `look-director`, to be read and followed when it appears). In `surface
 far-view lane edits that file).
 
 **Switches** (`world/nearground.js` `FLORA`, oil look only; 1 by default; 0 gives the package back exactly as it was):
-`?grass2=0` the whole grass package; `?nearcull=0` the off-screen cull alone.
+`?grass2=0` the whole grass package; `?nearcull=0` the off-screen cull alone; `?sheen=0` the gusts' sheen.
 
 **Done:**
 1. Speed-test rows (`core/bench.js`, after 'no small plants'): 'no near grass', 'near grass: the blades only (the fine
@@ -27,11 +27,33 @@ far-view lane edits that file).
    COUNTED earlier at the landing: 60-70 per cent of the near marks are outside the picture. The phone's saving is
    derived (-0.3 to -1.9 ms) until the row 'grass not culled off-screen' measures it.
 
+3. G4 and G2 (`nearground.js` `CARPET`, `layCarpet`, `styleOf` `leafB` / `gmB` / `carpet`; `materials.js` `NEAR_VERT`
+   `vSheen`, `NEAR_FRAG` the root step and the sheen, uniform `uNearL` = (paint on, sheen strength, the bend in rad the
+   sheen grows over: 0.03 to 0.35)). THE CARPET: a fifth ring, first, cell 0.45 m, reach 7 m (8 at the top tier, none at
+   the low one), fades in 0.5-1.2 m, gone above 14 m: three times the fine ring's blades a square metre, each blade's
+   own range 5 to 7 m. THE BLADES' OWN GREENS: a blade takes a quarter of the ground's wash where it took six tenths, and
+   in the oil look the biome's `oil.under.leaf` (the greens its PROP undergrowth wears; the autumn wood's watercolour
+   `under` is straw); a biome may set `oil.flora.sward` = { gm, carpet }. A blade's lowest fifth is a step deeper (dark
+   roots). THE SHEEN: PHYSICS' bend leaning a blade away from the eye lifts it a step (needs physics: the game, or the
+   gallery's `&physics=1`). SEEN, before and after at the same camera (`docs/shots/painter/flora-design/g2g4-*`): the
+   autumn landing at 1.8 m goes from a leaf carpet with straw blades to a sward of green and yellow-green blades; the
+   green wood gets dark spiky blades against the light; the meadow fills in near the feet; from 10 m nothing changes (the
+   carpet reaches 7 m from the eye), as designed. The sheen SEEN working only at an exaggerated setting (`g4-sheen-test-*`:
+   5,524 pixels change); the gallery's weather at the landing is nearly calm (0.67 m/s, a 2 degree bend), so at the
+   default it shows nothing here: it is for the game's wind and cannot be judged in motion on this machine.
+   MEASURED (`tools/overdraw.mjs`, scratch copy, tier 1, 936 x 372): the carpet adds 65,500 fragments (5,300 to 6,460 of
+   its marks in range, 15,900 to 19,400 triangles) at the meadow looking 24 degrees down and at the landing looking level.
+   DERIVED for the phone: +1.3 ms (0.8 to 2.3), before G1's and G3's savings.
+   NOT LIKED YET, for the next steps: the PROP undergrowth's big tufts (orange in autumn) still stand out of the sward
+   (flora.js: HELD); some dark accent blades in shade are near black (a look-director question: the root step and the
+   dark tone together).
+
 **Tests:** `tests/` 325 of 325, `src/world/` + `src/data/looks/` 65 of 65. `src/physics/` 415 of 416: the one failure is
 `loose.test.mjs` P25 ("under the closed wood the litter still puffs: 2"), which is FLAKY ON THE CLEAN COMMIT TOO (it
 failed 1 run in 5 there with none of this lane's changes): reported to the coordinator, not this lane's.
 
-**Next:** G4 (the grass in its own greens, dark roots, lit tips, the gusts' sheen) and G2 (the carpet ring).
+**Next:** G3, the middle band (12 to 40 m): teeth sized by the screen, narrower touches, fewer past 25 m, the blades'
+colours.
 
 
 Branch: `look-proto`, cut from `main` at `5e85754`. Nothing here is live. The plan, the owner's instructions, the sort of

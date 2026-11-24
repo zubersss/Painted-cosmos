@@ -296,8 +296,10 @@ export function attachBench(pc) {
       // (the flora lane) what the near grass costs, all of it and its finest ring alone. Its material's own `visible` is
       // the switch: the ring's update moves its mesh, never this.
       ['no near grass', () => nearRings((r) => { r.material.visible = false; }), () => nearRings((r) => { r.material.visible = true; })],
-      ['near grass: the blades only (the fine ring)', () => nearRings((r) => { r.material.visible = r.cfg.name === 'fine'; }),
+      ['near grass: the blades only (the fine ring and the carpet)', () => nearRings((r) => { r.material.visible = r.cfg.name === 'fine' || !!r.cfg.carpet; }),
         () => nearRings((r) => { r.material.visible = true; })],
+      // (G2, FLORA-DESIGN.md 6.2) the carpet of blades near the feet, which four times the near blades are bought with
+      ['no carpet of near blades', () => nearRings((r) => { if (r.cfg.carpet) r.material.visible = false; }), () => nearRings((r) => { r.material.visible = true; })],
       // (G1, FLORA-DESIGN.md 6.1) the marks outside the picture shaded whole again, as before the cull: what the cull saves
       ['grass not culled off-screen', () => nearRings((r) => { r.__k = r.material.uniforms.uNearK.value.x; r.material.uniforms.uNearK.value.x = 0; }),
         () => nearRings((r) => { r.material.uniforms.uNearK.value.x = r.__k == null ? 1 : r.__k; })],

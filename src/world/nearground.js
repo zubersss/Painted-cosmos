@@ -75,14 +75,16 @@ const VISTA = (() => {
 // Each is 1 by default in the oil look and 0 gives that package back exactly as it was.
 //   `?grass2=`   0 takes the whole grass package away (G1-G4): the oil look's near grass as it was on 24 Nov.
 //   `?nearcull=` 0 keeps the grass but shades every mark again, in view or not (G1; the speed test's row does the same).
+//   `?sheen=`    0 takes away the gusts' sheen on the blades (G4: needs PHYSICS' bend, so the game, or the gallery's &physics=1).
 const FLORA = (() => {
-  const f = { grass2: 1, cull: 1 };
+  const f = { grass2: 1, cull: 1, sheen: 1 };
   try {
     const q = new URLSearchParams(location.search), on = (k) => !q.has(k) || (q.get(k) !== '0' && q.get(k) !== 'false');
     f.grass2 = on('grass2') ? 1 : 0;
     f.cull = f.grass2 && on('nearcull') ? 1 : 0;
+    f.sheen = f.grass2 && on('sheen') ? 1 : 0;
   } catch { /* no address to read */ }
-  if (!LOOK.oil) { f.grass2 = 0; f.cull = 0; }
+  if (!LOOK.oil) { f.grass2 = 0; f.cull = 0; f.sheen = 0; }
   return f;
 })();
 export { FLORA };
@@ -92,7 +94,16 @@ const RINGS_OIL = [RINGS_WC[0], RINGS_WC[1], Object.assign({}, RINGS_WC[2], { po
   inner: [126 * V, 206 * V], innerQ: [[0, 0], [40 * V, 72 * V], [126 * V, 206 * V]], mark: [0, 0.45 * V, V],
   soft: 0.95, alt: 220, step: 1, vista: 1, grown: 1,
 }];
-const RINGS = LOOK.oil && V > 0 ? RINGS_OIL : RINGS_WC;
+// G2, THE CARPET (2026-11-24, docs/lead/FLORA-DESIGN.md 6.2). The same blades a square metre everywhere in the fine ring
+// covered 14 per cent of the ground's pixels at 3 m and all of them, overlapping, by 8 m (worked from the camera: a blade
+// never goes under 1.7 pixels wide, a square metre of ground shrinks as the cube of the distance at a grazing look), so the
+// sward was a bare leaf carpet at the feet and a textured band at 8 to 12 m. This ring adds three times the fine ring's
+// blades a square metre within 7 m of the eye: with the fine ring's own, four times. Its own ring, not more marks in the
+// fine one, because a cell keeps its marks as the eye walks on (it is laid when it enters the ring): the fine ring would
+// have to carry them to 12 m (to 23 at the top tier) in every cell. Each blade's own range falls between 5 and 7 m, so
+// the carpet thins into the fine ring with no edge. Not laid at the low tier, nor above 14 m of height.
+const CARPET = { name: 'carpet', cell: 0.45, range: [0, 7, 8], per: 20, inner: [0.5, 1.2], soft: 0, alt: 14, step: 2, carpet: 1 };
+const RINGS = !LOOK.oil ? RINGS_WC : (FLORA.grass2 ? [CARPET] : []).concat(V > 0 ? RINGS_OIL : RINGS_WC);
 const GROW_T = 0.7;      // seconds a clump laid inside the range takes to grow in (the shader's measure)
 const HOLD_T = 6;        // seconds the strokes wait at most for their ground
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -134,6 +145,17 @@ function styleOf(look, b) {
   st.crust = st.crustC ? 4 : 0;
   if (b.near) Object.assign(st, b.near);
   if (!st.crustC) st.crust = 0;
+  // (G4, the flora lane: a blade in its OWN greens. `leafB` / `gmB` are what the blades of the fine ring and the carpet are
+  // mixed from; with ?grass2=0 they are `leaf` and `gm` as they were. A blade took six tenths of the ground's own wash, so
+  // in a still a sward of four times the blades read as no more grass than one (docs/shots/painter/flora-design/
+  // exp-meadow-*): at a quarter it stands out as a stroke. In the oil look a biome's own undergrowth greens (`oil.under`,
+  // the ones its PROP undergrowth already wears) are the blades' too: the autumn wood's watercolour `under` is straw.
+  // A biome may set its own: `oil.flora.sward` = { gm, carpet } (carpet: the carpet ring's blades, 1 = three times the
+  // fine ring's a square metre).)
+  const sw = (FLORA.grass2 && b.oil && b.oil.flora && b.oil.flora.sward) || {};
+  st.leafB = FLORA.grass2 ? ((b.oil && b.oil.under && b.oil.under.leaf) || st.leaf) : st.leaf;
+  st.gmB = FLORA.grass2 ? (sw.gm != null ? sw.gm : 0.25) : st.gm;
+  st.carpet = sw.carpet != null ? sw.carpet : 1;
   let left = 8;
   for (const k of ['blade', 'reed', 'needle', 'ripple', 'dab']) { st[k] = Math.max(0, Math.min(left, st[k])); left -= st[k]; }
   for (const k of ['blade', 'reed', 'needle', 'ripple', 'dab', 'flower', 'fern', 'litter', 'crust']) st[k] /= 8;
@@ -161,6 +183,8 @@ class Ring {
     g.instanceCount = 0;
     this.material = makeNearMaterial(bu);
     this.material.uniforms.uNearK.value.set(FLORA.cull, 0, 0, 0);
+    // (the sheen grows over a bend of 0.03 to 0.35 rad: a breeze bends the grass a few degrees, a gust a fifth of a turn)
+    this.material.uniforms.uNearL.value.set(FLORA.grass2, FLORA.sheen, 0.03, 0.35);
     this.mesh = new THREE.Mesh(g, this.material);
     this.mesh.name = 'near-' + cfg.name + '-' + bodyId; this.mesh.frustumCulled = false; this.mesh.visible = false;
     root.add(this.mesh);
@@ -363,7 +387,8 @@ class Ring {
 
   lay(f, i, j, key, born) {
     if (!this.site(f, i, j, key)) return;
-    if (this.cfg.name === 'fine') this.layFine(i, j, born);
+    if (this.cfg.carpet) this.layCarpet(i, j, born);
+    else if (this.cfg.name === 'fine') this.layFine(i, j, born);
     else if (this.cfg.vista) this.layVista(i, j, born);
     else this.layBroad(i, j, born);
   }
@@ -449,7 +474,7 @@ class Ring {
       const len = (0.09 + 0.34 * q3 * q3) * tsz[tf] * (lead ? 1.5 : 1) * (acc ? 1.2 : 1), wid = 0.020 + 0.018 * q4;
       // most are close to the ground's own value (a little richer, or a little paler: the
       // sunlit and the dry); one in seven is a darker accent, and only those are left crisp
-      const L = st.leaf, c = L ? L[acc ? 2 : pv < 0.55 ? 1 : 0] : null, gm = acc ? st.gm * 0.73 : st.gm;
+      const L = st.leafB, c = L ? L[acc ? 2 : pv < 0.55 ? 1 : 0] : null, gm = acc ? st.gmB * 0.73 : st.gmB;
       let cr = gr, cg = gg, cb = gb;
       if (c) { cr = lerp(c[0], gr, gm); cg = lerp(c[1], gg, gm); cb = lerp(c[2], gb, gm); }
       if (lead && tall > 0.3 && !acc) { const m = 0.5 * tall; cr = lerp(cr, SEED_HEAD[0], m); cg = lerp(cg, SEED_HEAD[1], m); cb = lerp(cb, SEED_HEAD[2], m); }
@@ -490,6 +515,43 @@ class Ring {
         if (c) { cr = lerp(c[0], gr, 0.5); cg = lerp(c[1], gg, 0.5); cb = lerp(c[2], gb, 0.5); } else { const k2 = 1.3 + 0.8 * q5; cr = dens(gr, k2); cg = dens(gg, k2); cb = dens(gb, k2 + 0.1); }
       }
       this.put(ou, ov, 0, tilt, q2 * 6.2832 + 1.7, len, wid, mid, q3 * 0.61 + q1 * 0.39, born, cr, cg, cb, curl, flex);
+    }
+  }
+
+  // ---- G2, the carpet: tufts of single blades near the feet, three times the fine ring's a square metre ----
+  // The blades are the fine ring's own (the same lengths, widths, leans, curls and colours: layFine's grass below), laid in
+  // one to three tufts a cell; there are no stones, leaves or flowers here, which the fine ring lays.
+  layCarpet(i, j, born) {
+    const st = this.st, s = this.s, seed = this.seed, per = this.cfg.per;
+    if (!(st.blade > 0)) return;
+    const gr = s.r, gg = s.g, gb = s.b, H = (k) => hash3i(i, j, k, seed);
+    const tall = sstep(0.52, 0.74, this.rough);
+    const bedK = st.reed > 0 ? 0.3 + 0.7 * Math.min(1, this.reedy) : 1;
+    // (the fine ring lays st.blade x 11 x meadow x (0.7 + 0.5 rough) in a cell of 0.36 m2 with a tuft in five cells of six;
+    // 16 in a cell of 0.2025 m2 is three times that a square metre)
+    const want = st.blade * 16 * st.carpet * this.meadow * (0.7 + 0.5 * this.rough) * bedK;
+    const n = Math.min(per, Math.floor(want) + (H(300) < want - Math.floor(want) ? 1 : 0));
+    if (n <= 0) return;
+    const nT = n <= 7 ? 1 : n <= 15 ? 2 : 3, C = this.cfg.cell;
+    const tu = [], tv = [], tsz = [], tl = [];
+    for (let t = 0; t < nT; t++) {
+      tu.push((H(301 + t) - 0.5) * C * 0.8); tv.push((H(305 + t) - 0.5) * C * 0.8);
+      const z = H(309 + t); tsz.push((0.55 + 1.0 * z * z) * (1 + 0.45 * tall)); tl.push(H(313 + t) * 6.2832);
+    }
+    for (let k = 0; k < n; k++) {
+      const q1 = H(320 + k), q2 = H(345 + k), q3 = H(370 + k), q4 = H(395 + k), q5 = H(420 + k);
+      const tf = k % nT;
+      const ang = q1 * 6.2832, rad = 0.015 + 0.075 * q2;
+      const lead = k < nT * 2 && q3 > 0.45;
+      const pv = (q5 * 9.7) % 1, acc = pv < 0.14;
+      const len = (0.09 + 0.34 * q3 * q3) * tsz[tf] * (lead ? 1.5 : 1) * (acc ? 1.2 : 1), wid = 0.020 + 0.018 * q4;
+      const L = st.leafB, c = L ? L[acc ? 2 : pv < 0.55 ? 1 : 0] : null, gm = acc ? st.gmB * 0.73 : st.gmB;
+      let cr = gr, cg = gg, cb = gb;
+      if (c) { cr = lerp(c[0], gr, gm); cg = lerp(c[1], gg, gm); cb = lerp(c[2], gb, gm); }
+      if (lead && tall > 0.3 && !acc) { const m = 0.5 * tall; cr = lerp(cr, SEED_HEAD[0], m); cg = lerp(cg, SEED_HEAD[1], m); cb = lerp(cb, SEED_HEAD[2], m); }
+      const dk = acc ? 1.12 : pv < 0.36 ? 0.84 : 1.2;
+      this.put(Math.cos(ang) * rad + tu[tf], Math.sin(ang) * rad + tv[tf], 0, 0.08 + 0.85 * q4 * q4, tl[tf] + (q2 - 0.5) * 1.5, len, wid, acc && (k < 2 || q2 < 0.3) ? 3 : 2, q3 * 0.61 + q1 * 0.39, born,
+        dens(cr, dk), dens(cg, dk), dens(cb, dk), (q5 - 0.5) * 1.5 + (q1 - 0.5) * 0.5, 1);
     }
   }
 

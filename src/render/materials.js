@@ -2801,6 +2801,8 @@ uniform vec4 uWx;
 // (the flora lane, docs/lead/FLORA-DESIGN.md) x 1: a mark the eye cannot see is dropped at once (G1); y, z, w: see
 // nearground.js FLORA, where they are set
 uniform vec4 uNearK;
+uniform vec4 uNearL;    // x 1: the grass package's paint (G4), y how strong the gusts' sheen is, z w the bend (rad) it grows over
+varying float vSheen;   // (G4) how far the gust bends this blade away from the eye, as a step of light: 0 none
 #endif
 varying vec3 vBody;
 varying vec3 vNV;
@@ -2866,6 +2868,20 @@ void main() {
     ax = normalize(mix(ax, axh / max(length(axh), 0.05) + up * 0.16, fl * 0.92));
     vFlat = fl;
   } else vFlat = 0.0;
+  #ifdef PC_OIL
+  // (G4, THE GUSTS' SHEEN, 2026-11-24) PHYSICS' bend carries the wind's travelling waves (physics/flora.glsl.js: the gust
+  // and the wave train in pcPhysBend), so where a gust presses the sward the blades lean over together and, leaning away
+  // from the eye, show their lit backs: bands of paler grass sweep across a meadow as the gusts pass. Asked at the root,
+  // so a blade is lit WHOLE as everything in the look is.
+  vSheen = 0.0;
+  if (uNearL.y > 0.0 && flex > 0.01 && uPhysOn > 0.5) {
+    vec3 bd = uPhysEast * pb.x + uPhysNorth * pb.y;
+    float ba = length(bd);
+    vec3 th = toCam - up * dot(toCam, up);
+    float away = ba > 1e-4 ? -dot(bd / ba, th / max(length(th), 1e-3)) : 0.0;
+    vSheen = uNearL.y * smoothstep(uNearL.z, uNearL.w, ba) * (0.35 + 0.65 * away);
+  }
+  #endif
   vec3 sd = cross(ax, toCam / max(di, 0.001));
   sd /= max(length(sd), 0.05);
   float wPx = uNear.w * di;                                       // metres across one pixel here
@@ -2932,6 +2948,8 @@ varying float vLoad;
 varying float vKind;
 #ifdef PC_OIL
 varying vec3 vRootB;
+uniform vec4 uNearL;
+varying float vSheen;
 ${PC_UP_F}
 #endif
 #ifdef PC_FIRE
@@ -2979,6 +2997,13 @@ void main() {
       // tone is a flat patch)
       lv -= step(0.66, fract(r3o.x * 11.1)) * 0.6 * step(1.5, lv);
       if (vKind < 4.5 && vS.x > 0.42 + 0.3 * r3o.y) lv += 0.8 * sunO;
+      // (G4, the flora lane, ?grass2=0 off: a blade is dark at its root, where the sward's own shade lies, and the gusts'
+      // sheen lifts the blades they lean away from the eye. A blade is a lancet in three flat pieces at most -- the root,
+      // the body, the lit tip -- each with a clean edge; the root never darker than the blade's own shade colour.)
+      if (uNearL.x > 0.5 && vKind > 1.5 && vKind < 3.5) {
+        if (vS.x < 0.22 + 0.06 * r3o.z) lv -= 0.55;
+        lv += 0.7 * vSheen;
+      }
       // (a stroke's wash is never darker than a middle one: the watercolour's deep washes, laid as flat paint in the
       // shade, were black thorns all over the wood's floor; in the shade a blade is a deep green)
       vec3 kc = vCol;
