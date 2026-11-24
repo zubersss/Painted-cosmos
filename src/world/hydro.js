@@ -237,7 +237,7 @@ class Hydro {
       g.dirOf(f, i, j + 1, d4);
       return a * Math.hypot(d3[0] - d4[0], d3[1] - d4[1], d3[2] - d4[2]) * R;
     };
-    const maxA = o.lakeArea * 1e6;
+    const maxA = o.lakeArea * 1e6, lakeW = [];
     let id = 0, biggest = 0;
     this.lakeCores = [];
     for (let f = 0; f < 6; f++) for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
@@ -257,18 +257,37 @@ class Hydro {
       let acc = 0, f0 = lm;
       for (const [fl, a] of rows) { acc += a; if (acc > maxA) { f0 = Math.max(lm, fl); break; } }
       for (const [, , p] of rows) F0[p] = f0;
-      const core = rows.filter((r) => r[0] >= f0).reduce((s2, r) => s2 + r[1], 0);
+      const coreRows = rows.filter((r) => r[0] >= f0), core = coreRows.reduce((s2, r) => s2 + r[1], 0);
       biggest = Math.max(biggest, core);
-      this.lakeCores.push({ nodes: nodes.length, area: rows.reduce((s2, r) => s2 + r[1], 0), core, f0 });
+      // HOW WIDE the lake is (for the water's paint: a lake wider than about 150 m is laid as the sea is -- the look
+      // director's condition for the new strokes on ponds): the narrow axis of the ellipse of the core's own area and
+      // shape (the core's nodes' spread on the ground, their second moments), 2 sqrt(A r / pi) with r the axes' ratio
+      let mx = 0, my = 0, mz = 0;
+      for (const [, , p] of coreRows) { const q = this._pdir(p, d3); mx += q[0]; my += q[1]; mz += q[2]; }
+      const ml = Math.hypot(mx, my, mz) || 1; mx /= ml; my /= ml; mz /= ml;
+      let ux = -mz, uy = 0, uz = mx; if (Math.abs(my) > 0.9) { ux = 0; uy = mz; uz = -my; }
+      const ul = Math.hypot(ux, uy, uz) || 1; ux /= ul; uy /= ul; uz /= ul;
+      const vx = my * uz - mz * uy, vy = mz * ux - mx * uz, vz = mx * uy - my * ux;
+      let suu = 0, svv = 0, suv = 0;
+      for (const [, , p] of coreRows) {
+        const q = this._pdir(p, d3), a = (q[0] * ux + q[1] * uy + q[2] * uz) * R, b = (q[0] * vx + q[1] * vy + q[2] * vz) * R;
+        suu += a * a; svv += b * b; suv += a * b;
+      }
+      const nC = Math.max(1, coreRows.length); suu /= nC; svv /= nC; suv /= nC;
+      const tr = suu + svv, dt = Math.sqrt(Math.max(0, (suu - svv) * (suu - svv) / 4 + suv * suv)), l1 = tr / 2 + dt, l2 = tr / 2 - dt;
+      const ratio = l1 > 1e-6 ? Math.sqrt(Math.max(0, l2) / l1) : 1;
+      lakeW.push(2 * Math.sqrt(core * ratio / Math.PI));
+      this.lakeCores.push({ nodes: nodes.length, area: rows.reduce((s2, r) => s2 + r[1], 0), core, f0, width: lakeW[id] });
       id++;
     }
     // (the halo, as the field's own: a read stands between four nodes of one face)
     for (let f = 0; f < 6; f++) for (let j = -1; j <= n; j++) for (let i = -1; i <= n; i++) {
       if (i >= 0 && i < n && j >= 0 && j < n) continue;
       g.dirOf(f, i, j, d3);
-      F0[g.pid(f, i, j)] = F0[g.idOf(d3[0], d3[1], d3[2])];
+      const q = g.idOf(d3[0], d3[1], d3[2]);
+      F0[g.pid(f, i, j)] = F0[q]; comp[g.pid(f, i, j)] = comp[q];
     }
-    this.lakeF0 = F0; this.lakeBiggest = biggest;
+    this.lakeF0 = F0; this.lakeBiggest = biggest; this.lakeComp = comp; this.lakeWidth = Float32Array.from(lakeW);
     this.ms.lakes = now() - t0;
   }
 
@@ -730,6 +749,20 @@ class Hydro {
     c.wetA = Math.max(c.wetA, shore * 0.7);
     if (shore > 0.5) c.growA = Math.min(c.growA, 1 - shore);
     return h;
+  }
+
+  // (a field node's unit direction)
+  _pdir(p, out) {
+    const g = this.D.g, ff = Math.floor(p / g.s2), r = p - ff * g.s2, ii = (r % g.w) - 1, jj = ((r - (r % g.w)) / g.w) - 1;
+    g.dirOf(ff, ii, jj, out); return out;
+  }
+  // HOW WIDE THE LAKE IS at a unit direction (m; 0 where no lake of the field's basins: ponds, tarns and puddles are not
+  // these lakes). For the water's paint (lane W3: a lake wider than about 150 m takes the sea's paint level): asked at load
+  // by the mesher, never inside sample(). The basin's core width, read at the nearest field node.
+  lakeWidthAt(x, y, z) {
+    if (!this.lakeComp) return 0;
+    const id = this.lakeComp[this.D.g.idOf(x, y, z)];
+    return id >= 0 ? this.lakeWidth[id] : 0;
   }
 
   // ---- the hooks ------------------------------------------------------------------------------------------------------
