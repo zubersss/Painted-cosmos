@@ -1704,7 +1704,7 @@ vec3 pcWetWashV(vec3 c, float amt) {
 ${LEAF_SUN}
 uniform vec4 uLeafLod;    // the trees' leaves by distance (flora.js): x the distance within which every leaf is drawn (0: off), y the least share kept
 #endif
-#if defined(PC_TREE_LEAF) || defined(PC_TREE_CARD)
+#if defined(PC_TREE_LEAF) || defined(PC_TREE_CARD) || defined(PC_TREE_WOOD)
 uniform vec4 uFocus;      // (the trees' leaf program: the window round the explorer is cut here, whole leaves; flora.js _focus)
 #endif
 
@@ -1813,6 +1813,15 @@ void main() {
         keepT = smoothstep(mix(0.35, 0.9, twT), mix(1.6, 3.6, twT), cdT);
         float bnT = aBranchId < 0.0 ? 0.985 : fract(aBranchId * 7.31 + inst.z * 3.7) * 0.94 + 0.02;
         if (vWash < 0.999 && (vWash >= 0.0 ? bnT > vWash : bnT < 1.0 + vWash)) keepT = 0.0;
+        // (a trunk or a bough between the lens and the explorer is pinched in round the line of sight to the figure,
+        //  as the big program cut a ragged window through it: the figure is never lost behind a tree)
+        if (uFocus.w > 0.5) {
+          vec3 cvT = (modelViewMatrix * vec4(cwT + pcRound(io + uOrigin), 1.0)).xyz;
+          if (cvT.z > uFocus.z + 0.4) {
+            vec3 rdT = normalize(cvT);
+            keepT = min(keepT, smoothstep(0.5, 1.4, length(uFocus.xyz - rdT * dot(uFocus.xyz, rdT))));
+          }
+        }
       #endif
       if (keepT < 1.0) { cardO *= keepT; cardG *= keepT; lp = aCard + (lp - aCard) * keepT; }
     }
@@ -2124,7 +2133,10 @@ void main() {
     //  read, before every discard that breaks a crown up. The gap from 4 to 2 ("plants one flat colour", which runs
     //  all of those first) is what they cost; the gap from 2 to "as set" is the paint proper. These do nothing
     //  whatever unless the speed test sets them.)
-    if (uOilL.y > 3.5 && uOilL.y < 4.5) { pcWrite(vec3(0.42, 0.40, 0.32), 0.0, vec3(0.0, 0.0, 1.0), -vView.z, 3.0); return; }
+    // (24 Nov, the trees lane with the coordinator's leave: every speed-test row that writes a plant at once (4) or in one
+    //  flat colour (2) writes alpha 1, a whole cover. It wrote 0, and with alpha to coverage on a multisampled picture a
+    //  0 lays nothing, so the row timed plants that were not there. The as-set paint is not touched.)
+    if (uOilL.y > 3.5 && uOilL.y < 4.5) { pcWrite(vec3(0.42, 0.40, 0.32), 1.0, vec3(0.0, 0.0, 1.0), -vView.z, 3.0); return; }
   #endif
   pcFp = pcFootprint(vBody);      // (R1 W2.1, chunks.js: before any discard, where the flow is uniform)
   pcDist = length(vView);         // (R1 re-fix: the leaf shadow's far octaves, chunks.js)
@@ -2144,12 +2156,14 @@ void main() {
     // (uOilL.y 2: every plant one flat colour; 3: only the far trees, to tell their paint from their shapes)
     // (2026-11-24, trees lane: the far test was 'over 1.5', so rows 5 and 6 -- a leaf in its own colour, no air on
     //  the plants -- flattened every far tree as well and measured more than they said. Now only 2 and 3.)
+    // (trees lane, 24 Nov: the far flat and the bark flat write alpha 1, a whole cover: the as-set paint writes its cover
+    //  there, and a 0 laid NOTHING on a multisampled picture, alpha to coverage, so those rows measured less than they said)
     #ifdef PC_FAR
-    if (uOilL.y > 1.5 && uOilL.y < 3.5) { pcWrite(vData.y > 4.5 ? uLeafA * 0.7 : uBarkB, 0.0, nV, -vView.z, 3.0); return; }
+    if (uOilL.y > 1.5 && uOilL.y < 3.5) { pcWrite(vData.y > 4.5 ? uLeafA * 0.7 : uBarkB, 1.0, nV, -vView.z, 3.0); return; }
     #else
-    if (uOilL.y > 1.5 && uOilL.y < 2.5) { pcWrite(vData.y > 4.5 ? uLeafA * 0.7 : uBarkB, 0.0, nV, -vView.z, 3.0); return; }
+    if (uOilL.y > 1.5 && uOilL.y < 2.5) { pcWrite(vData.y > 4.5 ? uLeafA * 0.7 : uBarkB, 1.0, nV, -vView.z, 3.0); return; }
     // (7: the near trees' BARK one flat colour, every leaf and every discard as set -- trees lane T0 row c)
-    if (uOilL.y > 6.5 && uOilL.y < 7.5 && vData.y < 0.5) { pcWrite(uBarkB, 0.0, nV, -vView.z, 3.0); return; }
+    if (uOilL.y > 6.5 && uOilL.y < 7.5 && vData.y < 0.5) { pcWrite(uBarkB, 1.0, nV, -vView.z, 3.0); return; }
     #endif
   #else
     vec4 n1 = texture(uNoise3D, vBody / 9.0);
@@ -2599,9 +2613,11 @@ void main() {
 // pixel was run by a program the size of the bark's, and where a twig crossed the leaves the whole group of pixels
 // waited on the bark. The owner's phone measured the near trees at about 52 ms of an 89 ms frame (v37). Here a tree is
 // drawn by two programs, each only as long as its own part:
-//   WOOD_FRAG: the bark's streaks as before -- the same chart, the same octaves, the same paint at a streak's centre --
-//     but TWO tones a pixel (the streak it lies in and the one at its edge), where the old one laid the coarser
-//     layer whole under the finer one and toned every streak of both.
+//   WOOD_FRAG: the bark's streaks as before -- the same chart, the same octaves, the same two layers laid the same
+//     way, each at its own light -- with only what the big program spent and threw away left out: the flat wash under
+//     the layers (one tone and a shadow read, painted over whole wherever the strokes are on), and the finer layer's
+//     tones and light where neither of its streaks is there. (A first cut toned only two streaks a pixel; the look
+//     director saw the trunk's streaks flatter and less broken at 5 m, and the owner keeps today's, 24 Nov.)
 //   LEAF_FRAG: a leaf's paint is already worked out once a leaf in the vertex shader; this only lays it, with the
 //     lantern and the air. No discard and no alpha to coverage: the leaves a window or a wash leaves out are folded
 //     away whole in the vertex shader (PROP_VERT, PC_TREE_LEAF), so the card can test depth before it paints.
@@ -2649,8 +2665,21 @@ vec3 pcWoodColour(vec3 rnd, vec4 nA, vec3 barkA, vec3 barkB, float markP, float 
   k = pcWetWash(pcDensity(k, 1.0 + ((rnd.y - 0.5) * 1.5 + (nA.r - 0.5) * 0.5) * uOilB.z), 0.9);
   return k * mix(vec3(1.0), mix(vec3(1.12, 0.96, 0.80), vec3(0.90, 0.90, 1.08), rnd.z), 0.7 * uOilB.z);
 }
-// and its paint at the light level the streak's centre is in (the big program tones a streak and the one at its
-// edge at the SAME level, the level of the pixel's own streak, so only the colour differs between the two)
+// One layer's light, at the centre of the pixel's own streak in it (its facing there, and the shadow map there), and
+// that streak's nudge by its own number: PROP_FRAG's bark lights each layer so. Out: the centre on the body, and the
+// noise there (it shades the streaks' colour).
+float pcWoodLevel(vec2 ds, float w, float rx, vec3 bdx, vec3 bdy, vec3 nvdx, vec3 nvdy, bool seenFront, vec3 sunV,
+                  float pale, float canopy, out vec3 Bc, out vec4 nA) {
+  Bc = vBody + bdx * ds.x + bdy * ds.y;
+  vec3 nVc = normalize(vNV + nvdx * ds.x + nvdy * ds.y);
+  if (!seenFront) nVc = -nVc;
+  nA = uOilL.x > 0.5 ? vec4(0.5) : pcNoiseS(Bc, 9.0, w);
+  float xf = dot(nVc, sunV) * 0.5 + 0.5, sunny = pcSunAt(Bc, canopy * 0.8, 8.0 - vAbove, w), jit = (rx - 0.5) * 0.10;
+  // (the look director's one light, L3, as PROP_FRAG's bark takes it: uLookF.z picks it, chunks.js pcLit)
+  return uLookF.z > 0.5 ? pcLit(xf + jit, sunny, canopy * 0.8, 0.03) : pcLevel(xf * mix(0.55 + 0.30 * pale, 1.0, sunny) + jit, 0.03);
+}
+// and a streak's paint at its layer's light level (the big program tones a streak and the one at its edge at the
+// SAME level, the level of the pixel's own streak in that layer, so only the colour differs between the two)
 vec3 pcWoodPaint(vec3 k, float lvl, float pk, vec3 Bc, float r) {
   vec3 l = pcTone(k, lvl);
   if (pk > 0.001) l = mix(l, pcTone(k, max(lvl, 1.0) * 0.5 + 1.0), pk);
@@ -2662,12 +2691,24 @@ vec3 pcWoodPaint(vec3 k, float lvl, float pk, vec3 Bc, float r) {
 }
 void main() {
   #include <logdepthbuf_fragment>
+  #ifdef PC_TREE_FAIL
+    pcTreeFail = 1.0;      // (?trees2fail=wood: not GLSL on purpose, the guard's test: materials.js TREE_GUARD)
+  #endif
   // (the speed test's cuts, shared.js uOilL.y, as the big program honours them: 4 written at once, 2 one flat colour)
-  if (uOilL.y > 3.5 && uOilL.y < 4.5) { pcWrite(vec3(0.42, 0.40, 0.32), 0.0, vec3(0.0, 0.0, 1.0), -vView.z, 3.0); return; }
+  if (uOilL.y > 3.5 && uOilL.y < 4.5) { pcWrite(vec3(0.42, 0.40, 0.32), 1.0, vec3(0.0, 0.0, 1.0), -vView.z, 3.0); return; }
   pcDist = length(vView);
+  // (which way the face seen is turned. The wood is drawn BackSide (makePropMaterial), and three draws a BackSide
+  //  material by turning the winding over, so the faces seen report themselves front-facing; the big program, drawing
+  //  the same faces DoubleSide, saw them as back faces and turned their normals round. PC_WOOD_FLIP keeps that
+  //  exactly, so the bark is lit as it always was.)
+  #ifdef PC_WOOD_FLIP
+    bool seenFront = !gl_FrontFacing;
+  #else
+    bool seenFront = gl_FrontFacing;
+  #endif
   vec3 nV = normalize(vNV);
-  if (!gl_FrontFacing) nV = -nV;
-  if (uOilL.y > 1.5 && uOilL.y < 2.5) { pcWrite(uBarkB, 0.0, nV, -vView.z, 3.0); return; }
+  if (!seenFront) nV = -nV;
+  if (uOilL.y > 1.5 && uOilL.y < 2.5) { pcWrite(uBarkB, 1.0, nV, -vView.z, 3.0); return; }
   vec3 sunV = normalize((viewMatrix * vec4(uSunDirW, 0.0)).xyz);
   ${SKYUP('dot(nV, mat3(viewMatrix) * uUpW)')}
   float seed = vInst.z;
@@ -2695,26 +2736,29 @@ void main() {
   vec3 rF, rF2, rC, rC2; vec2 dsF, dsC; float cF, cC;
   pcThinLayer(ch, dcx, dcy, oc.x, ba, vObj + seed * 11.0, 4.0 * wpxP * ba, 2.0, rF, dsF, cF, rF2);
   pcThinLayer(ch, dcx, dcy, oc.x * 2.0, ba, vObj + seed * 11.0, 8.0 * wpxP * ba, 2.0, rC, dsC, cC, rC2);
-  // WHICH TWO STREAKS THIS PIXEL IS PAINTED FROM. A fine streak that is still there lies on top: its own paint, and at
-  // its edge the next fine streak's if that one is there, the coarse one under it if not. Where the fine streak has
-  // gone (its number under the octave's share), the coarse streak and its neighbour. Two tones a pixel, always: the
-  // old program toned every streak of both layers and a wash under them, five to nine tones.
+  // THE COARSER LAYER, whole, at its own light: its streak and the one at its edge (the big program's L == 1)
+  vec3 BcC, BcF; vec4 nAC, nAF;
+  float lvC = pcWoodLevel(dsC, oc.x * 2.0, rC.x, bdx, bdy, nvdx, nvdy, seenFront, sunV, pale, canopy, BcC, nAC);
+  vec3 c = mix(pcWoodPaint(pcWoodColour(rC2, nAC, barkA, barkB, markP, twig), lvC, pk, BcC, rC2.y),
+               pcWoodPaint(pcWoodColour(rC, nAC, barkA, barkB, markP, twig), lvC, pk, BcC, rC.y), cC);
+  // (the speed test's strokes off, uOilC.z: the big program's flat wash under the layers shows through; with the
+  //  strokes on, the default, the coarse layer covers it whole, so it is not painted at all)
+  if (uOilC.z < 0.999) {
+    float xbF = dot(nV, sunV) * 0.5 + 0.5, xbS = pcSunAt(vBody, canopy * 0.8, 8.0 - vAbove, oc.x);
+    float lvW = uLookF.z > 0.5 ? pcLit(xbF, xbS, canopy * 0.8, 0.04) : pcLevel(xbF * mix(0.55 + 0.30 * pale, 1.0, xbS), 0.04);
+    c = mix(pcTone(mix(barkA, barkB, 0.16), lvW), c, uOilC.z);
+  }
+  // THE FINER LAYER over it, at ITS own light: a fine streak still there lies on top, and at its edge the next fine
+  // streak if that one is there, the coarse layer if not; where the fine streak has gone (its number under the
+  // octave's share) the coarse layer shows, with the next fine streak still at the edge if it is there. Where neither
+  // is there the coarse layer is the whole answer, and the finer layer's light and tones are not worked out.
   bool here = rF.x * 0.999 >= gone, there = rF2.x * 0.999 >= gone;
-  vec3 rA = here ? rF : rC, rB = here ? (there ? rF2 : rC) : rC2;
-  vec2 dsA = here ? dsF : dsC;
-  float wA = here ? oc.x : oc.x * 2.0, covA = here ? cF : cC;
-  // the light, once, at the centre of the pixel's own streak: its facing, and the shadow map there
-  vec3 Bc = vBody + bdx * dsA.x + bdy * dsA.y;
-  vec3 nVc = normalize(vNV + nvdx * dsA.x + nvdy * dsA.y);
-  if (!gl_FrontFacing) nVc = -nVc;
-  vec4 nA = uOilL.x > 0.5 ? vec4(0.5) : pcNoiseS(Bc, 9.0, wA);
-  float xs = dot(nVc, sunV) * 0.5 + 0.5;
-  xs *= mix(0.55 + 0.30 * pale, 1.0, pcSunAt(Bc, canopy * 0.8, 8.0 - vAbove, wA));
-  xs += (rA.x - 0.5) * 0.10;
-  float lvl = pcLevel(xs, 0.03);
-  vec3 tA = pcWoodPaint(pcWoodColour(rA, nA, barkA, barkB, markP, twig), lvl, pk, Bc, rA.y);
-  vec3 tB = pcWoodPaint(pcWoodColour(rB, nA, barkA, barkB, markP, twig), lvl, pk, Bc, rB.y);
-  vec3 c = mix(tB, tA, covA);
+  if (here || there) {
+    float lvF = pcWoodLevel(dsF, oc.x, rF.x, bdx, bdy, nvdx, nvdy, seenFront, sunV, pale, canopy, BcF, nAF);
+    vec3 e = there ? pcWoodPaint(pcWoodColour(rF2, nAF, barkA, barkB, markP, twig), lvF, pk, BcF, rF2.y) : c;
+    vec3 lay = here ? mix(e, pcWoodPaint(pcWoodColour(rF, nAF, barkA, barkB, markP, twig), lvF, pk, BcF, rF.y), cF) : mix(e, c, cF);
+    c = mix(c, lay, uOilC.z);
+  }
   #ifdef PC_FIRE
     if (vBurnt > 0.001) {
       // (what the fire left standing is charred, as the big program chars it: a cold charcoal at the paint's own value)
@@ -2732,10 +2776,13 @@ const LEAF_FRAG = /* glsl */`
 ${TREE_HEAD}
 void main() {
   #include <logdepthbuf_fragment>
-  if (uOilL.y > 3.5 && uOilL.y < 4.5) { pcWrite(vec3(0.42, 0.40, 0.32), 0.0, vec3(0.0, 0.0, 1.0), -vView.z, 3.0); return; }
+  #ifdef PC_TREE_FAIL
+    pcTreeFail = 1.0;      // (?trees2fail=leaf: not GLSL on purpose, the guard's test: materials.js TREE_GUARD)
+  #endif
+  if (uOilL.y > 3.5 && uOilL.y < 4.5) { pcWrite(vec3(0.42, 0.40, 0.32), 1.0, vec3(0.0, 0.0, 1.0), -vView.z, 3.0); return; }
   vec3 nV = normalize(vNV);
   if (!gl_FrontFacing) nV = -nV;
-  if (uOilL.y > 1.5 && uOilL.y < 2.5) { pcWrite(uLeafA * 0.7, 0.0, nV, -vView.z, 3.0); return; }
+  if (uOilL.y > 1.5 && uOilL.y < 2.5) { pcWrite(uLeafA * 0.7, 1.0, nV, -vView.z, 3.0); return; }
   // (a leaf: one piece of flat colour, worked out once a leaf in the vertex shader; here the lantern's light, the fire's
   //  and the air are laid over it, as the big program's leaf branch lays them)
   float h = vData.w;
@@ -2781,7 +2828,7 @@ ${LEAF_SUN}
 ${SPRAY_GLSL}
 void main() {
   #include <logdepthbuf_fragment>
-  if (uOilL.y > 3.5 && uOilL.y < 4.5) { pcWrite(vec3(0.42, 0.40, 0.32), 0.0, vec3(0.0, 0.0, 1.0), -vView.z, 3.0); return; }
+  if (uOilL.y > 3.5 && uOilL.y < 4.5) { pcWrite(vec3(0.42, 0.40, 0.32), 1.0, vec3(0.0, 0.0, 1.0), -vView.z, 3.0); return; }
   // the card's chart, in the dab layer's own cells (kitbuild.js clusterCard), its screen derivatives for the leaf's
   // clean edge, and the topmost leaf laid there (dabtex.js SPRAY_GLSL: the shadow map finds the very same leaf)
   vec2 off = vec2(vCardS.y * 23.0);
@@ -2804,7 +2851,7 @@ void main() {
     if (cover < (uOilG.z > 0.5 ? 0.06 : 0.5)) discard;
   #endif
   vec3 nV = vCardM;
-  if (uOilL.y > 1.5 && uOilL.y < 2.5) { pcWrite(vCardLA * 0.7, 0.0, nV, -vView.z, 3.0); return; }
+  if (uOilL.y > 1.5 && uOilL.y < 2.5) { pcWrite(vCardLA * 0.7, 1.0, nV, -vView.z, 3.0); return; }
   pcUp = vCardS.z;
   vec3 sunV = normalize((viewMatrix * vec4(uSunDirW, 0.0)).xyz);
   float twig = vCardS.w;
@@ -2839,6 +2886,37 @@ void main() {
 // whether the pass runs, meshes the card meshes that take part, each carrying in userData.pcDepthMats the materials it
 // is drawn with in that pass (its wood hidden, its cards in depth only).
 export const TREE_DEPTH = { on: false, meshes: new Set() };
+// THE GUARD ON THE TREES' TWO SHORT PROGRAMS (the default since 24 Nov; flora.js TREES2). A phone's driver may refuse a
+// program the desktop takes. three says so in its own words for every program it links (renderer.debug.checkShaderErrors,
+// on by default: a console error with the compiler's log, and program.diagnostics.runnable false); the painter asks here
+// after each frame whether any of the trees' programs is among those (render/index.js), and the first that is sets
+// failed: every world's flora then puts every tree back to the one program at once (flora.js update), and the console
+// says which program and why. mats: every tree program made (makePropMaterial). ?trees2fail=wood or leaf (or 1, the
+// wood) breaks that program on purpose, so the guard can be seen to work.
+export const TREE_GUARD = { mats: new Set(), failed: '' };
+const TREE_FAIL = (() => {
+  if (typeof location === 'undefined' || !location.search) return '';
+  const q = new URLSearchParams(location.search).get('trees2fail');
+  return q === '1' || q === 'wood' ? 'wood' : q === 'leaf' ? 'leaf' : '';
+})();
+export function treeGuardCheck(renderer) {
+  if (TREE_GUARD.failed || !TREE_GUARD.mats.size || !renderer || !renderer.properties) return TREE_GUARD.failed;
+  for (const m of TREE_GUARD.mats) {
+    const progs = renderer.properties.get(m).programs;
+    if (!progs) continue;
+    for (const p of progs.values()) {
+      const d = p && p.diagnostics;
+      if (!d || d.runnable !== false) continue;
+      const log = [d.fragmentShader && d.fragmentShader.log, d.vertexShader && d.vertexShader.log, d.programLog].filter(Boolean).join('\n');
+      const first = (log.split('\n').find((l) => l.trim()) || 'the driver gave no log').trim().slice(0, 200);
+      TREE_GUARD.failed = (m.name || 'a tree program') + ': ' + first;
+      console.warn('[trees] the trees\' two short programs cannot be used on this device (' + TREE_GUARD.failed +
+        '). Every tree goes back to the one program it was drawn by before (as ?trees2=0).');
+      return TREE_GUARD.failed;
+    }
+  }
+  return '';
+}
 
 export function makePropMaterial(bodyU, opts = {}) {
   const v3 = (a, d) => ({ value: new THREE.Vector3().fromArray(a || d) });
@@ -2902,6 +2980,8 @@ export function makePropMaterial(bodyU, opts = {}) {
   // (?treedepth=1, the cards only: opts.depth 'first' the depth pass, 'equal' the colour pass drawn after it)
   const dpass = tree === 'card' && (opts.depth === 'first' || opts.depth === 'equal') ? opts.depth : null;
   if (dpass) defines[dpass === 'first' ? 'PC_TREE_DEPTH' : 'PC_TREE_EQUAL'] = 1;
+  if (tree === 'wood' && opts.doubleSide) defines.PC_WOOD_FLIP = 1;      // (drawn BackSide: see WOOD_FRAG)
+  if (tree && tree === TREE_FAIL) defines.PC_TREE_FAIL = 1;      // (?trees2fail=: the guard's test, TREE_GUARD)
   const m = new THREE.ShaderMaterial({
     name: 'pc-prop-' + (opts.name || ''),
     defines,
@@ -2913,6 +2993,7 @@ export function makePropMaterial(bodyU, opts = {}) {
     side: tree === 'wood' && opts.doubleSide ? THREE.BackSide : opts.doubleSide ? THREE.DoubleSide : THREE.FrontSide,
   });
   m.userData.pcPainted = true;
+  if (tree) TREE_GUARD.mats.add(m);
   // (the powers, fire: a crown that has burned is left bare and black. The plants need no list of burnt places -- each
   // instance carries its own number, PROP_VERT aBurnt -- so only the dials are attached. A mesh that has no such
   // numbers (grass, ferns, stones, and the trees until the world fills them) reads 0 for every instance, which is
@@ -3232,6 +3313,17 @@ uniform vec4 uNear;     // x full density out to here (m), y nothing beyond here
 uniform vec4 uNear2;    // x, y the ring fades in between these distances (m), z how soft its marks are left
 uniform float uTime;
 uniform vec4 uWx;
+#ifdef PC_OIL
+// (the flora lane, docs/lead/FLORA-DESIGN.md) x 1: a mark the eye cannot see is dropped at once (G1); z 1: the flowers'
+// heads are not drawn (the speed test's row; 0 in play); y, w: spare
+uniform vec4 uNearK;    // x 1: marks out of view are dropped (G1); y the year now (SEASON.t, the flowers' windows); z 1: no flower heads; w a flower head's least size on screen, a share (0: 1)
+uniform vec4 uNearL;    // x 1: the grass package's paint (G4), y how strong the gusts' sheen is, z w the bend (rad) it grows over
+varying float vSheen;   // (G4) how far the gust bends this blade away from the eye, as a step of light: 0 none
+varying float vTeeth;   // (G3) how many blades a fan-brush touch is cut into, from its size on the screen: 0 as it was
+                        // (F2) a flower's head: how many pixels tall it stands on the screen
+attribute float iTone;  // (F2) a mark's second colour, packed (world/nearground.js packTone): 0 none
+varying vec3 vTone;     // ... unpacked; x < 0: none, the second tone is the mark's own colour, deeper or paler
+#endif
 varying vec3 vBody;
 varying vec3 vNV;
 varying vec3 vView;
@@ -3250,7 +3342,7 @@ void main() {
   bool flick = kind > 1.5 && kind < 3.5;
   bool broad = kind > 3.5;
   bool fan = broad && kind < 4.5;
-  bool lying = kind > 5.5;
+  bool lying = kind > 5.5 && kind < 6.5;      // (kinds 7 to 12 are the oil look's flower heads, facing the eye as a round touch)
   bool dab = broad && !fan && !lying;
   vKind = kind;
   vLoad = flick ? 0.4 : (broad ? 0.6 : 1.0);
@@ -3261,6 +3353,42 @@ void main() {
   // every stroke has its own range (so the sward thins with distance) and grows in after it is laid
   float range = mix(uNear.x, uNear.y, fract(h * 7.31));
   float vis = (1.0 - smoothstep(range * 0.72, range, di)) * smoothstep(0.0, 0.7, uNear.z - iPar.w) * smoothstep(uNear2.x, uNear2.y, di);
+  #ifdef PC_OIL
+  // G1, THE MARKS THE EYE CANNOT SEE (2026-11-24, docs/lead/FLORA-DESIGN.md 6.1). A ring is one draw of every mark round
+  // the eye, and every mark used to be shaded whole -- the bend field read three times a vertex, the air -- in view or
+  // not, in range or not: COUNTED at the autumn landing, two thirds of 23,305 marks lay outside the picture, and a mark
+  // past its range was only shrunk to nothing at the end. Here such a mark is sent outside the clip volume before any
+  // of that, and its triangles are dropped, in the phone's binning pass too. Nothing that could reach the picture goes:
+  // the margin is the mark's own reach (its length, its width twice, the height a round touch is held at, a few pixels
+  // for the floor on a far mark's size, and the lean of a bend). A mark with no size (vis 0) drew nothing before either.
+  // uNearK.x 0 (the speed test's row, ?nearcull=0, ?grass2=0) is the ring as it was.
+  if (uNearK.z > 0.5 && kind > 6.5) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); return; }   // (the speed test's 'no flower heads')
+  // THE YEAR (the flora lane, docs/lead/FLORA-DESIGN.md 5.1, ?bloomyear=0 off): a flower's window on the year rides in
+  // iTone's top six bits (world/nearground.js packYear: when it comes into flower and when it is over, in sevenths of
+  // SEASON.t, 0 high summer to 1 deep autumn), and uNearK.y is the year now. Out of its window a kind's heads thin out one
+  // by one (each head by its own hash) and shrink before they go, over a seventh of the year, so nothing pops; a cushion
+  // keeps its leaves and its flowers go back into them. A mark with no window (every blade, stalk and leaf) is untouched.
+  float tn = iTone, yrF = 1.0, yrS = 1.0;
+  if (iTone > 262143.5) {
+    float yw = floor(iTone / 262144.0);
+    tn = iTone - yw * 262144.0;
+    float ya = floor(yw / 8.0) / 7.0, yb = 1.0 - mod(yw, 8.0) / 7.0;
+    yrF = smoothstep(ya - 0.143, ya, uNearK.y) * (1.0 - smoothstep(yb, yb + 0.143, uNearK.y));
+    if (kind < 11.5) {
+      float yq = fract(h * 5.37);
+      if (yq >= yrF) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); return; }
+      yrS = mix(0.45, 1.0, smoothstep(0.0, 0.18, yrF - yq));
+    }
+  }
+  if (uNearK.x > 0.5) {
+    vec4 rv = modelViewMatrix * vec4(root, 1.0);
+    float ext = iAxis.w * 1.2 + 2.0 * iPar.x + (dab ? iCol.a : 0.0) + 0.3 + uNear.w * di * 4.0;
+    vec4 rc = projectionMatrix * rv;
+    float kx = ext * sqrt(projectionMatrix[0][0] * projectionMatrix[0][0] + 1.0);
+    float ky = ext * sqrt(projectionMatrix[1][1] * projectionMatrix[1][1] + 1.0);
+    if (vis <= 0.0 || rv.z > ext || abs(rc.x) - rc.w > kx || abs(rc.y) - rc.w > ky) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); return; }
+  }
+  #endif
   float flex = iExt.y;
   // fresh snow buries what is short: no stroke stands on a snowfield but the tall stubble
   float snowK = 1.0 - smoothstep(0.12, 0.50, uWx.z) * (1.0 - 0.30 * smoothstep(0.62, 0.95, iAxis.w));
@@ -3278,6 +3406,24 @@ void main() {
     ax = normalize(mix(ax, axh / max(length(axh), 0.05) + up * 0.16, fl * 0.92));
     vFlat = fl;
   } else vFlat = 0.0;
+  #ifdef PC_OIL
+  vTeeth = 0.0;
+  if (tn > 0.5) { float pk = tn - 1.0; vTone = vec3(floor(pk / 4096.0), mod(floor(pk / 64.0), 64.0), mod(pk, 64.0)) / 63.0; }
+  else vTone = vec3(-1.0);
+  if (kind > 11.5 && yrF < 1.0 && vTone.x >= 0.0) vTone = mix(iCol.rgb, vTone, yrF);
+  // (G4, THE GUSTS' SHEEN, 2026-11-24) PHYSICS' bend carries the wind's travelling waves (physics/flora.glsl.js: the gust
+  // and the wave train in pcPhysBend), so where a gust presses the sward the blades lean over together and, leaning away
+  // from the eye, show their lit backs: bands of paler grass sweep across a meadow as the gusts pass. Asked at the root,
+  // so a blade is lit WHOLE as everything in the look is.
+  vSheen = 0.0;
+  if (uNearL.y > 0.0 && flex > 0.01 && uPhysOn > 0.5) {
+    vec3 bd = uPhysEast * pb.x + uPhysNorth * pb.y;
+    float ba = length(bd);
+    vec3 th = toCam - up * dot(toCam, up);
+    float away = ba > 1e-4 ? -dot(bd / ba, th / max(length(th), 1e-3)) : 0.0;
+    vSheen = uNearL.y * smoothstep(uNearL.z, uNearL.w, ba) * (0.35 + 0.65 * away);
+  }
+  #endif
   vec3 sd = cross(ax, toCam / max(di, 0.001));
   sd /= max(length(sd), 0.05);
   float wPx = uNear.w * di;                                       // metres across one pixel here
@@ -3292,10 +3438,37 @@ void main() {
       vec3 da = t1 * cos(iCol.a) + t2 * sin(iCol.a), db = cross(ax, da);
       rel = da * (max(len, wPx * 1.2 * grow) * (t * 2.0 - 1.0)) + db * (side * max(iPar.x, wPx * 0.9) * grow);
     } else if (dab) {
-      rel = ax * (iCol.a * (len / max(iAxis.w, 1e-4)) + max(len, wPx * 1.3 * grow) * t) + sd * (side * max(iPar.x, wPx * 1.3) * grow);
+      float dl = len, dw = iPar.x;
+      #ifdef PC_OIL
+      // (a flower's head never shrinks under a few pixels across, so a poppy six metres off still reads as a poppy and
+      // not a speck -- the coordinator on the level meadow, 24 Nov: the old flowers were bold dabs, the new heads 3-6 px.
+      // The whole head grows, its shape kept: half-width 2.6 px for a daisy, cup or poppy, 2.0 for a bell (they hang
+      // several to a stalk), 1.4 for a spike or froth, which are tall already. Only the oil look's heads, kinds 7-12.)
+      if (kind > 6.5) {
+        float hf = (kind > 9.5 && kind < 11.5 ? 1.4 : (kind > 8.5 && kind < 9.5 ? 2.0 : 2.6)) * (uNearK.w > 0.0 ? uNearK.w : 1.0);
+        float fk = max(1.0, wPx * hf * grow / max(dw, 1e-5));
+        dl *= fk * yrS; dw *= fk * yrS;     // (yrS: a head about to go out of flower shrinks first, the year above)
+      }
+      #endif
+      rel = ax * (iCol.a * (len / max(iAxis.w, 1e-4)) + max(dl, wPx * 1.3 * grow) * t) + sd * (side * max(dw, wPx * 1.3) * grow);
+      #ifdef PC_OIL
+      if (kind > 6.5) vTeeth = max(dl, wPx * 1.3) / max(wPx, 1e-5);
+      #endif
     } else {
       // a fan-brush touch: broad at the foot, spreading a little, its top cut into blades by the fragment shader
-      rel = ax * (len * t) + sd * (side * iPar.x * (1.0 + 0.4 * t) * grow + iCol.a * len * t * t);
+      float wk = 1.0;
+      #ifdef PC_OIL
+      // (G3, THE MIDDLE BAND, 2026-11-24, docs/lead/FLORA-DESIGN.md 6.3, ?grass2=0 off) A touch was cut into five to ten
+      // blades whatever its size, so at 20 m (5.6 cm a pixel) a 20 cm touch had blades under a pixel wide: the yellow
+      // speckle of the stills from 10 m. Now it is cut into as many as leave each blade about two pixels, never under
+      // two; and since the ring thins past 25 m (nearground.js: each touch's own range), a touch grows a little as the
+      // ring thins, up to 1.4 times by 40 m, so the band keeps its cover with fewer, larger touches.
+      if (uNearL.x > 0.5) {
+        wk = mix(1.0, 1.4, smoothstep(15.0, 40.0, di));
+        vTeeth = clamp(floor(2.4 * iPar.x * wk / max(wPx * 2.2, 1e-5)), 2.0, 9.0);
+      }
+      #endif
+      rel = ax * (len * t) + sd * (side * iPar.x * wk * (1.0 + 0.4 * t) * grow + iCol.a * len * t * t);
     }
   } else {
     // (close to the eye a blade is as slender as a blade is; farther off it is as broad as the brush must be)
@@ -3344,6 +3517,10 @@ varying float vLoad;
 varying float vKind;
 #ifdef PC_OIL
 varying vec3 vRootB;
+uniform vec4 uNearL;
+varying float vSheen;
+varying float vTeeth;
+varying vec3 vTone;
 ${PC_UP_F}
 #endif
 #ifdef PC_FIRE
@@ -3363,12 +3540,62 @@ void main() {
     if (fract(vS.z * 13.37 + 0.11) > uOilG.x * uGroundK.y) discard;
     {
       vec3 r3o = vec3(vS.z, fract(vS.z * 13.7), fract(vS.z * 5.1));
-      if (vKind > 4.5) {
+      bool second = false;
+      if (vKind > 6.5) {
+        // (F2, THE FLOWERS' HEADS, 2026-11-24, docs/lead/FLORA-DESIGN.md 7.2; world/bloom.js, nearground.js layBlooms.) Each
+        // cut from one quad that faces the eye, as the round touch is: a clean flat piece, no outline, and at most two
+        // flat colours -- its own and a second (the eye, the light in a cup, the shadow of a bell's mouth, a cushion's
+        // flowers), the second set as data (vTone) or the mark's own colour deeper or paler, never a hue of the shader's
+        // (LOOK-RULES R2.1). Lit WHOLE at its root like every near mark. Fine detail -- petals, scallops, florets -- is cut
+        // only where the head is big enough on the screen for each piece to be about two pixels (vTeeth: its height in
+        // pixels), so nothing finer than a pixel is ever drawn (R4.5); smaller, a head is its plain shape in its two tones.
+        vec2 q = vec2(vS.y, vS.x * 2.0 - 1.0);
+        float px = vTeeth, rq = length(q);
+        if (vKind < 7.5) {                          // rayed: petals round an eye (daisy, aster, campion)
+          if (rq > 0.96) discard;
+          float np = floor(clamp(px * 1.1, 0.0, 12.0));
+          if (np >= 5.0) {
+            float pa = fract(atan(q.y, q.x) / 6.2832 * np + vS.z * 7.0);
+            if (rq > 0.40 && abs(pa - 0.5) * 2.0 > 1.0 - 0.75 * (rq - 0.40)) discard;
+          }
+          second = rq < (px < 5.0 ? 0.45 : 0.36);
+        } else if (vKind < 8.5) {                   // cup: a round head, the light in the cup a step paler (buttercup, gentian, poppy)
+          if (rq > 0.95) discard;
+          if (px > 7.0 && rq > 0.80 && abs(fract(atan(q.y, q.x) / 6.2832 * 5.0 + vS.z * 3.0) - 0.5) > 0.38) discard;
+          second = q.y > 0.15 - 0.15 * q.x * q.x;
+        } else if (vKind < 9.5) {                   // bell: a hanging cup from the side, its mouth in shadow (harebell, bluebell)
+          float bw = 0.55 + 0.32 * smoothstep(0.3, -0.9, q.y);
+          if (abs(q.x) > bw || q.y > 0.82 - 0.40 * q.x * q.x || q.y < -0.94) discard;
+          if (px > 7.0 && q.y < -0.72 && abs(fract(q.x * 1.6 + 0.5) - 0.5) < 0.16) discard;
+          second = q.y < -0.60;
+        } else if (vKind < 10.5) {                  // spike: florets stacked up the stem, smaller to the top (foxglove, loosestrife)
+          float nf = clamp(floor(px / 3.0), 3.0, 9.0);
+          float yy = (q.y + 1.0) * 0.5 * nf, cl = floor(yy), fy = fract(yy) - 0.5;
+          float sx = mod(cl, 2.0) < 1.0 ? -0.22 : 0.22;
+          if (length(vec2((q.x - sx) * 0.75, fy)) > 0.48 * (1.0 - 0.5 * cl / nf)) discard;
+          second = cl > nf - 1.5;
+        } else if (vKind < 11.5) {                  // froth: a loose head of small dabs (meadowsweet, cotton grass)
+          float nd = clamp(floor(px / 2.5), 1.0, 7.0);
+          bool hit = nd < 1.5 && rq < 0.9;
+          for (int k = 0; k < 7; k++) {
+            if (float(k) >= nd) break;
+            vec2 cc = vec2(fract(sin(float(k) * 12.9898 + vS.z * 78.233) * 43758.5), fract(sin(float(k) * 39.346 + vS.z * 11.135) * 24634.6)) * 1.2 - 0.6;
+            if (length(q - cc) < 0.40) hit = true;
+          }
+          if (!hit) discard;
+        } else {                                    // cushion: a low dome of leaves, its flowers on top (thrift, alpine pink)
+          float topY = -1.0 + 1.75 * sqrt(max(0.0, 1.0 - q.x * q.x));
+          if (q.y > topY) discard;
+          second = q.y > topY - 0.42;
+          if (second && px > 10.0 && abs(fract(q.x * 2.2 + vS.z * 5.0) - 0.5) > 0.36) second = false;
+        }
+      } else if (vKind > 4.5) {
         vec2 q = vec2(vS.y, vS.x * 2.0 - 1.0);
         if (vKind > 5.5 ? abs(q.x) > (1.0 - q.y * q.y) * 0.92 : dot(q, q) > 0.94) discard;
       } else if (vKind > 3.5) {
         float u = vS.y * 0.5 + 0.5, hz = vS.z;
         float nb = 5.0 + floor(fract(hz * 5.37) * 5.0);
+        if (vTeeth > 0.5) nb = min(nb, vTeeth);      // (G3: never a blade under two pixels)
         float b1 = u * nb + hz * 7.0 + 0.4 * sin(u * 9.0 + hz * 30.0), b2 = u * nb * 0.37 + hz * 3.0;
         float h1 = 0.30 + 0.70 * fract(sin(floor(b1) * 12.9898 + hz * 78.233) * 43758.5453);
         float h2 = 0.55 + 0.45 * fract(sin(floor(b2) * 39.3468 + hz * 11.135) * 24634.6345);
@@ -3391,9 +3618,14 @@ void main() {
       // tone is a flat patch)
       lv -= step(0.66, fract(r3o.x * 11.1)) * 0.6 * step(1.5, lv);
       if (vKind < 4.5 && vS.x > 0.42 + 0.3 * r3o.y) lv += 0.8 * sunO;
+      // (G4, the flora lane, ?grass2=0 off: the gusts' sheen lifts the blades they lean away from the eye, WHOLE, asked at
+      // the root. A step deeper at a blade's root was tried and taken out: LOOK-RULES R3.1, a stroke is one flat colour.
+      // The sward's dark roots are the ground's paint under it instead: world/bloom.js bloomTint.)
+      if (uNearL.x > 0.5 && vKind > 1.5 && vKind < 3.5) lv += 0.7 * vSheen;
       // (a stroke's wash is never darker than a middle one: the watercolour's deep washes, laid as flat paint in the
       // shade, were black thorns all over the wood's floor; in the shade a blade is a deep green)
       vec3 kc = vCol;
+      if (second) kc = vTone.x >= 0.0 ? vTone : pcDensity(vCol, vKind > 7.5 && vKind < 8.5 ? 0.72 : 1.45);
       float kl = dot(kc, vec3(0.3, 0.5, 0.2));
       kc = mix(kc, kc * (0.52 / max(kl, 0.08)), smoothstep(0.52, 0.30, kl) * 0.85);
       vec3 ko = pcDabTint(pcDensity(kc, 1.0 + (r3o.x - 0.5) * 0.25), r3o, 0.0);
@@ -3468,6 +3700,8 @@ export function makeNearMaterial(bodyU) {
     uniforms: baseUniforms(bodyU, Object.assign({
       uOrigin: { value: new THREE.Vector3() }, uCamLocal: { value: new THREE.Vector3() },
       uNear: { value: new THREE.Vector4(5, 13, 0, 0.002) }, uNear2: { value: new THREE.Vector4(0.8, 2.6, 0, 0) },
+      // (the flora lane: nearground.js FLORA sets them; 0 is each package off, the ring as it was. Read only in the oil look)
+      uNearK: { value: new THREE.Vector4(0, 0, 0, 0) }, uNearL: { value: new THREE.Vector4(0, 0, 0, 0) },
     }, PHYS)),
     vertexShader: NEAR_VERT, fragmentShader: NEAR_FRAG,
     side: THREE.DoubleSide,

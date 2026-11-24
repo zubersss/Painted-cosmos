@@ -37,7 +37,16 @@ the air) is OFF until it passes the coordinator's eye (`?airfar=1`). L6 is off (
 | L2 + L7 the foliage shade and quiet darks | on | `&leafshade=0&postdark=0` |
 | L3 one light (figure, creatures, bark, rock) | on | `&onelight=0` |
 | T1 + the air's top + FV1 (the sky from the air) | on | `&skyceil=0&airtop=0` |
-| L5 the air from the air (not yet in) | `&airfar=1` | off |
+| L5 the air from the air | on | `&airfar=0` |
+
+**THE PROOF (24 Nov):** the six standard stills (S1-S6, gallery, 1024x480, quality 1, lite), one browser, an export of
+origin/look-proto 3408e03 against look-director 7dae2f2 with `?look=oil&light=old`: S1, S2, S3, S4 and S5 identical to
+the pixel (0 of 491,520 differ); S6 (Neptune at night) 12 pixels differ by at most 1 of 255, the software renderer's
+run-to-run noise (L0's proof saw the same). No page or shader error. So `?light=old` is the oil look as it was.
+The new look by default in the same merged tree, opened: S1 (build/S1_new_look_default.jpg, against
+build/S1_light_old.jpg) is the reworked picture (crowns as fiery, banks a quieter sage); 150 m (build/airtop/
+c150_down_old_over_new.jpg, top the old sky, bottom the new) now has its painted sky, blue with its clouds down to a
+pale band at the horizon, where the old one is a flat lavender band.
 
 ## How the stills are taken (so a later session can repeat them exactly)
 
@@ -247,3 +256,48 @@ sun side at noon where today's are an even lilac) and put the old facing back (P
 same picture. Flipping it is one line in PROP_FRAG and dropping that define, in one commit, but it changes every
 trunk in the approved picture: it wants A/B stills (S1, S2 at noon, the 275 m view) in front of the coordinator and
 the owner first. Not started.
+
+## L5, the air from the air: built and seen (ACCEPTED by the coordinator 24 Nov; on by default, `?airfar=0` or `?light=old` off)
+
+- `chunks.js` pcFogAmount: from the air (OIL.uLookN.w, set by world/index.js from the air's reach: 0 on foot, 1 by
+  the air's) the distance is taken 1.4 times instead of 2.4, and a share of 0.16 of the far land's own paint is kept
+  at the horizon by the same knee the ground uses; SHADOW.air (the lit air's twin in world/index.js) changed with it.
+  pcAtmosV and sky.js pcSkyAir: from the air the far air's gold lies toward the sun and its blue-violet away from it
+  and deeper with distance, where one fixed mix of the two made khaki (F6). In the sky only the air band at the
+  horizon takes the split: laid through the sky's own bands it flattened the painted sky to one periwinkle (seen,
+  fixed in 9a9bc1e).
+- SEEN (opened; A `airfar` 0, B 1, same page; build/L5/L5_sheet_off_left_on_right.jpg): 150 m the land deeper and
+  less washed (S 0.35 -> 0.46), the sky as it was; 420 m noon the far wood and the hills keep more of their own paint
+  (S 0.32 -> 0.36, satD 0.16 -> 0.30); 420 m at 16.8 the far land warmer toward the sun and the band at the limb
+  blue-violet away from it (khaki less, not gone); the mile the peaks and the meadow a step deeper and more modelled
+  under the same painted sky. On foot S1 is identical to the pixel with it on (0 pixels differ). V over 0.90 moves at
+  most 0.8 of a point. NOT fixed by it: the mile at noon is still pale (FV1's thick air lasts to 1.76 km), and the
+  golden-hour sky itself is still one warm ochre wash -- that is the sky's own gold key, a separate step.
+
+## The golden hour's sky (24 Nov; the coordinator's ruling (b))
+
+- Old: one gold wash all round the dome (0.80 of it low, 0.45 high), so from the air every direction was the same flat
+  ochre. Four tries were built and seen (rings by the angle to the sun, glazed over the bands); the third and fourth
+  painted the air well but from the ground at S1, which faces away from the sun, the approved golden-hour still lost its
+  warm sky. Ruling (b): on the ground the wash holds; the rings come in with height.
+- sky.js (`?goldsky=0` the wash everywhere; on unless `?light=old`): five rings by the angle to the sun, edges a pixel
+  wide and wandering: pale gold by the sun, gold, peach, cool lilac, and away from the sun the sky's own blue a step
+  deeper; each ring a glaze that keeps the value of the bands and clouds under it; a rose band low on the far side.
+  Mixed in by uSkyAir.w (world/index.js: a dip of 10 to 17 degrees, Earth 62 m to 180 m, as the sky's remap).
+- SEEN: S1 with it on is identical to the pixel to S1 without it (0 pixels differ): the warm sky over the fiery crowns
+  is today's. At 420 m (build/goldsky/b_420m_toward_then_away_old_left_new_right.jpg): toward the sun lilac, peach and
+  gold rings where the old is flat ochre; away from it a cool deep blue with its clouds and a rose band low where the
+  old is the same flat ochre.
+
+## The summer canopy (24 Nov; the coordinator: the summer wood from the air a carpet of lime crowns)
+
+- world/flora.js, behind LOOK.canopyGreen (on unless `?light=old`; `?canopygreen=0` alone): each tree kind's summer
+  dress (leafSum) through a scale per channel: the lightest green to an olive-gold (hue 73 to 59, V 0.92 to 0.78), the
+  middle a step deeper (V 0.80 to 0.66), the darkest toward a blue-green (V 0.58 to 0.46). Autumn dress, conifers and
+  the undergrowth (B's) untouched; the same uniforms feed near trees, far trees and impostors.
+- SEEN (opened; one page each, A `canopygreen=0`): with the impostors on (`fartree=impostor`), 150 m: a carpet of bright
+  lime crowns becomes a deeper olive-green with gold lights (V median 0.57 to 0.49, V over 0.90 5.3 to 3.7 %); 420 m the
+  same, calmer (V median 0.69 to 0.64). On foot S2: the leaves a step deeper; the bright lime left there is the floor
+  grass (B's sward and C's ground, not this). Honest limit: B reads a little greyer than ideal; more variety between
+  crowns (some warmer, some bluer) would be the next step if wanted.
+
