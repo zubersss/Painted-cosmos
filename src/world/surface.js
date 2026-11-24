@@ -516,7 +516,14 @@ class Surface {
     // (the oil look's rivers: a sand bar is pale sand, bare; c.bar from _riversOil)
     const bar = c.bar || 0;
     if (bar > 0) mix3(b, pal.sand || SAND_OIL, bar * 0.92);
-    mix3(b, pal.bed, smoothstep(w0 + 0.35, w0 - 0.5, s));
+    // (a RAIN-ONLY runnel's bed, ?runoff=1 (c.capOnly, E's flag): damp earth a step darker than the floor beside it, with
+    // litter, not a river bed's under-water colours: in the dry the runnel read as a ghost of painted water, E's still on
+    // design-water; the look director's wish, damp and a step darker. Under its rain the water hides it either way.)
+    const capO = c.capOnly ? 1 : 0;
+    if (capO) {
+      const kb = smoothstep(w0 + 0.35, w0 - 0.5, s), lt = pal.litter;
+      b.r += ((b.r + (lt[0] - b.r) * 0.35) * 0.80 - b.r) * kb; b.g += ((b.g + (lt[1] - b.g) * 0.35) * 0.78 - b.g) * kb; b.b += ((b.b + (lt[2] - b.b) * 0.35) * 0.76 - b.b) * kb;
+    } else mix3(b, pal.bed, smoothstep(w0 + 0.35, w0 - 0.5, s));
     mix3(b, pal.rock, rk * 0.92);
     const bedm = smoothstep(w0 + 0.6, w0 - 0.3, s);
     b.dry = clamp(0.34 + 0.5 * rk + 0.3 * glade - bedm * 0.4, 0, 1);
@@ -550,7 +557,9 @@ class Surface {
       const sd0 = pal.sand || SAND_OIL;
       b.r2 += (sd0[0] - b.r2) * bar * 0.9; b.g2 += (sd0[1] - b.g2) * bar * 0.9; b.b2 += (sd0[2] - b.b2) * bar * 0.9;
       const wl = smoothstep(w0 + 1.2 + (this.foot || 0) * 0.8, w0 - 0.6, s) * 0.92;
-      b.r2 += (0.42 - b.r2) * wl; b.g2 += (0.62 - b.g2) * wl; b.b2 += (0.86 - b.b2) * wl;
+      // (a rain-only runnel is not drawn as water from the air either: its line is the damp bed's own colour, ?runoff=1)
+      if (capO) { b.r2 += (b.r - b.r2) * wl; b.g2 += (b.g - b.g2) * wl; b.b2 += (b.b - b.b2) * wl; }
+      else { b.r2 += (0.42 - b.r2) * wl; b.g2 += (0.62 - b.g2) * wl; b.b2 += (0.86 - b.b2) * wl; }
     } else {
       const wl = smoothstep(w0 + 1.2, w0 - 0.6, s);
       b.r2 += (0.80 - b.r2) * wl; b.g2 += (0.87 - b.g2) * wl; b.b2 += (0.93 - b.b2) * wl;
