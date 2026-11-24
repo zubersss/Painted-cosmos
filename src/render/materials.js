@@ -6,7 +6,7 @@ import * as THREE from 'three';
 // THE GROUND SEEN FROM THE AIR (group C, the far view): the canopy painted into the ground. Its shader text, its uniforms
 // and its switch (?canopy=) live in render/farground.js; the hooks in the ground's shaders are all inside #ifdef PC_CANOPY, which is set
 // only in the oil look with the switch on.
-import { CANOPY, CANOPY_DEBUG, CANOPY_DAB, CANOPY_FLOOR, CANOPY_VERT_DECL, CANOPY_VERT_MAIN, CANOPY_FRAG, canopyUniforms, GROUND_SEASON, SEASON_VERT, SEASON_VERT_MAIN, SEASON_FRAG, seasonUniforms, ROCKFIELD, ROCK_FRAG, rockUniforms, ROCK_DEBUG, BLOOM_FAR, BLOOM_VERT_DECL, BLOOM_VERT_MAIN, BLOOM_FRAG, bloomUniforms } from './farground.js';
+import { CANOPY, CANOPY_DEBUG, CANOPY_FARSHADOW, CANOPY_DAB, CANOPY_FLOOR, CANOPY_VERT_DECL, CANOPY_VERT_MAIN, CANOPY_FRAG, canopyUniforms, GROUND_SEASON, SEASON_VERT, SEASON_VERT_MAIN, SEASON_FRAG, seasonUniforms, ROCKFIELD, ROCK_FRAG, rockUniforms, ROCK_DEBUG, BLOOM_FAR, BLOOM_VERT_DECL, BLOOM_VERT_MAIN, BLOOM_FRAG, bloomUniforms, FARWATER_VERT_DECL, FARWATER_VERT_MAIN, FARWATER_FRAG } from './farground.js';
 import { G, PHYS, PHYSW, PREV, OIL, LOOK, BURNPAINT, register, ensureGlobals, makeBodyUniforms } from './shared.js';
 import { MODE } from '../data/mode.js';
 import { FLORA_GLSL } from '../physics/flora.glsl.js';
@@ -268,6 +268,7 @@ varying vec3 vUpV;
 varying vec3 vRel;        // the place measured from the eye, in the body's axes: small numbers, so its screen derivatives are exact (chunks.js pcGroundChartD)
 #endif
 ${CANOPY_VERT_DECL}
+${FARWATER_VERT_DECL}
 ${SEASON_VERT}
 ${BLOOM_VERT_DECL}
 void main() {
@@ -287,6 +288,7 @@ void main() {
   vView = mv.xyz;
   vCol = mix(aColor, aColorP, m); vCol2 = mix(aColor2.rgb, aColor2P.rgb, m); vPar = mix(aParams, aParamsP, m);
 ${CANOPY_VERT_MAIN}
+${FARWATER_VERT_MAIN}
 ${SEASON_VERT_MAIN}
 ${BLOOM_VERT_MAIN}
   gl_Position = projectionMatrix * mv;
@@ -426,6 +428,7 @@ ${CANOPY_FRAG}
 ${SEASON_FRAG}
 ${ROCK_FRAG}
 ${BLOOM_FRAG}
+${FARWATER_FRAG}
 // The ground where a stroke lies (ds: the pixels from here to its centre; w: its width, m): its wash, the light's
 // level, the snow's cover, the canopy's colour and its cover there.
 void pcGroundAt(vec2 ds, float w, vec3 rnd, out vec3 c, out float lvl, out float snowC, out vec3 leaf, out float canopy) {
@@ -551,15 +554,28 @@ vec3 pcGroundPaint(vec3 c, vec3 leaf, float fk, vec3 rnd, float snowC, float lvl
   #ifdef PC_ROCKF
     // (the far view, FV4: on a rock face no dab is laid a step darker by its own number, and its pigment and stray
     // are halved, so the face reads in lit and shaded planes by its own facing, render/farground.js)
-    cg = mix(cg, c, max(0.5 * gRock, gCliff));      // (a cliff's dab keeps its bed's tone: no stray pigment)
-    lvl -= (1.0 - f) * step(0.58, fract(rnd.x * 11.1)) * 0.9 * step(1.5, lvl) * (1.0 - gRock);
-    vec3 k = pcDabTint(mix(cg, leaf, f), mix(rnd, vec3(0.5), 0.5 * gRock), f);
+    // (SNOW IS ONE PAINT: on the snowy wash, the land's own white, no dab takes a neighbouring pigment or the warm and cool
+    // stray, and none is laid a step deeper: on near-white each of those read as its own pale green, peach or lilac leaf,
+    // the pastel confetti on the lit snowy ridges, SEEN by the look director at the alpine meadow from 420 m. The snow keeps
+    // its light and its shade, in bigger patches by the land's own snow.)
+    // (snow: light and nearly without hue, so a pale cream sand or meadow keeps its pigments)
+    float snW = smoothstep(0.80, 0.90, min(min(c.r, c.g), c.b)) * (1.0 - smoothstep(0.08, 0.16, max(max(c.r, c.g), c.b) - min(min(c.r, c.g), c.b)));
+    cg = mix(cg, c, max(max(0.5 * gRock, gCliff), snW));      // (a cliff's dab keeps its bed's tone: no stray pigment)
+    lvl -= (1.0 - f) * step(0.58, fract(rnd.x * 11.1)) * 0.9 * step(1.5, lvl) * (1.0 - gRock) * (1.0 - snW);
+    // (but each snow dab keeps a value step of its own, a little lighter or darker by its number, no hue: laid as one flat
+    // paint the brightest lit snow ran as a smooth ramp, a fifth of its steps 0.005 to 0.03 of lightness, faintly a glow;
+    // the look director by R3.7: light in steps with clean edges, white laid in flat touches)
+    lvl += (floor(fract(rnd.x * 7.3) * 3.0) - 1.0) * 0.22 * snW;
+    vec3 k = pcDabTint(mix(cg, leaf, f), mix(rnd, vec3(0.5), max(0.5 * gRock, snW)), f);
   #else
   lvl -= (1.0 - f) * step(0.58, fract(rnd.x * 11.1)) * 0.9 * step(1.5, lvl);
   vec3 k = pcDabTint(mix(cg, leaf, f), rnd, f);
   #endif
   k = mix(pcWetWash(k, 1.0 - snowC), mix(vec3(0.94, 0.955, 1.0), vec3(0.86, 0.90, 1.0), rnd.x * 0.6), snowC);
   #ifdef PC_ROCKF
+    // (the land's snow laid in two flat paints, white or a pale blue by the dab's number: the wash under it drifts a little
+    // from point to point, and dab to dab that drift was the smooth ramp the look director measured on the lit snow)
+    k = mix(k, step(0.6, fract(rnd.x * 3.7)) > 0.5 ? vec3(0.88, 0.91, 1.0) : vec3(0.95, 0.96, 1.0), snW);
     k = mix(pcRockTemp(k), k, snowC);       // (a rock face warm in its lit plane, cool violet in its shade: render/farground.js)
   #endif
   // (GRASS in the shade is a deep green, its own colour laid heavier with half the cool key over it, as a leaf's shade
@@ -908,15 +924,36 @@ void main() {
       bareC = mix(bareC, canM.rgb, canM.a);
     #endif
     #ifdef PC_BLOOMF
-      bareC = mix(bareC, pcBloomPal(mix(vBloomI.x, vBloomI.y, step(325.0, dist))), mix(0.45, 0.2, smoothstep(250.0, 400.0, dist)) * vBloomK * uBloomOn);      // (far off a smaller share: with every drift on a slope taking the slope's kind, a whole hillside was washed in one strong red at 1 km, SEEN by flora B)      // (the ground between the dabs takes a share of the drift)
+      // (near the eye the ground between the dabs takes NONE of the drift, rising to its share by 250 m: a tint there read
+      // as a milky veil from 1.8 m and 10 m, frost or fog, the look director's ruling via flora B; near, the drift is carried
+      // by whole dabs in the flower's colour only)
+      bareC = mix(bareC, pcBloomPal(mix(vBloomI.x, vBloomI.y, step(325.0, dist))), mix(0.45, 0.2, smoothstep(250.0, 400.0, dist)) * smoothstep(150.0, 250.0, dist) * vBloomK * uBloomOn);      // (far off a smaller share: with every drift on a slope taking the slope's kind, a whole hillside was washed in one strong red at 1 km, SEEN by flora B)      // (the ground between the dabs takes a share of the drift)
     #endif
     float lvl0 = pcLevel(mix(min(x0, 0.44) - 0.10 * vPar.z, x0, sun0), 0.05);
     #ifdef PC_ROCKF
       // (on a cliff the ground between the dabs is the cliff's rock at the pixel's own place, render/farground.js)
       float clP = smoothstep(0.66, 0.50, gFaceP.x) * smoothstep(0.05, 0.20, 1.0 - vCol.a) * gFaceOn;
-      if (clP > 0.0) { bareC = mix(bareC, pcCliffC(vBody, rB - uBodyR, vec3(0.5), bareC, lw), clP); lvl0 = mix(lvl0, min(lvl0, 0.9), gGully * clP); }
+      if (clP > 0.0) {
+        gCliffU = 1.0;
+        bareC = mix(bareC, pcCliffC(vBody, rB - uBodyR, vec3(0.5), bareC, lw), clP);
+        gCliffU = 0.0;
+        lvl0 = mix(lvl0, min(lvl0, 0.9), gGully * clP);
+        // (and it takes the dabs' own light planes and their warm and cool lean, at the pixel's facing: in plain daylight
+        // it was lighter and bluer than the planes around it, so every gap between the dabs on a far face read as a pale
+        // blue-grey fleck of one or two pixels, SEEN at 1 km by the look director; ?rockdebug=1 shows those gaps grey)
+        gRockP = clP; lvl0 = pcRockPlanes(lvl0, nV, sun0);
+      }
+    #endif
+    #ifdef PC_ROCKF
+      // (and between the dabs the land's snow is the snow's own white, not the wash's smooth drift: from 420 m a fifth of the
+      // bright snow is these gaps, and their drift from point to point read as an airbrushed glow, R3.7)
+      { float snB = smoothstep(0.80, 0.90, min(min(bareC.r, bareC.g), bareC.b)) * (1.0 - smoothstep(0.08, 0.16, max(max(bareC.r, bareC.g), bareC.b) - min(min(bareC.r, bareC.g), bareC.b)));
+        bareC = mix(bareC, vec3(0.95, 0.96, 1.0), snB); }
     #endif
     vec3 bare = pcTone(bareC, lvl0);
+    #ifdef PC_ROCKF
+      if (clP > 0.0) bare = pcRockTemp(bare);
+    #endif
     #ifdef PC_ROCKDEBUG
       if (gFaceOn > 0.5 && uRockDbg < 1.5) bare = vec3(0.5);
     #endif
@@ -937,6 +974,9 @@ void main() {
     acc = mix(bare, acc + rem * bare, uOilC.z);
   }
   }
+  #ifdef PC_FARWATER
+    acc = pcFarWaterLay(acc, dist);      // (the far view's water line, laid over the ground at each pixel: render/farground.js)
+  #endif
   float f = pcFogAmount(dist * pcFogBank(vBody));
   vec3 cOut = pcAtmosV(acc, f, vView);
   vec3 upV = normalize(vUpV);
@@ -1142,7 +1182,7 @@ export function makeTerrainMaterial(bodyU) {
   // (the far view's painted canopy: compiled in only with the oil look and ?canopy= on; a world without a painted canopy
   // keeps uCanK.w at 0 and returns before any of it is worked out. terrain.js writes the season's crowns each frame.)
   if (LOOK.oil && CANOPY > 0) {
-    m.defines = m.defines || {}; m.defines.PC_CANOPY = 1; m.defines.PC_CAN_DAB = _gf(CANOPY_DAB); m.defines.PC_CAN_FLOOR = _gf(CANOPY_FLOOR); Object.assign(m.uniforms, canopyUniforms());
+    m.defines = m.defines || {}; m.defines.PC_CANOPY = 1; m.defines.PC_CAN_DAB = _gf(CANOPY_DAB); m.defines.PC_CAN_FLOOR = _gf(CANOPY_FLOOR); if (CANOPY_FARSHADOW) m.defines.PC_FAR_SHADOW = 1; Object.assign(m.uniforms, canopyUniforms());
     if (CANOPY_DEBUG) m.defines.PC_CANDEBUG = 1;
   }
   // (the far view, FV3: the floor and the far colour follow the year; compiled in only with the oil look and ?groundseason=)
@@ -1151,6 +1191,8 @@ export function makeTerrainMaterial(bodyU) {
   // (the far view, FV6(b): the flower drifts from the air, with flora B; compiled in only with the oil look and ?bloomfar=1)
   if (LOOK.oil && BLOOM_FAR) { m.defines = m.defines || {}; m.defines.PC_BLOOMF = 1; Object.assign(m.uniforms, bloomUniforms()); }
   if (LOOK.oil && ROCKFIELD) { m.defines = m.defines || {}; m.defines.PC_ROCKF = 1; Object.assign(m.uniforms, rockUniforms()); if (ROCK_DEBUG) m.defines.PC_ROCKDEBUG = _gf(ROCK_DEBUG); }
+  // (the far view's water line: compiled in only with the oil look and ?farwater=1; world/patchgen.js packs aFarW then)
+  if (LOOK.oil && MODE.water && MODE.water.farwater) { m.defines = m.defines || {}; m.defines.PC_FARWATER = 1; }
   // (the powers, fire: the ground goes black where the fire passed. Only with ?powers=1 and ?look=oil; see addFire.)
   addFire(m, true);
   return register(m, 'terrain');
@@ -3846,6 +3888,7 @@ void main() {
         float pk = smoothstep(11.0, 16.0, di) * yrS;
         if (pk < 0.02) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); return; }
         dl *= pk; dw *= pk;
+        vTeeth = max(dw, wPx * 1.3) / max(wPx, 1e-5);      // (its half-width in pixels: the poppy's centre below)
       }
       #endif
       rel = ax * (iCol.a * (len / max(iAxis.w, 1e-4)) + max(dl, wPx * 1.3 * grow) * t) + sd * (side * max(dw, wPx * 1.3) * grow);
@@ -3990,6 +4033,10 @@ void main() {
       } else if (vKind > 4.5) {
         vec2 q = vec2(vS.y, vS.x * 2.0 - 1.0);
         if (vKind > 5.5 ? abs(q.x) > (1.0 - q.y * q.y) * 0.92 : dot(q, q) > 0.94) discard;
+        // (a drift's patch, nearground.js PATCH: on a touch over about 6 px across, one dot of the flower's second colour at
+        // its heart, about 1.3 px, so a far red touch reads as a poppy and a violet one as an aster -- the look director,
+        // 24 Nov; smaller, the touch is its one colour, nothing under a pixel and a half is drawn, R4.5)
+        if (vKind > 5.35 && vKind < 5.45 && vTeeth > 3.0) second = length(vec2(q.x, q.y * 0.85) * vTeeth) < 1.3;
       } else if (vKind > 3.5) {
         float u = vS.y * 0.5 + 0.5, hz = vS.z;
         float nb = 5.0 + floor(fract(hz * 5.37) * 5.0);
@@ -4075,9 +4122,7 @@ void main() {
   }
   // (a flick carries little more pigment than the ground it stands on: a loaded, crisp, wet
   // mark pooled by the sheet as well was a black comma)
-  // (a drift's patch, kind 5.4, nearground.js PATCH, is one flat colour, LOOK-RULES R3.1: SEEN 24 Nov, the dab's loaded-brush
-  // step darkened a white drift's touches to a grey-beige that read as pebbles)
-  float d = 1.0 + (0.55 - vS.x) * (vKind > 5.35 && vKind < 5.45 ? 0.0 : (vKind > 4.5 && vKind < 5.5 ? 1.5 : 0.7)) * vLoad + (vS.z - 0.5) * 0.5 * vLoad + (n1.r - 0.5) * 0.5;
+  float d = 1.0 + (0.55 - vS.x) * (vKind > 4.5 && vKind < 5.5 ? 1.5 : 0.7) * vLoad + (vS.z - 0.5) * 0.5 * vLoad + (n1.r - 0.5) * 0.5;
   vec3 c = pcWetWash(pcDensity(vCol, d), mix(1.0, 0.4, 1.0 - vLoad));
   c = mix(c, vec3(1.0), max(uWx.z * smoothstep(0.35, 0.9, vS.x) * 0.8, vFlat * 0.16));     // snow on the tips; trodden grass shows its pale side
   vec3 nV = normalize(vNV);

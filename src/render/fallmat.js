@@ -29,8 +29,17 @@ import { register } from './shared.js';
 
 // (the milk of churned water, from its own wash: aer 0 is the river's colour, 1 a pale milk, never paper white; the same
 //  recipe as the water's own aeration in materials.js WATER_FRAG, kept apart so a fall needs no water mesh)
+// THE FALL'S OWN WATER (F, 24 Nov, against the water paint's deeper blue: "give the sheet its own milk independent of the
+// river's wash"): three steps that do not follow the river, so the fall stays the lightest thing in its part of the picture --
+// a few whites, most on the ropes, the body's milk, a pale blue under it. Only the glassy water at the lip, and the outflow
+// beyond the pool's milk, still take the river's own colour. (Measured lit, 68 m from the sea at phone settings: whites V 0.91,
+// the body's median 0.88, a quarter of the sheet under 0.82. F's literal numbers, milk 0.75 0.80 0.83 and pale 0.58 0.69 0.78,
+// were tried too: the body went grey, median 0.83, darker than before the change; the pair is in falls-ownmilk-ABC.jpg.)
 export const FALL_CHUNK = /* glsl */`
 vec3 pcFallMilk(vec3 wash, float aer) { return mix(wash, mix(vec3(0.90, 0.94, 0.95), pcDensity(wash, 1.25), 0.30), clamp(aer, 0.0, 1.0)); }
+const vec3 FALL_WHITE = vec3(0.90, 0.93, 0.95);
+const vec3 FALL_MILK = vec3(0.81, 0.86, 0.88);
+const vec3 FALL_PALE = vec3(0.64, 0.75, 0.84);
 `;
 
 const SHEET_VERT = /* glsl */`
@@ -109,12 +118,13 @@ void main() {
     // rock's dark wet face, not cut out (cheaper, and the gap reads dark as it does in a real fall)
     float thick = smoothstep(0.26, 0.56, rope + 0.30 * (1.0 - down));
     bool gap = rr.y > 0.45 + 0.55 * thick && sC > 0.25;
-    // the stroke's colour: a few bright whites (about V 0.92 once lit), the body in milk and pale blue steps, glassy near the lip
+    // the stroke's colour: the fall's own steps (FALL_CHUNK): a few whites, most of them on the ropes; the body milk; the pale
+    // blue under it; near the lip the river's own glass going pale
     float glassy = 1.0 - smoothstep(-0.05, 0.22, sC);
-    vec3 col = rr.x < 0.14 * uFallK.z + 0.10 * thick ? vec3(0.86, 0.90, 0.92)
-             : rr.x < 0.66 ? pcFallMilk(uFallWash, 0.90)
-             : pcFallMilk(uFallWash, 0.66);
-    if (rr.y < glassy * 0.8) col = pcFallMilk(uFallWash, 0.30 + 0.5 * step(0.7, rr.x));
+    vec3 col = rr.x < (0.05 + 0.14 * thick) * uFallK.z ? FALL_WHITE
+             : rr.x < 0.68 ? FALL_MILK
+             : FALL_PALE;
+    if (rr.y < glassy * 0.8) col = rr.x < 0.7 ? mix(uFallWash, FALL_PALE, 0.45) : FALL_PALE;
     // (the wet rock seen through a thin place: a mid slate, a step or two under the water, never a black hole)
     if (gap) col = mix(vec3(0.44, 0.45, 0.50), pcDensity(uFallWash, 1.2), 0.35);
     nb = normalize(vNb);
@@ -139,8 +149,7 @@ void main() {
     // milk at the foot, lace beyond: more strokes left out the farther from the foot
     float cover = 1.0 - smoothstep(0.30, 1.0, rN) * uFallK.y;
     if (rr.z > cover) discard;
-    vec3 milk = pcFallMilk(uFallWash, 0.85);
-    vec3 col = rr.x < 0.30 * uFallK.z ? vec3(0.92, 0.94, 0.95) : rr.x < 0.80 ? milk : pcFallMilk(uFallWash, 0.45);
+    vec3 col = rr.x < 0.30 * uFallK.z ? FALL_WHITE : rr.x < 0.80 ? FALL_MILK : mix(uFallWash, FALL_PALE, 0.55);
     nb = up;
     vec3 ctrB = vBody + dFdx(vRel) * ds.x + dFdy(vRel) * ds.y;
     float x = dot(up, uSunDirL) * 0.5 + 0.5 + (rr.y - 0.5) * 0.08;
@@ -244,7 +253,7 @@ void main() {
   // a short stroke, pointed at both ends, one flat colour: the thrown ones white or milk, the cloud's paler and bluer
   if (abs(vQ.y) > 1.0 - vQ.x * vQ.x) discard;
   float k = fract(vH * 23.7);
-  vec3 col = vKind > 1.5 ? pcFallMilk(uFallWash, 0.82 + 0.15 * k) : k < 0.40 ? vec3(0.88, 0.91, 0.93) : pcFallMilk(uFallWash, 0.8);
+  vec3 col = vKind > 1.5 ? mix(FALL_PALE, FALL_MILK, 0.55 + 0.45 * k) : k < 0.40 ? FALL_WHITE : FALL_MILK;
   #ifdef PC_OIL
     float sun = pcSunAt(vBody, 0.0, 0.0, 0.1);
     vec3 c = pcTone(col, mix(1.6, 2.8, sun));

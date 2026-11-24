@@ -22,7 +22,7 @@ import { makePropMaterial, TREE_DEPTH, TREE_GUARD } from '../render/materials.js
 import { ImpostorAtlas, makeImpostorMaterial, impostorQuadGeometry, IMP, IMP_SHADOW, makeImpostorShadowMaterial, bakeTick } from '../render/impostor.js';
 import { treeCell, underCell, hasCell, TREE_LEVEL, UNDER_LEVEL } from './obstacles.js';
 import { QUALITY, G, LOOK, SCREEN, SHADOW, SHADOW_CROWD } from '../render/shared.js';
-import { SHADOW_LAYER, SHADOW_TIERS, SHADOW_WHOLE, SHADOW_OPTS } from '../render/shadow.js';
+import { SHADOW_LAYER, SHADOW_TIERS, SHADOW_WHOLE, SHADOW_OPTS, FAR_SHADOW } from '../render/shadow.js';
 import { FELLED, FELL, felledAt, fallingOn, felledOn, fallTurn } from '../data/felled.js';
 
 // tier ranges in metres at quality 2; scaled by RANGE_SCALE at lower tiers
@@ -141,10 +141,12 @@ const PHONE_TS = 0.30;
 // on foot. From the air every kind is an impostor.
 const IMP_FOOT = (() => { try { const v = new URLSearchParams(location.search).get('impfoot'); return v === 'all' || v === 'none' ? v : 'conifers'; } catch { return 'conifers'; } })();
 const IMP_AIR = 40;
-// THE FAR SPRUCE (the look director's order 3 after crown mass, 24 Nov; A2's ?pines). OFF BY DEFAULT until the look
-// director rules between the two ways below; both act only where the spruce's spec carries needleTop (?pines,
-// kits/spruce.js), so ?pines=0 is the old far spruce whatever is asked here.
-//   ?farspruce=near   the atlas bakes the spruce from its near tree, as today, and its crown is never painted under
+// THE FAR SPRUCE (the look director's order 3 after crown mass, 24 Nov; A2's ?pines). 'near' IS THE DEFAULT: the look
+// director chose it from the sheets A1_farspruce_*_ABCD (24 Nov: "D keeps A's clean dense cones and lifts them from
+// near-black to deep green ... B is shards, C loses the darks"). Both ways act only where the spruce's spec carries
+// needleTop (?pines, kits/spruce.js), so ?pines=0 is the old far spruce whatever is asked here; ?farspruce=0 the old
+// far spruce with ?pines.
+//   near (default)    the atlas bakes the spruce from its near tree, as today, and its crown is never painted under
 //                     V 0.24, as the middle spruce's needles are from 20 m out (materials.js PROP_VERT): today's dense
 //                     cone in the references' deep green, not near-black. (SEEN, 24 Nov: the clean dense cones kept.)
 //   ?farspruce=bough  its two layers are baked from its BY-BOUGH MIDDLE tree (seeds 13 and 12 at lod 1, 650 triangles),
@@ -153,7 +155,7 @@ const IMP_AIR = 40;
 //                     at 2.2 a pole with green sprays that all but vanishes from the air; at 4, ?farsprucek=4, the
 //                     density rule's growth, its fewer larger needle cards are big flat green shards.)
 // (From the air only: on foot the spruce keeps today's far spike.)
-const FAR_SPRUCE = (() => { try { const v = new URLSearchParams(location.search).get('farspruce'); return v === 'near' || v === 'bough' ? v : ''; } catch { return ''; } })();
+const FAR_SPRUCE = (() => { try { const v = new URLSearchParams(location.search).get('farspruce'); return v === '0' || v === 'off' ? '' : v === 'bough' ? 'bough' : 'near'; } catch { return 'near'; } })();
 const FAR_SPRUCE_V = 0.24;
 const FAR_SPRUCE_K = (() => { try { const v = +new URLSearchParams(location.search).get('farsprucek'); return v > 0 ? Math.min(4, v) : 2.2; } catch { return 2.2; } })();
 const HAND = (() => {
@@ -418,7 +420,7 @@ export class Flora {
         //  better on the skyline than their impostors, 24 Nov; ?impfoot=all makes every kind an impostor on foot,
         //  ?impfoot=none none)
         sp.footCards = IMP_FOOT === 'none' || (IMP_FOOT !== 'all' && sp.far[2] >= 0.5);
-        // (the spruce with ?pines and ?farspruce=near or bough: FAR_SPRUCE above; with neither, as before)
+        // (the spruce with ?pines: FAR_SPRUCE above, its near tree floored at V 0.24 by default; ?farspruce=0 as before)
         const spec = this.tall[i], pine = !!FAR_SPRUCE && !!(spec && spec.needleTop) && !!TALL_KITS[spec.kit], byBough = pine && FAR_SPRUCE === 'bough';
         sp.impByBough = byBough;
         geos.push(byBough ? sp.base.geo1 : sp.geo0[0]);
@@ -572,7 +574,7 @@ export class Flora {
     // (an impostor mesh's own shadow, from the air: render/impostor.js IMP_SHADOW; on the shadow pass's list while the eye
     //  is up there, see update)
     if (far && this.mats && mat === this.mats.imp) {
-      mesh.userData.crowdEntry = { mesh, material: mat, makeShadow: makeImpostorShadowMaterial };
+      mesh.userData.crowdEntry = { mesh, material: mat, makeShadow: makeImpostorShadowMaterial, viewCull: true };
       if (this._impSh) SHADOW_CROWD.add(mesh.userData.crowdEntry);
     }
     // (the oil look's cast shadows, render/shadow.js: trees, bushes and stones cast; blades and flowers do not)
@@ -1108,6 +1110,10 @@ export class Flora {
   // game runs for the speed test's row: only the impostor program is compiled again. Returns the setting before, or null.
   setCrownMass(on) { const m = this.mats && this.mats.imp; if (!m) return null; const was = !!m.defines.PC_MASS; if (on) m.defines.PC_MASS = 1; else delete m.defines.PC_MASS; m.needsUpdate = true; return was; }
   get crownMass() { const m = this.mats && this.mats.imp; return !!(m && m.defines.PC_MASS); }
+  // The far crowns' shadows on the ground from the air (render/shadow.js FAR_SHADOW, ?farshadow=1), for the speed test's
+  // row: on or off while the game runs (the shadow square, the casters' list at the next update, the twin's whole crown).
+  setFarShadow(on) { const was = FAR_SHADOW.on; FAR_SHADOW.on = !!on; return was; }
+  get farShadow() { return FAR_SHADOW.on; }
   // The far impostors in the weather group's gust bands (render/impostor.js GUST, ?gustbands=1), for the speed test's row:
   // false keeps the bands off the crowns (the ground keeps them). Returns null where the impostors do not take them.
   setImpGust(on) { const u = this.mats && this.mats.imp && this.mats.imp.uniforms.uImpGust; if (!u) return null; const was = u.value > 0.5; u.value = on ? 1 : 0; return was; }
@@ -1338,7 +1344,8 @@ export class Flora {
     this.treeScale = ts; this.farScale = fs;
     // THE IMPOSTORS' SHADOWS, FROM THE AIR ONLY (?impshadow=1; T6's option): above 60 m no near or middle tree stands in the
     // shadow square, and the far crowns throw their own; on the ground the pass is left as it was.
-    const impSh = !!(IMP_SHADOW && this.impOn && (SHADOW.alt || 0) > 60);
+    // (and the far crowns' shadows beside them, ?farshadow=1: render/shadow.js FAR_SHADOW, the same list and the same 60 m)
+    const impSh = !!((IMP_SHADOW || FAR_SHADOW.on) && this.impOn && (SHADOW.alt || 0) > 60);
     if (impSh !== !!this._impSh) {
       this._impSh = impSh;
       for (const ch of this.farChunks.values()) for (const m of ch.meshes) if (m.userData.crowdEntry) { if (impSh) SHADOW_CROWD.add(m.userData.crowdEntry); else SHADOW_CROWD.delete(m.userData.crowdEntry); }
