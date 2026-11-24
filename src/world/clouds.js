@@ -81,9 +81,9 @@ export const CLOUDS = {
   maxLobes: 6144,         // instances a level of detail holds at most
   sagPx: 2.2,             // how far a lobe's outline may stand off the true round, in pixels, before the next level is taken (its noise hides that much)
   // (the phone's budget, WEATHER-DESIGN 4.5 about 120k: at quality levels under 2 (the phone), once the nearest clouds have
-  // spent this many triangles the rest take the coarsest lobe, and past 1.25 times it a far cloud keeps only its first
-  // three lobes; the far field still costs some 30k after it, so 95k lands near 120k. MEASURED before it: a building sky
-  // from the air was 159k-190k at the phone's pixel angle. ?cloudtris=)
+  // spent this many triangles the rest take the coarsest lobe. A far cloud keeps all its lobes: cut to three, the far
+  // heads went at the golden hour from 1 km (seen). MEASURED before it: a building sky from the air was 159k-190k at the
+  // phone's pixel angle. ?cloudtris=)
   budget: Math.max(20000, _qn('cloudtris', 95000)),
   life: [150, 360],       // s: a cumulus' life (the painter's clock)
 };
@@ -300,6 +300,13 @@ void main() {
   // cumulus' heads: from 600 m it was one flat light shape with a bumpy outline
   float crease = smoothstep(0.35, 0.02, PC_AT(vCrease, ds)) * (1.0 - down);
   x = mix(x, min(x, 0.44), crease);
+  // and EACH HEAD ITS OWN LIT CAP when the sun stands high: the lower half of every head, by its own normal, in the
+  // half-tone, so stacked heads read as a cauliflower whichever side the eye is on -- at noon, front-lit from the air, the
+  // whole cloud was in the light (the look director's reviews of rework 2). At a low sun the light comes from the side and
+  // the golden-hour form (passed) is left as it was.
+  float capK = smoothstep(0.30, 0.70, dot(sun, upV)) * uAtmo.y;
+  float headLow = smoothstep(0.10, -0.25, dot(normalize(PC_AT(vNL, ds)), upV));
+  x = mix(x, min(x, 0.46), headLow * capK * (1.0 - down));
   float core = 1.0 - smoothstep(0.35, 0.75, PC_AT(vAxis, ds));
   x = mix(x, 0.22 - 0.16 * core * st, down);
   // (rework 2: flat tones in the body, broken only at the edges -- a stroke's own jitter small, so the strokes of one tone
@@ -714,8 +721,9 @@ function makeStormTemplate(id, gen) {
   const K = 7;
   for (let k = 0; k < K; k++) {
     const f = k / (K - 1);
-    const n = Math.max(2, Math.round(6 - 3 * f + (H(j++) - 0.5)));
-    const ring = 0.52 - 0.22 * f, rr = 0.50 - 0.12 * f;
+    // (the column barely narrows: a cumulonimbus is a massive tower, its top as broad as its middle, not a stalk)
+    const n = Math.max(4, Math.round(7 - 2 * f + (H(j++) - 0.5)));
+    const ring = 0.50 - 0.12 * f, rr = 0.52 - 0.06 * f;
     const a0 = H(j++) * Math.PI * 2;
     for (let i = 0; i < n; i++) {
       const a = a0 + (i + (H(j++) - 0.5) * 0.6) * Math.PI * 2 / n;
@@ -723,14 +731,15 @@ function makeStormTemplate(id, gen) {
       L.push({ x: Math.cos(a) * rg, z: Math.sin(a) * rg, y: (k === 0 ? 0.01 : 0.04 + 0.80 * f) + (H(j++) - 0.5) * 0.03, r: rr * (0.85 + 0.3 * H(j++)), k, a: 0 });
     }
   }
-  // the anvil: about a dozen flattened lobes from just upwind of the tower to its far edge, fanning out
-  const NA = 13;
+  // the anvil: a FLAT shelf of smaller flattened lobes from over the tower out downwind, fanning out, its underside level
+  // (bigger round lobes over the column made a puffy cap: the mushroom)
+  const NA = 18;
   for (let i = 0; i < NA; i++) {
     const t = i / (NA - 1);
-    const x = -0.10 + 1.08 * t + (H(j++) - 0.5) * 0.08;
-    const half = 0.10 + 0.30 * t;
+    const x = 0.05 + 1.05 * t + (H(j++) - 0.5) * 0.06;
+    const half = 0.14 + 0.32 * t;
     const z = (H(j++) - 0.5) * 2 * half;
-    L.push({ x, z, y: 0.93 + (H(j++) - 0.5) * 0.04 - 0.03 * t, r: 0.13 + 0.07 * H(j++) + 0.05 * (1 - t), k: K + 1, a: 1 });
+    L.push({ x, z, y: 0.95 + (H(j++) - 0.5) * 0.02 - 0.02 * t, r: 0.09 + 0.05 * H(j++) + 0.04 * (1 - t), k: K + 1, a: 1 });
   }
   return L;
 }
@@ -1058,7 +1067,9 @@ export function createClouds(scene) {
         C.at(c.x, c.y, c.z, _cOut);
         const base = W ? _cOut.base : groundAt(-1 - i, c.x, c.y, c.z) + _cOut.base;
         const T = Math.max(700, _cOut.top - _cOut.base) * (0.55 + 0.45 * c.w);
-        const Rc = Math.min(520, Math.max(160, c.r * 0.30)) * (0.6 + 0.4 * c.w);
+        // (a BROAD tower, from the cell's own size: at 0.3 of it, seen from the coast at 3.3 km, a thin column of stacked balls
+        // under a puffy top read as a mushroom cloud)
+        const Rc = Math.max(Math.min(800, Math.max(300, c.r * 0.55)) * (0.7 + 0.3 * c.w), T * 0.45);
         // (the anvil grows as the storm matures and outlives the tower: weather.js lays a land storm's stage, 0 cumulus, a
         // quarter towering, a half mature, then decay; a storm with no stage is taken as mature)
         const stg = c.stage != null ? c.stage : 0.5;
@@ -1122,7 +1133,6 @@ export function createClouds(scene) {
       hid = !!cl.hidden;
       if (!hid && pxR < 2 + 4 * handK) continue;
       let nl = cl.cb ? t.lobes.length : Math.max(pxR < 4 ? 1 : 2, Math.min(t.lobes.length, Math.round(t.lobes.length * smooth(6, 60, pxR))));
-      if (!cl.cb && tris > budget * 1.25) nl = Math.min(nl, 3);
       if (hid) nl = Math.min(t.lobes.length, 8);
       const cxA = cl.bx + ux * cl.T * 0.45, cyA = cl.by + uy * cl.T * 0.45, czA = cl.bz + uz * cl.T * 0.45;
       const baseD = cl.T * 0.45;
@@ -1136,7 +1146,7 @@ export function createClouds(scene) {
           const y = o.y * cl.T, r = o.r * cl.La;
           const px = cl.bx + (ax * o.x + bxw * o.z) * cl.La + ux * y, py = cl.by + (ay * o.x + byw * o.z) * cl.La + uy * y, pz = cl.bz + (az * o.x + bzw * o.z) * cl.La + uz * y;
           const ac = 0.45 * cl.La, cy0 = cl.T * 0.94;
-          emit(px, py, pz, r, cl.bx + ax * ac + ux * cy0, cl.by + ay * ac + uy * cy0, cl.bz + az * ac + uz * cy0, cl.T * 0.06 + r * 0.2, ex, ey, ez, nx, ny, nz, pa, seed, 0.30, cl.T, 1, air);
+          emit(px, py, pz, r, cl.bx + ax * ac + ux * cy0, cl.by + ay * ac + uy * cy0, cl.bz + az * ac + uz * cy0, cl.T * 0.06 + r * 0.2, ex, ey, ez, nx, ny, nz, pa, seed, 0.20, cl.T, 1, air);
           continue;
         }
         const y = o.y * cl.T;
