@@ -214,6 +214,78 @@ The coordinator's order (3c). Plan sent to the coordinator before touching surfa
 - Test: `src/world/mountain.test.mjs` (the switch and the groups; streams on the mountains, narrow, their water never rising,
   dry stretches under 15 %; water in every wet gully under the snow line, white water, the snow rule asked directly; the
   landing as without the switch).
+### W2 THE BODIES OF WATER (branch `water-bodies`, session_01R5Bri2xowNiwS1SnP3VG3f; READ THIS to pick W2 up)
+
+Branch `water-bodies` = lane 0 + look-proto v37.1 + `origin/design-water` (W1's rivers, merged 24 Nov for `net.mouths` and
+`net.lakes`). Files W2 owns: `src/world/hydro.js`, `src/world/falls.js`, `src/render/fallmat.js`, their tests, the look keys
+`oil.lakeK`, `oil.ponds`, `oil.puddles`, `oil.fjords`, and its speed-test rows through `WATER_BENCH`.
+
+- **STEP 1 + 2 (built 24 Nov): `src/world/hydro.js` and `src/world/hydro.test.mjs`.** Every number is in `HYDRO_DEF`.
+  - LAKES (`?lakes=1`, `lakeCarve`): in a filled basin the wood's relief over the base level shrinks by `lakeK` (0.78) as the
+    fill goes from lakeMin to 1.6 lakeMin, and the bed is let down up to 1.4 m more. MEASURED (Node, Earth, the wood's basins'
+    points, 25 a node): wet 20.6 % -> 71.8 %; the four big basins 71 to 86 % (islands remain); lake 11 (780 m from the landing)
+    14 -> 53 %; lakes dead level; the landing in no basin, its ground and water unchanged, the nearest water to it still 10 m.
+  - THE MOUTH CUT (`?falls=1`): TRACED: the "26 m shelf and sheer wall" at a mouth are surface.js sample()'s BERM over the
+    wood-sea blend (the coast recipe there is open sea at -11 to -22 m), and the wall is where the wood's weight falls under
+    0.0015. A corridor runs from 18 m up the river's end, turning down the wood's weight, to that wall (found at load by
+    walking the unchanged surface, the lip bisected to 0.1 m). In it the wood's b.lq and the coast's c.lqC carry the cut's
+    level (so sample() merges the groups and no berm fires) and both recipes return the same bed and banks; the banks rise to
+    the shelf measured beside each station at load. MEASURED at Earth's main mouth (E6/E7): water 20.80 m at the river's
+    end, 19.59 m at the lip 383 m on, bed 1.2 m under it, banks to 24-25.6 m, then the sea floor at -22.1 m: a 19.5 m fall.
+    9 falls on Earth (of 21 mouths: 10 cross a biome the hooks cannot cut, 2 end on land). `S.hydro.falls` lists them.
+  - FJORDS (`?fjord=1`, rivers at least 8 m wide): the corridor and the river's own last reach at the sea's level, 40-90 m
+    wide, floor 12 m down, steep walls; the river falls into its head. Built and mapped only (`map-fjord13-B.jpg`); not seen.
+  - PONDS (`?ponds=1`, a biome's or the world's `oil.ponds` = the chance a 120 m cell holds one): only on low ground (the
+    wood's hills under 9 m), no basin, 22 m from running water, rim spread under 1.4 m, 80 m from a clearing; level 0.22 m
+    under the lowest of eight rim points (held in: tested at 1.3 radii); bent-ellipse outline 6-22 m. Earth at 0.3: 102.
+  - PUDDLES (`?puddles=1`, `oil.puddles`): `c.cap` (m at full wetness, at most 0.12) in the 15 m relief's hollows on slopes
+    under 3 %. MEASURED near the landing: 2.6 % of dry ground, mean 3 cm. Drawn by W3's mesher and `uWet` (not built here).
+  - LOAD (here): cuts 45 ms, ponds 25-30 ms (both at load, once a world).
+- **LANDED (lane 0 on design-water, merged into water-bodies 24 Nov):** `c.turbW` / `c.fspdW` in surface.js sample(): a
+  water part sets its own churn and speed. MEASURED in the main cut after the merge: turb 0 all along, 0.41 at the lip
+  (was 0.26-0.47 all along from the drainage field's slope across the coast blend).
+- Maps (Node, data drawn top down, not the renderer): `docs/shots/painter/water-w2/` (A today | B with the parts).
+- Scratch tools (not committed, in the session's scratchpad): `map.mjs` (top-down PNG of sample()), `cutprof.mjs` (a cut's
+  long profile and cross sections against the bare surface), `lakes2.mjs`, `ponds.mjs`, `puddles.mjs`, `mouths.mjs`.
+- **STEP 3 (built 24 Nov, commit 0aa7cb7): THE WATERFALL.** `src/world/falls.js` draws `S.hydro.falls` within 1.5 km: the
+  sheet along the jet's real path (leaves the lip at sqrt(g d) over the hard lip, 2.7 m/s at the main mouth, a parabola;
+  its top edge follows the wall's line, which hydro.js measures across the cut), the plunge pool (a disc of milk and lace
+  on the sea), the spray (dabs from the foot and off the lower sheet). Detail by distance; two draws. `src/render/fallmat.js`
+  paints the sheet in pcThinLayer strokes on its own chart (down the fall in time of flight), whole strokes left out
+  where it thins; the pool's strokes run out from the foot; spray dabs never under 3 px. SEEN (A ?rivers=tree | B
+  +falls=1, gallery): from the sea at 68 m, 150 m up and 400 m up the fall reads as a white fall at the end of the cut;
+  phone and top tier alike (`falls-AB-grid.jpg`). MEASURED: the layer is 5.9 % of the picture at 68 m, 1.2 % at 150 m;
+  DERIVED 0.29 ms and 0.06 ms on the phone (1.2 ms close under it; budget 1.5). Test `src/world/falls.test.mjs`.
+- **STEP 4 (commit f832ff2):** Earth's look keys `oil.lakeK 0.78`, `oil.ponds 0.25` (82 ponds), `oil.puddles 1`,
+  `oil.fjords { every: 2, len, width, depth, minW: 8 }` (mouth 8 drowned, the main mouth stays a fall). `fallsView(S)` on
+  the WATER_BENCH row as `place` for a falls view in core/bench.js (asked of its owner, exact lines sent).
+- **OPEN ASKS (sent to the coordinator):** W3's
+  mesher must skip a water cell whose corners' levels differ by more than 2 m and half the cell (else a flat blue
+  curtain stands behind every fall); bench.js's falls view; C: the berm's ruled, striped wall and the cut's banks in leaf
+  paint (o.bank is written for whoever paints it).
+- **AFTER (24 Nov, a950282):** the plunge pool's strokes run straight out from the cliff (a polar chart drew a starburst from
+  above); the hooks share one 120 m cell lookup and mark the cells near a cut at load. MEASURED (noisy here, about 0.15 us):
+  every part on adds about 0.1-0.2 us to a wood sample, lakes alone nothing measurable. lookstats, 68 m view A | B: V>0.90
+  13.3 -> 11.7 %, satL 0.44 -> 0.32, S(V<0.3) 0.43. Lakes, ponds and the fjord SEEN (`lakes-AB-grid.jpg`, `fjord-*.jpg`):
+  basin 6 becomes one open lake reaching the mountains' foot (86 % wet): the owner should see it before it is a default.
+  The game boots with every water switch (`game-landing-allwater-B.jpg`).
+- Camera places for the falls views: `fallsView(S)` and the scratch `fallcams.mjs` (sea60, sea150, air400, bank, E7, close25,
+  pool); the lakes' in the scratch `lshots.sh` (E4, E5, lake 11, ponds); the fjord's in `fjcams.mjs`.
+- **THE REVIEW OF 24 NOV (688c2b6).** F: PASS for the falls, three notes, all done (the curtain is W3's; a broken lip;
+  few whites near V 0.92, the body milk and pale blue). The coordinator: LAKES SIT IN THE WOOD, the largest about a
+  kilometre across: each basin drowns only its deepest core, at most `lakeArea` 0.75 km2 (`_buildLakes`, per node
+  `lakeF0`); basin 6 now 0.76 km2 of its 5.6, lake 11 whole with its island (`lakes-cores-AB-E4-E5-L11.jpg`). The sheet in
+  ropes with slate gaps painted (not cut out), widening and fraying, a 1.6 m run and a 0.35 m brink at the lip, a spray
+  cloud of small pale dabs (`falls-ropes-68m-29m-B1-scratchcurtainfix.jpg`, taken with W3's curtain lines in a scratch
+  copy only). The fjord: the wide mouth nearest the landing stays a fall. `c.cap` / `c.swell` by the max rule (runnels).
+  RULE from F: do not show the owner the 68 m falls view until W3's curtain lines land.
+- **DEFAULTS (the coordinator, 24 Nov, with the owner's leave):** the coordinator ACCEPTED the lake cores and the reworked
+  falls. Lakes, ponds, puddles and the fjord become the default on Earth in the oil look with E's rivers flip; `?x=0` opts
+  out. W2's side is landed (221040b): a part is built only on a world whose look asks for it (`oil.lakeK`, `oil.fjords`,
+  `oil.ponds`, `oil.puddles`); with every switch on only Earth changes (test). The flip itself is E's, in data/mode.js
+  (exact lines sent: `n('lakes', 1)` etc., falls staying `n('falls', 0)`). THE FALLS FLIP (`n('falls', 1)`) IS HELD until
+  W3's curtain lines land and F has seen the falls without the curtain.
+- NEXT: E's flip, then merge design-water and re-check; F's second look; W3's curtain fix; bench.js's falls view.
 
 ## Stations and tools
 
