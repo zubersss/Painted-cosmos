@@ -751,7 +751,10 @@ The address switch SEEN to work (a page opened with `&wx=storm&stormleaf=1`, bef
 the 38 tall-tree materials took the value, no other material, no program failed, no console error.
 FOR v39.4 (when tying to uLookS.x): take A1's ramp for the far crowns (trees-far c5ef26a, impostor.js stK =
 smoothstep(0.15, 0.6, uStorm) * uLookS.x * 0.5), so near and far crowns step down together at the hand-over in a
-middling storm (today's kSt = uStorm * 0.5 / 0.9 is 0.33 at uStorm 0.6 where A1's is 0.5; both 0.5 at a full storm).
+middling storm (today's kSt = uStorm * 0.5 / 0.9 is 0.33 at uStorm 0.6 where A1's is 0.5; both 0.5 at a full storm). A1
+AGREED (24 Nov); A1's far side has ?impstorm= (0 to 1, default 0.5) and A1 will say if F moves it, so ours follows.
+THE FAR SPRUCE: F chose A1's D, the NEAR spruce baked with the V 0.24 floor (default on trees-far 2729f6a); spruce.js
+needs no needleTop: 2.
 
 **MERGED look-proto v39.3 (87053ed, pull request 46, the pines live) into trees-near: f281556**, clean, nothing
 doubled; unit 328, world 124, physics 449 pass.
