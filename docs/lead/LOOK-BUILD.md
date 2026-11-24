@@ -39,6 +39,11 @@ the air) is OFF until it passes the coordinator's eye (`?airfar=1`). L6 is off (
 | T1 + the air's top + FV1 (the sky from the air) | on | `&skyceil=0&airtop=0` |
 | L5 the air from the air (not yet in) | `&airfar=1` | off |
 
+**THE PROOF (24 Nov):** the six standard stills (S1-S6, gallery, 1024x480, quality 1, lite), one browser, an export of
+origin/look-proto 3408e03 against look-director 7dae2f2 with `?look=oil&light=old`: S1, S2, S3, S4 and S5 identical to
+the pixel (0 of 491,520 differ); S6 (Neptune at night) 12 pixels differ by at most 1 of 255, the software renderer's
+run-to-run noise (L0's proof saw the same). No page or shader error. So `?light=old` is the oil look as it was.
+
 ## How the stills are taken (so a later session can repeat them exactly)
 
 - The scratch tools live in the session's scratchpad and are lost on a restart; what they do: `tools/lab.mjs serve`
