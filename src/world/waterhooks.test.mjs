@@ -12,7 +12,7 @@ const WH = await import('./waterhooks.js');
 test('the switches: the watercolour game has none; the oil look has the reviewed water on by default, each with its opt-out', () => {
   const W = waterFromSearch('?flow=1');
   assert.equal(W.on, false);
-  for (const k of ['rivers', 'lakes', 'ponds', 'puddles', 'swell', 'falls', 'fjord', 'splash']) assert.equal(W[k], 0, k);
+  for (const k of ['rivers', 'lakes', 'ponds', 'puddles', 'swell', 'falls', 'fjord', 'splash', 'farwater']) assert.equal(W[k], 0, k);
   assert.equal(W.wpaint, 1, 'the new strokes are the default on rivers and ponds (the coordinator, 24 Nov)');
   assert.equal(W.wsea, 0, 'and v37\'s on the sea until the sea from the air passes');
   let P = waterFromSearch('?wpaint=0'); assert.equal(P.wpaint, 0); assert.equal(P.wsea, 0, '?wpaint=0 alone: v37\'s water everywhere');
@@ -24,7 +24,7 @@ test('the switches: the watercolour game has none; the oil look has the reviewed
   //  paint's curtain fix passed the look director)
   const O = waterFromSearch('?look=oil');
   assert.equal(O.on, true);
-  for (const k of ['rivers', 'lakes', 'ponds', 'puddles', 'fjord', 'falls']) assert.equal(O[k], 1, k);
+  for (const k of ['rivers', 'lakes', 'ponds', 'puddles', 'fjord', 'falls', 'farwater']) assert.equal(O[k], 1, k);
   for (const k of ['swell', 'runoff', 'mount', 'splash', 'wsea']) assert.equal(O[k], 0, k);
   assert.equal(O.wpaint, 1, 'the strokes on rivers and ponds, the sea on v37 (wsea 0)');
   assert.equal(O.bends, 1);

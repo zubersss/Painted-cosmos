@@ -136,6 +136,8 @@ export class PlanetTerrain {
     // otherwise show a metre-wide sawtooth at the lip under one's feet
     this.maxLevel = opts.maxLevel != null ? opts.maxLevel : Math.max(4, Math.round(Math.log2((Math.PI * 0.5 * this.R) / (PATCH_N * 0.75))) + (this.S.look.fine ? 1 : 0));
     this.material = makeTerrainMaterial(bodyUniforms);
+    // (the far view's water line, ?farwater=1, mirrors the sky as the water does: the sky's own zenith and horizon)
+    if (this.material.defines && this.material.defines.PC_FARWATER && skyUniforms) { this.material.uniforms.uSkyZenith = skyUniforms.uSkyZenith; this.material.uniforms.uSkyHorizon = skyUniforms.uSkyHorizon; }
     this.waterMaterial = makeWaterMaterial(bodyUniforms, skyUniforms);
     this.group = new THREE.Group();
     this.group.name = 'terrain-' + bodyId;
@@ -175,6 +177,7 @@ export class PlanetTerrain {
     g.setAttribute('aColor2P', new THREE.BufferAttribute(d.colors2P, 4, true));
     g.setAttribute('aParamsP', new THREE.BufferAttribute(d.paramsP, 4, true));
     g.setAttribute('aNormalP', new THREE.BufferAttribute(d.normalsP, 3));
+    if (d.farw) { g.setAttribute('aFarW', new THREE.BufferAttribute(d.farw, 4, true)); g.setAttribute('aFarWP', new THREE.BufferAttribute(d.farwP, 4, true)); }   // (?farwater=1: patchgen.js)
     // (the flower drifts from the air, FV6(b), ?bloomfar=1: the cover and the palette index, patchgen.js; render/farground.js)
     if (d.bloom) { g.setAttribute('aBloom', new THREE.BufferAttribute(d.bloom, 4, true)); g.setAttribute('aBloomP', new THREE.BufferAttribute(d.bloomP, 4, true)); }
     g.setIndex(sharedIndex());
