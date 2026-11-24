@@ -18,7 +18,7 @@ import { dirToFace, faceToDir, nodeSize } from './cubesphere.js';
 import { INST_STRIDE, U_GRASS, U_FERN, U_BUSH, U_ROCK, U_FLOWER, U_STONE, U_REED, U_SHARD } from './floraplace.js';
 import { SEASON, leafNow } from '../data/season.js';
 import { FLORA_PHYS, TALL_KITS, farCardGeometry, farBlobGeometry, sortLeafCards, leafDrawCount, farTreeGeometry, grassGeometry, grassPatchGeometry, reedGeometry, fernGeometry, bushGeometry, rockGeometry, flowerGeometry, shardGeometry } from './florakit.js';
-import { makePropMaterial, TREE_DEPTH } from '../render/materials.js';
+import { makePropMaterial, TREE_DEPTH, TREE_GUARD } from '../render/materials.js';
 import { ImpostorAtlas, makeImpostorMaterial, impostorQuadGeometry, IMP } from '../render/impostor.js';
 import { treeCell, underCell, hasCell, TREE_LEVEL, UNDER_LEVEL } from './obstacles.js';
 import { QUALITY, G, LOOK, SCREEN, SHADOW } from '../render/shared.js';
@@ -57,15 +57,18 @@ const FAR_LUMP = typeof location !== 'undefined' && /[?&]fartree=lump\b/.test(lo
 const FAR_BLOB = typeof location !== 'undefined' && /[?&]fartree=blob\b/.test(location.search || '');
 const FAR_CARDS = !FAR_LUMP;
 // THE TREES TO 30 A SECOND (?trees2=, 2026-11-24; docs/lead/TREES-DESIGN.md on r2, package T2; the oil look only).
-//   ?trees2=1 or split: the near and middle trees drawn by TWO SHORT PROGRAMS, one for the wood and one for the leaves
-//     (materials.js WOOD_FRAG, LEAF_FRAG), with the wood's haze of hair twigs not built (kits/grove.js): the same
-//     leaves, the same skeleton, the same paint.
-//   ?trees2=cards: that, with the near tree's leaves as CLUSTERS on cards (kitbuild.js clusterCard).
-// Without it (or ?trees2=0) every tree is exactly what it was. The speed test swaps it while it runs (setTrees2).
+//   THE DEFAULT (since 24 Nov: the owner's phone measured the frame at 40.3 ms with it, 36.6 with no near trees): the near
+//     and middle trees drawn by TWO SHORT PROGRAMS, one for the wood and one for the leaves (materials.js WOOD_FRAG,
+//     LEAF_FRAG), with the wood's haze of hair twigs not built (kits/grove.js): the same leaves, the same skeleton,
+//     the same paint.
+//   ?trees2=0: every tree exactly what it was, in the one program (for an A and a B).
+//   ?trees2=cards: the near tree's leaves as CLUSTERS on cards (kitbuild.js clusterCard). Dropped by the owner; kept
+//     for the speed test's rows.
+// THE GUARD: a device that cannot build either short program puts every tree back to the one program at once
+// (materials.js TREE_GUARD; update below), and says why in the console. The speed test swaps it while it runs (setTrees2).
 const TREES2 = (() => {
-  if (typeof location === 'undefined' || !location.search) return '';
-  const q = new URLSearchParams(location.search).get('trees2');
-  return q === '1' || q === 'split' ? 'split' : q === 'cards' ? 'cards' : '';
+  const q = typeof location !== 'undefined' && location.search ? new URLSearchParams(location.search).get('trees2') : null;
+  return q === '0' || q === 'off' || q === 'false' ? '' : q === 'cards' ? 'cards' : 'split';
 })();
 // (only a kind whose crown is leaves one by one, and nothing else, can be split: parts 0 bark, 5 leaf, 6 snow on a
 //  bough. A kind with crowns of washes (part 1: the green wood's conifer) keeps the one program.)
@@ -274,7 +277,7 @@ export class Flora {
         famW: sp.fam ? (sp.fam[3] == null ? 1 : sp.fam[3]) : 0 });
     }
     this.treeDepth = TREEDEPTH; TREE_DEPTH.on = TREEDEPTH;
-    if (TREES2) this._useTrees2(TREES2);
+    if (TREES2 && !TREE_GUARD.failed) this._useTrees2(TREES2);
     const U = L.under || { leaf: [[0.8, 0.85, 0.4], [0.55, 0.7, 0.3], [0.35, 0.5, 0.3]], accent: [0.86, 0.29, 0.17], bush: [[0.64, 0.77, 0.37], [0.45, 0.63, 0.36], [0.24, 0.41, 0.36]], rock: [[0.8, 0.79, 0.83], [0.47, 0.45, 0.55]] };
     this.U = U;
     this.pal = new Map();
@@ -881,6 +884,7 @@ export class Flora {
   setTrees2(mode, depth) {
     if (!LOOK.oil || !this.ready || !this.species.some((s) => s.canSplit)) return null;
     mode = mode === 'cards' || mode === 'cards-near' || mode === 'cards-mid' ? mode : mode ? 'split' : '';
+    if (TREE_GUARD.failed) mode = '';      // (a program of theirs failed on this device: only the one program)
     depth = depth == null ? !!this.treeDepth : !!depth;
     if ((this.trees2 || '') === mode && !!this.treeDepth === depth) return mode;
     this.treeDepth = depth; TREE_DEPTH.on = depth;
@@ -1062,6 +1066,9 @@ export class Flora {
 
   // budgetMs: time this call may spend building and re-tiering. now: the world's wash clock (s).
   update(camLocal, active, budgetMs, now, lead) {
+    // (the guard: one of the trees' two short programs failed to link on this device, materials.js TREE_GUARD -- every
+    //  tree back to the one program, its patches built again from the next)
+    if (TREE_GUARD.failed && this.trees2) this.setTrees2('');
     this.camLocal.copy(camLocal);
     this.leadOn = !!lead;
     if (lead) this.lead.copy(lead);

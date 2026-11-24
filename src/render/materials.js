@@ -2557,9 +2557,11 @@ void main() {
 // pixel was run by a program the size of the bark's, and where a twig crossed the leaves the whole group of pixels
 // waited on the bark. The owner's phone measured the near trees at about 52 ms of an 89 ms frame (v37). Here a tree is
 // drawn by two programs, each only as long as its own part:
-//   WOOD_FRAG: the bark's streaks as before -- the same chart, the same octaves, the same paint at a streak's centre --
-//     but TWO tones a pixel (the streak it lies in and the one at its edge), where the old one laid the coarser
-//     layer whole under the finer one and toned every streak of both.
+//   WOOD_FRAG: the bark's streaks as before -- the same chart, the same octaves, the same two layers laid the same
+//     way, each at its own light -- with only what the big program spent and threw away left out: the flat wash under
+//     the layers (one tone and a shadow read, painted over whole wherever the strokes are on), and the finer layer's
+//     tones and light where neither of its streaks is there. (A first cut toned only two streaks a pixel; the look
+//     director saw the trunk's streaks flatter and less broken at 5 m, and the owner keeps today's, 24 Nov.)
 //   LEAF_FRAG: a leaf's paint is already worked out once a leaf in the vertex shader; this only lays it, with the
 //     lantern and the air. No discard and no alpha to coverage: the leaves a window or a wash leaves out are folded
 //     away whole in the vertex shader (PROP_VERT, PC_TREE_LEAF), so the card can test depth before it paints.
@@ -2607,8 +2609,21 @@ vec3 pcWoodColour(vec3 rnd, vec4 nA, vec3 barkA, vec3 barkB, float markP, float 
   k = pcWetWash(pcDensity(k, 1.0 + ((rnd.y - 0.5) * 1.5 + (nA.r - 0.5) * 0.5) * uOilB.z), 0.9);
   return k * mix(vec3(1.0), mix(vec3(1.12, 0.96, 0.80), vec3(0.90, 0.90, 1.08), rnd.z), 0.7 * uOilB.z);
 }
-// and its paint at the light level the streak's centre is in (the big program tones a streak and the one at its
-// edge at the SAME level, the level of the pixel's own streak, so only the colour differs between the two)
+// One layer's light, at the centre of the pixel's own streak in it (its facing there, and the shadow map there), and
+// that streak's nudge by its own number: PROP_FRAG's bark lights each layer so. Out: the centre on the body, and the
+// noise there (it shades the streaks' colour).
+float pcWoodLevel(vec2 ds, float w, float rx, vec3 bdx, vec3 bdy, vec3 nvdx, vec3 nvdy, bool seenFront, vec3 sunV,
+                  float pale, float canopy, out vec3 Bc, out vec4 nA) {
+  Bc = vBody + bdx * ds.x + bdy * ds.y;
+  vec3 nVc = normalize(vNV + nvdx * ds.x + nvdy * ds.y);
+  if (!seenFront) nVc = -nVc;
+  nA = uOilL.x > 0.5 ? vec4(0.5) : pcNoiseS(Bc, 9.0, w);
+  float xs = dot(nVc, sunV) * 0.5 + 0.5;
+  xs *= mix(0.55 + 0.30 * pale, 1.0, pcSunAt(Bc, canopy * 0.8, 8.0 - vAbove, w));
+  return pcLevel(xs + (rx - 0.5) * 0.10, 0.03);
+}
+// and a streak's paint at its layer's light level (the big program tones a streak and the one at its edge at the
+// SAME level, the level of the pixel's own streak in that layer, so only the colour differs between the two)
 vec3 pcWoodPaint(vec3 k, float lvl, float pk, vec3 Bc, float r) {
   vec3 l = pcTone(k, lvl);
   if (pk > 0.001) l = mix(l, pcTone(k, max(lvl, 1.0) * 0.5 + 1.0), pk);
@@ -2620,6 +2635,9 @@ vec3 pcWoodPaint(vec3 k, float lvl, float pk, vec3 Bc, float r) {
 }
 void main() {
   #include <logdepthbuf_fragment>
+  #ifdef PC_TREE_FAIL
+    pcTreeFail = 1.0;      // (?trees2fail=wood: not GLSL on purpose, the guard's test: materials.js TREE_GUARD)
+  #endif
   // (the speed test's cuts, shared.js uOilL.y, as the big program honours them: 4 written at once, 2 one flat colour)
   if (uOilL.y > 3.5 && uOilL.y < 4.5) { pcWrite(vec3(0.42, 0.40, 0.32), 0.0, vec3(0.0, 0.0, 1.0), -vView.z, 3.0); return; }
   pcDist = length(vView);
@@ -2662,26 +2680,28 @@ void main() {
   vec3 rF, rF2, rC, rC2; vec2 dsF, dsC; float cF, cC;
   pcThinLayer(ch, dcx, dcy, oc.x, ba, vObj + seed * 11.0, 4.0 * wpxP * ba, 2.0, rF, dsF, cF, rF2);
   pcThinLayer(ch, dcx, dcy, oc.x * 2.0, ba, vObj + seed * 11.0, 8.0 * wpxP * ba, 2.0, rC, dsC, cC, rC2);
-  // WHICH TWO STREAKS THIS PIXEL IS PAINTED FROM. A fine streak that is still there lies on top: its own paint, and at
-  // its edge the next fine streak's if that one is there, the coarse one under it if not. Where the fine streak has
-  // gone (its number under the octave's share), the coarse streak and its neighbour. Two tones a pixel, always: the
-  // old program toned every streak of both layers and a wash under them, five to nine tones.
+  // THE COARSER LAYER, whole, at its own light: its streak and the one at its edge (the big program's L == 1)
+  vec3 BcC, BcF; vec4 nAC, nAF;
+  float lvC = pcWoodLevel(dsC, oc.x * 2.0, rC.x, bdx, bdy, nvdx, nvdy, seenFront, sunV, pale, canopy, BcC, nAC);
+  vec3 c = mix(pcWoodPaint(pcWoodColour(rC2, nAC, barkA, barkB, markP, twig), lvC, pk, BcC, rC2.y),
+               pcWoodPaint(pcWoodColour(rC, nAC, barkA, barkB, markP, twig), lvC, pk, BcC, rC.y), cC);
+  // (the speed test's strokes off, uOilC.z: the big program's flat wash under the layers shows through; with the
+  //  strokes on, the default, the coarse layer covers it whole, so it is not painted at all)
+  if (uOilC.z < 0.999) {
+    float xb0 = (dot(nV, sunV) * 0.5 + 0.5) * mix(0.55 + 0.30 * pale, 1.0, pcSunAt(vBody, canopy * 0.8, 8.0 - vAbove, oc.x));
+    c = mix(pcTone(mix(barkA, barkB, 0.16), pcLevel(xb0, 0.04)), c, uOilC.z);
+  }
+  // THE FINER LAYER over it, at ITS own light: a fine streak still there lies on top, and at its edge the next fine
+  // streak if that one is there, the coarse layer if not; where the fine streak has gone (its number under the
+  // octave's share) the coarse layer shows, with the next fine streak still at the edge if it is there. Where neither
+  // is there the coarse layer is the whole answer, and the finer layer's light and tones are not worked out.
   bool here = rF.x * 0.999 >= gone, there = rF2.x * 0.999 >= gone;
-  vec3 rA = here ? rF : rC, rB = here ? (there ? rF2 : rC) : rC2;
-  vec2 dsA = here ? dsF : dsC;
-  float wA = here ? oc.x : oc.x * 2.0, covA = here ? cF : cC;
-  // the light, once, at the centre of the pixel's own streak: its facing, and the shadow map there
-  vec3 Bc = vBody + bdx * dsA.x + bdy * dsA.y;
-  vec3 nVc = normalize(vNV + nvdx * dsA.x + nvdy * dsA.y);
-  if (!seenFront) nVc = -nVc;
-  vec4 nA = uOilL.x > 0.5 ? vec4(0.5) : pcNoiseS(Bc, 9.0, wA);
-  float xs = dot(nVc, sunV) * 0.5 + 0.5;
-  xs *= mix(0.55 + 0.30 * pale, 1.0, pcSunAt(Bc, canopy * 0.8, 8.0 - vAbove, wA));
-  xs += (rA.x - 0.5) * 0.10;
-  float lvl = pcLevel(xs, 0.03);
-  vec3 tA = pcWoodPaint(pcWoodColour(rA, nA, barkA, barkB, markP, twig), lvl, pk, Bc, rA.y);
-  vec3 tB = pcWoodPaint(pcWoodColour(rB, nA, barkA, barkB, markP, twig), lvl, pk, Bc, rB.y);
-  vec3 c = mix(tB, tA, covA);
+  if (here || there) {
+    float lvF = pcWoodLevel(dsF, oc.x, rF.x, bdx, bdy, nvdx, nvdy, seenFront, sunV, pale, canopy, BcF, nAF);
+    vec3 e = there ? pcWoodPaint(pcWoodColour(rF2, nAF, barkA, barkB, markP, twig), lvF, pk, BcF, rF2.y) : c;
+    vec3 lay = here ? mix(e, pcWoodPaint(pcWoodColour(rF, nAF, barkA, barkB, markP, twig), lvF, pk, BcF, rF.y), cF) : mix(e, c, cF);
+    c = mix(c, lay, uOilC.z);
+  }
   #ifdef PC_FIRE
     if (vBurnt > 0.001) {
       // (what the fire left standing is charred, as the big program chars it: a cold charcoal at the paint's own value)
@@ -2699,6 +2719,9 @@ const LEAF_FRAG = /* glsl */`
 ${TREE_HEAD}
 void main() {
   #include <logdepthbuf_fragment>
+  #ifdef PC_TREE_FAIL
+    pcTreeFail = 1.0;      // (?trees2fail=leaf: not GLSL on purpose, the guard's test: materials.js TREE_GUARD)
+  #endif
   if (uOilL.y > 3.5 && uOilL.y < 4.5) { pcWrite(vec3(0.42, 0.40, 0.32), 0.0, vec3(0.0, 0.0, 1.0), -vView.z, 3.0); return; }
   vec3 nV = normalize(vNV);
   if (!gl_FrontFacing) nV = -nV;
@@ -2806,6 +2829,37 @@ void main() {
 // whether the pass runs, meshes the card meshes that take part, each carrying in userData.pcDepthMats the materials it
 // is drawn with in that pass (its wood hidden, its cards in depth only).
 export const TREE_DEPTH = { on: false, meshes: new Set() };
+// THE GUARD ON THE TREES' TWO SHORT PROGRAMS (the default since 24 Nov; flora.js TREES2). A phone's driver may refuse a
+// program the desktop takes. three says so in its own words for every program it links (renderer.debug.checkShaderErrors,
+// on by default: a console error with the compiler's log, and program.diagnostics.runnable false); the painter asks here
+// after each frame whether any of the trees' programs is among those (render/index.js), and the first that is sets
+// failed: every world's flora then puts every tree back to the one program at once (flora.js update), and the console
+// says which program and why. mats: every tree program made (makePropMaterial). ?trees2fail=wood or leaf (or 1, the
+// wood) breaks that program on purpose, so the guard can be seen to work.
+export const TREE_GUARD = { mats: new Set(), failed: '' };
+const TREE_FAIL = (() => {
+  if (typeof location === 'undefined' || !location.search) return '';
+  const q = new URLSearchParams(location.search).get('trees2fail');
+  return q === '1' || q === 'wood' ? 'wood' : q === 'leaf' ? 'leaf' : '';
+})();
+export function treeGuardCheck(renderer) {
+  if (TREE_GUARD.failed || !TREE_GUARD.mats.size || !renderer || !renderer.properties) return TREE_GUARD.failed;
+  for (const m of TREE_GUARD.mats) {
+    const progs = renderer.properties.get(m).programs;
+    if (!progs) continue;
+    for (const p of progs.values()) {
+      const d = p && p.diagnostics;
+      if (!d || d.runnable !== false) continue;
+      const log = [d.fragmentShader && d.fragmentShader.log, d.vertexShader && d.vertexShader.log, d.programLog].filter(Boolean).join('\n');
+      const first = (log.split('\n').find((l) => l.trim()) || 'the driver gave no log').trim().slice(0, 200);
+      TREE_GUARD.failed = (m.name || 'a tree program') + ': ' + first;
+      console.warn('[trees] the trees\' two short programs cannot be used on this device (' + TREE_GUARD.failed +
+        '). Every tree goes back to the one program it was drawn by before (as ?trees2=0).');
+      return TREE_GUARD.failed;
+    }
+  }
+  return '';
+}
 
 export function makePropMaterial(bodyU, opts = {}) {
   const v3 = (a, d) => ({ value: new THREE.Vector3().fromArray(a || d) });
@@ -2870,6 +2924,7 @@ export function makePropMaterial(bodyU, opts = {}) {
   const dpass = tree === 'card' && (opts.depth === 'first' || opts.depth === 'equal') ? opts.depth : null;
   if (dpass) defines[dpass === 'first' ? 'PC_TREE_DEPTH' : 'PC_TREE_EQUAL'] = 1;
   if (tree === 'wood' && opts.doubleSide) defines.PC_WOOD_FLIP = 1;      // (drawn BackSide: see WOOD_FRAG)
+  if (tree && tree === TREE_FAIL) defines.PC_TREE_FAIL = 1;      // (?trees2fail=: the guard's test, TREE_GUARD)
   const m = new THREE.ShaderMaterial({
     name: 'pc-prop-' + (opts.name || ''),
     defines,
@@ -2881,6 +2936,7 @@ export function makePropMaterial(bodyU, opts = {}) {
     side: tree === 'wood' && opts.doubleSide ? THREE.BackSide : opts.doubleSide ? THREE.DoubleSide : THREE.FrontSide,
   });
   m.userData.pcPainted = true;
+  if (tree) TREE_GUARD.mats.add(m);
   // (the powers, fire: a crown that has burned is left bare and black. The plants need no list of burnt places -- each
   // instance carries its own number, PROP_VERT aBurnt -- so only the dials are attached. A mesh that has no such
   // numbers (grass, ferns, stones, and the trees until the world fills them) reads 0 for every instance, which is

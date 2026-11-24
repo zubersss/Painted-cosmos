@@ -71,8 +71,11 @@ export function grow(P0, seed, lod, spec) {
   const sl = !!(spec && spec.slender);
   // THE TREES TO 30 A SECOND (?trees2=, 2026-11-24; docs/lead/TREES-DESIGN.md on r2, package T2). spec.trees2:
   //   'split': the same tree with its WOOD lighter -- no haze of hair twigs (460 to 4,350 triangles a tree, half of them
-  //            under a pixel on the phone) and a side fewer on every tube -- for the plant's two short programs
-  //            (materials.js WOOD_FRAG and LEAF_FRAG); the leaves are the leaves they were.
+  //            under a pixel on the phone) -- for the plant's two short programs (materials.js WOOD_FRAG and
+  //            LEAF_FRAG); the leaves are the leaves they were. (It also took a side off every tube at first. SEEN
+  //            24 Nov, the same trunk at 5 m: that, and not the programs or the twigs, is what made the bark's
+  //            streaks flatter and less broken than today's -- the split programs on today's tubes match today to
+  //            0.1 of 255 there -- so every tube keeps today's sides.)
   //   'cards': that wood, and the leaves as CLUSTERS on cards (kitbuild.js clusterCard; materials.js CLUSTER_FRAG).
   // THE TREE IS THE SAME TREE: every random number is drawn exactly as before, in the same order, whether or not
   // what it was for is built, so the skeleton -- the owner's chosen form, the fork, the boughs -- and where every
@@ -98,7 +101,7 @@ export function grow(P0, seed, lod, spec) {
   pts.push(V(axis(0).x, -0.25, axis(0).z)); rad.push(r0 * 1.7);
   for (let i = 0; i <= nS; i++) { const t = i / nS; pts.push(axis(t));
     rad.push(r0 * (P.leader ? Math.max(0.03, 1 - 0.97 * Math.pow(t, 1.15)) : 1 - 0.42 * Math.pow(t, 0.8))); }
-  tube(B, pts, rad, near ? (lite ? 5 : 6) : 5, { part: 0, shade: 0.2, swayK: 0.22, swayH: H, hash: rnd() });
+  tube(B, pts, rad, near ? 6 : 5, { part: 0, shade: 0.2, swayK: 0.22, swayH: H, hash: rnd() });
   const rTop = r0 * 0.58;
   // nothing hangs through the ground
   const groundUp = (q) => { if (q.y < 0.35) q.y = 0.35 / (1 + (0.35 - q.y) * 2.2); return q; };
@@ -117,7 +120,7 @@ export function grow(P0, seed, lod, spec) {
     const nP = near ? (depth === 1 ? 6 : P.arch < 0 ? 5 : 4) : 3;
     const pth = [], rr = [];
     for (let i = 0; i < nP; i++) { const t = i / (nP - 1) * tEnd; pth.push(at(t)); rr.push(r * (1 - (1 - P.taper) * Math.pow(t, 1.3))); }
-    const sd = near ? (lite ? (depth === 1 ? 4 : 3) : (depth === 1 ? 5 : depth === 2 ? 4 : 3)) : 3;
+    const sd = near ? (depth === 1 ? 5 : depth === 2 ? 4 : 3) : 3;
     tube(B, pth, rr, sd, { part: 0, shade: 0.16 + 0.12 * depth, sway0: 0.12 + 0.2 * depth, hash: rnd(), branch: bid });
 
     if (!divides) {
