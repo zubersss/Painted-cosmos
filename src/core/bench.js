@@ -244,6 +244,15 @@ export function attachBench(pc) {
       await wait(400);
       if (pc.settle) await Promise.race([pc.settle(12), wait(20000)]);
     };
+    // (?treesway=whole: the near trees bend whole, as the middle ones do, without the crown's branch-by-branch sway;
+    //  world/flora.js setTreeSway, the trees' patches built again. With the two short programs only.)
+    const sw0 = !!(flora() && flora().swayWhole);
+    const swapSway = async (whole) => {
+      const f = flora();
+      if (!f || !f.setTreeSway || f.setTreeSway(whole) == null) return;
+      await wait(400);
+      if (pc.settle) await Promise.race([pc.settle(12), wait(20000)]);
+    };
     const swapFar = async (on) => {
       const f = flora();
       if (!f || !f.setFarCards || f.setFarCards(on) == null) return;
@@ -286,6 +295,7 @@ export function attachBench(pc) {
       ['near trees as clusters', () => swapT2('cards-near', false), () => swapT2(t2a)],
       ['middle trees as clusters', () => swapT2('cards-mid', false), () => swapT2(t2a)],
       ['clusters with a depth pass first', () => swapT2('cards', true), () => swapT2(t2a)],
+      [sw0 ? 'near trees: branch sway as before' : 'near trees bend whole (no branch sway)', () => swapSway(!sw0), () => swapSway(sw0)],
     ];
     // ---- THE TENTH FORM'S HANDLES (see the top of this file) ----------------------------------------------------
     const tallMats = () => mats(/^pc-prop-tall/);

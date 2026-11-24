@@ -161,6 +161,15 @@ at 5 m and at 10 m (was 2.0 at 5 m with the side off). Stills: `A2_default_*`, a
 `A2_default_autumn-phone-5m-trunk-x3_*` (today | the default now | the first split). The wood program also lays the
 two layers as the big program did, each at its own light (it made a small difference, about 9,000 pixels, 0.08 of 255).
 
+**MERGED v39 (look-proto, 24 Nov): the new light.** The split's leaves follow the look director's L2 shade with no line
+of their own (their paint is made in `PROP_VERT`, shared with the one program; `LEAF_SUN`'s `pcLeafDeep` is now
+`pcShadeLeaf`). The WOOD program needed one change: v39 lights the big program's bark by the ONE LIGHT (L3, `pcLit`,
+picked by `uLookF.z`, on by default; `?light=old` turns it off), so `pcWoodLevel` and the wash under the layers now take
+it the same way. SEEN at the phone's settings, autumn wood 16.8 h: under v39's light the default against `?trees2=0`
+is 0.30 of 255 at 5 m and at 10 m (0.31 with `?light=old`, as before the merge); the new light itself moves the
+picture by 1.7, so the wood follows it; `?light=old&trees2=0` is pixel-identical to the still before the merge. Stills
+`A2_*-v39_*`. (The cards' own program, `CARD_FRAG`, does not take the one light: cards are dropped.)
+
 **What is built (the oil look only; `?trees2=0` puts every tree back as it was):**
 - THE DEFAULT (was `?trees2=1`): the near AND middle trees drawn by TWO SHORT PROGRAMS (`materials.js` `WOOD_FRAG`,
   `LEAF_FRAG`, chosen by `makePropMaterial(..., { tree: 'wood' | 'leaf' })`), over two groups of one index (wood, then
@@ -236,7 +245,17 @@ Counts: a copy of `tools/overdraw.mjs` with `QUALITY.level` from the environment
 arrays counted group by group, part 7 thinned as a leaf, `where=spawn` (the spawn is the autumn wood of grove trees;
 its `where=autumn` stand is the green wood's broadleaves, where `?trees2` changes no geometry).
 
-**Next:** a cheaper sway for the near trees behind its own switch (the coordinator's ask); when the look director's
+**`?treesway=whole` (the coordinator's ask for a cheaper sway, 24 Nov):** the NEAR trees bend whole, as the middle trees
+already do (T3), without PHYSICS' per-branch crown (`pcPhysCrown`: two field lookups, 24 sines, 4 powers, 3 arctangents
+a vertex). Built as the near tier being given the middle tier's own programs (`-mid`, branch off; each mesh sets its
+tier's ranges before it is drawn, so one program serves both). With the two short programs only. Speed-test row 'near
+trees bend whole (no branch sway)' (`flora.js setTreeSway`, `core/bench.js`). SEEN: compiles and draws; the near
+programs are the `-mid` ones and swap back; the still at rest is PIXEL-IDENTICAL to the default (the gallery's held clock
+has no wind, so no still can show the sway): HOW IT LOOKS IN MOTION IS NOT KNOWN, only the owner's phone can show it.
+Note for the bench: the 9.5 ms 'near trees: no wind in shader' row cuts the wind of every tall material, the middle tier
+too, and the middle tier lost its crown sway with the split already; that row wants running again on the split default.
+
+**Next:** when the look director's
 L2 is final, merge `origin/look-director` and have the split's leaf paint call the same `pcShadeLeaf` (`LEAF_SUN`'s
 `pcLeafDeep` sits on those lines). Keep `PC_WOOD_FLIP` on (today's inside-out bark facing) until the look director
 settles it. NOT KNOWN: the guard on a real phone's driver (it rests on three's own link check, which is on by default

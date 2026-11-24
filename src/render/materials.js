@@ -2669,9 +2669,9 @@ float pcWoodLevel(vec2 ds, float w, float rx, vec3 bdx, vec3 bdy, vec3 nvdx, vec
   vec3 nVc = normalize(vNV + nvdx * ds.x + nvdy * ds.y);
   if (!seenFront) nVc = -nVc;
   nA = uOilL.x > 0.5 ? vec4(0.5) : pcNoiseS(Bc, 9.0, w);
-  float xs = dot(nVc, sunV) * 0.5 + 0.5;
-  xs *= mix(0.55 + 0.30 * pale, 1.0, pcSunAt(Bc, canopy * 0.8, 8.0 - vAbove, w));
-  return pcLevel(xs + (rx - 0.5) * 0.10, 0.03);
+  float xf = dot(nVc, sunV) * 0.5 + 0.5, sunny = pcSunAt(Bc, canopy * 0.8, 8.0 - vAbove, w), jit = (rx - 0.5) * 0.10;
+  // (the look director's one light, L3, as PROP_FRAG's bark takes it: uLookF.z picks it, chunks.js pcLit)
+  return uLookF.z > 0.5 ? pcLit(xf + jit, sunny, canopy * 0.8, 0.03) : pcLevel(xf * mix(0.55 + 0.30 * pale, 1.0, sunny) + jit, 0.03);
 }
 // and a streak's paint at its layer's light level (the big program tones a streak and the one at its edge at the
 // SAME level, the level of the pixel's own streak in that layer, so only the colour differs between the two)
@@ -2739,8 +2739,9 @@ void main() {
   // (the speed test's strokes off, uOilC.z: the big program's flat wash under the layers shows through; with the
   //  strokes on, the default, the coarse layer covers it whole, so it is not painted at all)
   if (uOilC.z < 0.999) {
-    float xb0 = (dot(nV, sunV) * 0.5 + 0.5) * mix(0.55 + 0.30 * pale, 1.0, pcSunAt(vBody, canopy * 0.8, 8.0 - vAbove, oc.x));
-    c = mix(pcTone(mix(barkA, barkB, 0.16), pcLevel(xb0, 0.04)), c, uOilC.z);
+    float xbF = dot(nV, sunV) * 0.5 + 0.5, xbS = pcSunAt(vBody, canopy * 0.8, 8.0 - vAbove, oc.x);
+    float lvW = uLookF.z > 0.5 ? pcLit(xbF, xbS, canopy * 0.8, 0.04) : pcLevel(xbF * mix(0.55 + 0.30 * pale, 1.0, xbS), 0.04);
+    c = mix(pcTone(mix(barkA, barkB, 0.16), lvW), c, uOilC.z);
   }
   // THE FINER LAYER over it, at ITS own light: a fine streak still there lies on top, and at its edge the next fine
   // streak if that one is there, the coarse layer if not; where the fine streak has gone (its number under the
