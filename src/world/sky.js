@@ -669,6 +669,12 @@ void main() {
       float amt = gold * mix(0.30, 0.88, low) * mix(0.75, 1.0, ring / 5.0);
       col = ring < 0.5 ? mix(col, dens(col, 1.30) * vec3(0.86, 0.95, 1.14), gold * mix(0.55, 0.30, low))      // (away: the blue deeper)
                        : mix(col, rv, amt);
+      // (and all round the sky, low down, the golden hour's warm air: away from the sun a rose band over the far land,
+      // a step under the ring's own colour, so a view with its back to the sun still has its warm horizon and the blue
+      // only above it)
+      vec3 rose = vec3(0.92, 0.76, 0.68);
+      vec3 rosev = mix(rose, clamp(rose * (cl / 0.80), 0.0, 1.0), 0.55);
+      col = mix(col, rosev, gold * smoothstep(0.55, 0.95, low) * (1.0 - smoothstep(1.5, 3.0, ring)) * 0.55);
     }
     {
       // THE NIGHT SKY'S STREAKS (the owner, 2026-11-16: "make the lines on the sky at night time near the northern lights
