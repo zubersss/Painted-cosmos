@@ -32,17 +32,14 @@
 // ?canopy=0 takes it out (world/farstand.js reads it): the ground's program is compiled without any of it and the
 // mesher packs nothing new, so the picture is the one before to the bit. Only in the oil look, only on CANOPY_WORLDS.
 import { SEASON, leafNow } from '../data/season.js';
-import { CANOPY, NEEDLE, CANOPY_WORLDS, canopyOn } from '../world/farstand.js';
+import { CANOPY, NEEDLE, CANOPY_WORLDS, GROUND_SEASON, ROCKFIELD, canopyOn } from '../world/farstand.js';
 import { MODE } from '../data/mode.js';
 
-export { CANOPY, canopyOn };
-const GROUND_SEASON_DEFAULT = false;
+export { CANOPY, canopyOn, GROUND_SEASON, ROCKFIELD };
 // ?candab=: the canopy's own dabs against the ground's (0.5: its finer layer is half the ground's finest, its coarser
 // layer the ground's finest). From a few hundred metres up the ground's dab is as big as a whole crown, so the roof's
 // cap and shaded side could not be laid with it; a crown wants three or four strokes across.
 export const CANOPY_DAB = (() => { try { const q = new URLSearchParams(location.search); const v = q.has('candab') ? +q.get('candab') : 0.5; return isFinite(v) && v > 0.05 ? Math.min(v, 1) : 0.5; } catch (e) { return 0.5; } })();
-// ?groundseason=0|1: THE FLOOR AND THE FAR COLOUR FOLLOW THE YEAR (FV3; see SEASON_FRAG below). Read once.
-export const GROUND_SEASON = (() => { try { const q = new URLSearchParams(location.search); return q.has('groundseason') ? +q.get('groundseason') > 0 : GROUND_SEASON_DEFAULT; } catch (e) { return GROUND_SEASON_DEFAULT; } })();
 // ?candebug=1: each dab of the canopy in a flat colour that says what it is (see the end of pcCanopyAt). For looking only.
 export const CANOPY_DEBUG = (() => { try { return new URLSearchParams(location.search).get('candebug') === '1'; } catch (e) { return false; } })();
 
@@ -313,29 +310,89 @@ vec4 pcCanopyMean(float stand, float needle) {
 // (the autumn wood's golds, the green wood's greens) and its fallen leaves are that colour too, at every point of the
 // year -- so in summer the autumn wood stood green on a gold carpet (the design's stills) and in autumn the green wood's
 // far hills stayed green under gold trees. Here, in the oil look's ground:
-//   * a wood's far colour (vCol2, wherever the canopy is: parC.z) is moved by the difference between the crowns' mean
-//     wash NOW and the season the palette was painted for -- which is read off the palette itself: a gold far colour is
-//     an autumn one, a green one a summer one -- so the far wood is the colour its trees are, all year;
-//   * the share of the floor's dabs laid as fallen leaves is a quarter of itself in high summer and all of it in autumn;
+//   * a wood's far colour (vCol2) is moved by the difference between the crowns' mean wash NOW and the season its
+//     palette was painted for, over the canopy's share there: the share painted in a summer palette (every wood but one
+//     whose look data says autumn: 1) by now - summer, the rest by now - autumn. The mesher hands the summer-painted
+//     share in the parameters' second byte (vPar.y; surface.js canS), the autumn-painted in the first (vPar.x, canA), both
+//     of TREES and not of the canopy (which also counts a stream bank's shade: the stream drawn blue into the far colour
+//     went turquoise in the first summer still). So the far wood is the
+//     colour its trees are, all year, and at the top of autumn the autumn wood does not move at all, nor at its edges.
+//     (Two earlier forms, both MEASURED wrong at the top of autumn: the season read off the palette's own hue moved
+//     19,518 pixels of the autumn wood on foot; a blended "palette season" byte moved 43,595 pixels of a 400 m view where
+//     the wood blends into the mountain, its canopy being the wood's and its byte a blend.)
+//   * the share of the floor's dabs laid as fallen leaves is seven tenths of itself in high summer, all of it in autumn;
 //   * and a fallen leaf in summer is last year's: the floor's own wash taken toward its brown, not a fresh crown colour.
 // AT THE TOP OF AUTUMN (t = 1) NOTHING MOVES in the autumn wood: the move is zero where the palette is gold, the leaves'
 // share and colour are exactly what they were. That is the owner's approved autumn floor, kept to the bit.
 // ?groundseason=0 compiles none of it.
-export const SEASON_FRAG = /* glsl */`
+// (the far colour's move is worked out ONCE A VERTEX, in the vertex shader: it reads only what the vertex carries and three
+// uniforms, so the ground's pixels pay nothing for it; the fallen leaves' share and colour are the fragment's)
+export const SEASON_VERT = /* glsl */`
 #ifdef PC_SEASONG
 uniform vec4 uSeasonG;    // x the year (0 high summer .. 1 deep autumn), y 1: on (a world whose trees turn)
 uniform vec3 uCanSum;     // the crowns' mean wash in high summer and in deep autumn (farground.js: the canopy's own mean)
 uniform vec3 uCanAut;
-vec3 pcSeasonFar(vec3 c2, float canopy) {
+// (needle: the share of needle trees there, world/farstand.js; they do not turn, so only the broadleaves' share moves --
+// without it the mountain's conifer stands went gold in autumn)
+vec3 pcSeasonFar(vec3 c2, float canA, float canS, float needle) {
   if (uSeasonG.y < 0.5) return c2;
-  float refA = smoothstep(0.0, 0.06, c2.r - c2.g);
-  vec3 sh = mix(uCanSum, uCanAut, uSeasonG.x) - mix(uCanSum, uCanAut, refA);
-  return clamp(c2 + sh * clamp(canopy * 1.2, 0.0, 1.0), 0.0, 1.0);
+  vec3 now = mix(uCanSum, uCanAut, uSeasonG.x);
+  vec3 sh = (now - uCanSum) * clamp(canS * 1.15, 0.0, 1.0) + (now - uCanAut) * clamp(canA * 1.15, 0.0, 1.0);
+  return clamp(c2 + sh * (1.0 - needle), 0.0, 1.0);
 }
-float pcSeasonLeafK() { return uSeasonG.y < 0.5 ? 1.0 : mix(0.25, 1.0, uSeasonG.x); }
+#endif`;
+export const SEASON_VERT_MAIN = /* glsl */`
+  #ifdef PC_SEASONG
+    vCol2 = pcSeasonFar(vCol2, vPar.x, vPar.y, clamp(vPar.w, 0.0, 1.0));      // (the far view, FV3: render/farground.js)
+  #endif`;
+export const SEASON_FRAG = /* glsl */`
+#ifdef PC_SEASONG
+uniform vec4 uSeasonG;
+// (seven tenths of the fallen leaves in high summer, and last year's leaf a quiet brown with a third of its colour taken
+// to its own grey: with a quarter of the leaves and a heavier brown the floor under the trees on foot in summer was more
+// of the grass whose shade is today's saturated green (the look audit's F4, the look director's L2), and MEASURED, the
+// saturation of a still's darks went 0.61 to 0.68 -- worse on the look rules' C7; with a half, 0.66)
+float pcSeasonLeafK() { return uSeasonG.y < 0.5 ? 1.0 : mix(0.7, 1.0, uSeasonG.x); }
 vec3 pcSeasonLeaf(vec3 leaf, vec3 floorC) {
   if (uSeasonG.y < 0.5) return leaf;
-  return mix(leaf, pcDensity(floorC * vec3(1.0, 0.84, 0.64), 1.3), (1.0 - uSeasonG.x) * 0.85);
+  vec3 br = pcDensity(floorC * vec3(1.0, 0.86, 0.68), 1.2);
+  br = mix(br, vec3(dot(br, vec3(0.3, 0.5, 0.2))), 0.35);
+  return mix(leaf, br, (1.0 - uSeasonG.x) * 0.85);
+}
+#endif`;
+
+// ROCK FACES THAT READ FROM AFAR (FV4 of the design; the look audit's F12, mountains as flat-coloured facets and mottle).
+// What the alpine range was from the air (the design's stills, and fv2_alpine_400m_30deg_12h_phone_AB.jpg): a lilac,
+// green and cream mosaic with no lit and shaded planes. Three causes in the ground's own paint, and the cure for each:
+//   * the biome's patch colours (alpine green and pale cream, 48 m and 20 m across) mottle the faces as much as the
+//     meadows: on steep ground (the dab centre's facing, 35 to 48 degrees) the wash is taken most of the way to its own
+//     value, so a cliff is rock-coloured and the patches stay on the turf;
+//   * every dab of the floor strays: one in two takes a neighbouring pigment, two in five of the lit ones are laid a full
+//     step darker, and each varies its weight and warmth: on rock the step down is not taken, the pigment and the
+//     stray are halved, so a face is laid in lit planes and shaded planes by its own facing;
+//   * strata were not painted at all in the oil look (vCol.a carries them, 1 - strata): on steep rock two tones by
+//     height band, beds of unequal thickness (a band of a little over 19 m, wandering with a slow wave), each band one
+//     density of the rock's own wash -- no new hue.
+// The snow is shed off faces over about 40 degrees by the mesher (patchgen.js), so white lies on ledges and in gullies.
+// ?rockfield=0 compiles none of it. (The dabs on a cliff still smear: their chart is edge-on there, which only the look
+// director's slope chart can cure, F13.)
+export const ROCK_FRAG = /* glsl */`
+#ifdef PC_ROCKF
+uniform float uRockK;     // 1 on a world whose rock is painted so (CANOPY_WORLDS: Earth), 0 elsewhere
+float gRock = 0.0;        // how much this dab is a rock face (set in pcGroundAt, read in pcGroundPaint)
+// the wash at a dab on steep rock: up the dab centre's facing (dot of the normal with up), Bc its place, strata the
+// biome's (1 - vCol.a)
+vec3 pcRockWash(vec3 c, float up, vec3 Bc, float strata) {
+  gRock = smoothstep(0.82, 0.67, up) * uRockK;
+  if (gRock <= 0.0) return c;
+  float l = dot(c, vec3(0.3, 0.5, 0.2));
+  vec3 rk = mix(vec3(l), c, 0.35);
+  if (strata > 0.004) {
+    float hB = length(Bc) - uBodyR;
+    float f = fract(hB / 19.3 + 0.6 * sin(hB / 61.0 + 2.3));
+    rk = f < 0.42 ? pcDensity(rk, 0.86) : (f < 0.58 ? pcDensity(rk, 1.38) : rk);
+  }
+  return mix(c, rk, gRock * (0.75 + 0.25 * min(strata * 2.0, 1.0)));
 }
 #endif`;
 
@@ -350,6 +407,7 @@ export function canopyUniforms() {
     uCanK: { value: [8.0, 0.62, 60.0, 0.0] },
   };
 }
+export function rockUniforms() { return { uRockK: { value: 0 } }; }
 export function seasonUniforms() {
   return { uSeasonG: { value: [0, 0, 0, 0] }, uCanSum: { value: [0.6, 0.8, 0.3] }, uCanAut: { value: [0.9, 0.6, 0.2] } };
 }
@@ -446,6 +504,7 @@ export const CANOPY_BENCH = { off: false };
 const _c = [0, 0, 0];
 export function syncCanopy(material, S) {
   const u = material && material.uniforms;
+  if (u && u.uRockK) u.uRockK.value = MODE.oil && CANOPY_WORLDS[S.id] ? 1 : 0;
   if (!u || !(u.uCanK || u.uSeasonG)) return;
   const spec = MODE.oil && CANOPY_WORLDS[S.id] ? canopySpec(S) : null;
   if (u.uSeasonG) u.uSeasonG.value[1] = 0;

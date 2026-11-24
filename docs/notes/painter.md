@@ -66,11 +66,29 @@ colour only). NOT chunks.js, post.js, shared.js, world/index.js (look director),
   Confirm on the phone with the air table's row.
 - Suites: unit 325, world 59 (57 + farstand.test.mjs's 2), physics 416; all.mjs static passes.
 
-**FV3 (the floor and the far colour follow the year, `?groundseason=`) IS WRITTEN AND NOT YET SEEN:** `SEASON_FRAG` in
-farground.js and its hooks in TERRAIN_FRAG, compiled in only with `?groundseason=1` (default OFF until seen). Next: stills
-in summer, mid-year and autumn, and the autumn-identity check.
+**FV3, THE FLOOR AND THE FAR COLOUR FOLLOW THE YEAR (`?groundseason=0|1`, default 1; oil look, Earth).** BUILT AND SEEN.
+- `surface.js` sample: two blended shares of TREES, those of woods painted in a summer palette (`canS`, every wood but
+  one whose look says `autumn: 1`) and in an autumn one (`canA`); `patchgen.js` packs them into the parameters' first two
+  bytes (dry and wet, which the oil ground never reads), only with the switch on.
+- `farground.js` SEASON_VERT: in the VERTEX shader the far colour vCol2 moves by (now - summer mean) x canS + (now -
+  autumn mean) x canA, broadleaves only (x (1 - needle share)); the means are the painted canopy's own (`crownMean`, the
+  family run at each season). SEASON_FRAG: the fallen leaves' share is 0.7 of itself in high summer, all of it in autumn,
+  and a summer leaf is last year's (the floor's own wash toward its brown, a third to grey).
+- MEASURED / SEEN: at the top of autumn the autumn wood is IDENTICAL on foot (0 of 491,520 pixels) and, from 400 m, the
+  only pixels that move (20,966) are the green wood and the wetland on the horizon, whose broadleaves do turn gold
+  (fv3_wood_400m_45deg_12h_autumn_changed_pixels_magenta.jpg). Three earlier forms were measured wrong and replaced: the
+  season read off the palette's hue (19,518 pixels of the autumn wood moved on foot), a blended palette-season byte
+  (43,595 pixels where the wood meets the mountain), and canopy in place of trees (the river banks turned turquoise in
+  summer: the canopy counts a bank's shade). In summer: the far hills lose their orange, fewer red leaves on the floor
+  (fv3_* sheets). lookstats: summer 400 m V>0.90 2.4 -> 2.7 %, 150 m 4.2 -> 4.1; ON FOOT IN SUMMER S(V<0.3) 0.61 -> 0.63
+  (worse by 0.02 on C7; the darkest 15 % 0.47 -> 0.45): the dark pixels that change were brown leaves in shade, now
+  grass in shade, whose paint is today's saturated green (audit F4, the look director's L2). Phone cost: per vertex for
+  the far colour; about 10 instructions a dab for the leaves (about 1.5 % of the ground's: at most 0.07 ms on foot,
+  0.25 ms in the air on the design's bounds).
 
-**FV4 (rocks): not started.** Plan in the coordinator's message: on steep rock the dabs' own stray taken down, the patch
+**FV4 (rocks): WRITTEN, compiled out by default (`?rockfield=1` to try), NOT YET SEEN.** surface.js `snowK` (how much snow
+a wash carries), patchgen.js sheds it off faces steeper than about 40 degrees (undoing the surface's own mix), farground.js
+ROCK_FRAG + hooks (uRockK: Earth only). Plan as it was: on steep rock the dabs' own stray taken down, the patch
 colours (alpine green and cream) desaturated toward the rock's value, two rock tones by height band where the biome has
 strata (vCol.a), snow shed from faces over about 50 degrees; the dabs along the contour need the look director's slope
 chart (L8, `pcSlopeChart` in chunks.js), asked for.
