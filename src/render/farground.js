@@ -561,8 +561,12 @@ vec3 pcRockWash(vec3 c, float up, vec3 Bc, float strata, float dist, vec3 rnd, f
   float far = mix(smoothstep(0.82, 0.67, up), smoothstep(0.87, 0.74, up), kMt) * smoothstep(80.0, 250.0, dist);
   float cl = smoothstep(0.66, 0.50, up) * smoothstep(0.05, 0.20, strata);
   float nr = textureLod(uNoise3D, Bc / 4.3 + 0.13, 0.0).g;
-  gCliff = step(fract(rnd.y * 7.7 + rnd.z * 3.1) * 0.6 + nr * 0.4, cl * 1.1 - 0.05) * uRockK;
-  gRock = max(far * uRockK, gCliff);
+  // (SNOW WINS OVER ROCK above the snowline, the look director's condition: a wash the surface laid snow over (its own
+  // white, the mesher having shed it off the sheerest faces only) is not painted as rock, so the peaks keep their white;
+  // with rock laid over it the peaks' tips went grey at 420 m and 1 km, SEEN. Whole dabs: the wash at the dab's centre.)
+  float sn = smoothstep(0.70, 0.86, min(min(c.r, c.g), c.b));
+  gCliff = step(fract(rnd.y * 7.7 + rnd.z * 3.1) * 0.6 + nr * 0.4, (cl * 1.1 - 0.05) * (1.0 - sn)) * uRockK;
+  gRock = max(far * uRockK * (1.0 - sn), gCliff);
   gGully = 0.0;
   if (gRock <= 0.0) return c;
   if (gCliff > 0.5) return pcCliffC(Bc, hB, rnd, c, gRockLw);
@@ -610,10 +614,14 @@ float pcRockPlanes(float lvl, vec3 nV, float sunny) {
 }
 // the rock dab's paint leaned warm or cool by its plane (pcRockPlanes' gRockT): toward the sun's own colour a little on
 // the lit plane, toward a cool violet on the shaded ones (the shade key's hue, as the references paint rock in shade)
+// (v2, the look director's numbers: the warm lean is the rock's OWN warm tone's hue (uRockM3, normalised; the sun's
+// colour is near white at noon, so the first form leaned to almost nothing, rock S median 0.08 to 0.10 at noon, MEASURED)
+// strengthened 2.2 times, and the cool lean 1.25 blue)
 vec3 pcRockTemp(vec3 k) {
   if (gRock <= 0.0) return k;
-  vec3 sunC = pcOilSunC(); sunC /= max(dot(sunC, vec3(0.3, 0.5, 0.2)), 1e-3);
-  vec3 t = gRockT > 0.0 ? mix(vec3(1.0), sunC, 0.35 * gRockT) : mix(vec3(1.0), vec3(0.90, 0.87, 1.16), -gRockT);
+  vec3 wC = uRockM3 / max(dot(uRockM3, vec3(0.3, 0.5, 0.2)), 1e-3);
+  wC = vec3(1.0) + (wC - vec3(1.0)) * 2.2;
+  vec3 t = gRockT > 0.0 ? mix(vec3(1.0), wC, gRockT) : mix(vec3(1.0), vec3(0.86, 0.84, 1.25), -gRockT);
   return clamp(k * mix(vec3(1.0), t, gRock), 0.0, 1.0);
 }
 #endif`;

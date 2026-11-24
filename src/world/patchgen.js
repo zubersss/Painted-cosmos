@@ -177,11 +177,13 @@ export function stepPatch(job, deadline) {
         if (sk > 0.01) {
           const pr = 1 / Math.sqrt(_px[k] * _px[k] + _py[k] * _py[k] + _pz[k] * _pz[k]);
           const upn = (nor[o] * _px[k] + nor[o + 1] * _py[k] + nor[o + 2] * _pz[k]) * pr;
-          // (from about 49 degrees, all but a fifth of it by 61: MEASURED from 400 m, shedding from 38 degrees took the snow
-          // off nearly every summit -- at a far patch's spacing a summit's faces all read steep -- and the range went grey)
-          const st = sstep(0.66, 0.48, upn);
+          // (from about 55 degrees, all but two fifths of it by 70: MEASURED from 400 m, shedding from 38 degrees took the snow
+          // off nearly every summit -- at a far patch's spacing a summit's faces all read steep -- and the range went grey;
+          // from 49 to 61 degrees with a fifth kept, the peaks lost their white tips at 420 m and 1 km once the rock faces
+          // were laid, SEEN by the look director: snow wins over rock above the snowline, so only the sheerest faces shed)
+          const st = sstep(0.57, 0.34, upn);
           if (st > 0) {
-            const k2 = sk * (1 - 0.8 * st), cc = k * CS, iv = 1 / (1 - sk);
+            const k2 = sk * (1 - 0.6 * st), cc = k * CS, iv = 1 / (1 - sk);
             for (let t = 0; t < 3; t++) {
               const base = (_col[cc + t] - SNOW[t] * sk) * iv, base2 = (_col[cc + 3 + t] - SNOW[t] * sk) * iv;
               _col[cc + t] = base + (SNOW[t] - base) * k2;
@@ -212,7 +214,7 @@ export function stepPatch(job, deadline) {
       // flowers keep off steep ground by their own slope test. z: the slope's own kind, o.fi2, for the far dabs)
       if (blo) {
         const upn = (nor[o] * _px[k] + nor[o + 1] * _py[k] + nor[o + 2] * _pz[k]) / Math.sqrt(_px[k] * _px[k] + _py[k] * _py[k] + _pz[k] * _pz[k]);
-        blo[q] = b8(_bl[k * 3] * (1 - sstep(0.30, 0.55, 1 - upn))); blo[q + 1] = b8(_bl[k * 3 + 1] / 15); blo[q + 2] = b8(_bl[k * 3 + 2] / 15);
+        blo[q] = b8(_bl[k * 3] * (1 - sstep(0.13, 0.29, 1 - upn)));      // (from 30 degrees, gone by 45: from 46 the far patches' smoothed normals left red on the peaks' faces, SEEN by flora B) blo[q + 1] = b8(_bl[k * 3 + 1] / 15); blo[q + 2] = b8(_bl[k * 3 + 2] / 15);
       }
       if (!io && !jo) {
         // the parent's own normal here: its grid is twice as wide (at the border the apron is one cell deep)
