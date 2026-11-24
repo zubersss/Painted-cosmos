@@ -18,6 +18,13 @@ export default {
   seed: 'earth-7',
   seaLevel: 0,
   cloud: 0.45,
+  // (group D, the weather, with ?stormland=1: HOW STORMY the land is. One number for the owner to turn; it sets how
+  //  many storms grow on a stormy afternoon and how far they drift. MEASURED over 200 game days at the spawn:
+  //    1    storms on 71 % of days, one in sight of the wood on 65 %, one over the wood on 24 % (as tuned)
+  //    0.5  in sight on 43 %, over the wood on 11 %
+  //    1.5  in sight on 67 %, over the wood on 36 %
+  //    0    no storms born from the land at all.   physics/weather.js STORMLAND.)
+  storms: 1,
   deck: { height: 560 },
   visibility: [185, 2600],   // metres at ground level, and from high up
   sky: EARTH_SKY,

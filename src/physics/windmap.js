@@ -82,7 +82,7 @@ export const WINDMAP = Object.freeze({
   aloftGain: 1.2,        // (air.js AIR.aloftGain)
   aloftLand: 0.1,
   // the world's convection sites
-  sitesMax: 64,
+  sitesMax: 128,         // (W3.2: 64, the great peaks only; the range's front over the wood had none: weather.js stormswing)
   siteSpacing: 450,      // m between two sites at least
   siteMin: 0.12,         // a site scores at least this
 });

@@ -15,6 +15,7 @@
 //   ?rainlook=1   a downpour reads as one: more of the box's drops drawn the harder it rains, nearer the eye, longer
 //   ?rainshaft=1  rain shafts hanging under every raining storm in view (world/storms.js; needs the cloud map)
 //   ?bolts=1      lightning bolts, cloud to ground (world/storms.js; needs the cloud map)
+//   ?stormswing=0 (with ?stormland) the land storms as W3.2 laid them: 1 to 3 a day, drifting with the usual wind aloft
 const Q = (typeof location !== 'undefined' && location && location.search) ? new URLSearchParams(location.search) : null;
 const flag = (k, d) => (Q && Q.has(k) ? Q.get(k) !== '0' && Q.get(k) !== 'false' : d);
 const ALL = flag('wx2', false);
@@ -29,6 +30,8 @@ export const WX2 = {
   rainlook: flag('rainlook', ALL),
   rainshaft: flag('rainshaft', ALL),
   bolts: flag('bolts', ALL),
+  // (with ?stormland: every site its own chance, and the wind aloft swinging from day to day; ?stormswing=0 is W3.2's)
+  stormswing: flag('stormswing', true),
   // (the speed test's row 'weather: wind map frozen': the map stops refreshing, so the script's change is its cost)
   freeze: false,
 };

@@ -38,6 +38,8 @@ A separate session builds W1 CLOUDS once the look director's sky ceiling (touch 
 | `?rainlook=1` | a downpour reads as one: more of the box's drops drawn, from nearer the eye, each a third longer |
 | `?rainshaft=1` | rain shafts under every raining storm 1 to 7 km off (`world/storms.js`; turns on `cloudmap`; oil look only) |
 | `?bolts=1` | lightning bolts, cloud to ground (`world/storms.js`; turns on `cloudmap`; oil look only) |
+| `?stormswing=0` | with `?stormland`: the land storms as W3.2 laid them (1 to 3 a day, the usual wind aloft); on by default |
+| `?clouds3d=1` | (the look director's switch for W1's clouds) also turns on `cloudmap` and `windmap` |
 
 ## Done
 
@@ -185,7 +187,7 @@ A separate session builds W1 CLOUDS once the look director's sky ceiling (touch 
   | --- | --- |
   | days with a mature storm over the range | 72 % |
   | first matured | 14:42 to 17:42 local solar time (p10 to p90), median 15:48 |
-  | a mature storm within sight of the spawn's wood (within 4.5 km) | 33 % of days |
+  | a mature storm within sight of the spawn's wood (within 4.5 km) | 33 % of days (**4.5 km overstated it**: on this 4 km world a storm's top 2.4 km up is under the horizon past 3.7 km of ground; at 3.7 km it is 17 %) |
   | a land storm passing within 1.5 km of the spawn | **0 days of 60** |
   | the upper alpine meadow (above 500 m) over 10 days | **0.0 mm of water without**; 3.9 mm rain + 15.7 mm snow with, against its valleys' 11.8 + 8.4 |
   | windward against lee rain | at least 1.3 times (tested) |
@@ -257,6 +259,51 @@ A separate session builds W1 CLOUDS once the look director's sky ceiling (touch 
 - **Speed-test row:** 'storm: no rain shafts or bolts' (it hides `pc-storm-*`), asked only while one of the two
   switches is on. It means something only with a storm in sight.
 - **Suites:** physics 438, world and looks 65, unit 325, 0 failing.
+
+### W3.5: STORMS THAT COME TO THE PLAYER NOW AND THEN (the coordinator's ruling of 24 Nov; `weather.js`, `windmap.js`, `index.js`, the Earth look)
+
+- **The ruling:** a storm over the spawn's wood on about 1 day in 4, one within sight on about every other day, by
+  NATURAL means (the wind aloft swinging from day to day; a weak site on the wood's hills only if that is not enough);
+  never forced on the player; the dial one number in the look data.
+- **Built, behind `WX2.stormswing`** (on with `?stormland`; `?stormswing=0` gives W3.2 exactly: every land cell of 30 days hashed, identical):
+  1. **Every site has its own chance** on a stormy afternoon, by its weight and the day's instability (0.5 to 1.5). This
+     replaces 1 to 3 drawn over the whole world. `STORMLAND.count` is 12 expected over the world, at most 24.
+  2. **The day's wind aloft swings:** its direction turns by up to 180 degrees and its speed is 0.6 to 2.2 times the
+     usual. It changes smoothly over about 1.6 days and is the same for every storm of the day. `steer` is 0.8 (W3.2's
+     0.5 kept as `steer0` for `?stormswing=0`): a storm moves with most of the wind in its cloud layer.
+  3. **Lesser hills host lesser storms:** the wind map keeps 128 sites (was 64), so the range's front right above the
+     wood, at 1.1 to 1.8 km, gets sites. A storm's size and strength go down with its site's weight. This counts as
+     the weak sites; none was placed by hand.
+  4. **The dial:** `storms: 1` in `src/data/looks/earth.js`, passed in by `physics/index.js` (`setStormDial`). It sets
+     how many storms grow and how far they drift; 0 means none.
+- **Why not by the wind alone:** the wood lies SOUTH of the range and the usual wind aloft blows toward the north-east,
+  so storms leave the wood behind. With the swing alone (64 sites, 6 a day) it was 6 to 13 % over the wood.
+- **MEASURED** (200 game days, the real Earth, the game's own sun; within sight = 3.7 km, see the W3.2 correction):
+
+  | | storm days | within sight | over the wood (1.5 km) | its core over the spawn |
+  | --- | --- | --- | --- | --- |
+  | `?stormswing=0` (W3.2) | 71 % | 17 % | **0 %** | 0 % |
+  | dial 1 (default) | 71 % | **65 %** | **24 %** | 7 % |
+  | dial 0.5 | 70 % | 43 % | 11 % | 2 % |
+  | dial 1.5 | 71 % | 67 % | 36 % | 17 % |
+
+  - **Said plainly:** at the default, "over the wood" meets the target (24 % against 25 %), but "within sight" is
+    65 %, above the target of about every other day.
+  - With this land the two cannot both be met: every extra storm on the range adds to "in sight" faster than to "over
+    the wood". Dial 0.5 gives in sight 43 % but over the wood only 11 %. **The owner chooses with the dial.**
+- **Seen:**
+  - `W3.5_storm_tracks_60days_A_B.jpg`: a true-distance map, 10 x 10 km round the spawn, of every mature land storm in
+    60 days. A: 38 tracks, all over the range or off to the east; none crosses the wood. B: 229 tracks, crossing in every
+    direction, several over the wood.
+  - Two game stills at the wood (t 52,310, with and without the swing) show no difference to the eye, though the
+    physics says thunderstorm 6.6 mm/h against breeze. The gallery's frozen clock also freezes the sky's easing toward
+    the weather, so the storm overhead does not show. Not committed: they show nothing.
+- **Cost:** at the busiest moment in 20 days, 21 land cells live against 6. The cloud map's full refresh goes from
+  2.14 to 2.59 ms here, so its slice each frame goes from 0.143 to 0.173 ms. `weatherAt` costs the same. Phone: about
+  +0.1 ms of script, with the assumed x3.
+- **Tests:** a new one in `stormland.test.mjs` (over the wood 15 to 40 %, in sight at least 40 %, the dial working,
+  none over the wood without the swing). The sight distance is now 3.7 km in both.
+- **Suites:** physics 439, world and looks 73, unit 325, 0 failing.
 
 ## NEXT
 

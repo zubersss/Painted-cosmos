@@ -233,15 +233,42 @@ function pickKind(regime, h) {
 export const STORMLAND = Object.freeze({
   from: 1900,              // game s: none before, so Earth's first day stays fair and its first storm is the tuned one
   stormDays: 0.667,        // the share of days on which the range grows storms (the owner judges this one number)
-  perDay: [1, 3],          // how many sites fire on a stormy afternoon
+  perDay: [1, 3],          // how many sites fire on a stormy afternoon (W3.2; with ?stormswing=0 only)
   hours: [12.5, 16.0],     // the local hour a site fires
   lifeH: [4.0, 6.5],       // its life in game hours (cumulus at the start, gone by the evening)
   r: [520, 950],           // m: the storm's core grown to this radius
   cloudR: 1.3,             // the cloud's shield is this much wider than the core
-  steer: 0.5,              // it drifts at this share of the wind aloft over its site at its birth ...
+  steer: 0.8,              // it drifts at this share of the wind aloft over its site at its birth ...
+  steer0: 0.5,             // (... and at this share with ?stormswing=0, as W3.2 laid it)
   anchor: 0.25,            // ... only after this share of its life: it stands over the slope that feeds it while it builds
   aloft: 1.95,             // the wind aloft at the cloud's base over the 10 m wind (air.js aloftFactor at 350 m on Earth)
+  // (the coordinator's ruling of 24 Nov, behind WX2.stormswing, on with ?stormland: storms that come to the player now
+  //  and then by NATURAL means. Two changes. (1) On a stormy afternoon every site has its own chance to fire, by its
+  //  weight and the day's instability, so a stormy day over a range grows storms over many of its peaks, as real ones do,
+  //  and not one or two over the whole world; a lesser hill (the wind map keeps 128 sites) grows a lesser storm. (2) The wind aloft that steers them swings from day to day: a synoptic
+  //  turn of its direction and a change of its speed, smooth over a day or two, so on some days the range's storms are
+  //  carried over the wood and on most they go the usual way. The owner's dial (the look's `storms`, setStormDial)
+  //  scales both: how many fire, and how far they drift.)
+  count: 12,               // storms expected over the world on a stormy afternoon of average instability (dial 1)
+  countMax: 24,            // at most this many on one day (the cost of the gathers)
+  instab: [0.5, 1.5],      // the day's instability: it scales every site's chance
+  swing: 3.14,             // rad: the largest turn of the day's wind aloft from its usual direction (180 degrees: a reversal)
+  speed: [0.6, 2.2],       // the day's wind aloft as a share of its usual speed
+  swingDays: 1.6,          // days over which the swing changes (one knot of its smooth noise every 1.6 days)
 });
+// (the owner's dial, the look data's `storms` for the body: physics/index.js passes it in; 1 = as tuned)
+let DIAL = 1;
+export function setStormDial(n) {
+  const v = Number.isFinite(n) && n >= 0 ? n : 1;
+  if (v === DIAL) return;
+  DIAL = v; if (LAND) LAND.days.clear();
+}
+export function stormDial() { return DIAL; }
+// a smooth number in [0, 1] over x (one knot per unit), the same for every caller: the day's swing
+function knots(x, a, sd) {
+  const i = Math.floor(x), f = x - i, u = f * f * (3 - 2 * f);
+  return mix(hash3(i, a, 7, sd), hash3(i + 1, a, 7, sd), u);
+}
 const LAND_BASE = 20000;   // cell numbers of the land storms (LAND_BASE + 2 k: the cloud, + 1: the storm)
 let LAND = null;           // { bodyId, sites, solarDay, t0, hour0 (each site's world hour at t0), days: Map }
 // Register (or keep) a body's convection sites and the sun's reference: sites [{x, y, z, w}] (windmap.js), sunDir its
@@ -280,28 +307,49 @@ function landDay(bodyId, seed, D) {
   if (day) return day;
   day = [];
   const sd = seedFor(bodyId, seed) + 31337, S = STORMLAND;
-  if (hash3(D, 1, 0, sd) < S.stormDays) {
-    const n = S.perDay[0] + Math.floor(hash3(D, 2, 0, sd) * (S.perDay[1] - S.perDay[0] + 1) * 0.9999);
-    let wsum = 0; for (const st of L.sites) wsum += st.w;
-    const taken = new Set();
-    for (let k = 0; k < n; k++) {
-      let j = -1;
-      for (let tries = 0; tries < 6 && j < 0; tries++) {
-        let a = hash3(D, 3 + k, tries, sd) * wsum;
-        for (let q = 0; q < L.sites.length; q++) { a -= L.sites[q].w; if (a <= 0) { if (!taken.has(q)) j = q; break; } }
+  const swing = WX2.stormswing;
+  if (hash3(D, 1, 0, sd) < (swing && !(DIAL > 0) ? 0 : S.stormDays)) {
+    // (before the swing: the 64 strongest sites only, which were all the wind map gave then: windmap.js sitesMax)
+    const nSites = swing ? L.sites.length : Math.min(L.sites.length, 64);
+    let wsum = 0; for (let q = 0; q < nSites; q++) wsum += L.sites[q].w;
+    // which sites fire: (swing) each on its own chance, by its weight and the day's instability; (before) 1 to 3 drawn
+    const fire = [];
+    if (swing) {
+      const inst = mix(S.instab[0], S.instab[1], hash3(D, 2, 0, sd)), per = S.count * inst * DIAL / wsum;
+      for (let q = 0; q < L.sites.length && fire.length < S.countMax; q++) if (hash3(D, 100 + q, 1, sd) < Math.min(0.9, per * L.sites[q].w)) fire.push(q);
+    } else {
+      const n = S.perDay[0] + Math.floor(hash3(D, 2, 0, sd) * (S.perDay[1] - S.perDay[0] + 1) * 0.9999);
+      for (let k = 0; k < n; k++) {
+        let j = -1;
+        for (let tries = 0; tries < 6 && j < 0; tries++) {
+          let a = hash3(D, 3 + k, tries, sd) * wsum;
+          for (let q = 0; q < nSites; q++) { a -= L.sites[q].w; if (a <= 0) { if (!fire.includes(q)) j = q; break; } }
+        }
+        if (j >= 0) fire.push(j);
       }
-      if (j < 0) continue;
-      taken.add(j);
-      const site = L.sites[j];
-      const h = mix(S.hours[0], S.hours[1], hash3(D, 10 + k, 0, sd));
+    }
+    // (swing) the day's wind aloft: turned and scaled, the same for every storm of the day (one weather pattern)
+    const rot = swing ? S.swing * (2 * knots(D / S.swingDays, 1, sd) - 1) : 0;
+    const mul = swing ? mix(S.speed[0], S.speed[1], knots(D / S.swingDays, 2, sd)) * DIAL : 1;
+    const cr = Math.cos(rot), sr = Math.sin(rot);
+    for (let k = 0; k < fire.length; k++) {
+      const j = fire[k], site = L.sites[j];
+      // (the numbers each storm draws: by its order on the day before, by its site with the swing, so that a site
+      //  firing or not never changes another site's storm)
+      const hk = swing ? 1000 + j : k;
+      const h = mix(S.hours[0], S.hours[1], hash3(D, 10 + hk, 0, sd));
       const tf = L.t0 + (24 * D + h - L.hour0[0] + (L.hour0[0] - L.hour0[j])) * L.solarDay / 24;
-      const life = mix(S.lifeH[0], S.lifeH[1], hash3(D, 20 + k, 0, sd)) * L.solarDay / 24;
+      const life = mix(S.lifeH[0], S.lifeH[1], hash3(D, 20 + hk, 0, sd)) * L.solarDay / 24;
       // its drift: the large-scale wind over its site at its birth, made the wind aloft, along the site's east and north
       windLarge(bodyId, site.x, site.y, site.z, tf, seed, _lw);
       let ex = site.z, ez = -site.x; const el = Math.hypot(ex, ez) || 1; ex /= el; ez /= el;
       const nx = site.y * ez, ny = site.z * ex - site.x * ez, nz = -site.y * ex;
-      const ve = (_lw[0] * ex + _lw[2] * ez) * S.aloft * S.steer, vn = (_lw[0] * nx + _lw[1] * ny + _lw[2] * nz) * S.aloft * S.steer;
-      day.push({ k, j, site, tf, life, s: mix(0.75, 1, hash3(D, 30 + k, 0, sd)), r: mix(S.r[0], S.r[1], hash3(D, 40 + k, 0, sd)), ve, vn, ex, ez, nx, ny, nz });
+      const st = swing ? S.steer : S.steer0;
+      const ve0 = (_lw[0] * ex + _lw[2] * ez) * S.aloft * st, vn0 = (_lw[0] * nx + _lw[1] * ny + _lw[2] * nz) * S.aloft * st;
+      const ve = (ve0 * cr - vn0 * sr) * mul, vn = (ve0 * sr + vn0 * cr) * mul;
+      // (swing) a lesser hill grows a lesser storm: smaller and weaker by its site's weight
+      const lesser = swing ? site.w : 1;
+      day.push({ k, j, site, tf, life, s: mix(0.75, 1, hash3(D, 30 + hk, 0, sd)) * (0.55 + 0.45 * lesser), r: mix(S.r[0], S.r[1], hash3(D, 40 + hk, 0, sd)) * (0.6 + 0.4 * lesser), ve, vn, ex, ez, nx, ny, nz });
     }
   }
   if (L.days.size > 64) L.days.clear();

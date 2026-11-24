@@ -31,7 +31,9 @@ import { clamp01, smoothstep } from './util.js';
 import { WX2 } from './wx2.js';
 import { WindMap, WINDMAP, setThermal } from './windmap.js';
 import { CloudField, CLOUDMAP, rainAt, rainBetween, throughfall, RAIN_GLSL, RAINLAND } from './cloudfield.js';
-import { setForcedCell, forcedCell, setLandStorms, landStorms } from './weather.js';
+import { setForcedCell, forcedCell, setLandStorms, landStorms, setStormDial } from './weather.js';
+// (the owner's storm dial is look data: the body's `storms` in src/data/looks/<world>.js, pure data with no imports)
+import { LOOKS } from '../data/looks.js';
 import { WaterField, WATER_GLSL, WATER, windSea, seaGrown, fetchOf, wakeLength, foamCover, whiteWind, surf01, FetchGauge, FETCH_GAUGE, SEA_TEX } from './water.js';
 import { SeaMap, SEA_MAP, FetchRose } from './seamap.js';
 import { DeformField, DEFORM, MARK, MARK_STRIDE } from './deform.js';
@@ -420,6 +422,7 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
     // (group D, ?stormland=1) storms born from the land: the wind map's sites and the sun's reference handed to the weather;
     // and at the focus the weather's own top (from the cloud map, over the land), the land's rain factor and its cumulus
     if (WX2.stormland && windMap.land.ready && windMap.bodyId === bodyId && sunDir) {
+      setStormDial(LOOKS[bodyId] && LOOKS[bodyId].storms != null ? LOOKS[bodyId].storms : 1);
       setLandStorms(bodyId, windMap.sites, sunDir, time);
       RAINLAND.map = windMap;
       const cm = cloudMap.ready && cloudMap.bodyId === bodyId ? cloudMap.at(ux, uy, uz, _cmo) : null;

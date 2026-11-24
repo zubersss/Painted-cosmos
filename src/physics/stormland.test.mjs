@@ -28,6 +28,9 @@ async function earth() {
   E = { surf, wm, spawn, sunAt };
   return E;
 }
+// (a storm's top stands about 2.4 km over the datum: 220 m base and 1,800 m of tower over a range at 300 to 500 m; on a
+//  world of 4 km radius it sinks under the horizon of an eye 2 m up past acos(R / (R + 2)) + acos(R / (R + 2400)) of arc)
+const SIGHT = 3700;
 const R = 4000, dist = (a, b) => R * Math.acos(Math.max(-1, Math.min(1, a.x * b.x + a.y * b.y + a.z * b.z)));
 function on(E) {
   WX2.stormland = true;
@@ -47,7 +50,7 @@ test('land storms: a storm over the mountains on about two days in three, maturi
       for (const c of W.cellsAt('earth', t)) {
         if (!c.land || c.kindId !== 'storm' || c.w < 0.3) continue;
         stormDay.add(c.gen);
-        if (dist(c, E0.spawn) < 4500) seen.add(c.gen);
+        if (dist(c, E0.spawn) < SIGHT) seen.add(c.gen);
         const key = c.i + ':' + c.gen;
         if (!born.has(key)) {
           born.set(key, c);
@@ -65,9 +68,39 @@ test('land storms: a storm over the mountains on about two days in three, maturi
     assert.ok(onHigh / sites.length >= 0.9, `${onHigh} of ${sites.length} sites stand on ground 40 m and more over its surroundings or in a hot basin`);
     const alpine = sites.filter((s) => E0.surf.sampleSurfacePure('earth', s.x, s.y, s.z).biomeId === 'alpine_meadow').length;
     assert.ok(alpine / sites.length >= 0.6, `${alpine} of ${sites.length} on the alpine range`);
-    // and seen from the wood where the game begins (a tower 2 km tall within 4.5 km)
+    // and seen from the wood where the game begins (a storm's top, 2.4 km up, is over the horizon past 3.7 km of ground)
     assert.ok(seen.size / days >= 0.2, `a storm within sight of the spawn's wood on ${seen.size} of ${days} days`);
   } finally { off(); }
+});
+
+test('land storms come to the player now and then, by the wind aloft swinging from day to day (the coordinator, 24 Nov)', async () => {
+  const E0 = await earth(); if (!E0) return;
+  const days = 100, measure = () => {
+    const L = W.landStorms(), T0 = W.STORMLAND.from, stormy = new Set(), wood = new Set(), seen = new Set();
+    for (let t = T0; t < T0 + days * L.solarDay; t += 30) for (const c of W.cellsAt('earth', t)) {
+      if (!c.land || c.kindId !== 'storm' || c.w < 0.3) continue;
+      stormy.add(c.gen); const d = dist(c, E0.spawn);
+      if (d < 1500) wood.add(c.gen);
+      if (d < SIGHT) seen.add(c.gen);
+    }
+    return { stormy: stormy.size / days, wood: wood.size / days, seen: seen.size / days };
+  };
+  try {
+    on(E0);
+    const a = measure();
+    // the owner's asks: a storm over the spawn's wood on about 1 day in 4, one within sight on about every other day
+    assert.ok(a.wood >= 0.15 && a.wood <= 0.4, `a storm over the spawn's wood (within 1.5 km) on ${(a.wood * 100).toFixed(0)} % of days`);
+    assert.ok(a.seen >= 0.4, `a storm within sight of it on ${(a.seen * 100).toFixed(0)} % of days`);
+    assert.ok(a.stormy > 0.5 && a.stormy < 0.85, `storms over the land on ${(a.stormy * 100).toFixed(0)} % of days`);
+    // the owner's dial (the look's storms): fewer at 0.5, none at 0
+    W.setStormDial(0.5); const h = measure(); W.setStormDial(0); const z = measure(); W.setStormDial(1);
+    assert.ok(h.wood < a.wood && h.seen < a.seen, `dial 0.5: over the wood ${(h.wood * 100).toFixed(0)} %, in sight ${(h.seen * 100).toFixed(0)} %`);
+    assert.equal(z.stormy, 0);
+    // and with ?stormswing=0 they are W3.2's: none over the wood
+    WX2.stormswing = false; W.setLandStorms(null); W.setLandStorms('earth', E0.wm.sites, E0.sunAt(0), 0);
+    const b = measure();
+    assert.ok(b.wood < 0.05, `without the swing: over the wood on ${(b.wood * 100).toFixed(0)} % of days`);
+  } finally { WX2.stormswing = true; W.setStormDial(1); off(); }
 });
 
 test('land storms: the upper alpine meadow gets its weather (it got none above 496 m), as rain and snow', async () => {
