@@ -406,6 +406,61 @@ A separate session builds W1 CLOUDS once the look director's sky ceiling (touch 
   veils whose tops come in by flat steps; they read less like towers than W3.6's four thin ones.
 - **Cost:** the same or less (two veils instead of up to three; wider, about the same area).
 
+### W3.9: A STORM PASSING OVER THE PLAYER, CHECKED IN THE GAME (the coordinator's ask, 24 Nov)
+
+- **How:** the real game (`index.html`, not the gallery): `?look=oil&card=0&audio=0&save=0&fresh=1&dynres=0&quality=1&stormland=1&nearmap=1&farwind=1&rainlook=1&rainshaft=1&bolts=1`,
+  with the look director's T2 hook applied locally (look-director 1de2bf6), loaded in the lab (3.5 minutes).
+  - A new game's land storm passes over the spawn at game time 3,750 s. It is the only one in 12 game days whose core
+    passes within half its radius, 192 m from the explorer, at 16 m/s.
+  - `__pc.hold()` and `__pc.step(1/15)` with the painter's render switched off step the game's own frame (sim, physics,
+    world) with no picture, about 30 frames in 0.1 s here. A log of every game second from 3,600 to 3,850 s is in
+    `docs/shots/physics/weather-build/W3.9_game_storm_pass_log.json`.
+  - Stills from the explorer's camera, aimed at the storm, at three moments.
+- **What comes together (MEASURED):**
+  - Overcast from 850 m out (3,698 s). The gust front at 620 m (3,713 s): wind from 1.3 to 3.8 m/s, gust index 0.97,
+    **5 s before the first drizzle**.
+  - Rain from 550 m out, a thunderstorm at 400 m, 13.7 mm/h at its peak (3,743 to 3,758 s), clear by 3,803 s: 70 s of
+    rain, about 105 s from overcast to clear.
+  - Wind 5 to 9 m/s through the storm.
+  - **The near plants answer:** grass 6 m off bends from 0.06 to 0.14 rad to about 1 rad, and trees from 0.03 to 0.33 to
+    0.39 rad. They are back by 3,803 s.
+  - The rain box goes 0 to 1,250 drops.
+  - The world's darkening: `uStorm` goes 0 to 0.81, the key light turns a pale grey, the glaze deepens, the haze
+    darkens.
+- **What was broken and is FIXED here (weather.js, behind the cloud map; switches off bit-identical, 162,000 numbers):**
+  the flash of light at the player and the bolts in the sky were TWO DIFFERENT SERIES.
+  - The player's lightning followed the cell that covered the place most, often a storm's wider cloud shield (another
+    cell), at the rate gathered there. The bolts follow each storm cell's own schedule at its full rate.
+  - In the game, before: flashes at 3,731, 3,736 and 3,773 s; bolts at 3,763, 3,778, 3,783 and 3,803 s; never together.
+  - Now the lightning at a place is that of the up to three storms that flash most there, each on its own schedule
+    (the brightest flash, the latest `last`, the soonest next).
+  - In the game, after: **18 frames with a bolt and its flash of light together**. 9 frames have a bolt and no light:
+    bolts of storms 0.9 to 1.3 km off, whose light is the look director's `storms.flash`, to come. 27 frames have light
+    and no bolt: in-cloud flashes, as they should.
+  - A test: under storms, every listed flash of a storm over the place lights it.
+- **Seen (game stills):**
+  - `W3.9_game_A_3690s_storm950m_approaching.jpg`: the storm 950 m off. **The sky is fair blue with small cumulus**;
+    only a faint veil shows behind the trees.
+  - `W3.9_game_B_3745s_storm_overhead.jpg`: a dark storm sky, slanting rain, a darker light, the explorer's hood up,
+    the grass blown, leaves flying. It reads as a thunderstorm overhead.
+  - `W3.9_game_C_3778s_storm_departing.jpg`: the departing storm, a grey sky with light in the air and blown leaves.
+    The bolt I stepped to had ended within the grab's first step (the lab's step moves the clock 0.25 s), so no bolt is
+    in it.
+- **What is still MISSING (the report to the coordinator):**
+  1. **The storm cannot be seen coming** (lane W1, the clouds). The sky draws only the weather at the eye, so a storm
+     950 m off leaves a fair blue sky, and then the whole sky turns to a storm deck in about 30 s as it arrives. From
+     W1 I need the land storms of `fields.cloud` drawn as clouds: towers from about 3.7 km out, a dark base at the
+     map's `base`, an anvil downwind, and the deck overhead being THAT cloud. My veils will then hang from that base.
+  2. **The gust front is weak** for a thunderstorm: at most 9 m/s here, against 15 to 25 m/s in a real one, though the
+     storm kind carries an outflow of 14. Mine (physics): a stronger outflow ahead of the core, behind a switch.
+  3. **The pace:** this storm drifts at 16 m/s (the day's swing at its fastest), so the whole event is about 105 s.
+     A cap near 10 m/s would make it about 170 s. Mine; the owner can judge.
+  4. **The flash's light on the land** for distant bolts: the look director's, from `storms.flash`, after tonight's
+     release.
+  5. **Thunder in the audio:** not checked (`audio=0` in a headless browser). The physics gives `thunderIn` and
+     `thunder01`; PILOT's audio would need to play them.
+- **Suites:** physics 441, world and looks 103, unit 325, 0 failing.
+
 ## NEXT
 
 1. **The look director's second review** of the veils (W3.6), and their decision on region (a glaze keeping the region

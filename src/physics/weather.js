@@ -221,6 +221,7 @@ function pickKind(regime, h) {
   return ks[ks.length - 1][0];
 }
 
+const _lt = { flash01: 0, nextIn: Infinity, thunderIn: Infinity, thunder01: 0, last: { t: -1e9, x: 0, y: 1, z: 0, distance: 1e9 } };   // (one storm's lightning, merged in weatherAt)
 // ---- (group D) STORMS BORN FROM THE LAND -----------------------------------------------------------------------------
 // docs/lead/WEATHER-DESIGN.md 6.2 C2. Behind wx2.js WX2.stormland, and only on a body whose convection sites have been
 // registered (setLandStorms: the wind map's `sites`, windmap.js, read from the land). On a stormy afternoon a few sites
@@ -441,7 +442,7 @@ export function cellsAt(bodyId, t, seed = DEFAULT_SEED) {
 }
 
 const _c = {};
-const _acc = { blow: 0, rate: 0, rateIce: 0, rateFrost: 0, cloud: 0, windMul: 1, calm: 0, flash: 0, fog: 0, haze: 0, dust: 0, ox: 0, oy: 0, oz: 0, storm: 0, top: null, topW: 0, topCell: -1, topGen: 0, front: 0, clear: 1, conv: 0, baseW: 0, topH: 0, coverSum: 0 };
+const _acc = { blow: 0, rate: 0, rateIce: 0, rateFrost: 0, cloud: 0, windMul: 1, calm: 0, flash: 0, fog: 0, haze: 0, dust: 0, ox: 0, oy: 0, oz: 0, storm: 0, top: null, topW: 0, topCell: -1, topGen: 0, front: 0, clear: 1, conv: 0, baseW: 0, topH: 0, coverSum: 0, fTopW: 0, fCell: -1, fGen: 0, fRate: 0, f2W: 0, f2Cell: -1, f2Gen: 0, f2Rate: 0, f3W: 0, f3Cell: -1, f3Gen: 0, f3Rate: 0 };
 
 // (group D) A CELL FORCED OVER A PLACE (physics.forceWeather: the speed test's storm row and the stills of a storm). While
 // one is set it is gathered after the body's own cells everywhere, so the sky numbers, the rain, the lightning and the
@@ -463,6 +464,7 @@ function forcedCentre() { _fown.x = _forced.x; _fown.y = _forced.y; _fown.z = _f
 function resetAcc(a) {
   a.blow = 0; a.rate = 0; a.rateIce = 0; a.rateFrost = 0; a.cloud = 0; a.windMul = 1; a.calm = 0; a.flash = 0; a.fog = 0; a.haze = 0; a.dust = 0;
   a.ox = a.oy = a.oz = 0; a.storm = 0; a.top = null; a.topW = 0; a.topCell = -1; a.topGen = 0; a.front = 0;
+  a.fTopW = 0; a.fCell = -1; a.fGen = 0; a.fRate = 0; a.f2W = 0; a.f2Cell = -1; a.f2Gen = 0; a.f2Rate = 0; a.f3W = 0; a.f3Cell = -1; a.f3Gen = 0; a.f3Rate = 0;
   a.clear = 1; a.conv = 0; a.baseW = 0; a.topH = 0; a.coverSum = 0;
 }
 
@@ -495,6 +497,19 @@ function accumulate(a, c, ux, uy, uz, R) {
     a.rate += rr;
     if (K === KINDS.ice) a.rateIce += rr; else if (K === KINDS.frost) a.rateFrost += rr;
     a.flash += K.flash * core;
+    // (group D: the three cells that give this place most of its lightning, each with its own rate: with the cloud map on,
+    //  the lightning here is theirs, so every flash of a storm over or beside this place lights it, as its bolt is drawn)
+    const fw = K.flash * core;
+    if (fw > a.f3W) {
+      if (fw > a.fTopW) {
+        a.f3W = a.f2W; a.f3Cell = a.f2Cell; a.f3Gen = a.f2Gen; a.f3Rate = a.f2Rate;
+        a.f2W = a.fTopW; a.f2Cell = a.fCell; a.f2Gen = a.fGen; a.f2Rate = a.fRate;
+        a.fTopW = fw; a.fCell = c.i; a.fGen = c.gen; a.fRate = K.flash * c.w;
+      } else if (fw > a.f2W) {
+        a.f3W = a.f2W; a.f3Cell = a.f2Cell; a.f3Gen = a.f2Gen; a.f3Rate = a.f2Rate;
+        a.f2W = fw; a.f2Cell = c.i; a.f2Gen = c.gen; a.f2Rate = K.flash * c.w;
+      } else { a.f3W = fw; a.f3Cell = c.i; a.f3Gen = c.gen; a.f3Rate = K.flash * c.w; }
+    }
   }
   if (K.vis > 0) {
     // A bank of fog, dust or haze. The extinction (in clear-air units) is shaped so that the
@@ -595,7 +610,7 @@ export function liveCells(bodyId, t, seed = DEFAULT_SEED, out = []) {
 }
 // gather over a list made by liveCells (the same numbers gather gives at the same time and place). Returns its accumulator,
 // which the next call overwrites: read what you need from it first.
-const _acc2 = { blow: 0, rate: 0, rateIce: 0, rateFrost: 0, cloud: 0, windMul: 1, calm: 0, flash: 0, fog: 0, haze: 0, dust: 0, ox: 0, oy: 0, oz: 0, storm: 0, top: null, topW: 0, topCell: -1, topGen: 0, front: 0, clear: 1, conv: 0, baseW: 0, topH: 0, coverSum: 0 };
+const _acc2 = { blow: 0, rate: 0, rateIce: 0, rateFrost: 0, cloud: 0, windMul: 1, calm: 0, flash: 0, fog: 0, haze: 0, dust: 0, ox: 0, oy: 0, oz: 0, storm: 0, top: null, topW: 0, topCell: -1, topGen: 0, front: 0, clear: 1, conv: 0, baseW: 0, topH: 0, coverSum: 0, fTopW: 0, fCell: -1, fGen: 0, fRate: 0, f2W: 0, f2Cell: -1, f2Gen: 0, f2Rate: 0, f3W: 0, f3Cell: -1, f3Gen: 0, f3Rate: 0 };
 export function gatherFrom(cells, bodyId, ux, uy, uz) {
   const a = _acc2;
   resetAcc(a);
@@ -882,7 +897,26 @@ export function weatherAt(bodyId, ux, uy, uz, altitude, t, seed, env, o = {}) {
   li.flash01 = 0; li.nextIn = Infinity; li.thunderIn = Infinity; li.thunder01 = 0;
   li.last.t = -1e9; li.last.distance = 1e9;
   if (regime && regime.cells && a.topCell >= 0 && a.flash > 0.05) {
-    lightningFor(bodyId, regime, seed, a.topCell, a.topGen, a.flash, ux, uy, uz, t, atm.c, li, a.topCell === OWN_CELL ? _own : a.topCell === FORCED_CELL && _forced ? forcedCentre() : a.topCell >= LAND_BASE ? landCentre(bodyId, seed, a.topCell, a.topGen, t) : null);
+    // (group D, with the cloud map on: the storm overhead flashes as its own schedule says, the same flashes the cloud map
+    //  lists and the bolts draw (cloudfield.js flashesFor: flashOf, the cell's own rate); before, the place took the cell
+    //  that COVERED it most -- often a storm's wider cloud shield, a different cell -- at the rate gathered here, so the
+    //  flash of light and the bolt in the sky were two different series. Brightness still falls with the distance.)
+    //  (Up to the three storms that flash most here, each on its own schedule: the brightest flash of them, the latest one
+    //  as `last`, the soonest next.)
+    if (WX2.cloudmap && a.fCell >= 0 && a.topCell !== OWN_CELL) {
+      for (let q = 0; q < 3; q++) {
+        const cell = q === 0 ? a.fCell : q === 1 ? a.f2Cell : a.f3Cell;
+        if (cell < 0) continue;
+        const gen = q === 0 ? a.fGen : q === 1 ? a.f2Gen : a.f3Gen, per = q === 0 ? a.fRate : q === 1 ? a.f2Rate : a.f3Rate;
+        const L = _lt; L.flash01 = 0; L.nextIn = Infinity; L.thunderIn = Infinity; L.thunder01 = 0; L.last.t = -1e9; L.last.distance = 1e9;
+        lightningFor(bodyId, regime, seed, cell, gen, per, ux, uy, uz, t, atm.c, L, cell === FORCED_CELL && _forced ? forcedCentre() : cell >= LAND_BASE ? landCentre(bodyId, seed, cell, gen, t) : null);
+        if (L.flash01 > li.flash01) li.flash01 = L.flash01;
+        if (L.nextIn < li.nextIn) li.nextIn = L.nextIn;
+        if (L.last.t > li.last.t) { li.last.t = L.last.t; li.last.x = L.last.x; li.last.y = L.last.y; li.last.z = L.last.z; li.last.distance = L.last.distance; li.thunderIn = L.thunderIn; li.thunder01 = L.thunder01; }
+      }
+    } else {
+      lightningFor(bodyId, regime, seed, a.topCell, a.topGen, a.flash, ux, uy, uz, t, atm.c, li, a.topCell === OWN_CELL ? _own : a.topCell === FORCED_CELL && _forced ? forcedCentre() : a.topCell >= LAND_BASE ? landCentre(bodyId, seed, a.topCell, a.topGen, t) : null);
+    }
   }
 
   // ---- kind: one word for what a person would call it --------------------------------------------
