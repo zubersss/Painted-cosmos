@@ -1556,6 +1556,7 @@ void main() {
     vec3 wr1, wr2; vec2 wds; float wown;
     float wStill = 0.0;      // (how still the water is here, for the new colour below: the new paint's own, 0 in v37's)
     float wChop = 0.0;       // (how much the sea here is a narrow strait's short chop: lane W2, world/shore.js; 0 elsewhere)
+    float wMid = 0.0;        // (how much the far still sea's mid strokes are laid a step off its body: lane W2; 0 elsewhere)
     float wLow = 0.0;        // (how low the eye looks across the water, 0 from the air .. 1 on foot: the new paint's own)
     // (and the churn's own chart, below: it is turned to the current on a far lower floor than the dashes are,
     // because white water must MOVE even in an eddy, where the body of the water is rightly laid still)
@@ -1662,9 +1663,10 @@ void main() {
       // not joined into lines; they lengthen smoothly to the open sea's crests as the fetch grows: the look director.
       // wChop is 0 off the sea, so ponds and lakes keep the 10 above)
       wChop = step(0.75, vOpen) * (1.0 - smoothstep(300.0, 900.0, fetchW));
-      float aspW = still > 0.5 ? mix(10.0, 3.0, wChop) / max(lenF, 0.34) : 6.0;
+      float aspW = still > 0.5 ? mix(10.0, mix(3.5, 5.5, smoothstep(150.0, 600.0, dist)), wChop) / max(lenF, 0.34) : 6.0;      // (the chop longer toward the horizon, 3.5 to 5.5 widths: the look director)
       // (pointed ends on the sea, the look director's note; ponds and rivers keep square ones until F asks for them there)
       gWLens = smoothstep(0.5, 0.75, vOpen) * step(0.5, still);
+      gWLens *= smoothstep(3.5, 5.0, aspW * max(lenF, 0.34));      // (no taper on a short stroke: it broke the near chop into jagged bits -- lane W2, the look director)
       pcWStrokes(wch, wdx, wdy, dS, v0 * (1.0 - still), wo4.x, aspW, woc3, wr1, wr2, wown);
       gWLens = 0.0;
       // (the lace: along the current wherever there is one, at the water's own pace, on its own octaves)
@@ -1801,6 +1803,7 @@ void main() {
       // (the deeper body and the closer steps are THE SEA's, by the look director's ruling on the sea: so, from vOpen, water at
       //  the sea's level. Ponds, lakes and rivers keep the calmer values alone, as water-paint has them by default)
       float sk = wStill * smoothstep(40.0, 220.0, dist) * liq, so = step(0.75, vOpen);      // (only where every pixel takes the sea's level: vOpen 0.75 and over, wpL's own rule)
+      wMid = sk * so;
       c = mix(c, pcDensity(c, 1.45), sk * so);
       // THE SEA'S SPARKLE (the look director, measured: the new sea one mid blue-grey, its value spread half v37's): over the
       // deep body, a few whole light strokes, more and brighter on the sun's side (to about value 0.88, never over 0.90),
@@ -1833,6 +1836,16 @@ void main() {
     vec3 wsun = min(mix(pcOilSunC(), vec3(1.0), 0.35) * 1.06, vec3(1.0));
     float wau = uAuroraK * (1.0 - uDayness);
     vec3 w1 = wr1.x > wThL ? clight : (wr1.x < wThD ? cdeep : c), w2 = wr2.x > wThL ? clight : (wr2.x < wThD ? cdeep : c);
+    #ifdef PC_WPAINT
+    // THE SEA COVERED IN STROKES (lane W2, the look director: the mid strokes were the body's own colour, so the far sea read
+    // as a flat slate plane with sparse dabs floating on it; the references' sea IS its strokes, the body only in the thin
+    // gaps). Far still sea only: the mid strokes a step either side of the body, by their own number; the light and dark
+    // accents as they were.
+    if (wMid > 0.0) {
+      if (wr1.x <= wThL && wr1.x >= wThD) w1 = c * mix(1.0, fract(wr1.z * 7.31) > 0.5 ? 1.12 : 0.88, wMid);
+      if (wr2.x <= wThL && wr2.x >= wThD) w2 = c * mix(1.0, fract(wr2.z * 7.31) > 0.5 ? 1.12 : 0.88, wMid);
+    }
+    #endif
     w1 = wr1.z < 0.34 * wau ? mix(vec3(0.10, 0.74, 0.60), vec3(0.24, 0.96, 0.56), step(0.5, fract(wr1.z * 31.7))) : w1;
     w2 = wr2.z < 0.34 * wau ? mix(vec3(0.10, 0.74, 0.60), vec3(0.24, 0.96, 0.56), step(0.5, fract(wr2.z * 31.7))) : w2;
     w1 = wr1.y < wsp * 1.2 ? wsun : w1; w2 = wr2.y < wsp * 1.2 ? wsun : w2;
