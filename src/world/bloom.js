@@ -124,9 +124,13 @@ export function bloomTint(S, o, x, y, z, bi) {
   if (sw.grass2) {
     const g = swardOf(S, bi);
     if (g && g.floor) {
-      // (the pigment density model, as nearground.js dens: a glaze of the same colour, deeper and richer, never grey)
+      // (a step deeper in VALUE and a little quieter, not richer: LOOK-RULES R2.2 wants the darks deep and quiet, and a glaze
+      // of the same colour -- tried first -- raised the saturation of the meadow's darks from 0.43 to 0.50 seen from 60 m)
       const k = g.floor * Math.min(1, o.under || 0) * (1 - 0.6 * Math.min(1, o.canopy || 0));
-      if (k > 0) { o.r -= (o.r - o.r * o.r) * k; o.g -= (o.g - o.g * o.g) * k; o.b -= (o.b - o.b * o.b) * k; }
+      if (k > 0) {
+        const lum = o.r * 0.3 + o.g * 0.5 + o.b * 0.2, d = 1 - 0.6 * k, q = 1.6 * k;
+        o.r = (o.r + (lum - o.r) * q) * d; o.g = (o.g + (lum - o.g) * q) * d; o.b = (o.b + (lum - o.b) * q) * d;
+      }
     }
   }
   if (!sw.air) return;

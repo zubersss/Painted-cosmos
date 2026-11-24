@@ -94,14 +94,31 @@ commit (the alpine meadow's easel, every change of this lane in).
    NET; about 2,500 more marks in the fine ring, most of them outside the picture and dropped by the cull. DERIVED for
    the phone: about 0 to +0.1 ms. Row: 'no flower heads'.
    NOT DONE IN THIS STEP: the year (the flowers are laid once and do not follow `SEASON`; a ground's colour baked at
-   different moments would seam); A2-A3 (the vista ring's drifts and the comb).
+   different moments would seam).
+6. A2-A3, THE FAR MARKS, AND THE DARKS QUIETER (`nearground.js layVista`: in a drift's heart its first sward drag is
+   the drift's colour, close to the ground's as these drags are, `?vistaink=`; `grassTurn`: on level grass the drags
+   are combed one way -- a westerly wandering a fifth of a turn over 1.5 km --, on a slope they keep the contour, handed
+   over by the slope drag by drag; `bloom.js bloomTint`: the floor under a dense sward a step deeper in VALUE and a
+   little quieter, `oil.flora.sward.floor` 0.06 to 0.10; dark accent blades keep the ground's share they had, 0.6).
+   SEEN (`a-*-flora-off-on.jpg`, all of the lane off against all on): from 60 m and 150 m the change is SUBTLE: the
+   meadow a little deeper in tone with faint pale drift patches; the comb cannot be told by eye in these frames. The
+   look director's numbers (`docs/lead/lookstats.py` on `look-director`, run on the A and B PNGs): the meadow at 1.8 m
+   S(V<.3) 0.96 -> 0.85, V>.90 2.5 -> 1.3 per cent; the autumn landing 0.53 -> 0.52, V>.90 3.1 -> 1.9; from 150 m 0.26
+   -> 0.25 and the whole picture's saturation 0.52 -> 0.46; BUT from 60 m S(V<.3) 0.43 -> 0.47 (the picture as a whole
+   quieter, 0.63 -> 0.55) and in the green wood 0.41 -> 0.46: both under R2.2's 0.50, both raised. The green wood's
+   cause is the shared shade recipe (materials.js `deepO`, R1.2b: a green blade in shade to saturation 0.91) laid on
+   four times the blades; its cure is the look director's shared foliage shade (their build lane L2), not this lane's.
+   A floor deepened as a glaze of its own colour (tried first) raised the meadow's darks to 0.52 from 60 m and was
+   changed to the quieter step above.
 
 **Tests:** `tests/` 325 of 325, `src/world/` + `src/data/looks/` 65 of 65. `src/physics/` 415 of 416: the one failure is
 `loose.test.mjs` P25 ("under the closed wood the litter still puffs: 2"), which is FLAKY ON THE CLEAN COMMIT TOO (it
 failed 1 run in 5 there with none of this lane's changes): reported to the coordinator, not this lane's.
 
-**Next:** A2-A3, the vista ring's drifts and the grass's comb; then the look director's standard set (S1-S6 at 1024 x
-480) with `lookstats.py` for the review; O and F4 wait for the trees lane.
+**Next:** the look director's standard set (S1-S6 at 1024 x 480) with `lookstats.py` for the review; the year for
+the flowers (a uniform that lets a kind's heads go out of season in the vertex shader, no seam); O and F4 wait for the
+trees lane. ASKED OF THE FAR-VIEW LANE through the coordinator: a ground dab that takes a drift's colour WHOLE
+(pointillist) from `bloomAt`, the one thing that would make drifts read from 150 m and a mile.
 
 
 ## Hand-over of THE OIL LOOK, prototype on branch `look-proto` (READ THIS FIRST; kept current)

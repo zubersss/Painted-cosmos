@@ -19,7 +19,7 @@ const K = (a, b) => glazec(pig(a), pig(b));         // two washes laid one over 
 // sees it). Every colour is mixed from the named pigments (M, D above), never a loose number. The fields are described
 // at the head of world/bloom.js. A flower is a step below the explorer's cloak in strength; the cloak leads.
 const FLORA_TF = {      // the green wood: carpets under the open canopy, campion and foxglove at the edges, buttercup in damp glades
-  sward: { floor: 0.18 },
+  sward: { floor: 0.10 },
   blooms: [
     { kind: 'bluebell', shape: 'bell', c: M('ultramarine', 'cobaltViolet', 0.45), head: [0.010, 0.015], stalk: [0.16, 0.30], heads: [3, 6], drift: 8, peak: 22, share: 0.8, hab: { canopy: [0.05, 0.35] } },
     { kind: 'wood anemone', shape: 'rayed', c: D('cobaltViolet', 0.86), eye: M('quinGold', 'lemonYellow', 0.4), head: [0.012, 0.018], stalk: [0.08, 0.16], heads: [1, 1], drift: 6, peak: 26, share: 0.7, hab: { canopy: [0.05, 0.30] } },
@@ -29,7 +29,7 @@ const FLORA_TF = {      // the green wood: carpets under the open canopy, campio
   ],
 };
 const FLORA_AW = {      // the autumn wood: violet against the gold and yellow-green is the floor's own complement
-  sward: { floor: 0.18 },
+  sward: { floor: 0.10 },
   blooms: [
     { kind: 'Michaelmas aster', shape: 'rayed', c: M('cobaltViolet', 'ultramarine', 0.25), eye: M('quinGold', 'cadOrange', 0.2), head: [0.012, 0.019], stalk: [0.28, 0.55], heads: [2, 5], drift: 9, peak: 14, share: 0.9, hab: { canopy: [0.55, 0.05] } },
     { kind: 'harebell', shape: 'bell', c: M('cobaltViolet', 'cobaltBlue', 0.3), head: [0.010, 0.015], stalk: [0.20, 0.36], heads: [1, 3], drift: 7, peak: 12, share: 0.6, hab: { canopy: [0.6, 0.1] } },
@@ -38,7 +38,7 @@ const FLORA_AW = {      // the autumn wood: violet against the gold and yellow-g
   ],
 };
 const FLORA_AM = {      // the alpine meadow: gentian and pinks on the high turf, globe flower in the damp, ox-eye on the dry
-  sward: { floor: 0.15 },
+  sward: { floor: 0.08 },
   blooms: [
     { kind: 'gentian', shape: 'cup', c: M('ultramarine', 'cobaltBlue', 0.3), head: [0.012, 0.019], stalk: [0.04, 0.10], heads: [1, 1], drift: 6, peak: 20, share: 0.8, hab: { height: [120, 380] } },
     { kind: 'alpine aster', shape: 'rayed', c: M('cobaltViolet', 'roseMadder', 0.15), eye: M('quinGold', 'lemonYellow', 0.3), head: [0.014, 0.021], stalk: [0.10, 0.20], heads: [1, 1], drift: 8, peak: 14, share: 0.7 },
@@ -49,7 +49,7 @@ const FLORA_AM = {      // the alpine meadow: gentian and pinks on the high turf
   ],
 };
 const FLORA_SC = {      // the sea cliffs: thrift along the edge, campion on the stony ground, trefoil in the short turf
-  sward: { floor: 0.12 },
+  sward: { floor: 0.07 },
   blooms: [
     // (SEEN, 24 Nov: the cliff top's grass is yellow ochre, and its yellow trefoil and vetch vanished on it. Pink, white and
     // violet are the flowers that show on ochre; the yellow ones are kept few.)
@@ -66,7 +66,7 @@ const FLORA_DC = {      // the desert canyon: sparse, after rain, in the washes 
   ],
 };
 const FLORA_MW = {      // the misty wetland: marigold and iris at the water, loosestrife on the banks, cotton grass over the bog
-  sward: { floor: 0.10 },
+  sward: { floor: 0.06 },
   blooms: [
     { kind: 'marsh marigold', shape: 'cup', c: M('quinGold', 'lemonYellow', 0.3), head: [0.016, 0.024], stalk: [0.12, 0.25], heads: [1, 2], drift: 6, peak: 14, share: 0.9, hab: { wet: [0.4, 0.9] } },
     { kind: 'purple loosestrife', shape: 'spike', c: M('alizarin', 'cobaltViolet', 0.45), head: [0.15, 0.30], stalk: [0.55, 1.0], heads: [1, 1], drift: 10, peak: 4, share: 0.6, hab: { wet: [0.3, 0.8] } },

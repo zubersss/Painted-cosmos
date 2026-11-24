@@ -499,7 +499,7 @@ class Ring {
       const len = (0.09 + 0.34 * q3 * q3) * tsz[tf] * (lead ? 1.5 : 1) * (acc ? 1.2 : 1), wid = 0.020 + 0.018 * q4;
       // most are close to the ground's own value (a little richer, or a little paler: the
       // sunlit and the dry); one in seven is a darker accent, and only those are left crisp
-      const L = st.leafB, c = L ? L[acc ? 2 : pv < 0.55 ? 1 : 0] : null, gm = acc ? st.gmB * 0.73 : st.gmB;
+      const L = st.leafB, c = L ? L[acc ? 2 : pv < 0.55 ? 1 : 0] : null, gm = acc ? Math.max(st.gmB, st.gm) * 0.73 : st.gmB;
       let cr = gr, cg = gg, cb = gb;
       if (c) { cr = lerp(c[0], gr, gm); cg = lerp(c[1], gg, gm); cb = lerp(c[2], gb, gm); }
       if (lead && tall > 0.3 && !acc) { const m = 0.5 * tall; cr = lerp(cr, SEED_HEAD[0], m); cg = lerp(cg, SEED_HEAD[1], m); cb = lerp(cb, SEED_HEAD[2], m); }
@@ -618,7 +618,7 @@ class Ring {
       const lead = k < nT * 2 && q3 > 0.45;
       const pv = (q5 * 9.7) % 1, acc = pv < 0.14;
       const len = (0.09 + 0.34 * q3 * q3) * tsz[tf] * (lead ? 1.5 : 1) * (acc ? 1.2 : 1), wid = 0.020 + 0.018 * q4;
-      const L = st.leafB, c = L ? L[acc ? 2 : pv < 0.55 ? 1 : 0] : null, gm = acc ? st.gmB * 0.73 : st.gmB;
+      const L = st.leafB, c = L ? L[acc ? 2 : pv < 0.55 ? 1 : 0] : null, gm = acc ? Math.max(st.gmB, st.gm) * 0.73 : st.gmB;
       let cr = gr, cg = gg, cb = gb;
       if (c) { cr = lerp(c[0], gr, gm); cg = lerp(c[1], gg, gm); cb = lerp(c[2], gb, gm); }
       if (lead && tall > 0.3 && !acc) { const m = 0.5 * tall; cr = lerp(cr, SEED_HEAD[0], m); cg = lerp(cg, SEED_HEAD[1], m); cb = lerp(cb, SEED_HEAD[2], m); }
@@ -768,6 +768,30 @@ class Ring {
   // (the shader builds a flat touch's own frame from the ground's normal -- materials.js NEAR_VERT, the `lying`
   //  branch: t1 = normalize(n x k) with k the constant below, t2 = n x t1, and the touch runs along
   //  t1*cos(a) + t2*sin(a). The contour is n x uphill, so the turn is that direction read on that frame.)
+  // A3, THE GRASS'S COMB (the flora lane, docs/lead/FLORA-DESIGN.md 9.3; ?grass2=0 off): on level grass the far drags
+  // are laid one way, as the wind combs a meadow, where they lay every way; the comb is a prevailing wind from the west
+  // that wanders slowly (a fifth of a turn either way over a kilometre and a half), and on a slope the drags still run
+  // along the contour (contourTurn), the two handed over by the slope, drag by drag. Seen from the air a meadow is
+  // brushed in one direction and changes it as the land does.
+  grassTurn(q, q2) {
+    const steep = this.steep, k = sstep(0.08, 0.25, steep);
+    if (q2 < k) return this.contourTurn(q);
+    const nx = this.nx, ny = this.ny, nz = this.nz, R = this.S.R;
+    // east on the ground here (as the gallery and the game frame it: Y x up), turned by the slow wander
+    let ex = nz, ey = 0, ez = -nx;                                       // (0, 1, 0) x n
+    let l = Math.hypot(ex, ey, ez); if (!(l > 1e-6)) return this.contourTurn(q);
+    ex /= l; ey /= l; ez /= l;
+    const wx = ny * ez - nz * ey, wy = nz * ex - nx * ez, wz = nx * ey - ny * ex;                 // north = n x east
+    const w = 0.6 * this.S.nC.n3(this.x * R / 1500 + 3.1, this.y * R / 1500 - 7.7, this.z * R / 1500 + 1.3) + (q - 0.5) * 0.4;
+    const dx = ex * Math.cos(w) + wx * Math.sin(w), dy = ey * Math.cos(w) + wy * Math.sin(w), dz = ez * Math.cos(w) + wz * Math.sin(w);
+    // the same frame the shader builds a flat touch in (see contourTurn below)
+    let t1x = ny * 0.4671 - nz * 0.8271, t1y = nz * 0.3126 - nx * 0.4671, t1z = nx * 0.8271 - ny * 0.3126;
+    l = Math.hypot(t1x, t1y, t1z); if (!(l > 1e-7)) return this.contourTurn(q);
+    t1x /= l; t1y /= l; t1z /= l;
+    const t2x = ny * t1z - nz * t1y, t2y = nz * t1x - nx * t1z, t2z = nx * t1y - ny * t1x;
+    return Math.atan2(dx * t2x + dy * t2y + dz * t2z, dx * t1x + dy * t1y + dz * t1z);
+  }
+
   contourTurn(q) {
     const nx = this.nx, ny = this.ny, nz = this.nz, free = q * 6.2832;
     if (this.steep < 0.06) return free;
@@ -864,15 +888,25 @@ class Ring {
     if (st.blade > 0 && this.meadow > 0.15 && left > 0) {
       const n0 = Math.min(left, 1 + (H(380) < st.blade * this.meadow * 1.3 ? 1 : 0));
       const L = st.leaf, tall = sstep(0.52, 0.74, this.rough);
+      // (A2, the flora lane, ?bloom=0 off: where the cell lies in a flower drift's heart, its first drag is the drift's
+      // colour, held close to the ground's as these drags are (`?vistaink=`) but a step nearer the flower the deeper the
+      // heart: from 40 to 190 m the drifts the near rings lay as plants are patches of their colour)
+      let bo = null;
+      if (FLORA.bloom && hasBlooms(this.S, this.bi)) {
+        bo = bloomAt(this.S, this.x, this.y, this.z, s, this.bi, this.bo || (this.bo = { kind: -1, bloom: null, dens: 0, heart: 0 }));
+        if (bo.kind < 0 || bo.dens < 0.3) bo = null;
+      }
       for (let q = 0; q < n0; q++, left--) {
         const q1 = H(381 + q), q2 = H(385 + q), q3 = H(389 + q), q4 = H(393 + q), p = at(q1, q2);
         const v = q4 < 0.38 ? 2 : q4 < 0.74 ? 1 : 0, c = L ? L[v] : null, m = 1 - (1 - st.gm) * ink;
         let cr = gr, cg = gg, cb = gb;
         if (c) { cr = lerp(c[0], gr, m); cg = lerp(c[1], gg, m); cb = lerp(c[2], gb, m); }
         if (v === 0 && tall > 0.2) { const k2 = 0.45 * tall * ink; cr = lerp(cr, SEED_HEAD[0], k2); cg = lerp(cg, SEED_HEAD[1], k2); cb = lerp(cb, SEED_HEAD[2], k2); }
-        const dk = v === 2 ? 1 + 0.14 * ink : v === 1 ? 1 : 1 - 0.12 * ink;
+        let dk = v === 2 ? 1 + 0.14 * ink : v === 1 ? 1 : 1 - 0.12 * ink;
+        if (bo && q === 0) { const fc = bo.bloom.c, mf = Math.min(0.8, (0.35 + 0.5 * bo.dens) * ink); cr = lerp(gr, fc[0], mf); cg = lerp(gg, fc[1], mf); cb = lerp(gb, fc[2], mf); dk = 1; }
+        const turn = FLORA.grass2 ? this.grassTurn(q2, H(397 + q)) : this.contourTurn(q2);
         this.put(p[0], p[1], onLand(p[0], p[1], 0.02), 0, 0, (0.50 + 0.50 * q3) * msz, (1.5 + 1.4 * q1) * msz, LYING, q3, born,
-          dens(cr, dk), dens(cg, dk), dens(cb, dk), this.contourTurn(q2), 0);
+          dens(cr, dk), dens(cg, dk), dens(cb, dk), turn, 0);
       }
     }
     // stones last, and only the ones that are there at all: at 275 m a stone under a metre is nothing, so these
