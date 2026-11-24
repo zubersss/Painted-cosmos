@@ -9,7 +9,8 @@ import { FLORA_GLSL } from '../physics/flora.glsl.js';
 import { WATER_GLSL } from '../physics/water.js';
 import { VERT_PARS, VERT_END, FRAG_PARS, FOG_BANK, PAINT, AIR_FN } from './chunks.js';
 import { SPRAY_GLSL } from './dabtex.js';
-import { WATERCHUNK_GLSL, WPAINT, wpaintOn, benchWPaint } from './waterchunk.js';      // (the water's new paint, ?wpaint=2: lane W3)
+import { WATERCHUNK_GLSL, WPAINT, wpaintOn, benchWPaint, wakesOn, WAKE_U } from './waterchunk.js';      // (the water's new paint, ?wpaint=2, and the player's rings, ?wakes=2: lanes W3, W4)
+import { WAKE2_GLSL } from '../physics/water.js';
 
 // THE LOOK AT THREE HUNDRED YARDS (the owner, 2026-11-22: "better lighting ... i want things to look high quality and
 // fully rendered even from 300 yards away" -- 275 m). What this file does for that is on three dials, read once from
@@ -1117,6 +1118,9 @@ ${WATER_GLSL}
 #if defined(PC_OIL) && defined(PC_WPAINT)
 ${WATERCHUNK_GLSL}
 #endif
+#ifdef PC_WWAKE
+${WAKE2_GLSL}
+#endif
 
 // Mirror the painting itself: march the reflected ray through last frame's depth.
 // Returns uv and a confidence.
@@ -1161,6 +1165,15 @@ void main() {
   // and is given its whitecaps as a few anchored dabs instead.
   vec2 along;
   vec3 wv = pcPhysWaterD(vBody, along) + vWake;
+  #ifdef PC_WWAKE
+  // THE PLAYER'S OWN SMALL WAVES, PER PIXEL (the water group, lane W4, ?wakes=2; physics/water.js WAKES2, physics/splash.js):
+  // a footfall's ring, a swimmer's strokes and bow wave, a low flight's furrow. Worked out here and not at the mesh's
+  // corners, where a ring a metre long between vertices a metre or more apart was mostly lost; only within 30 m of the
+  // eye and only while one is alive (uWWakeN 0: the loop is not entered).
+  vec3 wk2 = vec3(0.0);
+  if (uWWakeN > 0.5 && dist < 32.0) wk2 = pcWake2(pcPhysGrid(vBody)) * (1.0 - smoothstep(22.0, 32.0, dist));
+  wv += wk2;
+  #endif
   // (PHYSICS P18: the sea that is here and the way its waves run, from the sea map: lower and fewer breaking in a bay
   // behind a spit, the crests coming round toward a beach; the reference sea where there is no map)
   vec4 sea = pcPhysSeaLocal(vBody);
@@ -1571,6 +1584,11 @@ void main() {
     wLitN = mix(wr2.x > wThL ? 1.0 : 0.0, wr1.x > wThL ? 1.0 : 0.0, wown);
     wMarkN = mix(wr2.y < wsp * 1.2 ? 1.0 : 0.0, wr1.y < wsp * 1.2 ? 1.0 : 0.0, wown);
     c = mix(w2, w1, wown);
+    #ifdef PC_WWAKE
+    // (the player's own rings, painted: where a ring's face is steep the stroke there takes the light step, in a line
+    // as thin as the ring's own crest; ?wakes=2, physics/splash.js)
+    c = mix(c, clight, smoothstep(0.035, 0.12, length(wk2.yz)) * 0.75 * liq);
+    #endif
     // AERATED WATER, AS PAINT (the owner, 2026-11-23: "airration" -- the white of a rapid, the lace below a fall,
     // the stirred edge where water meets rock). The foam above this is the SEA's, raised by the wind, and the game
     // had no other: nothing anywhere went white because the bed made it. The mesher measures the churn where each
@@ -1647,6 +1665,8 @@ export function makeWaterMaterial(bodyU, skyU) {
   });
   // (the powers, ?powers=1: the water is compiled with the parted channel; without the flag its program is as it was)
   if (MODE.powers) { m.defines.PC_POWERS = 1; m.uniforms.uPwChanA = G.uPwChanA; m.uniforms.uPwChanB = G.uPwChanB; }
+  // (the player's own small waves, ?wakes=2 with the oil look: render/waterchunk.js turns physics' set on)
+  if (wakesOn()) { m.defines.PC_WWAKE = 1; m.uniforms.uWWake = WAKE_U.uWWake; m.uniforms.uWWakeN = WAKE_U.uWWakeN; }
   // (the water's new paint, ?wpaint=2 with the oil look: compiled in behind one uniform the speed test can turn off;
   // without the switch the program is v37's, to the letter. render/waterchunk.js)
   if (wpaintOn()) { m.defines.PC_WPAINT = 1; m.uniforms.uWPaint = WPAINT.uWPaint; benchWPaint(); }

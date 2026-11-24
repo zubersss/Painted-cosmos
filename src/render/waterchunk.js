@@ -12,6 +12,8 @@
 // It needs chunks.js' pcThinR, pcChartToPx and uTime (in every painted fragment shader's FRAG_PARS).
 import { MODE } from '../data/mode.js';
 import { WATER_BENCH } from '../world/waterhooks.js';
+import { WAKES2 } from '../physics/water.js';
+import { SPLASHES } from '../physics/splash.js';
 
 // The new paint is compiled in with the oil look unless ?wpaint=0 (read at use: MODE is set after this module runs). Its
 // level is the uniform: 1 the new strokes (the default since 24 Nov), 2 and the new colour (steps 2-3, under review).
@@ -20,6 +22,17 @@ export function wpaintOn() {
   if (on) WPAINT.uWPaint.value = Math.min(2, MODE.water.wpaint);
   return on;
 }
+
+// THE PLAYER'S OWN SMALL WAVES (lane W4, ?wakes=2) and SPLASHES (?splash=1), with the oil look. Physics keeps their sources
+// (physics/water.js WAKES2, physics/splash.js) but never turns them on itself: the paint does, here, when a water material
+// is made with the switch. The uniforms are physics' own array and live count, read every frame.
+export function wakesOn() {
+  const on = !!(MODE.oil && MODE.water && MODE.water.wakes >= 2);
+  if (on) WAKES2.on = true;
+  if (MODE.oil && MODE.water && MODE.water.splash >= 1) SPLASHES.on = true;
+  return on;
+}
+export const WAKE_U = { uWWake: { value: WAKES2.buf }, uWWakeN: { get value() { return WAKES2.live; }, set value(v) { /* (physics owns it) */ } } };
 
 // 1: the new strokes, 2: and the new colour, 0: v37's. The same object in every water material, so one write switches them all.
 export const WPAINT = { uWPaint: { value: 1 } };

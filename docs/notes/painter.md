@@ -82,6 +82,24 @@ at the bank view (936 x 372, `&t=5`) 0 pixels differ from the build before steps
 liquid but whose levels spread over 2 m and over half the cell (a face steeper than 1 in 2), only with a water world
 switch (`MODE.water.on`). MEASURED over all 30,720 patches of levels 5 and 6 and 800 of 7 and 8: 0 dropped in today's
 world, with or without the drainage.
+
+**Step 4 (24 Nov), `?wakes=2` and `?splash=1`: the player and the water.** PHYSICS (1cca92d): `physics/water.js` WAKES2, 32
+per-pixel sources with a kind (bow, footfall, stroke, press) kept apart from the 16 per-vertex wakes; `physics/splash.js`
+`stepWaterPlay` (rings at each footfall in water over 3 cm, two at the hands each arm stroke, a furrow under a low fast
+flight, a crown of spray going in at speed, flecks at footfalls, a trail low over water; `wet01`; `here.water` for the
+audio); `index.js` single points (the explorer's call in the wake block, `_dEx.phys`, `here.water`). PAINT: `WAKE2_GLSL`
+summed per pixel within 30 m in `WATER_FRAG` (`PC_WWAKE`), the ring's steep faces taking the light step; `waterchunk.js`
+`wakesOn` turns physics' switches on with the material. SEEN IN THE REAL GAME (headless, 936 x 372, the explorer put on the
+landing brook's bank and walked in with synthetic W key events on the document; then dropped 3.5 m into the brook):
+`s4-game-wading-in-3-frames.jpg` (footfall rings counted 1 to 6, wet01 0 to 0.98, the wading spray), `s4-game-dropped-in-
+splash-and-rings.jpg` (entry at 3.9 m/s: splash 0.58, 70 spray drops, crisp rings spreading round the figure),
+`s4-game-wading-rings-crop-ab.jpg`. NOT SEEN: the swimmer's stroke V (the brook is waist deep: no swimming there), the
+low flight's furrow, the gust and tornado. The script is in the scratch (lab: open the game, `bank.js` puts the explorer,
+`walk.sh` presses W and steps `__pc.step(0.1, 2)`, reads WAKES2 and `here.water`). For PILOT: `physics.here.water`
+{ near, submerged, wet01, splash, speed, fallD, fallDrop, rainOn } -- the audio's voices; the figure's paint can read
+`wet01`. Phone cost DERIVED (not measured): the ring sum is about 30 instructions a source a pixel, only within 30 m
+and only while a ring lives; a wader keeps 10 to 16 alive.
+
 NOT done of FV5: shore-tangent dashes (they would bring the whorl back; the design lays still water along the wind)
 and the shore hairline (the owner's rule: no outlines) -- both said to C; the current made visible from 400 m.
 
