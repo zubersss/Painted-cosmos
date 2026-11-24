@@ -34,7 +34,7 @@ export default {
   //   own flat cloud lifted to the altocumulus this far over the land, keeping this share of its cover; cirrus: the high
   //   cloud's share where the map has none (sky.js A4); rainbow: 0 never (A9); deck, valley,
   //   towers, cumulus: switches and heights for the pieces as WEATHER-DESIGN 3 sets them (the map gives the deck's).
-  weather: { cumulus: 1, fair: 0.36, base: [300, 380], towers: 1, deck: [180, 260], valley: 1, alto: 1000, altoShare: 0.45, cirrus: 0.25, rainbow: 1, ceiling: [2800, 6000] },
+  weather: { cumulus: 1, fair: 0.36, base: [300, 380], towers: 1, deck: [180, 260], valley: 1, alto: 1000, altoShare: 0.75, cirrus: 0.25, rainbow: 1, ceiling: [2800, 6000] },
   visibility: [185, 2600],   // metres at ground level, and from high up
   sky: EARTH_SKY,
   // (the oil look: Earth takes the look's golden hours whole: its wood is the owner's reference clip's)

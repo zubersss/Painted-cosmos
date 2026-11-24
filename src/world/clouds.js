@@ -9,9 +9,10 @@
 //
 // PAINTED, NOT RENDERED. A lobe is not lit as a ball: its normal is bent toward the direction from its CLOUD's centre,
 // so a whole cloud is lit as one rounded mass and its lobes read as bumps on it. The light is then laid in FOUR FLAT
-// TONES (the lit top, a half-tone, the belly, the deep belly) and a thin rim where the sun is behind a thin edge, built
-// from the world's own keys exactly as the sky's own painted cloud is (sky.js), so every world and every hour keeps its
-// palette. The tone is chosen once per STROKE (the look's own thin strokes, chunks.js pcThinLayer, laid on each lobe's
+// TONES as the look director set them (24 Nov): the lit top in the light's own colour, warm at the golden hours; the
+// half-tone the sky's own blue-grey a step under it; the belly a further step down in the zenith key's hue; a deep tone
+// only inside a storm (slate and indigo from the world's heavy-weather pigment, the lit flank keeping the light). All of
+// it from the world's own keys, so every world and every hour keeps its palette; no line round anything. The tone is chosen once per STROKE (the look's own thin strokes, chunks.js pcThinLayer, laid on each lobe's
 // own sphere and held at about 6 to 13 pixels on the screen), from the light at the stroke's centre, so the borders
 // between tones are broken along the strokes' edges: crisp, no gradient, no outline.
 //
@@ -31,8 +32,8 @@
 //
 // SWITCHES (oil look only; the hook in world/index.js fetches this module only where ?clouds3d= asks):
 //   ?clouds3d=1   the cumulus;  2 (later) the towers' anvils and shelf
-//   ?cloudlobes=  the lobes' bend toward the cloud's centre (0 balls .. 1 one mass; 0.72)
-//   ?cloudslot=   the lattice's spacing in metres (220)
+//   ?cloudlobes=  the lobes' bend toward the cloud's centre (0 balls .. 1 one mass; 0.85)
+//   ?cloudslot=   the lattice's spacing in metres (380)
 //   ?cloudfair=   the fair-weather share where the map says nothing (default: the world's own)
 //   ?cloudsize=   a multiple of the clouds' size (1)
 //   ?deck=0       no deck (A3);  ?valleycloud=0 no valley cloud (A5; 1.6 forces a cover of 0.6, for looking before the map
@@ -54,15 +55,16 @@ const _gf = (v) => { const s = (+v).toFixed(4); return s; };
 
 export const CLOUDS = {
   mode: Math.max(0, _qn('clouds3d', 1)),
-  lobeBend: Math.max(0, Math.min(1, _qn('cloudlobes', 0.72))),
-  slot: Math.max(80, _qn('cloudslot', 220)),
+  lobeBend: Math.max(0, Math.min(1, _qn('cloudlobes', 0.85))),
+  slot: Math.max(80, _qn('cloudslot', 380)),
   fair: _qs && _qs.has('cloudfair') ? Math.max(0, Math.min(1, _qn('cloudfair', 0.35))) : null,
   size: Math.max(0.2, _qn('cloudsize', 1)),
   deck: _qn('deck', 1) > 0,                      // ?deck=0: no deck (A3)
-  valley: _qn('valleycloud', 1),                 // ?valleycloud=0: none; a number over 1 forces that much cover (0..1 as v - 1), for looking (A5)
+  valley: _qn('valleycloud', 1),
+  skyfix: _qn('skyfix', 1) > 0,                  // ?skyfix=0: the look director's audit items in sky.js left as they were                 // ?valleycloud=0: none; a number over 1 forces that much cover (0..1 as v - 1), for looking (A5)
   rebuild: 0.5,           // s between rebuilds of the instances (the drift itself is the group's turn, every frame; a lobe grows over tens of seconds, so twice a second is smooth)
   maxLobes: 6144,         // instances a level of detail holds at most
-  sagPx: 1.4,             // how far a lobe's outline may stand off the true round, in pixels, before the next level is taken
+  sagPx: 2.2,             // how far a lobe's outline may stand off the true round, in pixels, before the next level is taken (its noise hides that much)
   life: [150, 360],       // s: a cumulus' life (the painter's clock)
 };
 
@@ -133,12 +135,17 @@ void main() {
   float hb = dot(p - iB.xyz, up) + iB.w;
   float base = 0.0;
   if (hb < 0.0) { p -= up * hb; hb = 0.0; base = 1.0; }
-  // the painted normal: the lobe's own, bent toward the direction from a point a little below the cloud's centre (so the
-  // top reads round and the sides turn down), and on the base straight down
-  vec3 cen = iB.xyz - up * iB.w * 0.35;
+  // the painted normal: the lobe's own, bent toward the direction from a point just over the cloud's BASE (so all of the
+  // heap above the shelf faces up and out, toward the light, and only the flat base faces down: the lit top dominates, the
+  // review of 24 Nov; bent toward the cloud's middle, a far cloud seen from below was its grey belly all over), and on
+  // the base straight down
+  vec3 cen = iB.xyz - up * iB.w * 0.90;
   vec3 nl = normalize(off + up * dot(off, up) * (1.0 - iD.x));
   vec3 np = normalize(mix(nl, normalize(p - cen), uCloudBend));
-  vNP = normalize(mix(np, -up, base));
+  // (the flat base is told in the fragment by its height, which is exactly 0 across it: a vertex pressed onto the base and
+  // given the base's normal bent every triangle of a shelf lobe's side down with it, and the coarse far lobes, a triangle
+  // or two tall, were all belly whichever way the sun stood: the grey saucers of the reworked stills)
+  vNP = np;
   vNV = normalMatrix * vNP;
   { vec3 h = p - iB.xyz; h -= up * dot(h, up); vAxis = length(h) / max(iD.y * 0.9, 1.0); }
   // the stroke frame: the pole, and two axes round it
@@ -214,65 +221,63 @@ void main() {
   float sunK = clamp(PC_AT(vAirSun.y, ds), 0.0, 1.0);
   vec3 sun = normalize(uCloudSun);
   float lam = dot(nS, sun);
-  float down = smoothstep(0.55, 0.85, -dot(nS, normalize(vUp)));
-  // (the light across the form, as far as the sun reaches; the lower sides a little deeper; the flat base never deeper
-  // than the belly, which is lit by the sky and the land below it: the deepest paint is for the sides turned away)
-  float x = (lam * 0.5 + 0.5) * mix(0.42, 1.0, sunK) - (1.0 - smoothstep(0.0, 0.40, hS)) * 0.10 * (1.0 - down);
-  // (the base seen from below in three values, as a painter lays a cloud's underside: the core, where the cloud is
-  // thickest, the deep belly; a ring of the belly round it; the thin edge a half-tone (the outline rule below). Laid as one
-  // tone, a cloud from below counted a single value step, criterion 2 of the design's 4.4)
+  vec3 upV = normalize(vUp);
+  // (a far cloud is painted as its lit shape over a thin darker base, as a painter simplifies a distant cumulus: past a
+  // kilometre or so the base gives way to the light. Without it a far cloud seen a little from below was a grey saucer
+  // with a cream rim, the reworked stills of 24 Nov)
+  float onBase = 1.0 - smoothstep(0.004, 0.02, hS);
+  float down = max(smoothstep(0.55, 0.85, -dot(nS, upV)), onBase) * (1.0 - 0.75 * smoothstep(1200.0, 3500.0, dist));
+  float st = clamp(max(vK.z, uWxSky.y), 0.0, 1.0);
+  // THE LIGHT ACROSS THE FORM (the review of 24 Nov: the lit top must dominate, the base flat and darker, the heap
+  // building upward). Lit by the sun as far as it reaches, and from above whatever the hour, as a painter lights a
+  // cumulus; the lower sides a step deeper; the flat base one darker shelf, the belly, deeper at its core only in a storm.
+  // (and the sides lifted: light scattered through the cloud keeps a cumulus' turned-away flank a half-tone, not its belly;
+  // only the flat base goes to the belly. Without it a field of cumulus seen from below was grey shelves with a cream cap)
+  float x = (lam * 0.5 + 0.5) * mix(0.40, 1.0, sunK) + 0.18 * max(dot(nS, upV), 0.0) * uAtmo.y * mix(0.5, 1.0, sunK)
+          + 0.12 * (1.0 - abs(dot(nS, upV))) * uAtmo.y + 0.14 * smoothstep(1200.0, 3500.0, dist) * uAtmo.y * (1.0 - st);
+  x -= (1.0 - smoothstep(0.0, 0.40, hS)) * 0.10 * (1.0 - down);
   float core = 1.0 - smoothstep(0.35, 0.75, PC_AT(vAxis, ds));
-  x = mix(x, mix(0.25, 0.06, core), down);
-  // (and a painter's cloud is lit from above whatever the hour: what faces up takes a share of the light, sky.js does
-  // the same; with the sun behind the clouds, as most of the stations look, the first stills were all belly)
-  x += 0.14 * max(dot(nS, normalize(vUp)), 0.0) * uAtmo.y;
+  x = mix(x, 0.22 - 0.16 * core * st, down);
   float xN = x + (rndN.z - 0.5) * 0.10;
   x += (rnd.z - 0.5) * 0.10;
-  // the rim: an edge seen nearly side-on, with the sun behind the cloud, catches the light through its thin edge
+  // (a cloud's outline against the sky is never its deepest paint: the thin edge a step lighter than the body behind it.
+  // There is no line drawn round anything: a lit edge is a tone of the strokes, not a rim)
   float side = 1.0 - abs(dot(nS, vdir));
-  float behind = smoothstep(0.15, 0.75, dot(sun, vdir)) * sunK * uAtmo.y;
-  float rim = step(0.86, side + (rnd.y - 0.5) * 0.08) * step(0.3, behind) * step(rnd.x, 0.75);
-  // (a cloud's outline against the sky is never its deepest paint: seen from below with the sun behind the eye, the far
-  // side of every lobe turned away and laid a dark crescent round it, which read as an outline; the thin edge is a
-  // half-tone, as the sky's own cloud lets its thin edges be light)
   float sil = smoothstep(0.80, 0.90, side) * (1.0 - 0.6 * down);
-  x = mix(x, max(x, 0.46), sil); xN = mix(xN, max(xN, 0.46), sil);
-  // (the base seen from below is not one flat lilac: a stroke in six or so takes the half-tone, the light the land
-  // throws back up into it, as a painter flecks a cloud's belly; the first stills' bases were cut-outs)
-  x = mix(x, max(x, 0.46), down * step(rnd.x, 0.16)); xN = mix(xN, max(xN, 0.46), down * step(rndN.x, 0.16));
-  // THE FOUR TONES (sky.js THE CLOUD'S THREE TONES, and a deeper one): the lit top a neutral grey-white 0.78 with a
-  // breath of the light; the half-tone the world's cloud-shadow key; the belly that key with a third of the sky's own
-  // middle in it; the deep belly a step below in value, a fifth to its grey
+  // (with the sun behind the cloud the thin edge takes the light itself, the silver lining, a tone of the strokes over the
+  // grey body; across the sun's line a half-tone)
+  float backlit = smoothstep(0.2, 0.7, dot(sun, vdir)) * sunK * uAtmo.y;
+  float edgeX = mix(0.40, 0.56, backlit);
+  x = mix(x, max(x, edgeX), sil); xN = mix(xN, max(xN, edgeX), sil);
+  // (and a stroke in six or so in the base takes the half-tone: the light the land throws back up into it)
+  x = mix(x, max(x, 0.40), down * step(rnd.x, 0.16)); xN = mix(xN, max(xN, 0.40), down * step(rndN.x, 0.16));
+  // THE TONES (the look director's palette, 24 Nov): the lit top in THE LIGHT'S OWN COLOUR, warm at the golden hours;
+  // the half-tone the sky's own blue-grey a step under it; the belly that blue-grey a further step down, the zenith key's
+  // hue, never violet; the deep only inside a storm. About 0.82, 0.70 and 0.58 in luminance by day: three value steps.
   vec3 sunC = mix(pow(uLight, vec3(uOilA.z)), vec3(1.0, 0.84, 0.52), 0.75 * pcGold());
-  vec3 midS = mix(pcCloudDens(uSkyZenith, 1.0 + 0.45 * uAtmo.y), uSkyHorizon, 0.62);
-  vec3 cTop = mix(vec3(0.78, 0.78, 0.785), uSkyHorizon, 0.18) * mix(vec3(1.0), sunC, 0.30);
-  // (the steps are steps of VALUE, as the sky's own cloud lays them: half-tone, belly and deep about 0.68, 0.60 and 0.48 in
-  // luminance under a lit top of 0.78. Laid lighter, every tone of a cloud measured within 0.73 to 0.80 -- one value,
-  // the form told by hue alone: criterion 2 of the design's 4.4 counted a single step, 24 Nov)
-  vec3 cHalf = pcCloudDens(uCloudShade, 1.85);
-  cHalf = mix(cHalf, vec3(dot(cHalf, vec3(0.3, 0.5, 0.2))), 0.20);
-  vec3 cBase = mix(pcCloudDens(cHalf, 1.35), midS, 0.10);
-  cBase = mix(cBase, vec3(dot(cBase, vec3(0.3, 0.5, 0.2))), 0.22);
-  vec3 cDeep = mix(pcCloudDens(cBase, 1.8), vec3(dot(cBase, vec3(0.3, 0.5, 0.2)) * 0.62), 0.24);
-  vec3 cRim = min(mix(cTop, sunC, 0.45) * 1.06, vec3(0.86));
-  // a storm's cloud: the bellies go to the world's heavy-weather pigment, the tops a half-tone
-  float st = clamp(max(vK.z, uWxSky.y), 0.0, 1.0);
-  cDeep = mix(cDeep, pcCloudDens(uStormWash, 1.30), st * 0.85);
-  cBase = mix(cBase, pcCloudDens(uStormWash, 1.15), st * 0.70);
-  cTop = mix(cTop, mix(cHalf, cTop, 0.55), st * 0.6);
-  // (the deep belly only well round the shaded side: at 0.16 it lay as a dark crescent along every lobe's join seen
-  // from below, which read as an outline, the stills of 24 Nov)
-  vec3 c1 = x > 0.54 ? cTop : x > 0.38 ? cHalf : x > 0.09 ? cBase : cDeep;
-  vec3 c2 = xN > 0.54 ? cTop : xN > 0.38 ? cHalf : xN > 0.09 ? cBase : cDeep;
-  c1 = mix(c1, cRim, rim);
+  vec3 zh = uSkyZenith / max(dot(uSkyZenith, vec3(0.3, 0.5, 0.2)), 1e-3);
+  vec3 cTop = mix(vec3(0.82), sunC * 0.84, 0.50);
+  // (a LIGHT half-tone: with the sun behind a cloud, as most stations look, its turned-away flank is what the eye sees, and
+  // at 0.70 a field of cumulus read as grey bodies under cream caps; 0.77 keeps the step and lets the lit top lead)
+  vec3 cHalf = mix(mix(vec3(1.0), zh, 0.20) * 0.77, uSkyHorizon * 0.80, 0.20);
+  vec3 cBase = mix(vec3(1.0), zh, 0.30) * 0.62;
+  // a storm: the shade goes to the world's heavy-weather pigment, slate and indigo, and only there a deep tone; the
+  // lit flank keeps the light (the coordinator: a dark slate tower with a sunlit flank)
+  vec3 cDeep = mix(cBase * 0.82, pcCloudDens(uStormWash, 1.30), 0.8);
+  cHalf = mix(cHalf, pcCloudDens(mix(uStormWash, cHalf, 0.35), 1.05), st * 0.75);
+  cBase = mix(cBase, pcCloudDens(uStormWash, 1.18), st * 0.85);
+  cTop = mix(cTop, cTop * 0.92, st);
+  vec3 c1 = x > 0.48 ? cTop : x > 0.32 ? cHalf : (x > 0.10 || st < 0.05) ? cBase : cDeep;
+  vec3 c2 = xN > 0.48 ? cTop : xN > 0.32 ? cHalf : (xN > 0.10 || st < 0.05) ? cBase : cDeep;
   vec3 c = mix(c2, c1, own);
-  // THE GOLDEN HOURS, as the sky lays them over its own cloud (sky.js: the whole sky warms, most of all low down): a cloud
-  // left out of it stood lilac against a gold sky at 16:30, the first stills. Three fifths of the sky's, so the form stays.
+  float topK = mix(step(0.48, xN), step(0.48, x), own);
+  // THE GOLDEN HOURS, as the sky lays them over its own cloud (sky.js: the whole sky warms, most of all low down): the lit
+  // top takes nearly all of it, the shade under half, so the form stays while the cloud goes warm with its sky.
   {
-    float sunE = dot(sun, normalize(vUp));
+    float sunE = dot(sun, upV);
     float gold = (1.0 - smoothstep(0.48, 0.86, sunE)) * uAtmo.y * (1.0 - uAtmo.x) * (1.0 - uWxSky.x) * uOilG.w;
-    float eV = dot(vdir, normalize(vUp));
-    c = mix(c, vec3(0.92, 0.80, 0.58), gold * mix(0.80, 0.45, smoothstep(0.0, 0.7, eV)) * 0.6);
+    float eV = dot(vdir, upV);
+    c = mix(c, vec3(0.92, 0.80, 0.58), gold * mix(0.80, 0.45, smoothstep(0.0, 0.7, eV)) * mix(0.42, 0.90, topK));
   }
   // by night a cloud is a flat shape a step lighter than the sky it lies in, with no lit side (sky.js, the oil night)
   vec3 nightC = mix(mix(uSkyZenith, uSkyHorizon, 0.5), uSkyHorizon, 0.30) * (0.92 + 0.10 * hS);
@@ -409,34 +414,34 @@ void main() {
   vec3 sun = normalize(uCloudSun);
   float se = dot(sun, up);
   float sunK = vSun;
+  // (the same palette as the lobes, the look director's of 24 Nov: the light's own colour on top, the sky's blue-grey a step
+  // under it, a further step for the belly in the zenith key's hue, a deep only in a storm)
   vec3 sunC = mix(pow(uLight, vec3(uOilA.z)), vec3(1.0, 0.84, 0.52), 0.75 * pcGold());
-  vec3 midS = mix(pcShDens(uSkyZenith, 1.0 + 0.45 * uAtmo.y), uSkyHorizon, 0.62);
-  vec3 cTop = mix(vec3(0.78, 0.78, 0.785), uSkyHorizon, 0.18) * mix(vec3(1.0), sunC, 0.30);
-  vec3 cHalf = pcShDens(uCloudShade, 1.85);
-  cHalf = mix(cHalf, vec3(dot(cHalf, vec3(0.3, 0.5, 0.2))), 0.20);
-  vec3 cBase = mix(pcShDens(cHalf, 1.35), midS, 0.10);
-  cBase = mix(cBase, vec3(dot(cBase, vec3(0.3, 0.5, 0.2))), 0.22);
-  vec3 cDeep = mix(pcShDens(cBase, 1.8), vec3(dot(cBase, vec3(0.3, 0.5, 0.2)) * 0.62), 0.24);
+  vec3 zh = uSkyZenith / max(dot(uSkyZenith, vec3(0.3, 0.5, 0.2)), 1e-3);
+  vec3 cTop = mix(vec3(0.82), sunC * 0.84, 0.50);
+  vec3 cHalf = mix(mix(vec3(1.0), zh, 0.20) * 0.70, uSkyHorizon * 0.74, 0.20);
+  vec3 cBase = mix(vec3(1.0), zh, 0.30) * 0.58;
+  vec3 cDeep = cBase;
   float st = clamp(max(vDeck.z, uWxSky.y * (1.0 - uShellK.x)), 0.0, 1.0);
   // (a storm's ceiling a step lighter than its heaviest pigment: the sky is the light of a rain picture and its darks stay
-  // over the wood's, PAINTER 16/17; laid at full weight the first stills' storm was one dark indigo lid)
-  vec3 sDeep = pcShDens(uStormWash, 1.18), sBase = pcShDens(mix(uStormWash, cHalf, 0.25), 1.0), sHalf = mix(pcShDens(uStormWash, 0.80), cHalf, 0.45);
-  cDeep = mix(cDeep, sDeep, st * 0.85);
-  cBase = mix(cBase, sBase, st * 0.70);
-  cHalf = mix(cHalf, sHalf, st * 0.60);
+  // over the wood's, PAINTER 16/17)
+  cDeep = mix(cDeep, pcShDens(uStormWash, 1.18), st);
+  cBase = mix(cBase, pcShDens(mix(uStormWash, cHalf, 0.25), 1.0), st * 0.75);
+  cHalf = mix(cHalf, mix(pcShDens(uStormWash, 0.80), cHalf, 0.45), st * 0.6);
   float jit = (rnd.y - 0.5) * 0.10;
   vec3 c;
   if (below > 0.5) {
-    // FROM BELOW: the ROLLS, three flat tones laid by the mass itself (the thin of the roll a half-tone, its body the
-    // belly, its heaviest the deep), a storm a step heavier throughout; the thin edges of a gap lit when the sun is over
-    // the sheet (the light comes through them)
-    float x = mS + jit + 0.18 * st;
-    c = x > 0.66 ? cDeep : x > 0.42 ? cBase : cHalf;
-    float rim = (1.0 - smoothstep(0.0, 0.08, eS)) * step(0.0, se) * sunK * uAtmo.y * (1.0 - 0.7 * st);
-    c = mix(c, mix(cTop, sunC, 0.25), step(0.5, rim + (rnd.x - 0.5) * 0.4));
+    // FROM BELOW (the review of 24 Nov: a storm's ceiling broken into two or three big masses with lighter gaps): the big
+    // field that cuts the gaps sets the masses -- where it runs thin a lighter seam, a half-tone, even where the sheet is
+    // closed; its body the belly; the rolls only move a stroke a step either way; a deep only in a storm's heaviest
+    float hS2 = PC_AT(hm, ds);
+    float x = smoothstep(0.30, 0.62, hS2) * 0.8 + (mS - 0.5) * 0.35 + jit;
+    c = x > 0.72 && st > 0.05 ? cDeep : x > 0.34 ? cBase : cHalf;
+    // the gaps' own edges, where the sun is over the sheet: a step lighter (the light comes through them), never a line
+    float thin = (1.0 - smoothstep(0.0, 0.10, eS)) * step(0.0, se) * sunK * uAtmo.y * (1.0 - 0.7 * st);
+    c = mix(c, cHalf, step(0.5, thin + (rnd.x - 0.5) * 0.4));
   } else {
     // FROM ABOVE: a lit top in heaps (the mass is its relief), the hollows a half-tone; the sun's height lights the whole
-    float thick = clamp(eS / 0.30, 0.0, 1.0);
     float x = (0.55 + 0.45 * se) * mix(0.35, 1.0, sunK) + (mS - 0.5) * 0.40 + jit;
     c = x > 0.50 ? cTop : x > 0.30 ? cHalf : cBase;
   }
@@ -540,29 +545,40 @@ function hash(a, b, c) {
 }
 const smooth = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 
-// A cloud's lobes in its own units (x, z across in units of its radius; y up in units of its thickness; r in units of its
-// radius), the core first: a far cloud draws the first few. aspect: thickness over radius at birth.
+// A cloud's lobes in its own units (x, z across and r in units of its radius; y up in units of its thickness; sq how far
+// the lobe is squashed along up), built as a painter builds a cumulus: A CAULIFLOWER ON A SHELF (the review of 24 Nov:
+// "not a bunch of grapes"). The shelf: a ring of wide lobes whose centres sit ON the base plane, squashed, so half of
+// each is cut by it and the cloud stands on one flat base; the body over it, narrower; the heap on top, smaller lobes
+// building upward round the middle. The shelf first, then the body, then the heap: a far cloud draws the first few and
+// is a flat strip, as perspective lays a far cumulus, never a round pill. aspect: thickness over radius at birth.
 function makeTemplate(slot, gen, aspect) {
   const L = [];
-  const K = Math.max(2, Math.min(7, Math.round(aspect / 0.62)));     // tiers from base to top
   const H = (j) => hash(slot, gen * 131 + j, 77);
   let j = 0;
-  for (let k = 0; k < K; k++) {
-    const f = K > 1 ? k / (K - 1) : 0;
-    const n = Math.max(1, Math.round(5.2 - 3.6 * f + (H(j++) - 0.5) * 1.5));
-    const ring = 0.56 - 0.36 * f;
-    const rr = 0.46 - 0.16 * f;
-    const a0 = H(j++) * Math.PI * 2;
+  // the shelf
+  const ns = 6 + Math.floor(H(j++) * 3), a0 = H(j++) * Math.PI * 2;
+  for (let i = 0; i < ns; i++) {
+    const a = a0 + (i + (H(j++) - 0.5) * 0.5) * Math.PI * 2 / ns, rg = 0.58 * (0.8 + 0.4 * H(j++));
+    L.push({ x: Math.cos(a) * rg, z: Math.sin(a) * rg, y: 0.0, r: 0.44 * (0.85 + 0.3 * H(j++)), sq: 0.55, k: 0 });
+  }
+  L.push({ x: 0, z: 0, y: 0.04, r: 0.55, sq: 0.55, k: 0 });
+  // the body: one tier for a fair cumulus, more for a tower
+  const nb = Math.max(1, Math.min(5, Math.round(aspect / 0.9)));
+  for (let t = 0; t < nb; t++) {
+    const f = (t + 1) / (nb + 1), n = 4 + Math.floor(H(j++) * 2), b0 = H(j++) * Math.PI * 2;
     for (let i = 0; i < n; i++) {
-      const a = a0 + (i + (H(j++) - 0.5) * 0.6) * Math.PI * 2 / n;
-      const rg = ring * (0.75 + 0.5 * H(j++));
-      L.push({ x: Math.cos(a) * rg, z: Math.sin(a) * rg, y: (k === 0 ? 0.02 : 0.10 + 0.70 * f) + (H(j++) - 0.5) * 0.06, r: rr * (0.82 + 0.36 * H(j++)), k });
+      const a = b0 + (i + (H(j++) - 0.5) * 0.6) * Math.PI * 2 / n, rg = (0.34 - 0.10 * f) * (0.7 + 0.6 * H(j++));
+      L.push({ x: Math.cos(a) * rg, z: Math.sin(a) * rg, y: 0.18 + 0.50 * f + (H(j++) - 0.5) * 0.05, r: (0.40 - 0.06 * f) * (0.85 + 0.3 * H(j++)), sq: 0.9, k: 1 });
     }
   }
-  // the cap: one lobe on top, a little off the middle
-  L.push({ x: (H(j++) - 0.5) * 0.3, z: (H(j++) - 0.5) * 0.3, y: 0.86, r: 0.30 + 0.08 * H(j++), k: K });
-  // the core first (biggest, lowest, nearest the middle), the small heaped lobes last
-  L.sort((a, b) => (b.r - 0.25 * Math.hypot(a.x, a.z) - 0.1 * a.k) - (a.r - 0.25 * Math.hypot(b.x, b.z) - 0.1 * b.k));
+  // the heap: smaller lobes round the middle, building upward, and the cap
+  const nh = 3 + Math.floor(H(j++) * 3);
+  for (let i = 0; i < nh; i++) {
+    const a = H(j++) * Math.PI * 2, rg = 0.22 * H(j++);
+    L.push({ x: Math.cos(a) * rg, z: Math.sin(a) * rg, y: 0.62 + 0.18 * H(j++), r: 0.24 + 0.08 * H(j++), sq: 0.95, k: 2 });
+  }
+  L.push({ x: (H(j++) - 0.5) * 0.2, z: (H(j++) - 0.5) * 0.2, y: 0.80, r: 0.26 + 0.06 * H(j++), sq: 0.95, k: 3 });
+  // (the order: the shelf, the body, the heap, as built)
   return L;
 }
 
@@ -712,7 +728,7 @@ export function createClouds(scene) {
   const shState = { on: false, frame: 0, h: 2000, sun: new THREE.Vector3(0, 1, 0), centre: new THREE.Vector3(), fwd: new THREE.Vector3(), Rg: 4000, has: false, mats: null };
   const _cc = new THREE.Color(), _sp = new THREE.Vector3(), _st = new THREE.Vector3(), _su = new THREE.Vector3(), _sx = new THREE.Vector3();
   const self = {
-    eyeInCloud01: 0, enabled: true,
+    eyeInCloud01: 0, enabled: true, shadowK: 1,
     group, meshes, deck, valley, stats: { clouds: 0, lobes: 0, tris: 0, ms: 0 },
     shadowTarget: shadowRT,
   };
@@ -811,13 +827,15 @@ export function createClouds(scene) {
       // sky above 2 degrees, the land left out): the world's fair 0.45 covers 19 per cent of it, 0.55 about 30, 0.75 about
       // half, the design's 4.4 criterion 1: fair at most 25, building 30 to 60)
       const own = hash(k, gen, 11);
-      const s = env * smooth(own - 0.12, own + 0.12, cover * (0.55 + 0.35 * smooth(0.40, 0.80, cover)));
+      const s = env * smooth(own - 0.12, own + 0.12, cover * (0.62 + 0.45 * smooth(0.40, 0.80, cover)));
       if (s < 0.04) continue;
       // its size: a fair cumulus 70 to 150 m across the base's radius, more under a fuller sky; its thickness the map's
       // (towers in a storm's cell) or a fair one's
       // (fair cumulus are wider than they are tall: humilis; a thicker map makes them towers)
-      let Rc = (70 + 80 * hash(k, gen, 13)) * (0.75 + 0.5 * cover) * (0.55 + 0.45 * s) * CLOUDS.size;
-      const fairT = Rc * (0.75 + 0.75 * hash(k, gen, 17));
+      // (fewer and bigger, the review of 24 Nov: many small clouds read as stickers. A fair cumulus 110 to 240 m across its
+      // shelf's radius, wider than it is tall)
+      let Rc = (110 + 130 * hash(k, gen, 13)) * (0.75 + 0.5 * cover) * (0.55 + 0.45 * s) * CLOUDS.size;
+      const fairT = Rc * (0.65 + 0.55 * hash(k, gen, 17));
       let T = Math.max(60, (thick > 0 ? Math.max(fairT, thick * (0.55 + 0.45 * hash(k, gen, 19)) * (0.4 + 0.6 * conv)) : fairT) * (0.5 + 0.5 * s));
       // THE SEA OF CLOUD (the owner's Aloft reference): seen from above a closed deck, a cumulus is one of the deck's own
       // HEAPS -- wide, low, its lower third sunk in the sheet -- so the deck reads as one rolling floor with the peaks out of
@@ -905,7 +923,7 @@ export function createClouds(scene) {
       const cxA = cl.bx + ux * cl.T * 0.45, cyA = cl.by + uy * cl.T * 0.45, czA = cl.bz + uz * cl.T * 0.45;
       const baseD = cl.T * 0.45;
       const air = Math.round(Math.min(0.45, 0.55 * (1 - Math.exp(-cl.dist / 8000))) * 5) / 5;
-      const fewK = 1 + 0.55 * (1 - nl / t.lobes.length);
+      const fewK = 1 + 0.35 * (1 - nl / t.lobes.length);
       for (let i = 0; i < nl; i++) {
         const o = t.lobes[i];
         const pa = hash(cl.k, cl.gen * 37 + i, 23) * Math.PI, seed = hash(cl.k, cl.gen * 41 + i, 29) * 64;
@@ -918,11 +936,14 @@ export function createClouds(scene) {
           continue;
         }
         const y = o.y * cl.T;
-        const r = Math.max(4, o.r * (cl.cb ? cl.Rc : Math.min(cl.Rc * 1.05, Math.max(cl.T * 0.55, cl.Rc * 0.7)) * fewK));
+        // (a far cloud drawn with its first few lobes, the shelf's: they are laid a little wider to keep its size; perspective
+        // flattens it into a strip by itself. Squashed further, a far cloud seen from below was all flat base: a grey saucer)
+        const r = Math.max(4, o.r * cl.Rc * (cl.cb ? 1 : fewK));
+        const sqz = cl.cb ? 0.92 : Math.min(0.95, (o.sq || 0.9) * (1 + 0.6 * (fewK - 1)));
         const px = cl.bx + ex * o.x * cl.Rc + nx * o.z * cl.Rc + ux * y + lx * y;
         const py = cl.by + ey * o.x * cl.Rc + ny * o.z * cl.Rc + uy * y + ly * y;
         const pz = cl.bz + ez * o.x * cl.Rc + nz * o.z * cl.Rc + uz * y + lz * y;
-        emit(px, py, pz, r, cxA, cyA, czA, baseD, ex, ey, ez, nx, ny, nz, pa, seed, cl.cb ? 0.92 : 0.86 / fewK, cl.T, cl.storm, air);
+        emit(px, py, pz, r, cxA, cyA, czA, baseD, ex, ey, ez, nx, ny, nz, pa, seed, sqz, cl.T, cl.storm, air);
       }
     }
     for (const M of meshes) {
@@ -986,6 +1007,9 @@ export function createClouds(scene) {
       skyU.uCirrus.value.set(_w2.x, _w2.y, _w2.z, wx.cirrus != null ? wx.cirrus : 0.25);
     }
     if (skyU.uRainbow) skyU.uRainbow.value.set(C && wx.rainbow !== 0 ? 1 : 0, 1500, 0, 0);
+    // the look director's audit items in the sky (sky.js uSkyFix; ?skyfix=0 leaves the sky as it was): on with the clouds,
+    // and from the air the sky laid in brush strokes, from 150 m up to their full from 800 m
+    if (skyU.uSkyFix) skyU.uSkyFix.value.set(CLOUDS.skyfix ? 1 : 0, CLOUDS.skyfix ? 0.45 * smooth(150, 800, camR - Rg) : 0, 0, 0);
     own.uGroundR.value = R + (look.weather && look.weather.shadowGround != null ? look.weather.shadowGround : 250);
     self.stats.clouds = clouds.length; self.stats.lobes = meshes.reduce((a, M) => a + M.n, 0); self.stats.tris = tris;
     self.stats.ms = performance.now() - t0;
@@ -997,8 +1021,8 @@ export function createClouds(scene) {
   // row 'storm: no cloud shadows' (WX.uCloudShadowK 0): the map then reads no shadow anywhere.
   self.renderShadow = function renderShadow(renderer, scene0) {
     const root = group.parent;
-    const live = root && group.visible && mat && shState.has && WX.uCloudShadowK.value > 0 && shState.sun.dot(shState.centre) > 0.02 * shState.centre.length();
-    if (!live) { if (shState.on) { WX.uCloudShadowM.value.copy(NO_SHADOW); shState.on = false; } return; }
+    const live = root && group.visible && mat && shState.has && self.shadowK > 0 && shState.sun.dot(shState.centre) > 0.02 * shState.centre.length();
+    if (!live) { if (shState.on) { WX.uCloudShadowM.value.copy(NO_SHADOW); WX.uCloudShadowV.value.copy(NO_SHADOW); shState.on = false; } WX.uCloudShadowK.value = 0; return; }
     if ((shState.frame++ & 1) && shState.on) return;
     const sc = scene0 || scene;
     if (!sc) return;
@@ -1038,6 +1062,7 @@ export function createClouds(scene) {
     }
     WX.uCloudShadow.value = shadowRT.texture;
     WX.uCloudShadowM.value.copy(shM);
+    WX.uCloudShadowK.value = self.shadowK;
     shState.on = true;
   };
   // (the frame hook, at the start of every render: the eye's view space to the map, for a pass over the picture, and
@@ -1059,11 +1084,11 @@ export function createClouds(scene) {
   self.update = function update(dt, camL, root, sunL, fields, skyU) {
     if (!LOOK.oil || !CLOUDS.mode) return;
     // (the speed test's row 'weather: clouds as before': the sky's own flat cloud back in their place)
-    if (self.enabled === false) { group.visible = false; if (skyU && skyU.uCloud3D) skyU.uCloud3D.value.x = 0; if (skyU && skyU.uRainbow) skyU.uRainbow.value.x = 0; return; }
+    if (self.enabled === false) { group.visible = false; if (skyU && skyU.uCloud3D) skyU.uCloud3D.value.x = 0; if (skyU && skyU.uRainbow) skyU.uRainbow.value.x = 0; if (skyU && skyU.uSkyFix) skyU.uSkyFix.value.set(0, 0, 0, 0); return; }
     const id = root && root.name && root.name.startsWith('body-') ? root.name.slice(5) : null;
     if (!id || !BODIES[id]) return;
     const look = getLook(id);
-    if (!(BODIES[id].atmosphereHeight > 0) || !(look.cloud > 0.01 || (look.weather && look.weather.cumulus))) { group.visible = false; if (skyU && skyU.uCloud3D) skyU.uCloud3D.value.x = 0; if (skyU && skyU.uRainbow) skyU.uRainbow.value.x = 0; return; }
+    if (!(BODIES[id].atmosphereHeight > 0) || !(look.cloud > 0.01 || (look.weather && look.weather.cumulus))) { group.visible = false; if (skyU && skyU.uCloud3D) skyU.uCloud3D.value.x = 0; if (skyU && skyU.uRainbow) skyU.uRainbow.value.x = 0; if (skyU && skyU.uSkyFix) skyU.uSkyFix.value.set(0, 0, 0, 0); return; }
     group.visible = true;
     if (id !== bodyId || group.parent !== root) setBody(id, root);
     if (!mat) {

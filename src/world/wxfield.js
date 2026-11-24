@@ -41,6 +41,7 @@
 //     four texels itself and blends the VECTORS (four fetches, not one). pcWxField2's raw A channel is blended by the
 //     hardware: do not use it for anything but the nearest texel's direction.
 import * as THREE from 'three';
+import * as SHARED from '../render/shared.js';
 import { faceToDir, texelOf } from '../physics/windmap.js';
 
 export const WXN = 32;                 // the maps' grid (physics CLOUDMAP.N / WINDMAP's N)
@@ -63,16 +64,19 @@ function blankShadow() {
 }
 // (until clouds.js renders a shadow map, the matrix sends every point to uv (-1, -1): outside the map, no shadow)
 const _noShadowM = new THREE.Matrix4().set(0, 0, 0, -1, 0, 0, 0, -1, 0, 0, 0, 0, 0, 0, 0, 1);
+// (the look director's ruling of 24 Nov, touch T3: render/ does not import world/, so the three uniforms the last pass reads
+//  live in render/shared.js; where that file has them -- under any of these names -- these are the very same objects)
+const _CS = SHARED.CLOUD_SHADOW || SHARED.CLOUDSHADOW || (SHARED.uCloudShadow ? SHARED : null);
 
 export const WX = {
   uWxField: { value: atlas() },        // R low cover, G (top - base) / 2500 m, B sqrt(rain / 40 mm/h), A storm
   uWxField2: { value: atlas() },       // R base / 2500 m above the datum, G high cover, B wind / 30 m/s, A wind dir / 2pi
   uWxN: { value: WXN },
   uWxOn: { value: new THREE.Vector2(0, 0) },
-  uCloudShadow: { value: blankShadow() },          // (clouds.js A6) 256 x 256, R 0 lit .. 1 shadow, smooth
+  uCloudShadow: _CS && _CS.uCloudShadow || { value: blankShadow() },          // (clouds.js A6) 256 x 256, R 0 lit .. 1 shadow, smooth
   uCloudShadowM: { value: _noShadowM.clone() },    // body-local position -> shadow map uv (xy)
-  uCloudShadowK: { value: 1 },                     // 0: no cloud shadow anywhere (the speed-test row)
-  uCloudShadowV: { value: _noShadowM.clone() },    // (additive) the eye's VIEW space -> the map's uv, set every frame: for a pass over the picture (post.js), which has view positions, not body ones
+  uCloudShadowK: _CS && _CS.uCloudShadowK || { value: 0 },                    // 0: no cloud shadow anywhere (clouds.js sets it while its map is drawn)
+  uCloudShadowV: _CS && _CS.uCloudShadowV || { value: _noShadowM.clone() },   // (additive) the eye's VIEW space -> the map's uv, set every frame: for a pass over the picture (post.js), which has view positions, not body ones
 };
 
 // THE ATLAS'S INDEX: for every atlas texel, the map texel it copies (its own inside a face; across the edge, the
