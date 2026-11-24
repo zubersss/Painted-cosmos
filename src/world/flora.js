@@ -84,7 +84,8 @@ const TREESWAY = typeof location !== 'undefined' && /[?&]treesway=whole\b/.test(
 const PINES = !(typeof location !== 'undefined' && /[?&]pines=0\b/.test(location.search || ''));
 const NEEDLE_KITS = new Set(['tallpine', 'spruce']), NEEDLE_PX = 3.0;
 // ?nearleaf=1 (24 Nov, the look director's audit 2: near leaves read as big flat shards): a tree's leaves within 4 m of
-// the eye shrink about their centres, to half at 1.2 m (materials.js PROP_VERT, uNearLeaf); from 4 m out nothing changes.
+// the eye shrink about their centres, to 0.55 at 1.0 m on a smoothstep from 3.5 m (materials.js PROP_VERT, uNearLeaf);
+// from 3.5 m out nothing changes. In motion a leaf shrinks as the eye comes near: the thing to watch on the device.
 // OFF until the look director passes it.
 const NEARLEAF = typeof location !== 'undefined' && /[?&]nearleaf=1\b/.test(location.search || '');
 // (only a kind whose crown is leaves one by one, and nothing else, can be split: parts 0 bark, 5 leaf, 6 snow on a

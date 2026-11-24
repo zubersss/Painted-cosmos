@@ -1801,10 +1801,13 @@ void main() {
     // NO SHARDS UNDER THE NOSE (?nearleaf, 24 Nov; the look director's audit 2, R3.6 'nothing reads as a polygon'): a
     // leaf a metre or two from the eye is a hand-sized flat kite filling a tenth of the picture, straight-edged, where
     // the references' near leaves are small dabs with the sky between them. So within 4 m of the eye each leaf shrinks
-    // about its own centre, to half its size at 1.2 m; from 4 m out nothing changes (the owner approved the near trees
-    // at 5 to 15 m as they are). Its place and its paint are its own. 0: as before.
+    // about its own centre, to 0.55 of its size at 1.0 m, on a short gentle ramp (smoothstep from 3.5 m: the look
+    // director's terms, so the change lies mostly where the leaf would fill the frame and a leaf does not visibly shy
+    // away as the player walks into a low bough -- the thing to watch on the owner's device); from 3.5 m out nothing
+    // changes (the owner approved the near trees at 5 to 15 m as they are). Whole and crisp: no fade, its place and
+    // its paint its own (inside 3.5 m a leaf is tens of pixels across, so the 3 px floor never binds here). 0: as before.
     if (uNearLeaf > 0.0 && aData.y > 4.5 && aData.y < 6.5) {
-      cardO *= mix(0.5, 1.0, smoothstep(1.2, 4.0, distance((im * vec4(aCard, 1.0)).xyz, uCamLocal)));
+      cardO *= mix(0.55, 1.0, smoothstep(1.0, 3.5, distance((im * vec4(aCard, 1.0)).xyz, uCamLocal)));
       lp = aCard + cardO;
     }
   #endif
