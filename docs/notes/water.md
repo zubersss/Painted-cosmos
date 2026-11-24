@@ -475,7 +475,15 @@ Branch `water-bodies` = lane 0 + look-proto v37.1 + `origin/design-water` (W1's 
   on v39.4 (with lakeWidthAt for lakes over 150 m on the sea's level).
 - The stills since the lab's limit: scratch multishot.mjs (one page load, several views; page screenshots, which read a
   little differently from the lab's readPixels grabs: compare only like with like).
-- NEXT: F's verdict on the full sheet; W3's word on the jagged chop; after the branches meet (the coordinator's call): the pool's pcThinLayer to W3's
+- **F on 848b04e: NOT YET** -- 400 m about even with v37, 150 m worse: COVERAGE (the mid strokes were the body's own colour,
+  so the sea read as sparse dabs on a flat slate plane). Done on water-sea 817a5aa: the far still sea's mid strokes a step
+  either side of the body (x 1.12 / 0.88 by their own number; x 1.08 / 0.92 tried, too faint facing the coast); the
+  strait's chop 3.5 near to 5.5 widths toward the horizon; no lens taper under about 4 widths on the screen. MEASURED (sd,
+  v37 on the same code): 0.138 (0.157), 0.146 (0.157), 0.138 (0.160), 0.128 (0.129). Not good: the mid strokes read a little
+  as pebbles (my eye, not F's yet); a few white jagged bits at the very bottom of the strait view remain though the short
+  strokes are untapered (told W3). Default unchanged by construction (sea-only factors); not re-rendered this time. W3 to
+  take 817a5aa (not 848b04e) into the default commit.
+- NEXT: F's verdict on 817a5aa; after the branches meet (the coordinator's call): the pool's pcThinLayer to W3's
   pcWStrokes, pcFallMilk and the FALL_ colours into waterchunk.js.
 - Camera places for the falls views: `fallsView(S)` and the scratch `fallcams.mjs` (sea60, sea150, air400, bank, E7).
 
