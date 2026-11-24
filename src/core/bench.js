@@ -744,9 +744,18 @@ export function attachBench(pc) {
     const UNDER0 = (() => { try { return new URLSearchParams(location.search).get('under') === '1'; } catch (e) { return false; } })();
     const U2C0 = (() => { const f = flora(); return !!(f && f.u2cells); })();
     const standing = async () => { const t0 = performance.now(); while (performance.now() - t0 < 30000) { const f = flora(); if (!f || f.busy === 0) return; await wait(250); } };
+    // (the flora lane's denser near ground, world/nearground.js ?dense: asked the other way from how the run started; every
+    //  ring is built again from the other numbers, so the row waits for its marks to be laid before it is timed)
+    const nearG = () => pc.world && pc.world._near;
+    const DENSE0 = (() => { const n = nearG(); return !!(n && n.dense); })();
+    const nearLaid = async () => { const t0 = performance.now(); while (performance.now() - t0 < 20000) { const n = nearG(); if (!n || n.busy === 0) return; await wait(250); } };
+    const denseRow = [DENSE0 ? 'near grass as before 24 Nov (not dense)' : 'near grass and flowers denser',
+      async () => { const n = nearG(); if (n && n.setDense) { n.setDense(!DENSE0); await nearLaid(); } },
+      async () => { const n = nearG(); if (n && n.setDense) { n.setDense(DENSE0); await nearLaid(); } }];
     const footSteps = [
       [AS, null, null],
       ...GRASS,
+      denseRow,
       [AS, null, null],
       ['no small plants', () => show(/^pc-prop-(?!tall|far|under2)/, false), () => show(/^pc-prop-(?!tall|far|under2)/, true)],
       // (the flora lane's undergrowth with a body, package O, world/underkit.js: in a speed test the kits are always placed,
