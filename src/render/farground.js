@@ -46,6 +46,9 @@ export const ROCK_DEBUG = (() => { try { const v = +new URLSearchParams(location
 // ?canfloor=: the smallest a canopy dab may be, in pixels (2.6); 0 takes the floor out (for an A/B still).
 export const CANOPY_FLOOR = (() => { try { const q = new URLSearchParams(location.search); const v = q.has('canfloor') ? +q.get('canfloor') : 2.6; return isFinite(v) && v >= 0 ? Math.min(v, 12) : 2.6; } catch (e) { return 2.6; } })();
 export const CANOPY_DEBUG = (() => { try { return new URLSearchParams(location.search).get('candebug') === '1'; } catch (e) { return false; } })();
+// ?farshadow=1 (A1's far crowns' shadows, render/shadow.js FAR_SHADOW on trees-far; the same rule read here): the canopy's
+// dabs read the shadow map too (PC_FAR_SHADOW in pcCanopyAt). Off by default.
+export const CANOPY_FARSHADOW = (() => { try { const v = new URLSearchParams(location.search).get('farshadow'); return v === '1' || v === 'true'; } catch (e) { return false; } })();
 
 // THE VERTEX SHADER'S PART: the stand rides in the far wash's spare byte (patchgen.js), morphed as everything else is.
 export const CANOPY_VERT_DECL = /* glsl */`
@@ -260,6 +263,21 @@ void pcCanopyAt(vec3 P, vec2 ch, float stand, float needle, vec3 floorC, float l
   // reached V 0.95 and over, and the look rules want lit foliage at 0.60 to 0.82 (R1.2c); MEASURED, the share of a 1 km
   // still over V 0.90 went 11.1 to 13.7 per cent with the full light. A cap is still one flat colour for the dab.)
   gCanL = min(pcLevel(x + (rnd.z - 0.5) * 0.06, 0.03), 2.6);
+  #ifdef PC_FAR_SHADOW
+    // (THE FAR CROWNS' SHADOWS ON THE ROOF, trees-far A1's lines, ?farshadow=1, chosen by the look director: a dab whose centre
+    // lies in a far crown's shadow, as the shadow map says (pcSunAtSoft's own test without its dapple), takes the
+    // neighbour's-shadow level. It reads the map, not the grid, so it holds on both sides of pf: where this roof's own
+    // shading has gone to the mean, the dabs beside each impostor crown on its shadow side still step down. One read a dab.)
+    if (uShK.x >= 0.004) {
+      vec3 qF = (uShM * vec4(P, 1.0)).xyz; vec2 aF = abs(qF.xy);
+      float inF = (1.0 - smoothstep(uShK.w, 0.97, max(aF.x, aF.y))) * uShK.x;
+      if (inF > 0.5) {
+        vec2 fF = textureLod(uShAir, qF.xy * 0.5 + 0.5, 0.5).rg;
+        float covF = fF.r * step(fF.g / max(fF.r, 1e-3) - 0.0006, qF.z);
+        if (covF > 0.40 + 0.26 * fract(rnd.y * 5.7)) gCanL = min(gCanL, pcLevel(0.33, 0.03));
+      }
+    }
+  #endif
   #ifdef PC_CANDEBUG
     // (?candebug=1: what each dab is, in flat colours -- black a floor in shade, green a floor in sun, white a lit cap,
     // orange a crown's body, red its shaded side, purple a neighbour's shadow; a needle tree bluer; all of it at half

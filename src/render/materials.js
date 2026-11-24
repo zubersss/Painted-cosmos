@@ -6,7 +6,7 @@ import * as THREE from 'three';
 // THE GROUND SEEN FROM THE AIR (group C, the far view): the canopy painted into the ground. Its shader text, its uniforms
 // and its switch (?canopy=) live in render/farground.js; the hooks in the ground's shaders are all inside #ifdef PC_CANOPY, which is set
 // only in the oil look with the switch on.
-import { CANOPY, CANOPY_DEBUG, CANOPY_DAB, CANOPY_FLOOR, CANOPY_VERT_DECL, CANOPY_VERT_MAIN, CANOPY_FRAG, canopyUniforms, GROUND_SEASON, SEASON_VERT, SEASON_VERT_MAIN, SEASON_FRAG, seasonUniforms, ROCKFIELD, ROCK_FRAG, rockUniforms, ROCK_DEBUG, BLOOM_FAR, BLOOM_VERT_DECL, BLOOM_VERT_MAIN, BLOOM_FRAG, bloomUniforms, FARWATER_VERT_DECL, FARWATER_VERT_MAIN, FARWATER_FRAG } from './farground.js';
+import { CANOPY, CANOPY_DEBUG, CANOPY_FARSHADOW, CANOPY_DAB, CANOPY_FLOOR, CANOPY_VERT_DECL, CANOPY_VERT_MAIN, CANOPY_FRAG, canopyUniforms, GROUND_SEASON, SEASON_VERT, SEASON_VERT_MAIN, SEASON_FRAG, seasonUniforms, ROCKFIELD, ROCK_FRAG, rockUniforms, ROCK_DEBUG, BLOOM_FAR, BLOOM_VERT_DECL, BLOOM_VERT_MAIN, BLOOM_FRAG, bloomUniforms, FARWATER_VERT_DECL, FARWATER_VERT_MAIN, FARWATER_FRAG } from './farground.js';
 import { G, PHYS, PHYSW, PREV, OIL, LOOK, BURNPAINT, register, ensureGlobals, makeBodyUniforms } from './shared.js';
 import { MODE } from '../data/mode.js';
 import { FLORA_GLSL } from '../physics/flora.glsl.js';
@@ -562,6 +562,10 @@ vec3 pcGroundPaint(vec3 c, vec3 leaf, float fk, vec3 rnd, float snowC, float lvl
     float snW = smoothstep(0.80, 0.90, min(min(c.r, c.g), c.b)) * (1.0 - smoothstep(0.08, 0.16, max(max(c.r, c.g), c.b) - min(min(c.r, c.g), c.b)));
     cg = mix(cg, c, max(max(0.5 * gRock, gCliff), snW));      // (a cliff's dab keeps its bed's tone: no stray pigment)
     lvl -= (1.0 - f) * step(0.58, fract(rnd.x * 11.1)) * 0.9 * step(1.5, lvl) * (1.0 - gRock) * (1.0 - snW);
+    // (but each snow dab keeps a value step of its own, a little lighter or darker by its number, no hue: laid as one flat
+    // paint the brightest lit snow ran as a smooth ramp, a fifth of its steps 0.005 to 0.03 of lightness, faintly a glow;
+    // the look director by R3.7: light in steps with clean edges, white laid in flat touches)
+    lvl += (floor(fract(rnd.x * 7.3) * 3.0) - 1.0) * 0.22 * snW;
     vec3 k = pcDabTint(mix(cg, leaf, f), mix(rnd, vec3(0.5), max(0.5 * gRock, snW)), f);
   #else
   lvl -= (1.0 - f) * step(0.58, fract(rnd.x * 11.1)) * 0.9 * step(1.5, lvl);
@@ -569,6 +573,9 @@ vec3 pcGroundPaint(vec3 c, vec3 leaf, float fk, vec3 rnd, float snowC, float lvl
   #endif
   k = mix(pcWetWash(k, 1.0 - snowC), mix(vec3(0.94, 0.955, 1.0), vec3(0.86, 0.90, 1.0), rnd.x * 0.6), snowC);
   #ifdef PC_ROCKF
+    // (the land's snow laid in two flat paints, white or a pale blue by the dab's number: the wash under it drifts a little
+    // from point to point, and dab to dab that drift was the smooth ramp the look director measured on the lit snow)
+    k = mix(k, step(0.6, fract(rnd.x * 3.7)) > 0.5 ? vec3(0.88, 0.91, 1.0) : vec3(0.95, 0.96, 1.0), snW);
     k = mix(pcRockTemp(k), k, snowC);       // (a rock face warm in its lit plane, cool violet in its shade: render/farground.js)
   #endif
   // (GRASS in the shade is a deep green, its own colour laid heavier with half the cool key over it, as a leaf's shade
@@ -937,6 +944,12 @@ void main() {
         gRockP = clP; lvl0 = pcRockPlanes(lvl0, nV, sun0);
       }
     #endif
+    #ifdef PC_ROCKF
+      // (and between the dabs the land's snow is the snow's own white, not the wash's smooth drift: from 420 m a fifth of the
+      // bright snow is these gaps, and their drift from point to point read as an airbrushed glow, R3.7)
+      { float snB = smoothstep(0.80, 0.90, min(min(bareC.r, bareC.g), bareC.b)) * (1.0 - smoothstep(0.08, 0.16, max(max(bareC.r, bareC.g), bareC.b) - min(min(bareC.r, bareC.g), bareC.b)));
+        bareC = mix(bareC, vec3(0.95, 0.96, 1.0), snB); }
+    #endif
     vec3 bare = pcTone(bareC, lvl0);
     #ifdef PC_ROCKF
       if (clP > 0.0) bare = pcRockTemp(bare);
@@ -1169,7 +1182,7 @@ export function makeTerrainMaterial(bodyU) {
   // (the far view's painted canopy: compiled in only with the oil look and ?canopy= on; a world without a painted canopy
   // keeps uCanK.w at 0 and returns before any of it is worked out. terrain.js writes the season's crowns each frame.)
   if (LOOK.oil && CANOPY > 0) {
-    m.defines = m.defines || {}; m.defines.PC_CANOPY = 1; m.defines.PC_CAN_DAB = _gf(CANOPY_DAB); m.defines.PC_CAN_FLOOR = _gf(CANOPY_FLOOR); Object.assign(m.uniforms, canopyUniforms());
+    m.defines = m.defines || {}; m.defines.PC_CANOPY = 1; m.defines.PC_CAN_DAB = _gf(CANOPY_DAB); m.defines.PC_CAN_FLOOR = _gf(CANOPY_FLOOR); if (CANOPY_FARSHADOW) m.defines.PC_FAR_SHADOW = 1; Object.assign(m.uniforms, canopyUniforms());
     if (CANOPY_DEBUG) m.defines.PC_CANDEBUG = 1;
   }
   // (the far view, FV3: the floor and the far colour follow the year; compiled in only with the oil look and ?groundseason=)
