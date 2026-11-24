@@ -87,10 +87,28 @@ FV7 of `docs/lead/FARVIEW-DESIGN.md`. A second session (A2, branch `trees-near`)
 the same time: this lane touches only the far parts of `flora.js`, `florakit.js`, the plant material's far branch,
 `render/impostor.js`, `render/shadow.js` and new rows in `core/bench.js`.
 
-**State (update this line every step):** T0 committed (rows built and run in software: they work; their timings mean
+**State (update this line every step):** OPEN, waiting for answers (24 Nov, about 11:00): F on the crown-size note
+(my proposal: at views of 12 texels or fewer, pull a crown's strokes toward one lit cap and one shade instead of a bigger
+stroke, since a crown there is already 2-3 strokes across; nothing changed before F says yes); C (far view,
+session_01R5Bri2AMBsFiRcxvUUZMvu) on the seam between its FV2 canopy roof and the impostors' reach (questions sent:
+where its roof starts, whether to thin the impostors from steep views under its ?canopy, who shoots 150 m / 400 m /
+1 km with both); the coordinator on the merge of trees-far into look-proto. 1080-line desktop stills sent to F
+(`A1_impostor_*_desktop1080*`). THE IMPOSTORS ARE THE DEFAULT FAR TREES of the oil look (after F passed the
+grain fix on foot and from the air, and the owner's phone timed them: 150 m up 151 ms -> 16.7, the screen's cap);
+`?fartree=old` (or cards, lump, blob) is today's far tree. THE GUARD (`render/impostor.js` probe / fail): before the first
+bake step the impostor program is compiled on a one-tree mesh and three's own diagnostics read; a compile failure, a
+bake that throws or an atlas that comes out empty puts the far tier back to today's form (and the hand-over as it was)
+and the console says '[painted cosmos] far impostors off, today's far trees instead: <why>'. PROVEN in headless Chromium
+with `?impfail=compile` and `?impfail=bake`: impFailed set, 0 impostor trees, 5,915 trees in today's form. Row 'no
+shadows at all (400 m up)' added to `?bench=trees`. Earlier, after the look director's review: the grain fix (cb5666f), the bake in steps
+(7a48921) and the far wind (`?farwind=1`) committed; impostors still behind `?fartree=impostor`, waiting for the owner's
+`&bench=trees` table and F's verdict on the grain crops. Before that: T0 committed (rows built and run in software: they work; their timings mean
 nothing here, only the owner's phone can time them). T1 (impostors) committed behind `?fartree=impostor`, SEEN in A/B
 stills at the phone's and the desktop's settings (`docs/shots/painter/trees-far/`); not yet the default (waits for the
-owner's phone: `&bench=trees` has the row). Next: T4 (hand-over distances), then T6. Nothing merged.
+owner's phone: `&bench=trees` has the row). T4 committed: with the impostors on, the middle tree hands to the impostor
+at 45 m (was 57); the near hand-over stays at 27 m (18 m waits for A2's middle tree). T6: the impostors' own shadows
+from the air built behind `?impshadow=1`, NOT the default (the low-sun A/B is mixed); T6's main part, cheaper shadows of
+the near and middle trees drawn as clusters, waits for A2's cluster trees. Nothing merged.
 
 **T0, the speed test's tenth form (`src/core/bench.js`).** `?bench=1` the whole table with the new rows; `?bench=trees`
 the tree questions alone, on foot and from the air (24 rows); `?bench=air` or `?bench=air,<m>` the air table (FV7: 400 m
@@ -225,6 +243,43 @@ settles it. NOT KNOWN: the guard on a real phone's driver (it rests on three's o
 and which nothing in the game turns off), anything in motion.
 
 (A1, the far trees lane, kept its T1 note here in look-proto; it is theirs and kept as they wrote it:)
+
+**Next:** A/B stills (5/10/18/30/45 m, autumn and green wood, phone and desktop) -> commit T2 split -> stills of cards
+and T5 (pixel-identical check) -> commit -> T3 (the middle tree) -> report each step to the coordinator and the look
+director (session_01R5Brhzz2JPPF6Ecz6XRQHx).
+**THE FAR WOOD IN THE WIND (`?farwind=1`, the weather group's far wind field).** With it the impostor material takes the
+plants' physics uniforms (`PHYS`, shared) and its vertex shader leans the quad over the tree's foot by `pcPhysBendLite`
+(one bend a tree, read at its foot; stiff 1), so the top moves and the foot does not. Today that function reads the bend
+field near the eye; once the look director binds `uPhysFar` (look-director shared.js) and the weather group's
+flora.glsl.js lands, the same call reads the far field beyond 128 m with no change here. SEEN only as a still (with
+`physics=1`): the impostors draw whole and lean a little; motion is for the phone. Row: 'far trees still in the wind'
+(on foot and 150 m up), which sets the impostors' own `uPhysOn` to 0.
+
+**THE BAKE IN STEPS (`ImpostorAtlas.bake(renderer, budgetMs)`).** One step is one tree at one level: its 64 views drawn
+into its own square of the target and that square read back (at most 2.4 MB) into the level's array. The frame hook runs
+as many steps as fit in 4 ms of a frame (`?impbake=<ms>`, 0 = all at once, which the stills here use), always at least
+one; the impostors draw nothing until the last step (Earth: 13 trees x 6 levels = 78 steps). CHECKED: baked step by step
+it is byte for byte the one-shot atlas (0 of 50,319,360 bytes differ); here a step is about 0.13 s of software drawing.
+On the phone the steps' time is not measured; with one step a frame the far trees come in after 78 frames at worst.
+
+**THE GRAIN FIX (after the look director's review of T1, 24 Nov; it supersedes the T1 paragraph below where they
+differ).** Every leaf of a stroke now takes the stroke's ONE normal (the crown's front surface) and ONE inner shade, and is
+written at the stroke's own depth, so overlapping strokes are laid whole (no texel of the one behind pokes through);
+strokes 4.5 texels (so at least 2.5 px at the phone's level; `?impstroke=`); half the inner shade a stroke's depth gives
+(`?impdeep=`) and 0.35 of a near leaf's light jitter (`?impjit=`), so a crown reads as a lit mass and a shaded one; no
+read of the shadow map (a texel's place would cut a stroke at a shadow's edge); the silhouette by COVER: the four texels
+round the point weighed bilinearly, nothing laid under a half (a quarter on a multisampled picture, with alpha to
+coverage), so the outline is a smooth line at the pixel, not stair-steps (4 fetches a fragment instead of 1); the shade
+through the shared `pcShadeLeaf` wherever chunks.js has it (look-director c4306fc; detected in the text, else pcTone);
+nothing of a crown under V 0.18 (the ruling for the darkest conifer); the level a stroke is read from is coarser on a
+taller picture (about 3.5 px at 1080 lines, not yet seen on a desktop). ON FOOT the conifer kinds keep today's far form
+(their dark spikes, which the look director judged better on the skyline) below 40 m of height and become impostors
+from the air; the broadleaves are impostors at every height (`?impfoot=all|none`; flora.js tier 4 = far as impostor).
+MEASURED (phone, 150 m): lit crowns hue 67, S 0.60 (ruling: under about 80 and 0.75), but V 0.91 (R1.2c's lit canopy
+0.60-0.82: the lit step of the shared data colour, not a gain of the impostor's); V under 0.18 1.4 % of the picture
+(today 13.5 %); S(V<0.3) 0.35 -> 0.16. On foot the frame is 719k triangles (all impostors 609k, today 1,247k): the
+conifer cards cost about 145k. Stills `A1_grainfix_*`, 3x crops `A1_grainfix_crops_3x.jpg`.
+
 **T1, far trees as painted impostors (`src/render/impostor.js`; `?fartree=impostor`).** For every kind drawn far off as
 leaves (`CAN_CARD`), its lod-0 tree (one variant; `?impvar=2` two) is baked once per world, in a frame hook the first
 time an impostor is drawn (the painter's hooks run outside a render; the renderer is handed over by the first impostor
@@ -260,6 +315,35 @@ STILL WRONG / NOT KNOWN: the view switches (about 13 degrees apart, nearest, no 
 seen in motion; the hard edge where the trees end 1 km up (the far-view lane's painted canopy, FV2, is meant for it);
 the darkest conifer strokes are V 0.13 (R1.2c asks 0.18 for conifers); the hand-over at 57 m to the middle tree (T4);
 the bake is one long step at the first far draw (could be spread over frames).
+
+**T4, the hand-over distances (`flora.js` `setHandover`, `?treenear=` / `?treemid=` in metres at the phone's scale).**
+The full tree's and the middle tree's reach (T0 90 m, T1 190 m before the picture's scale) are per world now
+(`flora.t0`, `flora.t1`; the leaves-by-distance schedule reads `t0` as it is drawn, so they can move while the game runs;
+`shadow.js` `SHADOW_TIERS.mid` follows). With the impostors on, the middle tree stops at 45 m at the phone's picture
+(was 57) and the impostor takes over there; without them nothing changes unless the address says so. The design's full
+tree to 18 m is NOT taken by default: SEEN, with today's middle tree a tree 15 to 20 m off turns into an umbrella of
+big kites (`A1_handover_near18_phone.jpg`); it waits for the near lane's new middle tree (`?treenear=18` tries it).
+SEEN at 45 m (`A1_handover_stream_15h_{A,B}_phone.jpg`, `A1_handover_bank_3x.jpg`): the 40 to 57 m band of the far bank
+becomes impostors that match the ones behind them. Found and fixed on the way: a young oak at 50 m drew as a bare stump
+-- each quad stood 0.35 of its radius toward the eye, so a big neighbour's quad came out nearer and hid the small
+tree's crown; quads now stand at the tree's middle (`IMP.push` 0, `?imppush=`), and the limbs are kept to the third
+level (left out from the second, a small tree's crown floated over its trunk); `A1_impostor_stumpfix_4x.jpg`.
+COUNTED (phone, gallery, on foot, impostors on): middle tree to 57 m 651k triangles, 194 calls; to 45 m 609k, 178 calls.
+DERIVED: the middle trees from 45 to 57 m, about 42k triangles a frame at 0.043 to 0.124 ms per 1000 (the skeptic's
+range) and their pixels painted by the impostor instead: about -2 to -6 ms. Rows: 'middle trees only to 45 m',
+'trees hand over at 18 / 45 m', 'impostors from 45 m' (the package as `?fartree=impostor` ships it).
+Debug: `?impdebug=1` paints each impostor texel flat by what it is and the level it was read from.
+
+**T6, the impostors' shadows from the air (`render/impostor.js` `makeImpostorShadowMaterial`; `?impshadow=1`).** Above
+60 m (where no near or middle tree stands in the shadow square) each far impostor mesh joins the shadow pass's own list
+(`SHADOW_CROWD`, as the animals do) with a shadow twin: the quad turned to face the SUN, the baked view nearest the
+sun's direction read at the map's own texel, a third of the crown's strokes casting (`uThinLeaf`, as a near crown). SEEN
+at 17 h (`A1_impshadow_{air150,air400}_17h_{A,B}_phone.jpg`, `A1_impshadow_air150_2x.jpg`): plum shade lies beside the
+crowns in the glades and along the river banks, but the canopy as a whole gets darker (lookstats V median 0.51 -> 0.42 at
+150 m) and at 400 m the gain is slight. Not clearly earned, so OFF by default; the look director and the owner to rule.
+COUNTED: +33 calls and +48k triangles at 150 m, +41 calls at 400 m (the shadow pass's fragments not measured).
+T6's main part (the near and middle trees casting as clusters with the spray's coverage, about -0.8 ms) needs A2's
+cluster trees first.
 
 ## Hand-over of THE OIL LOOK, prototype on branch `look-proto` (READ THIS FIRST; kept current)
 

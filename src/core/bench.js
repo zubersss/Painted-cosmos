@@ -312,6 +312,15 @@ export function attachBench(pc) {
         m.needsUpdate = true;
       }
     };
+    const farWind = (on) => {
+      for (const m of mats(/^pc-prop-far-impostor/)) {
+        const U = m.uniforms;
+        if (!U || !U.uPhysOn) continue;
+        if (!on) { if (!m.userData.benchPhys) m.userData.benchPhys = U.uPhysOn; U.uPhysOn = { value: 0 }; }
+        else if (m.userData.benchPhys) { U.uPhysOn = m.userData.benchPhys; m.userData.benchPhys = null; }
+        m.uniformsNeedUpdate = true;
+      }
+    };
     const a2c = (on) => { for (const m of mats(/^pc-prop-/)) { if (on) { if (m.userData.benchA2C != null) { m.alphaToCoverage = m.userData.benchA2C; m.userData.benchA2C = null; } } else { if (m.userData.benchA2C == null) m.userData.benchA2C = m.alphaToCoverage; m.alphaToCoverage = false; } } };
     const farForm = async (form) => {
       const f = flora();
@@ -319,6 +328,9 @@ export function attachBench(pc) {
       await wait(400);
       if (pc.settle) await Promise.race([pc.settle(12), wait(30000)]);
     };
+    let hand0 = null;
+    const handTo = (n, m) => { const f = flora(); if (!f || !f.setHandover) return; if (!hand0) hand0 = [f.t0 * 0.30, f.t1 * 0.30]; f.setHandover(n, m); };
+    const handBack = () => { const f = flora(); if (!f || !f.setHandover || !hand0) return; f.setHandover(hand0[0], hand0[1]); hand0 = null; };
     const form0 = (() => { const f = flora(); return f ? (f.farForm || (f.impOn ? 'impostor' : cards0 ? 'cards' : 'lump')) : 'cards'; })();
     // the rows themselves: [label, on, off]
     const T0 = {
@@ -333,6 +345,15 @@ export function attachBench(pc) {
       // (T1: the far trees as painted impostors, two triangles a tree, swapped in the same minute; render/impostor.js.
       //  If the run was started with ?fartree=impostor this row asks the other way: the tree of flat pieces.)
       imp: form0 === 'impostor' ? ['far trees of flat pieces', () => farForm('cards'), () => farForm(form0)] : ['far trees as impostors', () => farForm('impostor'), () => farForm(form0)],
+      // (T4, the hand-over at the phone's scale: the middle tree to the far one at 45 m instead of 57; the design's
+      //  full target, 18 m and 45 m; and the far package as ?fartree=impostor ships it, the impostors from 45 m)
+      mid45: ['middle trees only to 45 m', () => handTo(27, 45), () => handBack()],
+      hand: ['trees hand over at 18 / 45 m', () => handTo(18, 45), () => handBack()],
+      pack: ['impostors from 45 m', async () => { handTo(27, 45); if (form0 !== 'impostor') await farForm('impostor'); }, async () => { handBack(); if (form0 !== 'impostor') await farForm(form0); }],
+      // (the far wood in the wind, ?farwind=1: the far impostors' own uPhysOn set to 0 for the row, as 'no wind in shader')
+      farStill: ['far trees still in the wind', () => farWind(false), () => farWind(true)],
+      // (with the impostors the far trees read no shadow map: what do shadows cost from the air without the far cards?)
+      noSh: ['no shadows at all', () => B({ shadow: false }), () => B({ shadow: true })],
       noFar: ['no far trees', () => show(/^pc-prop-far/, false), () => show(/^pc-prop-far/, true)],
       farFlat: ['far trees one flat colour', () => B({ flat: 3 }), () => B({ flat: 0 })],
       noNear: ['no near trees', () => show(/^pc-prop-tall/, false), () => show(/^pc-prop-tall/, true)],
@@ -474,7 +495,7 @@ export function attachBench(pc) {
       // (TENTH FORM, 2026-11-24: the near trees' 51.8 ms split six ways, and the depth questions; see the top)
       T0.leaves, T0.wood, T0.bark, T0.wind, T0.side, T0.order, T0.a2c,
       [AS, null, null],
-      T0.blob, T0.imp,
+      T0.blob, T0.imp, T0.mid45, T0.hand, T0.pack,
       // (2026-11-23, after speed test 9: the near trees are 62.7 ms of a 101 ms frame and NOTHING in that table says
       //  why. These three rows split it. "hand over at half the distance" is not a diagnostic -- it IS the change
       //  that would be made, so the device measures the fix and not a guess. "half their leaves" drives the leaf
@@ -560,9 +581,11 @@ export function attachBench(pc) {
       [AS, null, null],
       ...T2ROWS,
       [AS, null, null],
-      T0.blob, T0.imp, T0.noFar, T0.farFlat,
-      ...airAt(150, 30, [T0.noFar, T0.blob, T0.imp, T0.farFlat, T0.a2c]),
-      ...airAt(400, 45, [T0.noFar, T0.blob, T0.imp]),
+      T0.blob, T0.imp, T0.noFar, T0.farFlat, T0.farStill,
+      [AS, null, null],
+      T0.mid45, T0.hand, T0.pack,
+      ...airAt(150, 30, [T0.noFar, T0.blob, T0.imp, T0.farFlat, T0.a2c, T0.farStill]),
+      ...airAt(400, 45, [T0.noFar, T0.blob, T0.imp, T0.noSh]),
       onFoot,
       [AS + ', last', null, null],
     ];

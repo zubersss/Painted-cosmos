@@ -40,6 +40,8 @@ const LEAD = 0.4, FULL = 0.86;
 // texel 41% coarser on the ground the player is standing on, nor the wider frustum's draws on a device at its frame
 // cap. The phone's middle distance wants the far trees drawn into this pass, not a bigger square.
 const MID_TIER = 219;
+// (the middle tier's reach as the trees' hand-over has it now, T1 x 1.15: flora.js setHandover writes it; 219 as it was)
+export const SHADOW_TIERS = { mid: MID_TIER };
 // Looking DOWN this steeply (the sines of 48 and 58 degrees) the middle distance has left the frame, so the square
 // comes back in and the near shadow has its finest texels again. Two numbers and not one so that a view held near
 // the threshold does not change the texels a shadow is cut on from frame to frame.
@@ -245,7 +247,7 @@ export class ShadowMap {
     // the air were judged with the square their own height gives them, and this step is for the player on the land.
     if (REACH > 0 && R === this.R0 && (QUALITY.level | 0) >= 2) {
       this._far = f.lengthSq() > 0.5 && -pitch < (this._far ? LOOK_OFF : LOOK_ON);
-      for (let s = 0; this._far && s < REACH && R < 359 && (LEAD + FULL) * R < MID_TIER; s++) R *= Math.SQRT2;
+      for (let s = 0; this._far && s < REACH && R < 359 && (LEAD + FULL) * R < SHADOW_TIERS.mid; s++) R *= Math.SQRT2;
     }
     if (R !== this.R) { this.R = R; const sc = this.cam; sc.left = -R; sc.right = R; sc.top = R; sc.bottom = -R; sc.updateProjectionMatrix(); }
     const c = this._c.copy(camL).addScaledVector(up, -alt).addScaledVector(f, this.R * LEAD);
