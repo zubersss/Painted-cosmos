@@ -51,6 +51,7 @@
 
 import { BUILD } from './build.js';
 import { MAX_PIXELS } from './preset.js';   // (the ceiling on the 'every pixel the screen has' row)
+import { WX2 } from '../physics/wx2.js';     // (group D's switches: its rows run only while its pieces are on)
 
 export function attachBench(pc) {
   // which table (tenth form): '1' the whole of it, 'trees' the tree questions, 'air' or 'air,<metres>' the air table
@@ -443,6 +444,8 @@ export function attachBench(pc) {
         if (MK <= 1) await sharpen(1);
       }
     }
+    const WX0 = { ...WX2 };      // (group D: its switches as the address set them, put back after each of its rows)
+    const holdStorm = (on) => { const P = pc.sim && pc.sim.physics; if (P && P.forceWeather) P.forceWeather(on ? { kind: 'storm' } : null); };
     const steps = [
       [AS, null, null],
       // the far trees: their paint, their shapes, which pass, which place in the order of drawing, which form
@@ -501,6 +504,29 @@ export function attachBench(pc) {
       ['trees cast no shadow', () => treeMeshes((o) => o.layers.disable(2)), () => treeMeshes((o) => o.layers.enable(2))],
       ['no light in the air', () => B({ shaft: false }), () => B({ shaft: true })],
       [lite0 ? 'the full paint' : 'the lighter paint', () => B({ lite: !lite0 }), () => B({ lite: lite0 })],
+      // (GROUP D, THE SECOND WEATHER: docs/lead/WEATHER-DESIGN.md section 7. Asked only while its pieces are switched on
+      //  (?wx2=1, ?windmap=1 ...): with them off the rows would time the same frame twice and say nothing.)
+      ...(WX2.windmap ? [
+        [AS, null, null],
+        // the far field the plants read beyond the bend field (physics flora.js FAR): one lookup for one lookup, so ~0
+        ['weather: no far wind on plants', () => { WX2.farwind = false; }, () => { WX2.farwind = WX0.farwind; }],
+        // the whole wind map's refresh stopped: read the script time against the row before (about 0.14 ms derived)
+        ['weather: wind map frozen', () => { WX2.freeze = true; }, () => { WX2.freeze = false; }],
+      ] : []),
+      // (group D: a STORM HELD OVERHEAD, physics.forceWeather, so the worst case is timed whatever the weather of the
+      //  moment: the sky, the rain, the wind of a thunderstorm. "storm: no rain drawn" is the same storm with the rain's
+      //  marks hidden: the gap between the two rows is what the falling rain costs.)
+      ...(WX2.cloudmap ? [
+        [AS, null, null],
+        ['weather: a storm held overhead', () => holdStorm(true), () => holdStorm(false)],
+        ['storm: no rain drawn', () => { holdStorm(true); show(/^pc-kit-rain/, false); }, () => { show(/^pc-kit-rain/, true); holdStorm(false); }],
+      ] : []),
+      // (group D: the rain shafts under distant storms and the lightning bolts, world/storms.js. Not with the storm held
+      //  overhead: a shaft is not drawn round the eye, so the row means something only with a storm in sight, about
+      //  1 to 7 km away -- the weather of the moment, as the table is run. Derived for the phone: about 0.2 ms a storm in view.)
+      ...((WX2.rainshaft || WX2.bolts) ? [
+        ['storm: no rain shafts or bolts', () => show(/^pc-storm-/, false), () => show(/^pc-storm-/, true)],
+      ] : []),
       // (TENTH FORM) THE AIR: no row had ever timed it. The same spot, from 150 m and 400 m up.
       ...airAt(150, 30, [T0.noFar, T0.blob, T0.imp]),
       ...airAt(400, 45, [T0.noFar, T0.imp]),
