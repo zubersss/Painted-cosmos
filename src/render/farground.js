@@ -46,6 +46,9 @@ export const ROCK_DEBUG = (() => { try { const v = +new URLSearchParams(location
 // ?canfloor=: the smallest a canopy dab may be, in pixels (2.6); 0 takes the floor out (for an A/B still).
 export const CANOPY_FLOOR = (() => { try { const q = new URLSearchParams(location.search); const v = q.has('canfloor') ? +q.get('canfloor') : 2.6; return isFinite(v) && v >= 0 ? Math.min(v, 12) : 2.6; } catch (e) { return 2.6; } })();
 export const CANOPY_DEBUG = (() => { try { return new URLSearchParams(location.search).get('candebug') === '1'; } catch (e) { return false; } })();
+// ?farshadow=1 (A1's far crowns' shadows, render/shadow.js FAR_SHADOW on trees-far; the same rule read here): the canopy's
+// dabs read the shadow map too (PC_FAR_SHADOW in pcCanopyAt). Off by default.
+export const CANOPY_FARSHADOW = (() => { try { const v = new URLSearchParams(location.search).get('farshadow'); return v === '1' || v === 'true'; } catch (e) { return false; } })();
 
 // THE VERTEX SHADER'S PART: the stand rides in the far wash's spare byte (patchgen.js), morphed as everything else is.
 export const CANOPY_VERT_DECL = /* glsl */`
@@ -260,6 +263,21 @@ void pcCanopyAt(vec3 P, vec2 ch, float stand, float needle, vec3 floorC, float l
   // reached V 0.95 and over, and the look rules want lit foliage at 0.60 to 0.82 (R1.2c); MEASURED, the share of a 1 km
   // still over V 0.90 went 11.1 to 13.7 per cent with the full light. A cap is still one flat colour for the dab.)
   gCanL = min(pcLevel(x + (rnd.z - 0.5) * 0.06, 0.03), 2.6);
+  #ifdef PC_FAR_SHADOW
+    // (THE FAR CROWNS' SHADOWS ON THE ROOF, trees-far A1's lines, ?farshadow=1, chosen by the look director: a dab whose centre
+    // lies in a far crown's shadow, as the shadow map says (pcSunAtSoft's own test without its dapple), takes the
+    // neighbour's-shadow level. It reads the map, not the grid, so it holds on both sides of pf: where this roof's own
+    // shading has gone to the mean, the dabs beside each impostor crown on its shadow side still step down. One read a dab.)
+    if (uShK.x >= 0.004) {
+      vec3 qF = (uShM * vec4(P, 1.0)).xyz; vec2 aF = abs(qF.xy);
+      float inF = (1.0 - smoothstep(uShK.w, 0.97, max(aF.x, aF.y))) * uShK.x;
+      if (inF > 0.5) {
+        vec2 fF = textureLod(uShAir, qF.xy * 0.5 + 0.5, 0.5).rg;
+        float covF = fF.r * step(fF.g / max(fF.r, 1e-3) - 0.0006, qF.z);
+        if (covF > 0.40 + 0.26 * fract(rnd.y * 5.7)) gCanL = min(gCanL, pcLevel(0.33, 0.03));
+      }
+    }
+  #endif
   #ifdef PC_CANDEBUG
     // (?candebug=1: what each dab is, in flat colours -- black a floor in shade, green a floor in sun, white a lit cap,
     // orange a crown's body, red its shaded side, purple a neighbour's shadow; a needle tree bluer; all of it at half
@@ -403,6 +421,7 @@ float gGully = 0.0;       // how far into a gully the cliff dab lies: its light 
 float gRockLw = 1.0;      // (main) the surface's metres per pixel here (lw): how many pixels a bed spans
 float gRockT = 0.0;       // the rock dab's temperature by its plane: +0.8 lit (warm) .. -1 turned away (cool), pcRockPlanes
 float gRockP = 0.0;       // how much the light planes rule this dab: bedded rock only (a cliff, a mountain's face), never snow
+float gCliffU = 0.0;      // 1 while pcCliffC paints the ground BETWEEN the dabs, per pixel (main's bare branch)
 float gFaceOn = 0.0;      // (main) this pixel is steep enough that the upright charts may lay its dabs
 float gFaceD = 0.0;       // (main) the dab being painted lies on an upright chart
 #ifdef PC_ROCKDEBUG
@@ -539,7 +558,11 @@ vec3 pcCliffC(vec3 Bc, float hB, vec3 rnd, vec3 c, float w) {
   else if (f > 0.89) tone = mix(tone, lipC, 0.6);      // (the lit lip: the only near-white on a face)
   vec3 meanC = 0.5 * (mix(uRockC0, uRockC3, 0.28) + mix(uRockC1, uRockC2, 0.4));
   vec3 meanM = 0.5 * (mix(uRockM0, uRockM3, 0.4) + mix(uRockM1, uRockM2, 0.3));
-  tone = mix(tone, mix(meanC, meanM, kM), 0.85 * kB);
+  // (the ground between the dabs is asked per pixel, not per dab: there a bed under about 3 px tall, its seams and lips
+  // a fraction of a pixel, came out as a dither of light and dark pixels, the speckle the look director saw on the far
+  // faces at 1 km. So under the dabs the beds go WHOLLY to the mean by 3 px, the way a dab's beds go to it by 7.)
+  float kBf = mix(0.85 * kB, 1.0, gCliffU * (1.0 - smoothstep(3.0, 6.0, uRockB.x / max(w, 1e-4))));
+  tone = mix(tone, mix(meanC, meanM, kM), kBf);
   tone = mix(tone, pcDensity(mix(mix(uRockC1, uRockC2, 0.4), mix(uRockM1, uRockM2, 0.5), kM), 1.15), gGully * 0.75);
   float lc = max(dot(c, vec3(0.3, 0.5, 0.2)), 0.05);
   tone = clamp(tone * mix(vec3(1.0), clamp(c / lc, vec3(0.7), vec3(1.4)), 0.08), 0.0, 1.0);
@@ -558,7 +581,10 @@ vec3 pcRockWash(vec3 c, float up, vec3 Bc, float strata, float dist, vec3 rnd, f
   float hB = length(Bc) - uBodyR;
   // (up the range, past the coast's height band, the rock begins at a gentler slope, about 30 degrees, from 80 m out:
   // the mountains' flanks were the pastel patches of the alpine wash, rose, lime and lilac, the audit's rainbow)
-  float kMt = smoothstep(uRockMH.x, uRockMH.y, hB) * smoothstep(0.05, 0.20, strata);
+  // (the mountain's family and its light planes only where the beds are WHOLE: a partly snowy place (patchgen.js reports
+  // part of its beds) took part rock and part wash, and the planes darkened the wash's red patch into soft dark red-brown
+  // smudges on the alpine ridges, SEEN by the look director)
+  float kMt = smoothstep(uRockMH.x, uRockMH.y, hB) * smoothstep(0.35, 0.50, strata);
   float far = mix(smoothstep(0.82, 0.67, up), smoothstep(0.87, 0.74, up), kMt) * smoothstep(80.0, 250.0, dist);
   float cl = smoothstep(0.66, 0.50, up) * smoothstep(0.05, 0.20, strata);
   float nr = textureLod(uNoise3D, Bc / 4.3 + 0.13, 0.0).g;
@@ -570,7 +596,7 @@ vec3 pcRockWash(vec3 c, float up, vec3 Bc, float strata, float dist, vec3 rnd, f
   gRock = max(far * uRockK * (1.0 - sn), gCliff);
   // (the planes only on BEDDED rock: a snow-laid place reports no beds (patchgen.js), and a snowfield turned from the sun
   // was laid in the deep shade plane and went dark at 1 km, SEEN; snow keeps the ordinary light)
-  gRockP = max(gCliff, far * uRockK * (1.0 - sn) * smoothstep(0.05, 0.20, strata));
+  gRockP = max(gCliff, far * uRockK * (1.0 - sn) * smoothstep(0.35, 0.50, strata));
   gGully = 0.0;
   if (gRock <= 0.0) return c;
   if (gCliff > 0.5) return pcCliffC(Bc, hB, rnd, c, gRockLw);
@@ -625,7 +651,12 @@ vec3 pcRockTemp(vec3 k) {
   if (gRockP <= 0.0) return k;
   vec3 wC = uRockM3 / max(dot(uRockM3, vec3(0.3, 0.5, 0.2)), 1e-3);
   wC = vec3(1.0) + (wC - vec3(1.0)) * 2.2;
-  vec3 t = gRockT > 0.0 ? mix(vec3(1.0), wC, gRockT) : mix(vec3(1.0), vec3(0.86, 0.84, 1.25), -gRockT);
+  // (AT NOON the side and turned-away planes lean further to the cool violet, the look director after v39.4: with the sun
+  // high their shade is shallow and the rock read as one grey, S median 0.07 at the noon views, MEASURED; 1.25 blue at a
+  // low sun as before, up to the noon key with the sun overhead)
+  float kN = smoothstep(0.55, 0.85, dot(gSunV, normalize(vUpV)));
+  vec3 cool = mix(vec3(0.86, 0.84, 1.25), vec3(0.82, 0.80, 1.34), kN);
+  vec3 t = gRockT > 0.0 ? mix(vec3(1.0), wC, gRockT) : mix(vec3(1.0), cool, -gRockT);
   return clamp(k * mix(vec3(1.0), t, gRockP), 0.0, 1.0);
 }
 #endif`;
@@ -844,3 +875,63 @@ export function syncCanopy(material, S) {
     for (let i = 0; i < 3; i++) { u.uCanSum.value[i] = spec.means[0][i]; u.uCanAut.value[i] = spec.means[1][i]; }
   }
 }
+
+// THE FAR VIEW'S WATER LINE (?farwater=1; the water group's lead, written here with C's agreement, 24 Nov; docs/notes/water.md
+// "THE WATER FROM THE AIR" on design-water). From high up the ground's patches are coarse: they drop a river's water mesh
+// (world/patchgen.js: thin water is left to the far colour) and a river of 19 m falls between vertices 40 to 60 m apart, so
+// from 1 km a river of the tree was lost. The mesher packs at each vertex the SIGNED distance to the nearest river's centre
+// line (its sign the side of the river), which passes through zero across the river and interpolates truly between
+// vertices however far apart they lie, the river's half width, and its size (no river near: two rivers' distances of
+// opposite sign would cross zero between them). The river is then laid as wide as it is, at each pixel, over the ground's
+// paint, in the tone of water seen from above (the sky's, as the water's own paint takes it). WHY AT EACH PIXEL AND NOT IN
+// THE DABS (C asked for the dabs; tried, 24 Nov 17:00, and SEEN to lose the river again): from 1 km the river is about 7
+// pixels wide, narrower than a dab, and a dab is painted whole from its centre, so few dabs ever took the water and the
+// line broke up. Only past 250 m (nearer, the water's own mesh holds the river). Compiled in only with the oil look and
+// ?farwater=1 (render/materials.js); the mesher packs nothing without it.
+export const FARWATER_VERT_DECL = /* glsl */`
+#ifdef PC_FARWATER
+attribute vec4 aFarW;     // the signed distance to a river's centre (0.5 on it), its size, the river's half width
+attribute vec4 aFarWP;    // the same as the parent patch paints it
+varying vec3 vFarW;
+#endif`;
+export const FARWATER_VERT_MAIN = /* glsl */`
+  #ifdef PC_FARWATER
+    vFarW = mix(aFarW.xyz, aFarWP.xyz, m);
+  #endif`;
+export const FARWATER_FRAG = /* glsl */`
+#ifdef PC_FARWATER
+varying vec3 vFarW;
+// how much of this pixel is river: 1 inside, 0 out, over the pixel's own share of the distance (a crisp edge of about a
+// pixel). Its width breathes: br along it, and the pools are in the packed half width already. Near the eye it does not
+// fade out but NARROWS to nothing, from 500 m to 250 m (the look director: by whole width, never a soft cross-fade)
+float pcFarWater(vec3 fw, float aa, float dist, float br) {
+  float sd = (fw.x - 0.5) * 96.0, dc = fw.y * 48.0, hw = fw.z * 24.0;
+  float hwE = hw * br * smoothstep(250.0, 500.0, dist);
+  aa = max(aa, 0.05);
+  return (1.0 - smoothstep(hwE - aa, hwE + aa, abs(sd))) * step(0.75, hw) * step(0.05, hwE) * (1.0 - smoothstep(41.0, 46.0, dc));
+}
+// the ground's paint c with the river laid over it. ITS COLOUR (the look director, 24 Nov, after a darker try lost it): water
+// far off mirrors the sky, so it is the LAKE'S OWN COLOUR at that distance, by the angle -- the water's own paint's sky
+// (WATER_FRAG, v37's: the sky from horizon to zenith along the reflected ray, three tenths of white, the liquid's wash taken
+// in and the mirror's share of it) -- pale blue toward grazing, the zenith's deeper blue looking down; and looking nearly
+// straight down, the water's body, a step darker than the land beside it. The liquid: the landing wood's (the autumn
+// woodland's, looks/earth.js: the rivers of the tree are drawn only on a wood). The air is laid over it after, as over the lake.
+uniform vec3 uSkyZenith;
+uniform vec3 uSkyHorizon;
+vec3 pcFarWaterLay(vec3 c, float dist) {
+  float br = 0.82 + 0.36 * texture(uNoise3D, vBody / 85.0).r;      // (riffles narrower, reaches wider, over about 100 m)
+  float k = pcFarWater(vFarW, fwidth(vFarW.x) * 72.0, dist, br);
+  if (k <= 0.0) return c;
+  float re = clamp(dot(normalize(vUpV), normalize(-vView)), 0.0, 1.0);   // (the reflected ray's height: 1 looking straight down)
+  const vec3 liq = vec3(0.68, 0.78, 0.84);
+  vec3 skyc = mix(mix(uSkyHorizon, uSkyZenith, clamp(re * 1.2, 0.0, 1.0)), vec3(1.0), 0.30);
+  vec3 mir = mix(pcDensity(liq, 1.0), pcDensity(skyc * mix(vec3(1.0), liq, 0.35), 1.12), 0.72);
+  // (and a step deeper and bluer: the water's own paint averages its light and dark strokes to this; with the sky's alone
+  //  the line came out a step lighter and greyer than the lake beside it, SEEN 18:10: V 0.81 S 0.11 against V 0.71 S 0.17)
+  mir *= vec3(0.74, 0.78, 0.82);
+  vec3 bodyW = mix(mix(uHaze, vec3(1.0), 0.30), vec3(0.45, 0.62, 0.86), 0.5);
+  float lw = dot(bodyW, vec3(0.299, 0.587, 0.114)), lc = dot(c, vec3(0.299, 0.587, 0.114));
+  bodyW *= 0.70 * lc / max(lw, 1e-3);
+  return mix(c, mix(mir, bodyW, smoothstep(0.80, 0.93, re)), k);
+}
+#endif`;

@@ -13,20 +13,29 @@ review before a step is called done, a short message to the coordinator (session
 The weather group lands the rain field (its section 9.3: `fields.rain` at 32 a face, mm/h, 2 Hz, `rainAt`,
 `rainBetween`, a GPU channel `pcRainAt`): use theirs for rain (the design's `uRainCells[8]` and `rainAt` are replaced).
 
-**STATE (24 Nov, 12:10), the short of it.** Pushed on design-water (01ec60c, ready for the coordinator's release): W1 rivers
-with S-bends (aeca809), the index fix, mountain streams behind ?mount=1 (1eed43a, dfbe555; F: keep behind the switch, the
-white water is the paint's), THE DEFAULT FLIP in the oil look (4873c6a: rivers of the tree, lakes, ponds, puddles, fjord on;
-falls held), the speed test's falls view and ?bench=water (597ab63), the landing's river (c229268: Earth's oil.springs and
-oil.keep, the save's nudge to 24 m; ACCEPTED by the coordinator from the stills 1ec1984), E-W2's puddle fix merged (110b43e:
-round the landing 1.39 % of the dry ground). THEN (a877068): water-paint merged (f05eee3) with THE FALLS FLIP (W.falls = n('falls', d), E-W2's line, F passed the falls with the paint's curtain fix; they ship with water-paint, never before). THEN (2d40220, THE v39.2 WATER, the coordinator's ruling): ?wpaint defaults to 0 (v37's strokes: the look director found the sea from the air a blocky checker with ?wpaint=1 and 2); the falls stay on; stills v392-*.jpg. NEXT: merge look-proto when the coordinator says v39.1 has landed; W3 will later make its strokes the default for rivers and ponds only. THEN (24 Nov 13:25): the runoff A/B in a storm and after
-(RUNOFF below): it works; the dry gully keeps a bed's blue (C), the brown is weak (F). THEN: the hydrograph mended (the
-streams fall back over tens of minutes, and it now keeps the weather's clock, 60 times the game's).
-The coordinator (13:11): v39.1 is live, design-water 2d40220 is in v39.2's gate; merge look-proto only once v39.2 lands there.
-Order next: W3 splits rivers and ponds from the sea (strokes default there), E-W2 and W3 fix the sea, then the mountain streams.
-OPEN: F's sand-bar notes (colour, grass,
-pebbles: C's recipe, queued after the cliff; the trees' line now reads c.barZone). The lead's sessions: coordinator session_01R5Bri1TV3HBTyuxNZZuhNw,
-F session_01R5Brhzz2JPPF6Ecz6XRQHx, E-W2 session_01R5Bri2xowNiwS1SnP3VG3f, E-W3/W4 session_01R5Bri2fSASVVvyrSG11UGF,
-C session_01R5Bri2AMBsFiRcxvUUZMvu, D (weather) session_01R5Bri2bBgFSfCmxpKKuURT (src/physics/index.js is now the water's).
+**STATE (24 Nov, 18:45), the short of it.** THE WATER IS LIVE in v39.3 (look-proto 87053ed; merged here 48f1809). Before that, v39.2 shipped WITHOUT the water (the coordinator pulled it at its gate for two
+faults, both now answered); the water goes into v39.3 with the weather. design-water HEAD 792d1f1 = v39.2 (look-proto c7d8d9e)
+merged in (df7c3ba: the ground sample 25 floats, the water's still at 23, the far view's snow at 24; W3's runoff cap and swell
+to take 25, 26; THE LAYOUT FOR THE WATER LANES IS THIS SESSION'S, the coordinator's word) plus:
+- THE FIRST VIEW (05aa102): keep r 3 and Earth's oil.face [100, -6.9] (surface.js getSpawn reads a look's oil.face for the
+  landing it already picks): in the game, the river beside the explorer into the distance, the ship on the left, 8.5 % water
+  plus 2.8 % churn against v39.1's 6.4 % (first-view-3.jpg).
+- FROM THE AIR (792d1f1, "THE WATER FROM THE AIR" below): the old high frame has little water because the rivers run
+  elsewhere; the added gate frame at the landing's river (cam=high&yaw=145.6&pitch=-13.4) shows it and a lake; 150 m and
+  400 m read; at 1 km the 19 m river is lost in the far ground itself. v39.3 TOOK 792d1f1 (the water ships with the weather).
+- THE FAR WATER LINE (a1f12fd, then e01eea8 the lake's own colour by the angle; C agreed; F PASSED 18:22): DEFAULT in the oil
+  look (?farwater=0 opts out); waiting for the coordinator's next batch. The ground-sample layout is now CS 30 (27-29 the line's).
+- Earlier today, all on this branch: W1 rivers with S-bends and point bars (the trees stand back from the bars, F passed);
+  mountain streams behind ?mount=1 (F: the white water is W3's paint, queued); THE DEFAULT FLIP in the oil look (rivers of the
+  tree, lakes, ponds, puddles, fjord, falls on; ?wpaint 0); the speed test's falls view, ?bench=water; the landing's river
+  (oil.springs, oil.keep, the save's nudge); RUNOFF behind ?runoff=1 (the hydrograph on the weather's clock, streams falling
+  within the hour; runnels 1-2 m, F passed; c.capOnly for C's dry bed; still OFF until W3's muddy colour and C's dry bed).
+- ORDER (the coordinator): W3 splits rivers and ponds from the sea (done, 05bfe0a on water-paint), E-W2 and W3 fix the sea,
+  then the mountain streams (W3's white water; nothing of this session's blocks them).
+OPEN: F's sand-bar colour (C, after the cliff); the runnel's mud colour (W3); the far water line (asked). The lead's sessions:
+coordinator session_01R5Bri1TV3HBTyuxNZZuhNw, F session_01R5Brhzz2JPPF6Ecz6XRQHx, E-W2 session_01R5Bri2xowNiwS1SnP3VG3f,
+E-W3/W4 session_01R5Bri2fSASVVvyrSG11UGF, C session_01R5Bri2AMBsFiRcxvUUZMvu, A1 (far trees) session_01R5Bri1GA9riShvfh4TrjW4,
+D (weather) session_01R5Bri2bBgFSfCmxpKKuURT (src/physics/index.js is now the water's).
 
 ### LANE 0 (built and pushed 24 Nov, commit b5924da): the hooks, the switches, the speed test's water views
 
@@ -226,6 +235,29 @@ build only where the look asks: 221040b).
   beside the explorer into the distance on the right, a riffle, the ship on the left, a meadow of yellow flowers): 8.5 %
   water-blue and 2.8 % white churn, against 6.4 % for v39.1; the three side by side `first-view-3.jpg`.
 
+### THE CONFLUENCE BY THE LANDING (24 Nov 19:20-19:55; the coordinator's PRIORITY, live in v39.3)
+
+Another lane's still from 10 m up at the landing (design-flora 8aa970d, a7-aw10-before-after-v39.3-merge.jpg) showed zig-zag
+staircase seams and straight polygon lines across the water and a broad white band. CAUSE (measured; mine, not the paint): the
+landing's river and a tributary meet just south of the landing, and each point took the level and the current of its NEAREST
+segment, which switches along a line between the two: the water stepped 0.35 to 0.45 m within half a metre there (22.65 against
+22.30) and the current flipped by more than 60 degrees at 17 points of a 60 x 40 m map. The mesh drew the step as a staircase;
+patchgen's churn read the fall as white water. FIX (rivers.js RIVER_DEF.blend = 8 m, `_blend`): in a river and on its banks
+(its half width and 3 blend) the level and the current are blended over the segments within 3 blend of the nearest, weighted
+exp(-extra / blend). MEASURED there: the largest level step 3 cm a metre (under the churn's 3.5 %), no step over 5 cm, the
+current's jumps 17 to 2; over a 6 km box random water pairs 1 m apart are unchanged elsewhere (13 steps over 5 cm, before and
+after: they are not confluences). The sample costs about 9 % more near the landing (1.57 to 1.71 us). SEEN
+(`docs/shots/painter/water-default/confluence-step-before-after.jpg`, B's view and near the first view): the white band, the
+staircase and the straight lines GONE; HONEST: the strokes now follow a current that curves through the confluence, so they
+swirl and marble there, and a faint line of fine hatching remains along where the seam was: for the look director.
+- F (19:52): keep the level blend; the swirl NOT acceptable (marbled paper). MADE (14772ce): the current blended over 1.5 m only
+  (RIVER_DEF.blendDir), the level still over 8 m (the step stays gone: 3 cm a metre at most). SEEN (`confluence-current-short-
+  turn.jpg`: v39.3 | both over 8 m | current over 1.5 m, B's view and near the first view): the tributary's strokes long and
+  nearly straight again to where the rivers meet; some curved banding and fine hatching remain on the main river by the meeting,
+  as v39.3's own frame shows on that bending reach. CAUSE of that (read in WATER_FRAG, v37's strokes, the default): a current
+  turns the stroke chart at each pixel about the middle of a 26 m cell, so where a river bends a point 13 m from the middle
+  shifts metres for a few degrees and the strokes bunch: ONE DIRECTION PER STROKE needs the paint (W3's), asked.
+
 ### THE WATER FROM THE AIR (24 Nov 14:50-16:15, this session; the coordinator held the water out of v39.2 for it)
 
 The gate's high frame (gallery cam=high at the landing, 420 m up, looking north-north-east and down 29 degrees, 936x372)
@@ -247,6 +279,46 @@ showed NO water with the water branch (`docs/shots/painter/water-air/gate-high-a
   built): pack the signed distance to the water's edge at each vertex (patchgen, the layout is this session's) and let the
   far ground's paint (C's farground.js) draw a river-coloured line where the interpolated distance crosses zero: a line that
   survives any vertex spacing. W3's notes already name "the far water byte for C".
+- WHY 1 KM LOST IT, exactly: patchgen drops a patch's water when it covers under 8 % of the patch below level 5 ("thin water is
+  left to the terrain's far colour"), and the far colour's own widening (surface.js, S.foot) makes a river as wide as the
+  samples lie apart, at part strength: a faint broken band 50 to 100 m wide.
+- BUILT, ?farwater=1 (the coordinator, 16:14: after v39.3 took 792d1f1; C agreed, 16:22), off by default, the oil look only:
+  rivers.js writes c.rsd (the signed distance to the nearest river's centre line, its sign the segment's side) and c.rhw (that
+  river's half width), every call; surface.js hands them out as o.rsd, o.rhw while the rivers are attached (the context reset
+  each sample). patchgen.js: THE LAYOUT, CS 30: 23 still, 24 snow, 25 and 26 W3's runoff (reserved), 27 the signed distance,
+  28 its size, 29 the half width; packed only with the switch into aFarW (+ aFarWP for the morph: x 0.5 + sd / 96 m, y size
+  over 48 m, z half width over 24 m); terrain.js binds them. render/farground.js (at C's place: FARWATER_VERT_DECL / _MAIN /
+  _FRAG, inside #ifdef PC_FARWATER): pcFarWaterLay lays the river over the ground's finished paint at each pixel, as wide as
+  the interpolated distance says, in water's tone from above (the haze with 0.3 white, as the water's own paint takes the
+  sky), only past 250 m (fading in to 500 m), and only where the size says a river is near both vertices (two rivers'
+  distances of opposite sign would cross zero between them). materials.js: the includes and one line before the haze.
+  TRIED AND NOT KEPT (C's first wish): the water's wash in the dabs at their centres and between them, with crowns and fallen
+  leaves gated off a river dab: from 1 km the river is about 7 px, narrower than a dab, and lost again
+  (`farwater-in-dabs-tried-1km.jpg`). SEEN (`farwater-ab-400-1km-1600.jpg`, same frames A | B): 400 m unchanged (the water's
+  own mesh holds the river there); 1 km the landing's river a continuous line from near the eye into the lake, and two other
+  rivers; 1.6 km the rivers winding lines. HONEST: the line is a plain pale stroke, lighter than the lake's painted water and
+  without its strokes: the look director's call. Test: src/world/farwater.test.mjs (nothing packed without the switch; with
+  it, coarse patches over the landing carry vertices inside the river, and they are wet). Switches off: 0 of 1,688,000 values
+  differ, both looks; the ground's program is compiled without any of it.
+- F's REVIEW (17:33): keep it, the right fix. Changes asked and MADE: (1) the lake's own hue, a step darker than the land (its
+  value set to 0.70 of the paint it lies on; the hue the sky's tone pulled halfway to the lakes' blue, since the air greys it:
+  the sky's tone alone at 0.82 read grey-green and was lost in the wood, SEEN 17:45); (2) a crisp edge (about a pixel) and the
+  width breathing (the packed half width now the river's with its pools, and +-18 % along it over about 100 m); (3) near the
+  eye it narrows to nothing from 500 m to 250 m, no cross-fade. SEEN (`farwater-F-notes-1km-1600.jpg`, before | after): 1 km a
+  continuous darker blue-grey line into the lake; 1.6 km FAINT in the haze (value 0.59 against the land's 0.74 at 1 km, the
+  air greying it to saturation 0.07), where the pale line read more. Asked F to choose the value for the far end.
+- F's SECOND WORD (17:58): darker loses it; water far off MIRRORS THE SKY. Made: the line is the lake's own colour by the angle,
+  the water's own paint's sky (v37's WATER_FRAG: horizon to zenith along the reflected ray, three tenths of white, the liquid's
+  wash and the mirror's share; terrain.js binds the sky's uSkyZenith and uSkyHorizon with the switch), a step deeper and bluer
+  as the lake's strokes average, and looking nearly straight down the water's body (darker than the land). MEASURED in the
+  same frames (the purest line pixels against the lake's water): 1 km line hue 208 S 0.20 V 0.75, lake 206 0.17 0.71; 1.6 km
+  line 210 0.17 0.72, lake 222 0.15 0.72. SEEN (`farwater-lake-colour-1km-1600.jpg`, darker | the lake's colour): 1 km a blue
+  line into the lake in the lake's own colour; 1.6 km subtler, a winding line of the same blue. Not yet: the gold toward a low sun.
+- F PASSED it (18:22): "right on"; DEFAULT in the oil look since then (mode.js W.farwater = n('farwater', d); ?farwater=0 the
+  opt-out; the watercolour game off). The gold toward a low sun comes after: take the sky along the reflected ray at a golden
+  hour as the water's mirror does (look director cbf7f41's wash and glow in the water's skyc), so line and lake turn together.
+  v39.3 (look-proto 87053ed, the water live) merged in (48f1809): C's flower drifts from the air (aBloom, ?bloomfar) beside the
+  line's aFarW; with both on 14 of the 16 attributes. Its 3D clouds now cover much of the 1 km views: later A/Bs with &wx=fair.
 
 ### THE SPEED TEST'S FALLS VIEW AND ?bench=water (24 Nov, this session; lane 0, the coordinator's order)
 
@@ -448,9 +520,117 @@ Branch `water-bodies` = lane 0 + look-proto v37.1 + `origin/design-water` (W1's 
   slope. Not good yet, said plainly: at 150 m the surface reads as long grey-blue bands (the shared still-water strokes, as
   on the lakes), more like ribbed metal than a still tarn; for F to judge. Not yet looked at in the game itself (only the
   gallery, which uses the same surface code).
-- NEXT: W3's curtain fix (then F looks at the falls, then the word to E for the falls flip); whatever F says of the tarns.
+- **F on the tarns: PASS** to keep behind the switch (shores crisp at all three distances; no change to the tarn code). The ribbed
+  bands are the shared still-water strokes: F and the coordinator have given them to water-paint (step 3), the tarns as a test
+  case.
+- **IN THE GAME (not only the gallery):** `/?body=earth&look=oil&mount=1&card=0&time=15.4&quality=1` booted in the lab in about
+  4 minutes; the page reports 24 tarns, lakes on, no errors. The explorer placed 7 m from the south shore of the tarn at
+  [-0.014061, 0.899892, 0.435885] (shore found 42 to 45 m south of its middle), facing north: `tarn-in-game-shore.jpg`. SEEN:
+  the water lies at the back of the meadow where it should, the shore crisp against the grass; the strokes on it are choppy,
+  the same shared still-water strokes as above. (c.swell, which the tarn sets to 0.4, is how far water rises after rain,
+  not waves.)
+- **PUDDLES BESIDE A WIDE RIVER (110b43e, for E's landing river 784184b, which made the puddle test read 7.73 %):** on a
+  river's flat floor a hollow must be deeper (capFloor 0.12 m times (1 - rise) squared) and none lies within capBank 4 to 10 m
+  of the water's edge. Measured in 288 m squares beside Earth's six widest rivers (half width 13 m): 5 to 9 % of the dry
+  ground before, 1.0 to 2.7 % now; round the landing 3.3 to 1.2 %; the wood's uplands unchanged. The test holds the widest
+  river's square under 4 % too. NOT run on top of E's commit by me (E runs it after the merge). E's own suggestion, no puddle
+  within 30 m of any stream, was measured by E and works, but would take most of the wood's puddles (the streams are dense).
+- **E's LANDING RIVER (c229268, in design-water 01ec60c with 110b43e; merged here d5b4437, suites 325 / 96 / 416):** round
+  the landing puddles on 1.39 % of the dry ground (7.73 % with the old rule); hydro, falls and tarns 18 of 18. Of the nine
+  falls eight are the same; the main one is 26.0 m wide (was 25.6), its lip 0.2 m over, the same 19.5 m drop: the landing's
+  river now carries more water to it. The 22 mouths are the same, so is the fjord's choice; ponds 84 to 85.
+- **THE FALLS WITHOUT THE CURTAIN (W3's fix, water-paint 7889acf, merged in a SCRATCH copy only with design-water):** SEEN
+  at phone settings, 68 m from the sea, 150 m, 400 m: `falls-nocurtain-68m-150m-400m-P1.jpg`, and the fall at 150 m before
+  and after: `falls-curtain-before-after-150m.jpg`. The blue strips beside the sheet are gone; the sheet meets the cliff
+  faces. Not mine but seen: the sheet reads paler and greyer than at F's PASS (its milk takes the water's wash, which W3's
+  new colour changed); asked F whether to raise the whites (fallmat.js, mine). Sent to F; when F passes, the falls line to E.
+  (The scratch merge of design-water and water-paint conflicts in data/mode.js and data/looks/earth.js, two lines each:
+  water-paint's wpaint default 1 against E's switches test, and earth.js oil needs E's keys and W3's airTop; told the
+  coordinator.)
+- **F: the curtain-free falls PASS.** THE FALLS FLIP SENT TO E: `W.falls = n('falls', d)` in data/mode.js waterFromSearch (the
+  oil look's default like the lakes; `?falls=0` opts out), with the dependency said plainly: the curtain fix is on
+  water-paint, so the flip ships with or after water-paint 7889acf, never on design-water alone. The top tier seen too:
+  `falls-nocurtain-68m-150m-400m-T2.jpg` (no curtain).
+- **THE FALL'S OWN WATER (ef3e182, F's note):** the sheet, the pool's milk and the spray no longer take the river's wash (W3's
+  deeper blue made the sheet grey and flat): FALL_CHUNK's FALL_WHITE / FALL_MILK / FALL_PALE, a few whites mostly on the
+  ropes, the milk body, the pale blue under it; only the lip's glass and the outflow keep the river's colour. SEEN at phone
+  settings (scratch copy): lit whites V 0.91, the body's median 0.88 (0.87 before) with clear steps. F's literal numbers
+  (milk 0.75 0.80 0.83) tried: the body went grey, median 0.83; both in `falls-ownmilk-ABC.jpg`; F to choose (three numbers).
+- **F: the fall's own water PASS** (the committed, lighter set; F's literal numbers read grey). Nothing more on the falls until
+  W3's sea fix lands.
+- **THE SEA'S CHECKER FROM THE AIR (F's note 3, given to W2 by the coordinator; branch `water-sea`, 9525b16, cut from
+  water-paint 46b7657; W3 told the lines; W3 owns waterchunk.js, untouched):** cause: at ?wpaint=1 still water kept v37's
+  three steps in near equal shares (one very deep) on short square-ended strokes; off Earth's coast the crests run toward the
+  coast, so from offshore the strokes foreshorten into squares, and two cells' and two octaves' overlaps read as a checker.
+  Fix in render/materials.js only (two places in PC_WPAINT): still water's strokes 10 long, kept long on the screen (up to 3x
+  against the foreshortening); far still water at wpaint 1 fewer light and deep strokes in closer steps. SEEN 150 m, 400 m,
+  1 km at phone settings (`sea-air-150m-400m-1km-wpaint0-wpaint1-fix.jpg` on water-sea): no checker, spread 0.26 at 150 m
+  (0.40 before). ?wpaint=0 unchanged (0 to 2 pixels of 518400 by at most 2 of 255). NOT GOOD YET: where the crests run
+  toward the eye the near sea reads as long streaks, not v37's swell; option rendered (far still water across the view; turns
+  with the camera, a seam between near and far): F to choose.
+- **F on the sea (13:00):** the checker PASSES (keep the spread 0.26); across-the-view REFUSED (it would swim); the body a
+  step deeper: done on water-sea 079fcf3 (median 0.66 / 0.66 / 0.65 at 150 m / 400 m / 1 km, spread 0.26 at 150 m). The
+  crests' direction checked in the page: the strokes are along the crests; the crests run toward this coast because the wind
+  does (gallery ?physics=1: uPhysWaterDir -0.996, 0.091; the sea map off, uPhysSeaGrid.w 0); in the game physics' warp, which
+  turns crests toward a shore, covers 17 x 16 m round the player only. Turning them along the coast within ~300 m of land
+  needs a shore direction per sea vertex from the mesher (patchgen, a new two-byte attribute in terrain.js, read in
+  WATER_FRAG): asked the coordinator who does it.
+- design-water a877068 (the falls flip, with water-paint and its curtain fix) merged here (1dbc5ee); E's one line in
+  hydro.test kept (every part switched off for 'no part asked for'). Suites 325 / 107 / 445.
+- **THE SEA'S SHORE AND CHOP (the coordinator gave it to W2, F's design; branch `water-sea`, da7baa7, a merge of W3's
+  water-paint 05bfe0a; all behind ?wsea=1, the default sea v37):** world/shore.js (new, with shore.test.mjs): the way toward
+  land times its nearness (by the share of rings at 120 / 250 / 450 m on land) and the narrowest crossing (land each side,
+  read to 700 m), on a 160 m lattice of the cube faces, measured once a node, read bilinearly from the nodes that ARE sea.
+  patchgen (only with ?wsea >= 1, sea found by W3's aTurb.z byte) hands it to the water mesh as aShore, four bytes, bound in
+  terrain.js; no ground-sample slot. WATER_FRAG: the wind's waves turned toward land by the nearness (left alone when they run
+  out to sea), the strokes along the turned crests; the fetch (the crossing over how squarely the wind crosses it) under
+  900 m (fully 300 m) makes the strokes short chop, 3.5 widths, fewer light ones. The deeper far body (079fcf3) is the sea's
+  only (vOpen), so ponds and lakes keep water-paint's values. SEEN at phone settings with ?physics=1
+  (`sea-shore-chop-strait150-strait400-coast150-coast400-v37-off-on.jpg` on water-sea): the falls strait short broken chop;
+  facing a coast with the wind along it the strokes bend along the coast. PROVEN: the default against water-paint 05bfe0a's
+  own files, at most 74 of 518400 pixels by 6 of 255. Cost: a sea node 0.1 ms in the browser, about 2,800 over three views,
+  once a world. NOT RIGHT YET: end-on up the strait the chop still lines up toward the horizon; the bent strokes may read as
+  current lines round headlands. With F. Slots: W3 go ahead, C agreed, B no reply. (Commit 521202e said "agreed" before the
+  replies came: left as it is.) Heads-up passed on: water-paint's runoff slots 24-25 against C's snow at 24 in v39.2.
+- C (far view) paints the coast's wall (?rockfield=1); agreed: no geometry change within 30 m of any fall, and C runs
+  hydro.test and falls.test on its merge.
+- **F on da7baa7: NOT YET** (keep ?wsea off): (a) the radial line-up read as planks; (b) the shore's curl as current lines
+  and whirlpools; also the new sea flatter in value than v37 (sparkle) and cool under a gold sky (shared with F). Done on
+  water-sea 9ec9b3a: (a) the sea's crest turned toward the eye's sideways axis by how grazing the eye looks (smoothstep
+  0.35 .. 0.85 of 1 - |forward . up|), from the EYE'S forward, one value a frame (per pixel it sheared every cell's rows);
+  so at a grazing look the strokes turn as the eye turns -- told F plainly, only the owner's device can judge it moving;
+  chop 3 widths. (b) the turn at most 35 degrees, within ~120 m of land (near 1 / 0.3 / 0 / 0), none from stacks (share
+  0.2 .. 0.5). The sea-only lines where vOpen >= 0.75 (wpL always the sea there). SEEN: the strait's chop across the view,
+  the coast in level bands (`sea-foreshortened-...-v37-before-now.jpg`, `sea-strait150-crop-v37-before-now.jpg` on
+  water-sea). PROVEN: default against water-paint 05bfe0a's files, at most 28 of 518400 pixels by 2 of 255.
+- **F on 9ec9b3a: (a) and (b) ACCEPTED.** FIRST THING TO CHECK IN MOTION ON THE OWNER'S DEVICE (F's order): at a grazing
+  look the sea's strokes turn as the eye turns (yaw), because the foreshortening takes the eye's forward for the whole frame.
+  If it swims, the fallback is the crests alone (kG = 0 in WATER_FRAG; the strait then reads as planks again).
+- **THE SEA'S SPARKLE (water-sea ca13cff; W3's 6fcd2ed merged on top, 25e5cde):** far still sea only (so): whole light
+  strokes, more and brighter toward the sun's side (15-22 %, to value 0.88, capped 0.90), whole dark troughs (16 %, to 0.42).
+  MEASURED value p5 / p95 / sd: strait 150 m 0.42 / 0.88 / 0.118 (v37 0.151), coast 150 m 0.41 / 0.88 / 0.127 (v37
+  0.151); 400 m still short (0.105 and 0.089 against 0.138 and 0.117). The POINTED DASH ENDS are W3's (waterchunk.js, all
+  water at the new paint); F's full sheet and the strait crop go when they land. F passes ?wsea for the coordinator's
+  default decision only if it then reads at least as well as v37 in all four rows.
+- **400 m sparkle (water-sea b053b4b):** the light and dark shares grow 8 points each from 200 to 600 m out; strait / coast
+  400 m spread 0.120 / 0.108 (p95 0.85); F: on target. **The sun path in gold (cba04ab, F's note):** the sea's light strokes
+  toward the sun take pcOilSunC by the square of the sun's side (a path, not half the sea), cap 0.90. SEEN at 18.3 h facing
+  the low sun (`sea-sunpath-1818-white-then-gold.jpg` on water-sea): gold dashes down the strait, where white read as floes.
+  F now owns the sky's gold on the water generally (look-director cbf7f41, ?goldsky).
+- The lab (tools/lab.mjs serve) hit the machine's two-hour limit twice; later stills come from tools/shot.mjs one-offs with
+  the scratch helper and sunview.js (scratch only).
+- **LAKE WIDTHS for the paint (5377ec9, W3's ask; F's condition: lakes wider than ~150 m take the sea's level, ponds keep
+  the strokes):** _buildLakes keeps each basin's id per node (lakeComp, halo too) and its core's width, the narrow axis of
+  the ellipse of the core's area and shape (2 sqrt(A r / pi)); S.hydro.lakeWidthAt(x, y, z) answers it at load (0 where no
+  lake: ponds, tarns, puddles). Not a sample field: surface.js untouched. Earth: 13 lakes, 212 to 958 m, 12 over 150 m.
+  Suites 325 / 108 / 445 (the commit message says 107: written before the run).
+- F accepted the gold sun path; for the full sheet: W3's pointed ends to cure the square slabs; and at golden hour the sea's
+  troughs toward violet by pcGold() -- W3 chose option (b), mine, after W3's golden-hour wash change lands.
+- NEXT: W3's push (pointed ends, pcWCellC(wL, asp), wLow, gWLens around the pcWStrokes call: merge with care at my aspW /
+  lenF / kG lines), the violet troughs, then the full sheet, the strait crop and the 18.3 h sun view to F; after the
+  branches meet (the coordinator's call): the pool's pcThinLayer to W3's
+  pcWStrokes, pcFallMilk and the FALL_ colours into waterchunk.js.
 - Camera places for the falls views: `fallsView(S)` and the scratch `fallcams.mjs` (sea60, sea150, air400, bank, E7).
-- NEXT: lake stills at E4/E5 (A/B), ponds from 150 m, the fjord; then what the review asks.
 
 ## Stations and tools
 

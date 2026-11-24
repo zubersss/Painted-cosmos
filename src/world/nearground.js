@@ -83,8 +83,8 @@ const VISTA = (() => {
 //   `?tuft=`     0 lets each blade pick its own colour again instead of its tuft's, and each touch of the middle band its
 //                own instead of mostly its cell's (the look director's audit 2)
 //   `?comb=`     0 lets the middle band's grass touches lean every way again instead of with the meadow's comb (audit 2)
-//   `?driftpatch=` 1 lays a coloured drift's heart past the near ring as a patch of round touches instead of many
-//                floor-sized heads (audit 2; OFF by default until the look director passes it on the phone)
+//   `?driftpatch=` 0 lays a coloured drift's heart past the near ring as many floor-sized heads again, not as a patch of
+//                round touches (audit 2; passed as a default by the look director)
 //   `?patchfloor=` 1 also brings the heads' floor down in the middle and far rings (0.55 and 0.4 of it; not yet seen)
 //   `?sheen=`    0 takes away the gusts' sheen on the blades (G4: needs PHYSICS' bend, so the game, or the gallery's &physics=1).
 const FLORA = (() => {
@@ -107,10 +107,10 @@ const FLORA = (() => {
   f.bloom = LOOK.oil ? bloomSwitches().bloom : 0;
   try {
     const q = new URLSearchParams(location.search), on = (k) => !q.has(k) || (q.get(k) !== '0' && q.get(k) !== 'false');
-    // (the drift patch is OPT-IN until the look director passes it on the phone: ?driftpatch=1; tuft and comb are passed)
-    f.patch = f.bloom && q.get('driftpatch') === '1' ? 1 : 0;
+    // (the drift patch: the look director PASSED it as a default on the clean phone pair, 24 Nov, 69fc578)
+    f.patch = f.bloom && on('driftpatch') ? 1 : 0;
     f.pfloor = f.patch && q.get('patchfloor') === '1' ? 1 : 0;
-  } catch { f.patch = 0; }
+  } catch { f.patch = f.bloom; }
   return f;
 })();
 export { FLORA };
