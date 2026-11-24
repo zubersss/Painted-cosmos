@@ -192,6 +192,38 @@ water), the river still a little over the band; E5 0.12 to 0.37 saturation, valu
 note still water is the calmest thing: a step deeper, less mirror, strokes 10:1 and in close values, white only on the sun's
 path. NIGHT (F's ask): the light strokes keep a step of light over the pulled body, the moon's marks are left out of the
 pull (`s2-E1-night-23h-wpaint2-crest-ab.jpg`: water V 0.45, land 0.22).
+**THE RIVER ON FOOT (24 Nov, night; the look director's second audit, item 2, the coordinator's top job).** On foot the
+river was grain: hair-thin scratches, 70 % of its pixels on a light-dark edge (grass 33-39). FOUND: seen from a standing
+eye the water lies at 2 to 10 degrees; the strokes were laid larger for the rows' squeeze only up to 5x, and at 20x and
+more the rows stayed 1 to 2 px. FIXED in the new paint (`?wpaint=1`, the rivers' default): the squeeze made up to 20x;
+the lower the eye looks across the water (`wLow`, from |dot(eye ray, up)| 0.35 down to 0.08) the larger the stroke itself,
+to 2.6x (the thinnest row of the finer octave over about 3 px at 480 lines, the audit's rule); on foot fewer light
+strokes (threshold to 0.86), closer steps (the light and deep a third nearer the body) and the body a step darker (x0.86);
+a stroke cell at least two and a half strokes long (`pcWCellC(wL, asp)`). AND THE GOLDEN HOUR (F's ask with the sky's
+gold in the mirror, look-director cbf7f41): at a golden hour less of the water's own blue wash (x(1 - 0.45 pcGold)) and
+the sun's path widened (exponent to 14), noon unchanged. TRIED AND DROPPED: laying a river's strokes longer as they are
+foreshortened (as still water's are): looking along the river from its bank the near water broke into specks 1 to 2 px
+tall (measured, A/B stills, then reverted). MEASURED (the audit's measure, share of water pixels on a step of lightness
+over 0.08 to the next pixel, with the value; 1024 x 480 phone settings, autumn, season=1):
+`cam=trees` 12:00 v37 69 % V 0.75 -> new 35 % V 0.65; 16:48 v37 71 % V 0.60 R-G -0.04 -> new 41 % V 0.53 R-G +0.01
+(warm); `cam=stream` (a small far stream there) 12:00 67 % -> 48 %, 16:48 75 % -> 67 %; the bank view E2 (960 x 540,
+before this change 55 %, after 31 %); the game's first view (third person, higher) 52 % -> 41 % (these two, E2 and the
+game, were taken before the body's step darker and the golden hour were added; the `cam=` ones after). From the air (E3, E4)
+unchanged by eye. Stills: `s9-foot-trees.jpg`, `s9-foot-stream.jpg`, `s9-game-first-view.jpg`, `s9-E2-ab.jpg`,
+`s9-E3-ab.jpg`, `s9-E4-ab.jpg`. COST (bank view, phone settings, software, 6 frames each): the new paint adds 39 % of
+the water's cost before, 60 % after: possibly real (the runs scatter 10 to 20 points); derived on the phone at a bank
+about +0.27 ms before, up to about +0.4 ms after. NOT reached: the small far stream at `cam=stream` (48 %). v37 (`?wpaint=0`, the live paint) is not changed:
+the fix is the new paint's.
+**THE RUNOFF IS MUDDY** (the look director by E: hue 35-40, S 0.30-0.40, V 0.45-0.55 in the storm's light): the runnels
+muddy whenever they run (their water is all rain, `vCap`, full from 4 cm of it), a swollen river as much as it has risen;
+laid AFTER the churn's whites, following the paint's lightness (the churn a lighter mud) and each stroke's number.
+MEASURED in a storm still by the landing: H 29, S 0.26, V 0.57 (strokes 0.47 to 0.65); before: H 214, S 0.27, V 0.73
+(`s9-runoff-mud.jpg`). Three tries on the way (pale sand S 0.08; half mud half blue S 0.16; flat S 0.29) are in the
+code's comments. NOT fixed: a straight cut where the rain-only water ends (the mesher's vertices, 1.5 m).
+**POINTED ENDS ON THE SEA** (F's note by E-W2: "the near chop reads as bricks"): a global `gWLens` (waterchunk.js) set
+by the caller; each stroke drawn to a point over its last 1.3 widths, the body past the point; the sea only for now
+(`?wsea=1/2`; ponds and rivers keep square ends until F asks). SEEN at 20 m and 60 m over the bay (`s9-chop-C20.jpg`,
+`s9-chop-C60.jpg`; the before side lacks the low-eye sizing too).
 **THE SEA'S FIX, the paint's half (24 Nov, evening; E-W2 has the strokes' direction along the shore).** Three faults the
 look director named, each found and fixed in the paint (`?wsea=1` / `?wsea=2` to see them on the sea; rivers take the
 first two by default):

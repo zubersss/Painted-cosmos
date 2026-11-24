@@ -1545,6 +1545,7 @@ void main() {
     vec2 wdx = pcGroundChartD(vBody, -dFdx(vToCam), uBodyR), wdy = pcGroundChartD(vBody, -dFdy(vToCam), uBodyR);
     vec3 wr1, wr2; vec2 wds; float wown;
     float wStill = 0.0;      // (how still the water is here, for the new colour below: the new paint's own, 0 in v37's)
+    float wLow = 0.0;        // (how low the eye looks across the water, 0 from the air .. 1 on foot: the new paint's own)
     // (and the churn's own chart, below: it is turned to the current on a far lower floor than the dashes are,
     // because white water must MOVE even in an eddy, where the body of the water is rightly laid still)
     vec2 ach = wch, adx = wdx, ady = wdy;
@@ -1583,8 +1584,17 @@ void main() {
       float rowF = length(cross(cross(up, dot(d3, d3) > 1e-6 ? normalize(d3) : k3), Vd));
       // (up to five times: at three the sea from 400 m, seen at a tenth of a right angle, still had rows under two pixels
       // and its thinnest strokes were dotted lines along the swell, the look director's "faint dotted grain")
-      float graze = 1.0 / max(rowF, 0.2);
-      vec4 wo4 = pcStrokeOct4(dist * graze * 1.1, uOilPx.z * 1.1);
+      // ON FOOT THE RIVER WAS GRAIN (the look director's second audit, item 2: seen from the bank 70 per cent of the
+      // river's pixels sat on a light-dark edge, against 33 to 39 for the grass; its dashes were 1 to 2 pixels tall).
+      // Seen from a standing eye the water lies at 2 to 10 degrees: its rows are squeezed twenty times and more, and a
+      // squeeze held at five left them hairs. So: the rows laid larger by the whole squeeze (to twenty times), and the
+      // lower the eye looks across the water the larger the stroke itself (to 2.6 times: the thinnest row of the finer
+      // octave stays over about three pixels at 480 lines, the audit's rule), so a river seen from its bank is a few
+      // long dashes, not a hundred scratches. From the air (the eye looking down more than about 20 degrees) as before.
+      float graze = 1.0 / max(rowF, 0.05);
+      wLow = (1.0 - smoothstep(0.08, 0.35, abs(dot(Vd, up)))) * liq;
+      float wKs = 1.1 * (1.0 + 1.6 * wLow);
+      vec4 wo4 = pcStrokeOct4(dist * graze * wKs, uOilPx.z * 1.1);
       vec2 wocR = pcWOctRate(vBody, Vd, up, dist, uBodyR);
       vec3 woc3 = vec3(wo4.w - wo4.z, wocR);
       // (with the new colour, still water's strokes are longer, as calm water is laid: the look director, on E3)
@@ -1594,8 +1604,13 @@ void main() {
       // toward the coast here and there, and from the air their strokes were squares), so it is laid longer by as much,
       // up to three times -- the same care the rows' squeeze already has above (graze), for the other axis.
       float lenF = length(cross(dot(d3, d3) > 1e-6 ? normalize(d3) : k3, Vd));
+      // (a river's strokes are NOT laid longer the same way: tried, and seen from the bank looking along the river the
+      // near water broke into specks a pixel or two tall, worse than before; measured and dropped)
       float aspW = still > 0.5 ? 10.0 / max(lenF, 0.34) : 6.0;
+      // (pointed ends on the sea, the look director's note; ponds and rivers keep square ones until F asks for them there)
+      gWLens = smoothstep(0.5, 0.75, vOpen) * step(0.5, still);
       pcWStrokes(wch, wdx, wdy, dS, v0 * (1.0 - still), wo4.x, aspW, woc3, wr1, wr2, wown);
+      gWLens = 0.0;
       // (the lace: along the current wherever there is one, at the water's own pace, on its own octaves)
       aDir = coh > 0.02 ? fc : kc; aSpd = coh > 0.02 ? v0 : 0.0;
       ao4 = pcStrokeOct4(dist * graze * 1.1, uOilPx.z * 0.40);
@@ -1667,6 +1682,15 @@ void main() {
     #endif
     #ifdef PC_WPAINT
     vec3 cRef = c;      // (what the water mirrors and shows here, before its own body is laid: the new paint, below)
+    if (wpL > 0.5) {
+      // THE GOLDEN HOUR IN THE WATER (the look director, 24 Nov: with the sky's gold in the mirror, look-director cbf7f41,
+      // the stream's colour moved by under 0.02, because over half the water's own blue wash is laid over everything and
+      // the sun's path is a narrow lobe). At a golden hour less of the blue wash, so the light strokes carry the sky's
+      // gold, and the sun's path widened (in the sun's own colour, wsun below); noon is as it was.
+      float gW = pcGold();
+      wBodyK *= 1.0 - 0.45 * gW;
+      wSunE = mix(wSunE, 14.0, gW);
+    }
     #endif
     c = mix(c, pcDensity(vLiq.rgb, wBodyD) * vec3(0.80, 0.95, 1.06), wBodyK * (1.0 - vLiqP.x) * (1.0 - vLiqP.y));
     vec3 cdeep = pcDensity(c, 2.1) * vec3(0.90, 0.92, 1.0), clight = mix(c, wLightC, 0.45);
@@ -1700,6 +1724,17 @@ void main() {
     }
     #endif
     #ifdef PC_WPAINT
+    if (wpL > 0.5) {
+      // (on foot, fewer light strokes and closer steps: the look director's audit wants "a sparse glitter toward the sun,
+      // not every row"; seen low, every third stroke a step lighter made the river the busiest thing in the picture)
+      float gq = wLow * (1.0 - wStill * 0.5);
+      wThL = mix(wThL, 0.86, gq); wThD = mix(wThD, 0.20, gq);
+      clight = mix(c, clight, 1.0 - 0.35 * gq); cdeep = mix(c, cdeep, 1.0 - 0.35 * gq);
+      // (and a step darker: on foot the river stood at value 0.75, the lightest thing in the picture; the audit's
+      // references lay water about 0.56 to 0.65)
+      float kV = 1.0 - 0.14 * gq;
+      c *= kV; clight *= kV; cdeep *= kV;
+    }
     if (wpL > 0.5 && wpL < 1.5) {
       // THE SEA FROM THE AIR (E-W2, F's note): with the new strokes and v37's colour, still water far off kept v37's three
       // steps in near equal shares, the deep one very deep: where strokes of two cells and two octaves lie over one another
@@ -1743,11 +1778,6 @@ void main() {
       float rainR = 25.0 * uWx.w * (1.0 - smoothstep(35.0, 60.0, dist));
       if (rainR > 0.2) c = mix(c, mix(skyc, vec3(0.93), 0.55), pcRainRings(wch, rainR, uTime, max(dist * uOilPx.x, 1e-3)) * 0.9 * liq);
     }
-    #endif
-    #ifdef PC_RUNOFF
-    // (a swollen stream carries the land's brown, as much as it has risen, laid over its strokes: ?runoff=1,
-    // world/waterstate.js mud)
-    c = mix(c, pcDensity(vec3(0.55, 0.44, 0.30), 1.3) * (0.85 + 0.3 * wr1.x), uRunoff.z * vSwell * 0.55 * liq);
     #endif
     #ifdef PC_WWAKE
     // (the player's own rings, painted: where a ring's face is steep the stroke there takes the light step, in a line
@@ -1799,6 +1829,22 @@ void main() {
       c = mix(c, vec3(1.0), mix(step(ath, ar2.x), step(ath, ar1.x), aown) * (0.30 + 0.70 * aer));
       }
     }
+    #ifdef PC_RUNOFF
+    // (STORM WATER IS MUDDY, the look director by the water group's lead, 24 Nov: the runnels and a swollen river go toward
+    // a muddy raw umber, an ochre grey -- hue about 37, S 0.35, V about 0.5 in the storm's light -- the churned strokes a
+    // step lighter, never white; the runnel had been clear pale blue-white, the lightest thing in a dark storm wood. A
+    // runnel's water is all rain (aWater2.x, vCap), so it is muddy whenever it runs; a river as much as it has risen.
+    // ?runoff=1, world/waterstate.js)
+    // (laid strong, and AFTER the churn's whites: the storm's light greys and lifts everything after this, and a first try
+    // at 0.52 0.45 0.34, laid before the churn, came out a pale sand grey, S 0.08 V 0.61, measured in a storm still. The
+    // mud follows the paint's own lightness, so the churned strokes are a lighter mud, never white; the runnel's own end
+    // eased over its first 4 cm: a runnel's rain-only water is only a few centimetres deep, and eased over 0.2 m it was
+    // laid half mud and half blue, which mixed to a grey, S 0.16, measured)
+    float mudR = smoothstep(0.0, 0.04, vCap) * min(1.0, uRunoff.x * 1.6) * 0.92;
+    // (and each stroke a little lighter or darker by its own number: laid by lightness alone the mud was one flat sand-
+    // coloured strip, S 0.29 V 0.60, measured)
+    c = mix(c, vec3(0.46, 0.34, 0.19) * (0.70 + 0.60 * dot(c, vec3(0.30, 0.59, 0.11))) * (0.84 + 0.32 * wr1.x), max(mudR, uRunoff.z * vSwell * 0.75) * liq);
+    #endif
   }
   #endif
   #ifdef PC_OIL
