@@ -305,11 +305,66 @@ A separate session builds W1 CLOUDS once the look director's sky ceiling (touch 
   none over the wood without the swing). The sight distance is now 3.7 km in both.
 - **Suites:** physics 439, world and looks 73, unit 325, 0 failing.
 
+### W3.6: THE LOOK DIRECTOR'S REVIEW OF W3.3 / W3.4, ANSWERED (`world/storms.js`, `render/kitmat.js`)
+
+- **The review (24 Nov):** rainlook PASS (but streaks to the sky's pale value, V at most about 0.85). Bolts PASS (the
+  fault is the fair sky behind them, which is W1's). Shafts NOT YET: a comb of thin lines, and scratches over the slopes.
+  Use veils. Regions: shafts 7, bolts 8. The T2 hook is committed on look-director as 1de2bf6, with wx2.js and
+  storms.js both fetched lazily, only when the address names `?rainshaft=`, `?bolts=` or `?wx2=`. **Keep that
+  contract:** nothing shared may import `physics/wx2.js` at the top.
+- **The shafts are now veils**, per the review: two or three per storm (three from 12 mm/h), each at a place fixed in
+  the storm.
+  - Each veil is a flat sheet from the cloud's base to the ground, turned about the vertical to face the eye, its top
+    upwind by 10 to 25 degrees with the wind.
+  - Width 0.16 to 0.30 of the storm's core radius. The look director asked for 20 to 80 px at 1 km; this is about 40 to
+    80 px for an average storm, and narrower for lesser ones.
+  - Each is a VALUE STEP: a multiply of 0.06 to 0.10 (by the rain rate), half of it in the hue of the cool key
+    (`pcOilShadeC`).
+  - Strokes inside run along the slant, at the brush's width (4.6 px at 720 lines, never under 2 px), each within 0.03
+    of the step. Under three strokes wide the veil is one flat step.
+  - It thins in flat steps toward its sides (1, 2/3, 1/3, with edges that wander stroke by stroke), its top, and its
+    foot. The air in front takes back 60 % of its step at full fog.
+  - **Drawn in the scene pass, after everything solid, as a multiply** (CustomBlending: colour times the step, alpha
+    kept). The second target, region and depth (`pcAux`), is written as 1, times 1, so the land and sky under the veil
+    keep their own region and depth.
+  - So it writes NO region of its own. That is my answer to the region-7 ask: a glaze over the land, the land keeping
+    its region. Depth-tested, so the land in front cuts it.
+  - Why not the GLAZES path after the scene: it needs the full-screen copy into rtAbs that the plain frame skips (the
+    2026-11-18 note in post.js), which on a dry day with only distant storms would cost more than the veils.
+- **Bolts:** region 8.
+- **rainlook:** with the switch, the rain streak's pale is the sky's own (`uHaze`) capped at V 0.85, not near-white.
+  The switch is read from the address in kitmat.js, not imported (the contract above).
+  - MEASURED at the spawn's storm: the median streak V went from 0.72 to 0.67.
+  - The brightest 5 % of changed pixels stay at 0.90. Those may be leaves and flakes that also differ between frames;
+    the shader caps the pale itself.
+- **The flash's light, for the look director:** `storms.flash` (a THREE.Vector4).
+  - xyz: the direction from the eye to the brightest flash on now, in the body's axes, as `uSunDirL`.
+  - w: its strength 0..1 (its brightness, 1 within 500 m, a quarter at 2.5 km); 0 between flashes.
+  - Every flash counts, cloud to ground or in the cloud.
+- **Seen:**
+  - `W3.6_A_wood150_storm1700m_veils_off.jpg` and `W3.6_B_..._on.jpg`, plus a 3x crop: from 150 m over the wood,
+    facing a 14 mm/h storm 1.7 km off (t 25,520, re-anchored at 1999).
+    - B: four slanted veils of violet-grey glaze over the horizon, made of low-contrast strokes, with stepped sides and
+      ragged tops. Nothing else changes.
+    - **What is still wrong:** with no storm cloud drawn above them (W1), they hang from nothing. At this distance they
+      are tall and narrow, a little like towers. Their feet are under the curve of this small world past about 1 km.
+  - At the mountain station from 450 m (W3.4's view) the veils are behind the near ridge: 353 pixels change.
+  - `W3.6_B_rain_spawnstorm_rainlook_pale.jpg`: the downpour still reads as rain, the streaks greyer than in
+    `W3.3_B_...`.
+  - `W3.6_B_valley_bolt_region8.jpg`: the bolt is unchanged to the eye in region 8.
+- **Phone cost, derived:** the veils' shader is under a third of the ground's paint per pixel (about 8 ns).
+  - A storm 1.5 km off: about 2 % of the picture, about 0.05 ms.
+  - A storm at 1 km: about 0.1 ms.
+  - A few storms in view: about 0.2 ms.
+  - The speed-test row 'storm: no rain shafts or bolts' stands.
+- **Suites:** physics 439, world and looks 73, unit 325, 0 failing.
+
 ## NEXT
 
-1. **The look director's review** of the W3.3 and W3.4 stills, and their decision on the T2 hook (6 lines in
-   `world/index.js`). Change the shafts as they say.
-2. **W3.3's remainder**, if wanted: the box's rain from the map's four corners.
+1. **The look director's second review** of the veils (W3.6), and their decision on region (a glaze keeping the region
+   under it, or region 7).
+2. **W3.3's remainder** (the coordinator, 24 Nov): the rain box reads the map's four corners.
 3. **Then the water group's turn on `physics/index.js`** (touch T6): the rain field is in place for them
    (`fields.rain`: `cells`, `cellsX`, `now`, `GLSL`, `rainAt`, `rainBetween`, `throughfall`).
-4. W1 CLOUDS is another session's; the storm cannot be seen as a cloud until it lands.
+4. W1 CLOUDS is another session's; the storm cannot be seen as a cloud until it lands, and the veils hang from nothing
+   until then.
