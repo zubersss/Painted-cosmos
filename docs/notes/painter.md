@@ -951,6 +951,34 @@ the other way round). SEEN, 0 PIXELS: the gallery, autumn noon, phone settings 1
 grabs equal) then the default against the old order flipped live and the default again: the stream view (19 tall
 meshes, all at 6 by default) 0 and 0 pixels; a maple from 9 m (27 tall meshes) 0 and 0 pixels.
 
+**THE SHARPER PICTURE, AS IT STANDS (v39.7; supersedes the entry below where they differ).** The coordinator REVERTED
+0c0a198 from v39.6 (cfa4d3c5) after this lane found, in Node, that BEFORE it a phone in play climbed to TIER 2 within
+about 6 s (tier-up after 12 s pinned high, counted double under 22 ms; down only at the 0.85 floor over 37 ms) and stayed
+there even with tier-2 frames at 30 ms: the owner has been playing at tier 2, which 0c0a198 took away. REDONE (b05f259,
+aba481e, on the oscillation fix d4ce701): a touch device in the oil look keeps maxQuality 2, the ladder climbs only from
+the top of everything, from rung 0, at most 2 rungs; the touch guard stays (27 ms for half a second, rungs first, 6 s
+under 20 ms to climb; sharpFailWithin 60 and sharpGiveUp 1: a rung lost within a minute of its climb ends the climbing
+until the next rest). Worst case = v39.5. The bench measures what the owner plays: under ?bench a touch device starts at
+tier 2, rows 'sharper, rung 1 (1.20x each way)' and 'tier 1 (the tier under the one played)'. THE OSCILLATION (an
+independent review): a rung lost after its 5 s trial did not count, so a borderline view cycled every 6-7 s; reproduced
+in Node (31 steps in five minutes over three runs), now at most 2 (3 when reached later). MODELLED, tier 2 never timed on
+the phone and taken as tier 1 + 15 per cent: on foot tier 2 + rung 1 16.7 ms, 0 per cent held twice at the gentler
+wobble; at the harsher one tier 2 alone 23.8 ms and no rung is climbed. OPEN (told the coordinator): rung 2 models at
+26.1 ms with 57 per cent of frames held twice, just under the 27 ms line: cap at rung 1 or lower the line to about 21 ms
+if smoothness rules.
+
+**THE NEAR LEAVES AND THE BUSH (F, 24 Nov late: the near bush in u2cells-am02 'in the old leaf-card look'; 93080eb,
+three switches, all OFF).** F's reading: mostly (a) the NEAR-BLACK PIECES (a shaded leaf takes the
+one foliage shade, near-black for a darker wash, and at arm's length nothing lifts it; R1.2c: the darkest values belong
+to trunks in shade), then (b) the bush's leaf SIZE (0.24 x 0.11 m on a sapling bush: oak leaves on a shrub); not the
+outline (six corners is fine). Built: `?nearshade=1` (PROP_VERT uNearShade: within 3 m of the eye a shaded leaf takes the
+land's glaze at the glaze level, pcTone with the sky's fill, back to today by 5 m; trees and bushes), `?bushleaf=1`
+(uLeafScale 0.65 on the bush: each leaf shrinks about its centre, the same triangles, the sky between), `?bushpaint=1`
+(the bush takes the trees' storm step and colour family: its biome's first kind with a fam, riding the season; only where
+the biome turns its bush colours, as the autumn wood does). The bush is the oil sapling (florakit.js bushGeometry,
+spec.oil), made in flora.js _underMats; B (flora) is not touching those lines. Pairs for F: 1.8 m by a meadow bush (the
+nearest is 364 m from the meadow's stream camera) and 1.5 m under the maple.
+
 **THE SHARPER PICTURE ON A TOUCH DEVICE (the coordinator's job for this lane, 24 Nov late; 0c0a198, PILOT files:
 main.js, core/dynres.js, core/bench.js, tests/dynres.test.mjs).** A phone or a tablet in the oil look starts on RUNG 1 of
 dynres's sharpening ladder: 1.2x each way (1.5 picture pixels to the point for 1.25; the owner's 823x384 box draws
