@@ -330,8 +330,14 @@ Branch `water-bodies` = lane 0 + look-proto v37.1 + `origin/design-water` (W1's 
   on Earth, 41-55 ms at load. Seen (with the line in a scratch copy only): `tarns-AB-floor-150m-400m-scratchhook.jpg`.
 - **E's DEFAULT FLIP is in (4873c6a, merged):** with ?look=oil, rivers=tree, lakes, ponds, puddles and fjord default on
   (?rivers=old, ?lakes=0 ... to opt out); falls stays off. E commits the held falls flip when W2 sends the word.
-- NEXT: E's mountain line (promised with E's next push: the falls view in the speed test), then merge and re-check the tarns
-  in the game; W3's curtain fix (then the word to E for the falls flip).
+- **E's mountain line is in (597ab63, merged 4fdf9bf):** prepareMountain's alpine hook now calls `hydro.alpine`, so the
+  tarns need no scratch copy any more. SEEN with the real hook, in the gallery (`?look=oil&flow=1&mount=1`, 24 tarns
+  reported by the page, no console problems): `tarns-real-hook.jpg` (valley floor 1.7 m, 150 m, 400 m; the same views as
+  the scratch A/B, and they match it). The shore is crisp against meadow and trees, the water flat and level, nothing on a
+  slope. Not good yet, said plainly: at 150 m the surface reads as long grey-blue bands (the shared still-water strokes, as
+  on the lakes), more like ribbed metal than a still tarn; for F to judge. Not yet looked at in the game itself (only the
+  gallery, which uses the same surface code).
+- NEXT: W3's curtain fix (then F looks at the falls, then the word to E for the falls flip); whatever F says of the tarns.
 
 ## Stations and tools
 
