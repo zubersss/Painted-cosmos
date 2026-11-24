@@ -53,6 +53,9 @@ export const IMP = {
   leafLo: 1.4, leafHi: 4.0,                              // (never less, never more, than this much larger)
   variants: Math.round(_qn('impvar', 1, 1, 2)),          // trees baked of each kind (?impvar=2: two, at twice the memory)
   minLeaf: _qn('impminleaf', 2.0, 0, 6),                 // and never under this many texels across, at any level
+  // SMALL CROWNS IN TWO STEPS (?impsmall=1, or =N texels; OFF by default until the look director has seen the A/B): a
+  // view of 12 texels or fewer paints a crown's strokes in two light levels, its cap and its body (IMP_FRAG)
+  small: (() => { const v = _q && _q.get('impsmall'); if (!v || v === '0') return 0; const n = +v; return v === '1' || !isFinite(n) ? 12 : Math.max(0, Math.min(96, n)); })(),
 };
 // (the levels: halving until a view is a single texel; 96 texels give 96, 48, 24, 12, 6, 3 and the last is cut at 1.5
 //  so it stops at 3 -- six levels)
@@ -185,25 +188,19 @@ void main() {
 `;
 
 const PENDING = new Set();
-let hooked = false;
+let hooked = false, TICK = 0;
+// (how many frames the painter has drawn since the first bake was asked for: flora.js steps the bake from its own
+//  update only when no frame came between two updates -- the gallery's settling loop, which waits for nothing to be
+//  busy without drawing -- so a game frame never pays for two steps)
+export function bakeTick() { return TICK; }
 function hook() {
   if (hooked) return;
   hooked = true;
   // (the bake needs the renderer and must run OUTSIDE a render: the painter's frame hooks run before the frame's
-  //  passes, render/index.js. The renderer is handed over by the first impostor mesh that is drawn, flora.js.)
+  //  passes, render/index.js. The renderer is handed over by the first far tree that is drawn, flora.js.)
   FRAME_HOOKS.push(() => {
-    for (const a of PENDING) {
-      if (a.ready || a.failed || !a.renderer) { PENDING.delete(a); continue; }
-      try {
-        // (THE GUARD, before the first step: the impostor program must compile on this device)
-        if (!a._probed) { a._probed = true; const why = a.probe(a.renderer); if (why) { a.fail(why); PENDING.delete(a); continue; } }
-        if (_q && _q.get('impfail') === 'bake') throw new Error('forced by ?impfail=bake');
-        if (a.bake(a.renderer, IMP.bakeMs > 0 ? IMP.bakeMs : Infinity)) {
-          PENDING.delete(a);
-          if (!a.texture || !a.hasTree()) a.fail('the atlas came out empty');
-        }
-      } catch (e) { a.fail('the bake threw: ' + ((e && e.message) || e)); PENDING.delete(a); }
-    }
+    TICK++;
+    for (const a of PENDING) a.step();
   });
 }
 
@@ -309,7 +306,26 @@ export class ImpostorAtlas {
     for (let i = 3; i < d.length; i += 4 * 97) if (d[i]) return true;
     return false;
   }
-  // asked by every impostor mesh while it is drawn and the atlas is not yet made
+  // ONE SLICE OF THE BAKE (IMP.bakeMs of it; all of it with ?impbake=0), the guard before the first: run by the frame
+  // hook, and by flora.js from its update when no frame came between (it is outside a render either way). When the
+  // last step is done and the atlas holds a tree, onReady is called, in that same call: flora swaps today's far trees
+  // for the impostors there and then. Returns true once the atlas is made or has failed.
+  step() {
+    if (this.ready || this.failed || !this.renderer) { PENDING.delete(this); return true; }
+    try {
+      // (THE GUARD, before the first step: the impostor program must compile on this device)
+      if (!this._probed) { this._probed = true; const why = this.probe(this.renderer); if (why) { this.fail(why); PENDING.delete(this); return true; } }
+      if (_q && _q.get('impfail') === 'bake') throw new Error('forced by ?impfail=bake');
+      if (this.bake(this.renderer, IMP.bakeMs > 0 ? IMP.bakeMs : Infinity)) {
+        PENDING.delete(this);
+        if (!this.texture || !this.hasTree()) this.fail('the atlas came out empty');
+        else if (typeof this.onReady === 'function') this.onReady();
+        return true;
+      }
+    } catch (e) { this.fail('the bake threw: ' + ((e && e.message) || e)); PENDING.delete(this); return true; }
+    return false;
+  }
+  // asked by every far tree's mesh while it is drawn and the atlas is not yet made (flora.js)
   request(renderer) {
     if (this.ready || this.failed || !renderer) return;
     this.renderer = renderer;
@@ -319,8 +335,10 @@ export class ImpostorAtlas {
   // THE BAKE IN STEPS (the coordinator, 24 Nov: 48 MB baked in one go was about ten seconds in software and an unknown
   // hitch on the phone at the first far draw). A step is one tree at one level: its 64 views drawn into its own square
   // of the target, and that square read back into the level's array. The frame hook runs as many steps as fit in
-  // IMP.bakeMs of a frame (always one), and the atlas is made when the last is done; till then the impostors draw
-  // nothing (uImpK.x 0). ?impbake=0: all at once (for stills). Returns true when done.
+  // IMP.bakeMs of a frame (always one), and the atlas is made when the last is done; till then flora draws today's far
+  // trees (the coordinator, 24 Nov: with the impostors drawing nothing until the last step, the far wood was gone for
+  // up to 8 s on the phone after every world load) and counts the bake as busy, so a still waits for it.
+  // ?impbake=0: all at once. Returns true when done.
   bake(renderer, budgetMs = 0) {
     const t0 = performance.now();
     const W = this.width, H = this.height, N = IMP.views;
@@ -575,8 +593,9 @@ flat varying vec3 vDepth;
 flat varying vec2 vKB;
 void main() {
   #include <logdepthbuf_fragment>
-  // (the speed test, shared.js uOilL.y = 4: written at once, before the atlas is read or anything is cut away)
-  if (uOilL.y > 3.5 && uOilL.y < 4.5) { pcWrite(vec3(0.42, 0.40, 0.32), 0.0, vec3(0.0, 0.0, 1.0), -vView.z, 3.0); return; }
+  // (the speed test, shared.js uOilL.y = 4: written at once, before the atlas is read or anything is cut away; alpha 1,
+  //  the whole quad covered, or alpha to coverage on a multisampled picture would lay none of it)
+  if (uOilL.y > 3.5 && uOilL.y < 4.5) { pcWrite(vec3(0.42, 0.40, 0.32), 1.0, vec3(0.0, 0.0, 1.0), -vView.z, 3.0); return; }
   // THE SILHOUETTE BY COVER, NOT BY THE TEXEL'S SQUARE (the look director: stair-steps at the pixel). The four texels
   // round the point are read; how much of them is tree, weighed as the point lies among them, is the cover. Where it is
   // under a half (a quarter on a multisampled picture, which alpha to coverage then edges) nothing is laid; the paint
@@ -618,10 +637,11 @@ void main() {
     // (?impdebug=1: what an impostor reads, flat: wood brown, leaves by the level read (0 green, 1 cyan, 2 yellow,
     //  3 magenta, 4 red, 5 white), the core grey)
     vec3 lvc = vLod < 0.5 ? vec3(0.2, 0.8, 0.2) : vLod < 1.5 ? vec3(0.2, 0.8, 0.9) : vLod < 2.5 ? vec3(0.95, 0.9, 0.2) : vLod < 3.5 ? vec3(0.9, 0.2, 0.9) : vLod < 4.5 ? vec3(0.9, 0.2, 0.1) : vec3(1.0);
-    pcWrite(cls < 0.5 ? vec3(0.45, 0.3, 0.15) : cls > 2.5 ? vec3(0.4) : lvc, 0.0, vec3(0.0, 0.0, 1.0), -vView.z, 3.0); return;
+    pcWrite(cls < 0.5 ? vec3(0.45, 0.3, 0.15) : cls > 2.5 ? vec3(0.4) : lvc, clamp(cover, 0.0, 1.0), vec3(0.0, 0.0, 1.0), -vView.z, 3.0); return;
   #endif
-  // (the speed test's flat plants, 2 and 3: every far tree one flat colour, its outline kept)
-  if (uOilL.y > 1.5 && uOilL.y < 3.5) { pcWrite(cls < 0.5 ? vBB : vLA * 0.7, 0.0, vec3(0.0, 0.0, 1.0), -vView.z, 3.0); return; }
+  // (the speed test's flat plants, 2 and 3: every far tree one flat colour, its outline kept; the cover as the paint's
+  //  alpha, as below, or alpha to coverage on a multisampled picture would lay none of it)
+  if (uOilL.y > 1.5 && uOilL.y < 3.5) { pcWrite(cls < 0.5 ? vBB : vLA * 0.7, clamp(cover, 0.0, 1.0), vec3(0.0, 0.0, 1.0), -vView.z, 3.0); return; }
   vec3 r3 = vec3(id, fract(id * 13.7), fract(id * 5.1));
   float ms = dot(n, vSunK);
   ${SKYUP('dot(n, vUpK)')}
@@ -644,9 +664,22 @@ void main() {
     // a stroke of leaves: its colour from the tree's run by its own number, its light at its centre (PROP_VERT, "a
     // leaf's paint, once a leaf": the same steps, and the same tone function every surface takes, pcTone)
     float twig = step(1.5, vKB.x);
+    // SMALL CROWNS IN TWO STEPS (?impsmall=; the look director, 24 Nov: "at the coarse levels only (a view of 12 texels
+    // or fewer), pull a crown's strokes toward two steps: the cap one step, the rest of the crown one step, so each small
+    // crown reads as one lit mass with its shade, not lit and dark alternating; leave 24+ texels as they are. Keep the
+    // step difference between cap and body at one level (not less)". SEEN before it, from 1 km over the far view's
+    // canopy roof: crowns of 1-3 px each split into lit and dark strokes made the wood V 0.49 with a third of it under
+    // V 0.3, against the roof's 0.74 past the impostors' reach.) The strokes facing the sun are the cap, at the level a
+    // lit stroke of this crown takes; every other stroke is the body, one level under it. No stroke's own light jitter
+    // and no inner shade there; each stroke keeps its own colour. The conifer's dark core is left as it is.
+    bool small = false;
+    #ifdef PC_IMP_SMALL
+      small = uImpK.z * exp2(-vLod) < float(IMPS_T) + 0.5;
+    #endif
+    float azL = small ? 0.0 : az;
     float hue = vInst.x + (id - 0.5) * 1.7;
     vec3 cs = mix(vLA, vLB, clamp(0.5 + hue * 0.5, 0.0, 1.0));
-    cs = mix(cs, vLC, clamp(az * 0.55 + (r3.y - 0.5) * 0.6, 0.0, 1.0));
+    cs = mix(cs, vLC, clamp(azL * 0.55 + (r3.y - 0.5) * 0.6, 0.0, 1.0));
     cs = pcWetWash(pcDabTint(pcDensity(cs, 1.0 + vInst.y * 0.4), r3, 1.0 - twig), 0.7);
     bool snow = cls > 1.5 && cls < 2.5;
     if (snow) cs = mix(vec3(0.95, 0.97, 1.0), vec3(0.80, 0.87, 0.98), r3.x * 0.7);
@@ -661,6 +694,14 @@ void main() {
     xl = max(xl, mix(0.30 + 0.15 * r3.x, 0.18 + 0.12 * r3.x, ${'${FARCROWN}'}));
     if (cls > 2.5) xl = 0.2;
     float lv = pcLevel(xl, 0.03);
+    if (small && cls < 2.5) {
+      // (the cap's level: a stroke of this crown facing the sun at 0.6, lit, with the crown's own light against the sun)
+      float xc = max(0.80, vKB.y * 0.8 * (1.0 - twig));
+      if (snow) xc = max(xc, 0.68);
+      float lc = floor(pcLevel(xc, 0.002) + 0.5);      // (a soft of 0 would be a smoothstep with equal edges: undefined)
+      float cap = step(mix(0.05, 0.585, canopy), 0.5 + 0.5 * ms);
+      lv = cap > 0.5 ? lc : max(lc - 1.0, 0.0);
+    }
     // (the shade of a crown through the shared foliage shade where the build has it, chunks.js pcShadeLeaf, as a
     //  near leaf takes its own; otherwise pcTone alone)
     c = ${'${IMPSHADE}'};
@@ -692,7 +733,8 @@ export function makeImpostorMaterial(bodyU, atlas, farMat, farcrown = FARCROWN) 
   if (wind) Object.assign(own, PHYS, { uStiff: { value: 1 }, uPlantHeight: { value: 12 } });
   const m = new THREE.ShaderMaterial({
     name: 'pc-prop-far-impostor',
-    defines: Object.assign({ PC_IMPOSTOR: 1, PC_IMP_NV: Math.max(1, atlas.n), PC_NFAR: fu.uFarA.value.length }, _q && _q.get('impdebug') === '1' ? { PC_IMP_DEBUG: 1 } : null, wind ? { PC_PHYS: 1 } : null),
+    defines: Object.assign({ PC_IMPOSTOR: 1, PC_IMP_NV: Math.max(1, atlas.n), PC_NFAR: fu.uFarA.value.length }, _q && _q.get('impdebug') === '1' ? { PC_IMP_DEBUG: 1 } : null, wind ? { PC_PHYS: 1 } : null,
+      IMP.small > 0 ? { PC_IMP_SMALL: 1, IMPS_T: IMP.small.toFixed(1) } : null),
     uniforms: makePaintUniforms(bodyU, own),
     vertexShader: IMP_VERT,
     fragmentShader: IMP_FRAG.split('${FARCROWN}').join(fc).split('${IMPJIT}').join((+IMP.jit).toFixed(4))

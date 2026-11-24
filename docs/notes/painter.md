@@ -277,13 +277,37 @@ FV7 of `docs/lead/FARVIEW-DESIGN.md`. A second session (A2, branch `trees-near`)
 the same time: this lane touches only the far parts of `flora.js`, `florakit.js`, the plant material's far branch,
 `render/impostor.js`, `render/shadow.js` and new rows in `core/bench.js`.
 
-**State (update this line every step):** OPEN, waiting for answers (24 Nov, about 11:00): F on the crown-size note
-(my proposal: at views of 12 texels or fewer, pull a crown's strokes toward one lit cap and one shade instead of a bigger
-stroke, since a crown there is already 2-3 strokes across; nothing changed before F says yes); C (far view,
-session_01R5Bri2AMBsFiRcxvUUZMvu) on the seam between its FV2 canopy roof and the impostors' reach (questions sent:
-where its roof starts, whether to thin the impostors from steep views under its ?canopy, who shoots 150 m / 400 m /
-1 km with both); the coordinator on the merge of trees-far into look-proto. 1080-line desktop stills sent to F
-(`A1_impostor_*_desktop1080*`). THE IMPOSTORS ARE THE DEFAULT FAR TREES of the oil look (after F passed the
+**State (update this line every step):** (24 Nov, about 12:45) URGENT FIX DONE for v39.1 (the coordinator): during
+the bake over frames the far wood was gone; now today's far trees stand in until the bake is done and hand over in that
+frame (flora.js impWant / impOn, _impReady; impostor.js step(), onReady, bakeTick), the bake counts as busy from the
+frame it is asked for. SEEN, gallery autumn wood 16.8 h on foot, phone settings: mid-bake (step 5 of 78, not ready,
+busy 1) today's far trees across the river, 5,915 drawn, 0 impostors; after (78 frames, 10.7 s of bake in software) the
+swap in one frame, 20.4 ms here, then 4,920 impostors and only the 1,068 conifers in today's form on foot (no tree
+drawn twice, no impostor kind left in today's form), page ready only then; 400 m up 83,520 impostors
+(`A1_bake_foot_mid_vs_after.jpg`, `A1_bake_after_air400.jpg`). Before that: SMALL CROWNS IN TWO STEPS built behind `?impsmall=1`
+(OFF by default), as F ruled (11:07): at a view of 12 texels or fewer the strokes facing the sun take the cap's level and
+the rest exactly one level under it, no stroke jitter, no inner shade; 24+ texels and the conifer core untouched. SEEN
+at phone settings with C's roof (`A1_small_*`): 150 m the far crowns a lit mass and a mid shade instead of lit/black
+confetti, near crowns unchanged; 1 km the wood V 0.49 -> 0.75 (the roof past it 0.74), pixels under V 0.3 37 -> 7
+percent, so the value step at the seam is gone, but the wood is now a bright lime, S 0.80 against the roof's 0.50 (the
+lime-not-olive question, F's). Desktop A/B (1920x1080 tier 2) being shot; then to F for the ruling on the default. All
+speed-test alpha-0 writes in materials.js now write 1 (coordinator's leave). Coordinator: v39.1 (impostor default +
+guard) is in its gate on look-proto; merge origin/look-proto when told. look-proto 0d5533b merged into
+trees-far (1ecf744, pushed). SEAM, SEEN in a scratch merge of trees-far with C's branch farview (d720b02, never pushed),
+phone settings 936x372, autumn wood 15.4 h, impostors drawn in marker colours (?impdebug=1) and A/B ?canopy=0 / 1
+(`docs/shots/painter/trees-far/A1_seam_*`): the impostors' reach is the horizon or nearly at 150 m (farScale 1.75,
+about 1,050 m; horizon 1,106 m) and at 400 m (2.5, 1,500 m; horizon 1,833 m): the roof alone is under half a percent of
+the wood there, so no seam. At 1 km (farScale 3, 1,800 m; horizon 3,000 m) the roof alone carries a ring at the disc's
+edge and the change is plain: MEASURED inside the reach V 0.49 with 37 percent of pixels under V 0.3, the roof-only band
+V 0.74 with none; the roof alone over the same zone (impostors not drawn) V 0.68, 12 percent. The darks are the
+impostors' own leaf strokes at the two coarsest levels (84 percent of their pixels at 1 km; trunks 3, conifer cores 5),
+each crown of 1-3 px still split into a lit stroke and a shaded one: the confetti R1.3c forbids, and what C's roof
+avoids by taking a crown smaller than a dab to its mean light. So the seam and the crown-size note are one fix. Inside
+the reach C's roof replaces the yellow and orange leaf floor between the trees with crowns (V unchanged, 0.50 to 0.49).
+Also FIXED (0c873ea): the debug colours and the speed test's flat rows wrote alpha 0, which with alpha to coverage
+laid nothing on a multisampled picture (the first marker stills showed no far tree; the far flat row measured less than
+it said); the plant program's own rows 2 and 4 outside the far branch still write 0 (not this lane's; told the
+coordinator). Waiting: F on the crown-size note; C on the seam. THE IMPOSTORS ARE THE DEFAULT FAR TREES of the oil look (after F passed the
 grain fix on foot and from the air, and the owner's phone timed them: 150 m up 151 ms -> 16.7, the screen's cap);
 `?fartree=old` (or cards, lump, blob) is today's far tree. THE GUARD (`render/impostor.js` probe / fail): before the first
 bake step the impostor program is compiled on a one-tree mesh and three's own diagnostics read; a compile failure, a

@@ -345,7 +345,7 @@ export function attachBench(pc) {
     let hand0 = null;
     const handTo = (n, m) => { const f = flora(); if (!f || !f.setHandover) return; if (!hand0) hand0 = [f.t0 * 0.30, f.t1 * 0.30]; f.setHandover(n, m); };
     const handBack = () => { const f = flora(); if (!f || !f.setHandover || !hand0) return; f.setHandover(hand0[0], hand0[1]); hand0 = null; };
-    const form0 = (() => { const f = flora(); return f ? (f.farForm || (f.impOn ? 'impostor' : cards0 ? 'cards' : 'lump')) : 'cards'; })();
+    const form0 = (() => { const f = flora(); return f ? (f.farForm || (f.impWant || f.impOn ? 'impostor' : cards0 ? 'cards' : 'lump')) : 'cards'; })();
     // the rows themselves: [label, on, off]
     const T0 = {
       leaves: ['near trees: leaves only', nearPart('leaves'), nearPart(null)],
