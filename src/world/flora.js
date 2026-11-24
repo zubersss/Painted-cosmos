@@ -93,6 +93,15 @@ const NEARLEAF = typeof location !== 'undefined' && /[?&]nearleaf=1\b/.test(loca
 // trees were at 0, before the ground, so where a hill or a bank hides a tree its leaves were painted and then covered.
 // They are opaque and depth-tested, so the order of opaque geometry decides only what is shaded, never what is seen
 // (the same argument, and the same kind of saving, as the far trees' own 9). ?treeorder=0: drawn first, as before.
+// THE NEAR LEAVES AND THE BUSH (24 Nov, the look director on the near bush in u2cells-am02; all OFF until it passes them):
+// ?nearshade=1 -- a shaded leaf within 3 m of the eye takes the land's glaze instead of the near-black deep foliage
+//   shade, back to today by 5 m (materials.js PROP_VERT uNearShade): the trees and the bushes;
+// ?bushleaf=1 -- the bush's leaves at 0.65 of their size about their centres, with the sky between them (uLeafScale);
+// ?bushpaint=1 -- the bush takes the trees' storm step and their colour family (its biome's first kind with one), so it
+//   agrees with the trees in every weather and season.
+const NEARSHADE = typeof location !== 'undefined' && /[?&]nearshade=1\b/.test(location.search || '') ? 1 : 0;
+const BUSHLEAF = typeof location !== 'undefined' && /[?&]bushleaf=1\b/.test(location.search || '') ? 0.65 : 1;
+const BUSHPAINT = typeof location !== 'undefined' && /[?&]bushpaint=1\b/.test(location.search || '');
 const TREES_AFTER_GROUND = typeof location === 'undefined' || !/[?&]treeorder=0\b/.test(location.search || '');
 // ?leafgrow=1 (24 Nov, AN OPTION FOR THE OWNER, the look director's (C)): a thinned broadleaf's kept leaf grows at most
 // 1.15 times within 15 m of the eye (today up to 1.65 at 15 m on the phone's picture), back to today's by 25 m
@@ -319,7 +328,7 @@ export class Flora {
     const TALL = L.tall.map((sp) => (LOOK.oil ? Object.assign({}, sp, { oilLook: 1 }, sp.kit === 'broadleaf' || sp.kit === 'maple' || sp.kit === 'aspen' ? { leafy: 1, double: 1 } : null, sp.kit === 'roundmaple' || sp.kit === 'poplar' || sp.kit === 'oak' || sp.kit === 'birch' || sp.kit === 'willow' || sp.kit === 'sapling' ? { double: 1 } : null, sp.oil, PINES && sp.kit === 'spruce' ? { needleTop: 1 } : null) : sp));      // (?pines: the spruce's needles budgeted by bough, kits/spruce.js)
     this.tall = TALL;
     this.species = TALL.map((sp, i) => {
-      const mo = { needle: PINES && NEEDLE_KITS.has(sp.kit) ? NEEDLE_PX : 0, nearLeaf: NEARLEAF ? 1 : 0, leafGrow: LEAFGROW, stormLeaf: STORMLEAF, name: 'tall-' + sp.kit + i, barkA: sp.bark[0], barkB: sp.bark[1], leafA: sp.leaf[0], leafB: sp.leaf[1], leafC: sp.leaf[2], barkP: sp.barkP, leafP: sp.leafP, accent: sp.accent, oilDark: sp.dark || null, oilFam: sp.fam || null, oilKind: sp.snowy ? 1 : sp.bare ? 2 : 0, wind: sp.wind == null ? 0.03 : sp.wind, doubleSide: !!sp.double, phys: sp.kit === 'vine' ? null : 'lite', branch: BRANCHY.has(sp.kit), stiff: sp.kit === 'kelp' ? 0.1 : 1, plantHeight: (FAR_DIMS[sp.kit] || [0, 10])[1], gem: sp.kit === 'crystal',
+      const mo = { needle: PINES && NEEDLE_KITS.has(sp.kit) ? NEEDLE_PX : 0, nearLeaf: NEARLEAF ? 1 : 0, leafGrow: LEAFGROW, stormLeaf: STORMLEAF, nearShade: NEARSHADE, name: 'tall-' + sp.kit + i, barkA: sp.bark[0], barkB: sp.bark[1], leafA: sp.leaf[0], leafB: sp.leaf[1], leafC: sp.leaf[2], barkP: sp.barkP, leafP: sp.leafP, accent: sp.accent, oilDark: sp.dark || null, oilFam: sp.fam || null, oilKind: sp.snowy ? 1 : sp.bare ? 2 : 0, wind: sp.wind == null ? 0.03 : sp.wind, doubleSide: !!sp.double, phys: sp.kit === 'vine' ? null : 'lite', branch: BRANCHY.has(sp.kit), stiff: sp.kit === 'kelp' ? 0.1 : 1, plantHeight: (FAR_DIMS[sp.kit] || [0, 10])[1], gem: sp.kit === 'crystal',
         // (the last fixes: a spire parts round an eye inside it; its girth at the foot, height and lean, florakit.js spireGeometry)
         hollow: sp.kit === 'spire' ? (sp.slim ? [1.3, 10.5, 0.3] : [2.0, 12, 0]) : null };
       const mat = makePropMaterial(bodyUniforms, mo);
@@ -499,13 +508,14 @@ export class Flora {
     }
   }
 
-  _underMats(U, tag) {
+  _underMats(U, tag, fam) {
     const bodyUniforms = this.bodyUniforms, sh = U.shard || U.rock;
     return {
       under: makePropMaterial(bodyUniforms, { name: 'under' + tag, leafA: U.leaf[0], leafB: U.leaf[1], leafC: U.leaf[2], accent: U.accent, wind: 0.07, doubleSide: true, phys: 'full', stiff: 0, plantHeight: 0.5 }),
       // near grass: the same washes, each blade bent about its own root
       patch: makePropMaterial(bodyUniforms, { name: 'patch' + tag, leafA: U.leaf[1], leafB: U.leaf[2], leafC: U.leaf[2].map((x) => x - (x - x * x) * 0.6), accent: U.accent, wind: 0.07, doubleSide: true, phys: 'full', stiff: 0, plantHeight: 0.5, bladeRoot: true }),
-      bush: makePropMaterial(bodyUniforms, { name: 'bush' + tag, doubleSide: LOOK.oil, leafA: U.bush[0], leafB: U.bush[1], leafC: U.bush[2], leafP: [0.85, 0.3, 1.0, 0.25], wind: 0.04, phys: 'lite', stiff: FLORA_PHYS.bush.stiffness, plantHeight: FLORA_PHYS.bush.height }),
+      bush: makePropMaterial(bodyUniforms, { name: 'bush' + tag, doubleSide: LOOK.oil, nearShade: NEARSHADE, leafScale: LOOK.oil ? BUSHLEAF : 1,
+        ...(LOOK.oil && BUSHPAINT ? { stormLeaf: STORMLEAF, oilFam: fam || null } : {}), leafA: U.bush[0], leafB: U.bush[1], leafC: U.bush[2], leafP: [0.85, 0.3, 1.0, 0.25], wind: 0.04, phys: 'lite', stiff: FLORA_PHYS.bush.stiffness, plantHeight: FLORA_PHYS.bush.height }),
       rock: makePropMaterial(bodyUniforms, { name: 'rock' + tag, barkA: U.rock[0], barkB: U.rock[1], wind: 0 }),
       shard: makePropMaterial(bodyUniforms, { name: 'shard' + tag, barkA: sh[0], barkB: sh[1], wind: 0, gem: !!U.shard }),
     };
@@ -516,14 +526,18 @@ export class Flora {
     if (!m) {
       const b = this.S.biomes[bi];
       const U = Object.assign({}, this.U, b.under, LOOK.oil && b.oil ? b.oil.under : null);
-      m = this._underMats(U, '-' + bi); this.pal.set(bi, m);
+      // (?bushpaint: the bush takes the colour family of its biome's first kind of tree that has one, the maple's reds in
+      //  the autumn wood; like the trees' it is an autumn colour and rides the season, below)
+      const famSp = LOOK.oil && BUSHPAINT ? (b.tall || []).map((k) => this.tall && this.tall[k]).find((sp) => sp && sp.fam) : null;
+      const fam = famSp ? famSp.fam : null;
+      m = this._underMats(U, '-' + bi, fam); this.pal.set(bi, m);
       // A BIOME MAKES ITS OWN UNDERGROWTH MATERIALS, here and lazily, and they are not the ones the constructor
       // registered: without this the trees of a wood turned from summer to autumn and THE FLOOR BENEATH THEM DID
       // NOT. (Found by reading, after a still showed a green floor under a gold wood and it was put down to grass.)
       if (LOOK.oil && this._turn) {
         const add = [];
         if (U.leafSum || U.leafAut) add.push({ mat: m.under, sum: U.leafSum || U.leaf, aut: U.leafAut || U.leaf });
-        if (m.bush && (U.bushSum || U.bushAut)) add.push({ mat: m.bush, sum: U.bushSum || U.bush, aut: U.bushAut || U.bush });
+        if (m.bush && (U.bushSum || U.bushAut)) add.push({ mat: m.bush, sum: U.bushSum || U.bush, aut: U.bushAut || U.bush, famW: fam ? (fam[3] == null ? 1 : fam[3]) : 0 });
         if (add.length) { for (const q of add) this._turn.push(q); const t = this._seasonAt; this._seasonAt = -1; this.setSeason(t < 0 ? SEASON.t : t); }
       }
     }

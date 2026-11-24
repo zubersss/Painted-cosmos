@@ -2027,6 +2027,8 @@ uniform float uNeedle;    // (?pines: a conifer's needles never narrower on the 
 uniform float uNearLeaf;  // (?nearleaf: 1 the leaves within arm's length shrink about their centres; 0 off, as before)
 uniform float uLeafGrow;  // (?leafgrow: the most a thinned broadleaf's kept leaf grows within 15 m of the eye, e.g. 1.15; 0 off, as before)
 uniform float uStormLeaf; // (the share of the land's storm paint a crown takes at a full storm: 0.5 by default, ?stormleaf=0 off; flora.js)
+uniform float uNearShade; // (?nearshade: 1 a shaded leaf within 3 m of the eye takes the land's glaze, not the deep foliage shade; 0 off, as before)
+uniform float uLeafScale; // (?bushleaf: the size of this plant's leaves about their own centres; 1 or 0 as built)
 uniform vec4 uOilPx;      // (x: the angle one pixel of the scene pass takes, radians: shared.js)
 uniform mat4 uShM;
 uniform highp sampler2D uShTex;
@@ -2159,6 +2161,13 @@ void main() {
     // tens of pixels across, so the 3 px floor never binds here). 0: as before.
     if (uNearLeaf > 0.0 && aData.y > 4.5 && aData.y < 6.5) {
       cardO *= mix(0.55, 1.0, smoothstep(1.0, 5.0, distance((im * vec4(aCard, 1.0)).xyz, uCamLocal)));
+      lp = aCard + cardO;
+    }
+    // THE BUSH'S LEAVES SMALLER (?bushleaf, 24 Nov, the look director: 0.24 x 0.11 m leaves on a sapling bush are oak
+    // leaves on a shrub; about 0.65 of that, with the sky between them -- sparser, not more triangles). Each leaf shrinks
+    // about its own centre, whole and crisp, at every distance. Set on the bush's material only; 1 (or 0): as built.
+    if (uLeafScale > 0.0 && uLeafScale != 1.0 && aData.y > 4.5 && aData.y < 6.5) {
+      cardO *= uLeafScale;
       lp = aCard + cardO;
     }
   #endif
@@ -2390,6 +2399,16 @@ void main() {
       if (aData.z > 1.5) xl = 0.2;
       float lvL = pcLevel(xl, 0.03);
       vec3 deepL = pcShadeLeaf(cs);      // (L2: the one foliage shade, chunks.js)
+      // NO NEAR-BLACK LEAF AT ARM'S LENGTH (?nearshade, 24 Nov, the look director on the near bush in u2cells-am02, with
+      // leave to use the shared shade this way: R1.2c, the darkest values belong to trunks in shade). A leaf whose light
+      // falls under the second step takes the one foliage shade, which for a darker wash is near-black; far off the air
+      // lifts it, but at arm's length nothing does, and a bush or a low bough in full daylight showed the darkest pieces
+      // in the picture. So within 3 m of the eye a shaded leaf takes the land's own glaze at the glaze level (pcTone, with
+      // the sky's fill in it) in place of the deep shade, back to today's shade by 5 m. Trees and bushes. 0: as before.
+      if (uNearShade > 0.0) {
+        float kNe = (1.0 - smoothstep(3.0, 5.0, length(cV))) * uNearShade;
+        if (kNe > 0.0) deepL = mix(deepL, pcTone(cs, max(lvL, 1.0)), kNe);
+      }
       // THE CROWNS UNDER A STORM (?stormleaf, 24 Nov, the coordinator after the look director's storm light, LOOK-BUILD.md
       // 'The land under a storm'). MEASURED in the gallery under wx=storm (uStorm 0.9, overcast 1.0): a lit leaf's level
       // is already about 1.4 there, so it is painted almost wholly in the foliage shade above -- and that shade is the
@@ -3363,6 +3382,8 @@ export function makePropMaterial(bodyU, opts = {}) {
     uNearLeaf: { value: opts.nearLeaf || 0 },  // (?nearleaf: flora.js; 0 for every plant but a tree with the switch on)
     uLeafGrow: { value: opts.leafGrow || 0 },  // (?leafgrow: flora.js; 0 for every plant but a tree with the switch on)
     uStormLeaf: { value: opts.stormLeaf || 0 },  // (flora.js: 0.5 for a tall tree by default, ?stormleaf=0 off; 0 for every other plant)
+    uNearShade: { value: opts.nearShade || 0 },  // (?nearshade: flora.js; the trees and the bushes)
+    uLeafScale: { value: opts.leafScale || 1 },  // (?bushleaf: flora.js; the bush only)
     uOilDarkA: v3(opts.oilDark && opts.oilDark[1], [0.5, 0.4, 0.4]), uOilDarkB: v3(opts.oilDark && opts.oilDark[2], [0.2, 0.15, 0.2]),
   };
   const defines = {};
