@@ -628,7 +628,8 @@ A separate session builds W1 CLOUDS once the look director's sky ceiling (touch 
   - Reading the band per vertex would barely save anything: the far ground's mesh has about 216,000 vertices in this
     view against 518,000 pixels.
 
-- **W3.12c, the look director's review (ACCEPTED with one change, made):**
+- **W3.12c, the look director's review (ACCEPTED with one change, made; the change itself ACCEPTED 24 Nov, which closes
+  W3.12 from the look director's side. C lands it once pcGustBand and the binding are both on look-proto; off by default):**
   - The sheen is a GREYING AND COOLING, not a lightening. Half the saturation, a touch toward the sky's blue-grey, and a
     lift of at most 0.06 that never reaches a stroke already over V 0.80. On the lemon floor the first step had pushed
     light strokes past white (cream fog).
@@ -650,7 +651,8 @@ A separate session builds W1 CLOUDS once the look director's sky ceiling (touch 
     lanes' hand-overs are kept.
   - The look director's storms hook (1de2bf6), already in v39.2.
   - **91cf7a8 THE FLIP** and **ed198bd THE CLOUDS' FLIP** (W1's two lines, with the look director's leave).
-  - weather-clouds c4b612e (the anvil wedge and the mountain cloud, accepted by the look director) is for v39.4.
+  - weather-clouds c4b612e (the anvil wedge and the mountain cloud, accepted by the look director) is for v39.4: merged
+    into design-weather as e72bcc4 at the coordinator's word, clean; suites 443 / 129 / 328. Not yet checked in a browser.
 - **The flip is the OIL LOOK's default only.** As first written it switched the new weather on in every page, which
   would have changed the watercolour game. Now wx2.js, kitmat.js and audio.js all read `?look=oil` exactly as shared.js
   LOOK.oil does. The storm hook and the 3D clouds were oil-only already.
@@ -679,7 +681,7 @@ A separate session builds W1 CLOUDS once the look director's sky ceiling (touch 
   - A land storm passes 70 m from the landing at game time 3,653 s:
     - at 990 m, a slate-violet ceiling with lighter seams comes over the wood;
     - overhead, a thunderstorm of 10.8 mm/h: slanting rain, a darker sky, the explorer's hood up, leaves blowing.
-  - The look director's pair, noon at the landing, `?clouds3d=0` over the default
+  - The look director's pair (ACCEPTED by the look director), noon at the landing, `?clouds3d=0` over the default
     (`release/v39.3_game_noon_pair_*.jpg`):
     - Nearly the same picture: the canopy hides most of the sky. With `?clouds3d=0` the sky is the old painted flat
       cloud and the clouds module is never loaded.
