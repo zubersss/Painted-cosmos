@@ -40,13 +40,15 @@ import { SEASON } from '../data/season.js';
 // the picture back as it was before the lane, to the bit. Each of these is 1 by default and 0 gives that part back:
 //   ?bloom=0     no flowers from this map at all (the near rings lay their flowers as before, the ground is not tinted)
 //   ?bloomair=0  the flowers, but not their colour in the ground (A1)
+//   ?bloomfar=1  (FV6, with the far view) the drift's cover and colour as their own channel for the ground's far dabs
+//                (o.fd, o.fc below), and the drift no longer mixed into the far colour (o.r2..b2): off until C's half lands
 //   ?bloomyear=0 the flowers, but not following the year (every kind in flower all the year, as before the year came)
 //   ?grass2=0    (read here too for the floor under the sward; nearground.js FLORA reads it for everything else)
 // Read once, at the first call (MODE.oil is set by render/shared.js when it loads, which may be after this module is).
 let SW = null;
 export function bloomSwitches() {
   if (SW) return SW;
-  const f = { bloom: 1, air: 1, grass2: 1, year: 1 };
+  const f = { bloom: 1, air: 1, grass2: 1, year: 1, far: 0 };
   try {
     const q = new URLSearchParams(location.search), on = (k) => !q.has(k) || (q.get(k) !== '0' && q.get(k) !== 'false');
     const isOld = q.get('flora') === 'old' || q.get('flora') === '0' || q.get('flora') === 'false';   // (the opt-out: nearground.js FLORA)
@@ -54,8 +56,11 @@ export function bloomSwitches() {
     f.bloom = !isOld && on('bloom') ? 1 : 0;
     f.air = f.bloom && on('bloomair') ? 1 : 0;
     f.year = f.bloom && on('bloomyear') ? 1 : 0;
+    // (FV6 with the far view, C: the drift's cover and colour go to the ground's far dabs as their own channel, aFar.z/w in
+    // patchgen.js; 0 by default until C's half lands, then on together after stills at 150 m, 400 m and 1 km)
+    f.far = f.air && q.get('bloomfar') === '1' ? 1 : 0;
   } catch { /* no address to read (Node, the tests): everything on, if the look is */ }
-  if (!MODE.oil) { f.bloom = 0; f.air = 0; f.grass2 = 0; f.year = 0; }
+  if (!MODE.oil) { f.bloom = 0; f.air = 0; f.grass2 = 0; f.year = 0; f.far = 0; }
   SW = f;
   return f;
 }
@@ -161,6 +166,16 @@ export function bloomAt(S, x, y, z, s, bi, out, tEval) {
   return out;
 }
 
+// a colour packed RGB565 into 0..1 (exact in a 16-bit normalised attribute), and back
+export function packRGB565(c) {
+  const r = Math.round(Math.max(0, Math.min(1, c[0])) * 31), g = Math.round(Math.max(0, Math.min(1, c[1])) * 63), b = Math.round(Math.max(0, Math.min(1, c[2])) * 31);
+  return ((r << 11) | (g << 5) | b) / 65535;
+}
+export function unpackRGB565(v, out) {
+  const n = Math.round(v * 65535), o = out || [0, 0, 0];
+  o[0] = ((n >> 11) & 31) / 31; o[1] = ((n >> 5) & 63) / 63; o[2] = (n & 31) / 31; return o;
+}
+
 // how near a flower's colour lies to the ground's round the colour wheel: 1 the same hue or no hue (a white or a grey
 // flower), 0.33 opposite
 function hueNear(c, r, g, b) {
@@ -177,8 +192,15 @@ function hueNear(c, r, g, b) {
 // near paint where the grass is dense (the dark between the blades: LOOK-RULES R3.1 keeps a blade one flat colour, so
 // the dark roots are the ground's). Writes nothing else; with the look off or no data it returns at once.
 const _bo = { kind: -1, bloom: null, dens: 0, heart: 0 };
+const _fc = [0, 0, 0];
+// It also writes the DRIFT CHANNEL for the ground's far dabs (FV6, the far view's patchgen.js packs it into aFar.z/w):
+//   o.fd  0..1  the drift's cover (its density times its kind's tint; 0 where none)
+//   o.fc  0..1  its flower's colour packed RGB565, (r5 << 11 | g6 << 5 | b5) / 65535 (0 where none)
+// Both are 0 on a sample that is not full (bloomTint is not called) only if the reader resets them: patchgen reads them
+// from FULL samples, where this always runs first.
 export function bloomTint(S, o, x, y, z, bi) {
   const sw = bloomSwitches();
+  o.fd = 0; o.fc = 0;
   if (!sw.air && !sw.grass2) return;
   if (sw.grass2) {
     const g = swardOf(S, bi);
@@ -207,5 +229,12 @@ export function bloomTint(S, o, x, y, z, bi) {
   const near = hueNear(c, o.r, o.g, o.b);
   const kn = cover * 0.4 * near, kf = Math.min(0.7, cover) * near;
   o.r += (c[0] - o.r) * kn; o.g += (c[1] - o.g) * kn; o.b += (c[2] - o.b) * kn;
-  o.r2 += (c[0] - o.r2) * kf; o.g2 += (c[1] - o.g2) * kf; o.b2 += (c[2] - o.b2) * kf;
+  o.fd = Math.min(1, cover);
+  // (the far dabs: a white or a near-white flower is held a step under the meadow's lightest grass -- the look director at
+  // 150 m: "pale near-white flecks on the slopes read as paper" -- its top channel no more than 0.80)
+  const cmx = Math.max(c[0], c[1], c[2]), cmn = Math.min(c[0], c[1], c[2]);
+  if (cmx - cmn < 0.25 * cmx && cmx > 0.80) { const f = 0.80 / cmx; _fc[0] = c[0] * f; _fc[1] = c[1] * f; _fc[2] = c[2] * f; o.fc = packRGB565(_fc); }
+  else o.fc = packRGB565(c);
+  // (with the channel on, the far dabs carry the drift in its own colour, so the far colour does not carry it as well)
+  if (!sw.far) { o.r2 += (c[0] - o.r2) * kf; o.g2 += (c[1] - o.g2) * kf; o.b2 += (c[2] - o.b2) * kf; }
 }

@@ -58,6 +58,16 @@ test('no flower head at the cloak\'s blue (LOOK-RULES R2.5: hue 210-240 at S ove
   }
 });
 
+test('the drift channel for the far dabs (FV6): a colour packs into 16 bits and back within a step', async () => {
+  const { packRGB565, unpackRGB565 } = await import('../../world/bloom.js');
+  for (const { f } of floras) for (const b of f.blooms) {
+    const v = packRGB565(b.c), back = unpackRGB565(v);
+    assert.ok(v >= 0 && v <= 1);
+    assert.ok(Math.abs(Math.round(v * 65535) - v * 65535) < 1e-6, 'a whole 16-bit step');
+    for (let i = 0; i < 3; i++) assert.ok(Math.abs(back[i] - b.c[i]) <= 1 / 31 / 2 + 1e-9, b.kind + ' channel ' + i);
+  }
+});
+
 test('the year: a kind with no window is always in flower, and a window opens and closes', () => {
   for (let t = 0; t <= 1.0001; t += 0.05) assert.strictEqual(inFlower(null, t), 1);
   assert.strictEqual(inFlower([0, 1], 0.5), 1);
