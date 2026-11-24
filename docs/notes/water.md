@@ -386,7 +386,17 @@ Branch `water-bodies` = lane 0 + look-proto v37.1 + `origin/design-water` (W1's 
   (The scratch merge of design-water and water-paint conflicts in data/mode.js and data/looks/earth.js, two lines each:
   water-paint's wpaint default 1 against E's switches test, and earth.js oil needs E's keys and W3's airTop; told the
   coordinator.)
-- NEXT: F's word on the falls (then `W.falls = n('falls', 1)` to E); the top tier's falls views (being taken).
+- **F: the curtain-free falls PASS.** THE FALLS FLIP SENT TO E: `W.falls = n('falls', d)` in data/mode.js waterFromSearch (the
+  oil look's default like the lakes; `?falls=0` opts out), with the dependency said plainly: the curtain fix is on
+  water-paint, so the flip ships with or after water-paint 7889acf, never on design-water alone. The top tier seen too:
+  `falls-nocurtain-68m-150m-400m-T2.jpg` (no curtain).
+- **THE FALL'S OWN WATER (ef3e182, F's note):** the sheet, the pool's milk and the spray no longer take the river's wash (W3's
+  deeper blue made the sheet grey and flat): FALL_CHUNK's FALL_WHITE / FALL_MILK / FALL_PALE, a few whites mostly on the
+  ropes, the milk body, the pale blue under it; only the lip's glass and the outflow keep the river's colour. SEEN at phone
+  settings (scratch copy): lit whites V 0.91, the body's median 0.88 (0.87 before) with clear steps. F's literal numbers
+  (milk 0.75 0.80 0.83) tried: the body went grey, median 0.83; both in `falls-ownmilk-ABC.jpg`; F to choose (three numbers).
+- NEXT: F's choice of the two milks; after the branches meet (the coordinator's call): the pool's pcThinLayer to W3's
+  pcWStrokes, pcFallMilk and the FALL_ colours into waterchunk.js.
 
 ## Stations and tools
 
