@@ -48,6 +48,10 @@
 //   ?bench=trees  the tree questions only, on foot and in the air: shorter, so the phone is cooler for each row
 //   ?bench=air    the air table (FV7 of docs/lead/FARVIEW-DESIGN.md): 400 m up and 45 degrees down, or ?bench=air,150
 //                 for another height; the questions every air lane waits on.
+//   ?bench=foot   the frame ON FOOT at the landing, the parts that are not the trees (the owner's 33 ms, 24 Nov): the
+//                 near grass and flowers (whole, half of their marks, one flat colour: what a blade and a pixel of the
+//                 sward cost, for the denser flora to come), the small plants, the ground, the shadows, the light in
+//                 the air, then the trees for scale, and the water's own views last.
 
 import { BUILD } from './build.js';
 import { MAX_PIXELS } from './preset.js';   // (the ceiling on the 'every pixel the screen has' row)
@@ -454,6 +458,16 @@ export function attachBench(pc) {
         if (MK <= 1) await sharpen(1);
       }
     }
+    // THE NEAR GRASS AND FLOWERS (the pc-near rings, world/nearground.js): in no row until 24 Nov, though the header has
+    // named them since the second form. Whole; half of their marks, folded away by number in the vertex shader before
+    // any is rasterised (materials.js NEAR_VERT uNearCut), so the gap to 'as set' is half the marks' whole cost; and
+    // every mark kept but painted one flat colour (shared.js uOilL.y 8), so that gap is the sward's paint a pixel.
+    const nearCut = (k) => { for (const m of mats(/^pc-near$/)) if (m.uniforms && m.uniforms.uNearCut) m.uniforms.uNearCut.value = k; };
+    const GRASS = [
+      ['no near grass or flowers', () => show(/^pc-near$/, false), () => show(/^pc-near$/, true)],
+      ['near grass: half its marks', () => nearCut(0.5), () => nearCut(0)],
+      ['near grass one flat colour', () => B({ flat: 8 }), () => B({ flat: 0 })],
+    ];
     const WX0 = { ...WX2 };      // (group D: its switches as the address set them, put back after each of its rows)
     const holdStorm = (on) => { const P = pc.sim && pc.sim.physics; if (P && P.forceWeather) P.forceWeather(on ? { kind: 'storm' } : null); };
     const steps = [
@@ -500,6 +514,7 @@ export function attachBench(pc) {
       ...T2ROWS,
       ['no trees', () => show(/^pc-prop-(tall|far)/, false), () => show(/^pc-prop-(tall|far)/, true)],
       ['no small plants', () => show(/^pc-prop-(?!tall|far)/, false), () => show(/^pc-prop-(?!tall|far)/, true)],
+      ...GRASS,
       // (2026-11-20) WHERE THE DRAW CALLS ARE. The table's header says 350 of them and 9.6 ms of script, and a draw
       // call costs a phone's processor something like twenty millionths of a second, so the two numbers are most
       // likely the same number. Counted in the painter's gallery on one frame of the autumn wood: 245 draws, of
@@ -597,7 +612,30 @@ export function attachBench(pc) {
       onFoot,
       [AS + ', last', null, null],
     ];
+    // ?bench=foot: the frame on foot at the landing without the trees' questions (the owner's 33 ms, 24 Nov). With the
+    // two short programs and the impostors as the default trees the frame is expected near 22 ms (derived, never
+    // measured), so these rows are asked off the cap, where they can be read: each against the "as set" row before it.
+    const footSteps = [
+      [AS, null, null],
+      ...GRASS,
+      [AS, null, null],
+      ['no small plants', () => show(/^pc-prop-(?!tall|far)/, false), () => show(/^pc-prop-(?!tall|far)/, true)],
+      ['no ground drawn', () => ground(false), () => ground(true)],
+      ['ground one flat colour', () => B({ flat: 1 }), () => B({ flat: 0 })],
+      [AS, null, null],
+      ['no shadows at all', () => B({ shadow: false }), () => B({ shadow: true })],
+      ['trees cast no shadow', () => treeMeshes((o) => o.layers.disable(2)), () => treeMeshes((o) => o.layers.enable(2))],
+      ['no light in the air', () => B({ shaft: false }), () => B({ shaft: true })],
+      [lite0 ? 'the full paint' : 'the lighter paint', () => B({ lite: !lite0 }), () => B({ lite: lite0 })],
+      [AS, null, null],
+      ['no near trees', () => show(/^pc-prop-tall/, false), () => show(/^pc-prop-tall/, true)],
+      T0.bark, T0.noFar,
+      ['no trees', () => show(/^pc-prop-(tall|far)/, false), () => show(/^pc-prop-(tall|far)/, true)],
+      [AS + ', last', null, null],
+      ...waterRows,
+    ];
     if (MODE_B === 'trees') steps.splice(0, steps.length, ...treeSteps);
+    else if (MODE_B === 'foot') steps.splice(0, steps.length, ...footSteps);
     else if (MODE_B === 'air' || MODE_B.startsWith('air,')) steps.splice(0, steps.length, ...airSteps);
     const rows = [];
     let r0 = null, base = null;
