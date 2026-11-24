@@ -511,7 +511,7 @@ whether the performance work is one more version or a redesign.** Their own row 
 
 ## 3. State right now (update this before you stop)
 
-**STATE 24 Nov, 08:40 (first account): TEN HELPER SESSIONS BUILDING, EACH ON ITS OWN BRANCH. `main` is v37.1.**
+**STATE 24 Nov, 09:00 (first account): TWELVE HELPER SESSIONS BUILDING, EACH ON ITS OWN BRANCH. `main` is v37.1.**
 - The owner's direction (24 Nov): 30 a second on the S23 Ultra, the view from the air good to a mile, much denser
   grass, flowers and more plants, flora before fauna. The v37 speed test that drives it is in the log (24 Nov): as
   set about 89 ms (11 a second); near trees about 52 ms, far trees about 17-21, the plants' fragment work about 34;
@@ -535,9 +535,12 @@ whether the performance work is one more version or a redesign.** Their own row 
     ?farwind=1); W3.1 the cloud and rain map (?cloudmap=1) and E's rain field landed; now W3.2 storms born from the land.
   - D-W1 CLOUDS, branch `weather-clouds` (session_01R5Bri2WCHjprh5TfZSAsMU; = look-proto + design-weather + look-director):
     wxfield.js, then 3D cumulus, the deck, cloud shadows, high cloud.
-  - E WATER, branch `design-water` (session_01R5Bri3QABGWhztzAc3keGn): lane 0 (hooks, MODE.water, two water views in
-    the speed test), W1 rivers, then FV5 water from the air. Two more water sessions (W2 bodies of water; W3 paint
-    and W4 the player) start when lane 0 lands.
+  - E WATER, branch `design-water` (session_01R5Bri3QABGWhztzAc3keGn): lane 0 landed (hooks, MODE.water, two water
+    views in the speed test); now W1 rivers; leads the water group.
+  - E-W2 BODIES OF WATER, branch `water-bodies` (session_01R5Bri2xowNiwS1SnP3VG3f): lakes, ponds, puddles, the
+    waterfall off the sea cliff, fjords.
+  - E-W3/W4 WATER PAINT AND PLAYER, branch `water-paint` (session_01R5Bri2fSASVVvyrSG11UGF): still water, octaves, the
+    night key on water, colour and far shine, FV5 water from the air, wakes and splashes, rain on water.
   - F LOOK DIRECTOR, branch `look-director` (session_01R5Brhzz2JPPF6Ecz6XRQHx): L0 landed (one air text,
     bit-identical); now the sky ceiling with FV1 folded in (the sky stays a sky to a mile), then L1 night, L2+L7
     shade and darks, L3 one light, L5/L6 the far air (released). L4 (the morning) waits for the owner.
