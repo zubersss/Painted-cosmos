@@ -39,6 +39,7 @@ A separate session builds W1 CLOUDS once the look director's sky ceiling (touch 
 | `?rainshaft=1` | rain shafts under every raining storm 1 to 7 km off (`world/storms.js`; turns on `cloudmap`; oil look only) |
 | `?bolts=1` | lightning bolts, cloud to ground (`world/storms.js`; turns on `cloudmap`; oil look only) |
 | `?rainmap=1` | the rain box's drops placed by the rain map at its four corners (turns on `cloudmap`) |
+| `?gustbands=1` | the gust bands seen from the air (the physics side; a material shows them only with its `PC_GUST` hook and the `uPhysGust` binding) |
 | `?stormswing=0` | with `?stormland`: the land storms as W3.2 laid them (1 to 3 a day, the usual wind aloft); on by default |
 | `?clouds3d=1` | (the look director's switch for W1's clouds) also turns on `cloudmap` and `windmap` |
 
@@ -460,6 +461,136 @@ A separate session builds W1 CLOUDS once the look director's sky ceiling (touch 
   5. **Thunder in the audio:** not checked (`audio=0` in a headless browser). The physics gives `thunderIn` and
      `thunder01`; PILOT's audio would need to play them.
 - **Suites:** physics 441, world and looks 103, unit 325, 0 failing.
+
+### W3.10: THE GUST FRONT, THE PACE, AND THUNDER (the coordinator's rulings after W3.9; `weather.js`, `audio.js`)
+
+- **A correction of my own W3.9 report.** I wrote "the gust front is weak, 9 m/s at most". That was the wind at the
+  explorer's 2 m, not the standard 10 m.
+  - Measured properly, the 10 m wind (as the near grid composes it) under the OLD storms was already 8 to 25 m/s at
+    the leading edge.
+  - What was wrong was WHERE it blew: strongest inside the rain and on the REAR side (13 to 39 m/s behind), and only 1
+    to 4 m/s at 1.2 radii ahead.
+  - My first attempt (a stronger outflow) pushed the edge to 20 to 37 m/s and was too much. It was replaced before any
+    commit.
+- **The gust front at the leading edge** (`weather.js`, behind `?stormland`):
+  - A storm's outflow now peaks at its edge (0.95 to 1.1 radii), on the side it moves toward.
+  - It carries 0.8 of the storm's own speed there and 0.12 of its outflow behind, capped at 16.5 m/s (`STORMGUST`).
+  - MEASURED, six mature land storms, at 10 m:
+
+    | where | before | now |
+    | --- | --- | --- |
+    | 1.2 radii ahead | 1 to 4 m/s | 3 to 10 m/s |
+    | the leading edge (0.8 to 1 radius) | 8 to 25 m/s | 12 to 26 m/s |
+    | behind | 13 to 39 m/s | 12 to 22 m/s (the storm's own wind; its outflow there under a third of ahead's) |
+
+  - **In the game** (`W3.10_game_storm_pass_log.json`): the explorer's 2 m wind rises from 1.3 to 9 m/s about 18 s
+    BEFORE the first drizzle (5 s before), peaks at 11.5 m/s in the first heavy rain (about 15 to 16 m/s at 10 m over
+    open grass), and falls to 3 to 4 m/s behind.
+- **The pace:** no land storm drifts faster than 10 m/s times the dial (`STORMLAND.driftMax`).
+  - In the game the same storm now passes over the spawn in 157 s of cloud and 106 s of rain (was 105 and 70).
+  - The dial's table, measured again over 200 days, in `src/data/looks/earth.js`: dial 1 over the wood 22 % and in sight
+    62 %; 0.5 gives 11 / 42; 1.5 gives 27 / 68.
+  - `?stormswing=0` is still W3.2's exactly (hashed).
+- **Thunder** (`src/audio/audio.js`, PILOT's file, given to group D for this one piece; behind `?stormland` or `?wx2`,
+  read from the address; without them exactly as before):
+  - `thunderPlan(dist, cover, roof, seed)`: a near bolt (under 450 m) CRACKS, a rip of high noise then a slap, then the
+    boom and a roll. Up to 1.6 km it is a softened clap and rolls. Beyond, only two to four low rolls, slow to swell,
+    over up to about 10 s.
+  - Under leaves a quarter quieter; in the ship or under its hull no crack, muffled, and at most 0.55 of the loudness.
+  - The distance is read back from the loudness the thunder arrives with (`thunderDistance`), so `core/game.js` is
+    untouched.
+  - The bang plays when the count-down crosses zero, as before. With the switch, a crossing found more than 0.5 s late
+    is not played (`thunderDue(prev, now, 0.5)`).
+  - The physics now hands the count-down of the NEXT thunder among the storms here, so a switch between storms never
+    makes a late or double bang. In the first game run one late quiet roll had been read as 32 km off.
+  - **In the game:** 6 thunderclaps, each 0.9 to 1.8 s after its flash, within one frame of the distance over 340 m/s.
+    Near ones crack, ones 465 to 590 m off clap and roll.
+  - `tests/audiocheck.mjs`, which renders the graph in an OfflineAudioContext and fails on clipping, clicks or DC,
+    PASSES with and without the switch. Its click measure in the thunderstorm case goes from 1.2 to 2.3 with the
+    switch (the crack's 4 ms attack), within its limits.
+  - **Nobody has heard it**: there is no sound in a cloud session. The owner's ears decide.
+- **Tests:** `tests/thunder.test.mjs` (3: the bang due once at any frame rate and never late with the switch; the delay
+  as distance over the speed of sound with the distance read back; crack near, roll far, quieter under cover).
+  `stormland.test.mjs` gained the gust front and the drift cap.
+- **Suites:** physics 442, world and looks 103, unit 328, 0 failing. Switches off: bit-identical, 162,000 numbers.
+
+### W3.11: THE FLIP, READY BUT NOT APPLIED, AND THE GUARD (the coordinator, 24 Nov)
+
+- **The guard (committed, ade2f6f):** `src/world/wxguard.js`, `watchPrograms(mesh, name)`.
+  - On the frames after a mesh's first draw it looks once at the program three compiled for it. A failed one
+    (`diagnostics.runnable === false`) is hidden for good, with a console warning, and the game goes on without it.
+  - `world/storms.js` uses it for the veils and the bolts; the clouds lane may use it for its clouds.
+  - SEEN: a deliberately broken material was hidden and reported, a good one beside it untouched.
+- **THE FLIP, as one commit, NOT applied:** `docs/lead/WEATHER-FLIP.patch` (`git am docs/lead/WEATHER-FLIP.patch`).
+  It applies on top of the look director's storms hook (look-director 1de2bf6), which it changes; checked to apply
+  cleanly on design-weather plus that hook. What it does:
+  - `physics/wx2.js`: in a page every switch of the new weather is on unless the address turns it off. **?weather=old**
+    turns them all off (the weather of v37 to the last digit). `rainmap` stays off. In Node (no page) every switch stays
+    off, so no test changes meaning.
+  - `render/kitmat.js` and `audio/audio.js` read the same: on unless `?weather=old`.
+  - `world/index.js`: the hook fetches wx2.js and storms.js in the oil look unless `?weather=old`.
+  - `core/bench.js`: the row 'weather: the old weather (?weather=old)': the whole new weather against the old, live.
+  - CHECKED in the game: with no switches every switch is on but `rainmap`, the storms are loaded, the maps run, there
+    are no errors and the picture draws. With `?weather=old` every switch is off and storms.js is never fetched.
+  - NOT in it: the clouds lane's own switch (`?clouds3d`, the look director's and W1's) flips with their review.
+
+### W3.12: THE WIND SEEN FROM THE AIR (the coordinator, 24 Nov; `flora.js`, `flora.glsl.js`, `wx2.js`, `core/bench.js`)
+
+- **What the far land already took from the wind** (`?farwind`):
+  - The far trees' painted stand-ins (A1, trees-far `render/impostor.js`) lean at their foot with the far field
+    (pcPhysBendLite). From 150 m to 1 km a lean moves a crown's top about a pixel: no gusts can be seen in it.
+  - The ground reads only the push field (the trodden track, within 70 m). The near grass strokes read only its
+    flattening.
+  - The near plants carry travelling gust waves (`uPhysWave`), but these are 11 to 19 m long and their phases are kept
+    modulo one wave, so they cannot drive bands seen from far off.
+- **What a gust looks like from above:** not a bend but a SHEEN. Where it lays the grass and turns the leaves, their
+  paler side shows, and the pale patch runs downwind.
+- **Built (physics side, committed):** behind `?gustbands=1` (`WX2.gustbands`).
+  - `flora.js` hands the shaders `uPhysGust`: xyz the bands' direction (the near waves' own slowly turning direction,
+    in body axes) times their strength, which is 0 in a calm and full in a fresh breeze (`GUSTBAND.windLo` 0.4 and
+    `windHi` 2.2 m/s at the blades). w is how far they have run (1.5 times the blade wind), wrapped at the noise's
+    period so that they never jump.
+  - `flora.glsl.js pcGustBand(p)`: 0..1 at a body-local point (a stroke's centre). It is one read of the shared 3D noise,
+    stretched to bands about 40 m along the wind and 120 m across, lying on the world (no jump when the frame
+    re-anchors), with more and bolder bands the stronger the wind.
+  - **Compiled only where a material defines `PC_GUST`**, and that material must bind `uPhysGust` (the coordinator's
+    rule: no unbound uniform anywhere).
+  - Test: `gustband.test.mjs` (off by default; on in a breeze along the ground, running, wrapped, never jumping; the
+    function behind its define).
+- **The hooks, as patches for their owners (applied locally for the stills only, NOT committed):**
+  - `docs/shots/physics/weather-build/T_gust_render_shared_js.patch.txt`, for the look director: `uPhysGust` in
+    shared.js `PHYS`, one line. syncPhysFlora's loop then copies it.
+  - `docs/shots/physics/weather-build/T_gust_ground_materials_js.patch.txt`, for C, the far ground: in
+    `makeTerrainMaterial` `PC_GUST` with `?gustbands=1` or `?wx2=1` in the oil look. In `pcGroundPaint` a growth stroke
+    (green to lemon and straw: `k.g - k.b`; not rock, not snow) under a band is laid a pale, cooler step, by whole
+    strokes.
+  - For A1, the far crowns: the same, one `pcGustBand(tree foot)` a tree in the impostor's fragment stage, a pale
+    lift of the crown's leaves (they turn their paler side); `PC_GUST` and the same binding.
+- **Seen** (`W3.12_*`): the green wood from 150 m in a 5 m/s breeze, A off, B on at t and one second later, a 3x crop
+  stack and a x12 difference.
+  - B has patches of paler, cooler ground strokes between the trees, and one second later they have moved downwind.
+    2.3 % of the pixels differ from A; 1.3 % differ between B's two frames.
+  - **Said plainly: it is subtle over a wood.** The crowns cover most of the ground from the air, so over woods the
+    visible answer needs the crowns too (A1's impostors, and the middle trees). Over open grass it reads more.
+  - In a calm, which this game's near winds mostly are (0.3 to 2.5 m/s at 2 m), it is off.
+- **Phone cost, derived (uncertain: no device):** one 3D texture read and about fifteen operations per ground stroke
+  layer, in growth strokes, while there is a breeze. The ground's paint is 24 to 34 ns a pixel (v37) with many reads,
+  so this is about a tenth of it: about 0.3 to 0.5 ms from the air over grass.
+  - That is over the 0.3 ms a change. On the phone tier, read it once a pixel at the coarse layer's stroke: about a
+    third of that.
+  - Speed-test row: 'weather: no gust bands seen from the air' (live).
+- **Suites:** physics 443, world and looks 103, unit 328.
+- **Agreed after (24 Nov, messages):**
+  - **A1 (far crowns):** one `pcGustBand(foot)` per tree in the impostor's vertex stage, flat over the crown; each
+    tree turns at its own threshold (`step(0.15 + 0.7 * seed, band)`), its cap light one level up with a slightly
+    silvery hue, the same target as the ground. Under `PC_GUST` A1 declares `uniform sampler3D uNoise3D;` above
+    FLORA_GLSL in that vertex shader (the noise is declared in the fragment stage only), takes PHYS when gusts are on,
+    and follows my switch.
+  - **C (far ground):** sent the ground patch. It takes no ground-sample slot and no attribute (a fragment-stage read
+    at the stroke's centre). Asked C whether C's far ground past the mesh needs the same step.
+  - Both land with or after F's `uPhysGust` binding, never before.
+  - **W1 asked:** the 16 m/s anvil in its game test was the drift before the cap (881c97d came after the c359e12 it
+    merged); for a land cell the anvil is the capped drift.
 
 ## NEXT
 

@@ -1,0 +1,155 @@
+From 40a8f7baf1e7e6526dd36c41563225527b8c850d Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Tue, 24 Nov 2026 13:26:04 +0000
+Subject: [PATCH] [physics] THE FLIP: the new weather becomes the game's
+ default, with one opt-out, ?weather=old
+
+To be applied once the clouds lane passes review (the coordinator, 24 Nov), on top of the look director's storms hook
+(look-director 1de2bf6).
+- physics/wx2.js: in a page every switch of the new weather is on unless the address turns it off; ?weather=old turns
+  them all off (the weather as it was at v37, to the last digit); ?rainmap stays off (its effect is too small to see);
+  where there is no page (the Node tests) every switch is off as before.
+- render/kitmat.js (the rain streak's pale) and audio/audio.js (thunder by distance) read the same: on unless ?weather=old.
+- world/index.js: the storms' hook fetches wx2.js and storms.js in the oil look unless ?weather=old.
+- core/bench.js: the row 'weather: the old weather (?weather=old)', the new weather as a whole against the old, live.
+The guard is already on design-weather (ade2f6f): a weather program that does not compile switches itself off.
+CHECKED in the game in the headless browser: with no switches in the address every switch is on but rainmap, the
+storms are loaded, the wind and cloud maps run, no errors, the picture draws; with ?weather=old every switch is off and
+storms.js is never fetched. Suites (Node, where the switches stay off): physics 442, world and looks 103, unit 328
+(one physics run of four had one failure that did not come back in the next three: a timing budget while the
+headless browser was busy).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01R5Bri2bBgFSfCmxpKKuURT
+---
+ src/audio/audio.js   |  8 +++++---
+ src/core/bench.js    |  9 ++++++++-
+ src/physics/wx2.js   | 16 ++++++++++------
+ src/render/kitmat.js |  8 +++++---
+ src/world/index.js   |  4 +++-
+ 5 files changed, 31 insertions(+), 14 deletions(-)
+
+diff --git a/src/audio/audio.js b/src/audio/audio.js
+index cca7d09..2e09bc3 100644
+--- a/src/audio/audio.js
++++ b/src/audio/audio.js
+@@ -14,9 +14,11 @@ const PAD_CHORD = { mercury: [1, 1.5, 2.25], venus: [1, 1.26, 1.5], earth: [1, 1
+ //  distance over the speed of sound of the air); the bang plays when its count-down crosses zero, as before. Without
+ //  the switch the thunder is exactly what it was.)
+ const STORM_AUDIO = (() => {
+-  if (typeof location === 'undefined' || !location || !location.search) return false;
+-  const q = new URLSearchParams(location.search), on = (k) => q.has(k) && q.get(k) !== '0' && q.get(k) !== 'false';
+-  return on('stormland') || on('wx2');
++  if (typeof location === 'undefined' || !location) return false;
++  const q = new URLSearchParams(location.search || ''), on = (k) => q.has(k) && q.get(k) !== '0' && q.get(k) !== 'false';
++  if (q.has('stormland')) return on('stormland');
++  if (q.get('weather') === 'old') return false;
++  return q.has('wx2') ? on('wx2') : true;               // (the new weather is the default: physics/wx2.js)
+ })();
+ export const THUNDER = Object.freeze({
+   near: 450,        // m: within this a bolt cracks
+diff --git a/src/core/bench.js b/src/core/bench.js
+index 7bf8e50..5de4b0e 100644
+--- a/src/core/bench.js
++++ b/src/core/bench.js
+@@ -444,7 +444,8 @@ export function attachBench(pc) {
+         if (MK <= 1) await sharpen(1);
+       }
+     }
+-    const WX0 = { ...WX2 };      // (group D: its switches as the address set them, put back after each of its rows)
++    const WX0 = { ...WX2 };
++    const WX_ALL = ['windmap', 'nearmap', 'farwind', 'cloudmap', 'stormland', 'rainlook', 'rainshaft', 'bolts', 'rainmap'];      // (group D: its switches as the address set them, put back after each of its rows)
+     const holdStorm = (on) => { const P = pc.sim && pc.sim.physics; if (P && P.forceWeather) P.forceWeather(on ? { kind: 'storm' } : null); };
+     const steps = [
+       [AS, null, null],
+@@ -527,6 +528,12 @@ export function attachBench(pc) {
+       ...((WX2.rainshaft || WX2.bolts) ? [
+         ['storm: no rain shafts or bolts', () => show(/^pc-storm-/, false), () => show(/^pc-storm-/, true)],
+       ] : []),
++      // (group D, the flip: THE NEW WEATHER AS A WHOLE against the old one (?weather=old), switched live -- the physics
++      //  reads its switches every frame. What is fixed when the page is made stays: the rain streak's pale (kitmat.js)
++      //  and the thunder's shape (audio.js), neither of which costs anything measurable.)
++      ...(WX2.windmap ? [
++        ['weather: the old weather (?weather=old)', () => { for (const k of WX_ALL) WX2[k] = false; show(/^pc-storm-/, false); }, () => { for (const k of WX_ALL) WX2[k] = WX0[k]; show(/^pc-storm-/, true); }],
++      ] : []),
+       // (TENTH FORM) THE AIR: no row had ever timed it. The same spot, from 150 m and 400 m up.
+       ...airAt(150, 30, [T0.noFar, T0.blob, T0.imp]),
+       ...airAt(400, 45, [T0.noFar, T0.imp]),
+diff --git a/src/physics/wx2.js b/src/physics/wx2.js
+index b1beee9..673c52e 100644
+--- a/src/physics/wx2.js
++++ b/src/physics/wx2.js
+@@ -1,10 +1,12 @@
+ // Painted Cosmos physics: the switches of the second weather (group D: the planet wind map, the cloud and rain map,
+ // storms born from the land). OWNER: PHYSICS (group D). See docs/lead/WEATHER-DESIGN.md.
+ //
+-// EVERY SWITCH IS OFF BY DEFAULT: with none of them in the address the physics is what it was at v37, to the last digit.
+-// The address is read only where there is one, guarded exactly as fauna.js reads its dials, so the Node tests see the
+-// defaults; a test or a page may also set the fields directly (the object is not frozen for that reason).
+-//   ?wx2=1        every piece of the second weather built so far (the owner's link); a piece's own switch wins
++// THE NEW WEATHER IS THE GAME'S DEFAULT (the coordinator's flip, applied once the clouds lane passed review): in a page
++// every switch below is on unless the address turns it off, and ONE opt-out, ?weather=old, gives the weather as it was at
++// v37, to the last digit. Where there is no page (the Node tests) every switch is off, as before, so a test sees the old
++// weather unless it sets a field itself (the object is not frozen for that reason).
++//   ?weather=old  the old weather: every switch below off (a piece's own switch still wins)
++//   ?wx2=0        the same, as the switches' own master
+ //   ?windmap=1    the planet wind map (windmap.js): the land read once, wind, lift and the convection trigger each second
+ //   ?thermal=0    ... without the thermal winds (up the sunny slopes by day, down them at night, the lake and sea breeze)
+ //   ?nearmap=1    the near wind grid (air.js) takes its large-scale wind from the map instead of windLarge
+@@ -19,7 +21,9 @@
+ //   ?stormswing=0 (with ?stormland) the land storms as W3.2 laid them: 1 to 3 a day, drifting with the usual wind aloft
+ const Q = (typeof location !== 'undefined' && location && location.search) ? new URLSearchParams(location.search) : null;
+ const flag = (k, d) => (Q && Q.has(k) ? Q.get(k) !== '0' && Q.get(k) !== 'false' : d);
+-const ALL = flag('wx2', false);
++const PAGE = typeof location !== 'undefined' && !!location;
++const OLD = !!(Q && Q.get('weather') === 'old');
++const ALL = flag('wx2', PAGE && !OLD);
+ 
+ export const WX2 = {
+   windmap: flag('windmap', ALL),
+@@ -32,7 +36,7 @@ export const WX2 = {
+   rainshaft: flag('rainshaft', ALL),
+   bolts: flag('bolts', ALL),
+   // (W3.3's last part: the rain box's drops placed by the rain map read at the box's four corners, not one rate for all)
+-  rainmap: flag('rainmap', ALL),
++  rainmap: flag('rainmap', false),            // (off even in the new weather: its effect is too small to see, W3.7)
+   // (with ?stormland: every site its own chance, and the wind aloft swinging from day to day; ?stormswing=0 is W3.2's)
+   stormswing: flag('stormswing', true),
+   // (the speed test's row 'weather: wind map frozen': the map stops refreshing, so the script's change is its cost)
+diff --git a/src/render/kitmat.js b/src/render/kitmat.js
+index 692ca6a..5bafa56 100644
+--- a/src/render/kitmat.js
++++ b/src/render/kitmat.js
+@@ -18,9 +18,11 @@ import { VERT_PARS, VERT_END, FRAG_PARS } from './chunks.js';
+ //  W3.3: a downpour's streaks were laid near paper white; with the switch they are laid at the sky's own pale value,
+ //  never over V 0.85, so in front of dark trees they read as rain and not as scratches.)
+ const RAINLOOK = (() => {
+-  if (typeof location === 'undefined' || !location || !location.search) return 0;
+-  const q = new URLSearchParams(location.search), on = (k) => q.has(k) && q.get(k) !== '0' && q.get(k) !== 'false';
+-  return q.has('rainlook') ? (on('rainlook') ? 1 : 0) : (on('wx2') ? 1 : 0);
++  if (typeof location === 'undefined' || !location) return 0;
++  const q = new URLSearchParams(location.search || ''), on = (k) => q.has(k) && q.get(k) !== '0' && q.get(k) !== 'false';
++  if (q.has('rainlook')) return on('rainlook') ? 1 : 0;
++  if (q.get('weather') === 'old') return 0;
++  return q.has('wx2') ? (on('wx2') ? 1 : 0) : 1;        // (the new weather is the default: physics/wx2.js)
+ })();
+ 
+ // what a kind is drawn with when it did not come from the ground (updated by the world: rain
+diff --git a/src/world/index.js b/src/world/index.js
+index 5522021..0fa016d 100644
+--- a/src/world/index.js
++++ b/src/world/index.js
+@@ -99,7 +99,9 @@ export function createWorld(scene) {
+   //  for, and the game without the switches loads nothing new. D's patch imported wx2.js at the top, which would have
+   //  stopped the world loading wherever wx2.js is not yet merged: the look director's one change to it.)
+   let storms = null;
+-  if (LOOK.oil && typeof location !== 'undefined' && /[?&](wx2|rainshaft|bolts)=/.test(location.search || '')) {
++  // (the new weather is the default: fetched in the oil look unless the address says ?weather=old; physics/wx2.js says
++  //  whether the shafts and the bolts are on, and a program that does not compile switches itself off: wxguard.js)
++  if (LOOK.oil && typeof location !== 'undefined' && !/[?&]weather=old(&|$)/.test(location.search || '')) {
+     import('../physics/wx2.js').then(({ WX2 }) => (WX2.rainshaft || WX2.bolts ? import('./storms.js').then((m) => {
+       storms = m.makeStorms(null, { shafts: WX2.rainshaft, bolts: WX2.bolts }); scene.add(storms.shafts); scene.add(storms.bolts);
+     }) : null)).catch((e) => console.warn('storms.js: ' + e.message));
+-- 
+2.43.0
+

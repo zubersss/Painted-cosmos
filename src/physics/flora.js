@@ -26,7 +26,24 @@ import { scrollField } from './near.js';
 import { devilWind } from './features.js';
 import { powerWind, windsBend, WINDPOWER } from './powers.js';
 import { timeAt } from './times.js';
-import { wakeAt, heightFactor, WIND } from './wind.js';    // (P16: from wind.js, not air.js; air.js imports this module, and the cycle broke the browser in 6d5c02a)
+import { wakeAt, heightFactor, WIND } from './wind.js';
+import { WX2 } from './wx2.js';
+
+// (group D, ?gustbands=1) GUSTS SEEN FROM THE AIR (the coordinator, 24 Nov: from 150 m to 1 km the gusts should read as
+// bands travelling across the grass and the crowns). Seen from above a gust is not a bend -- a far tree's lean is a
+// pixel -- but a SHEEN: where it lays the grass and turns the leaves, their paler side shows, and that pale patch runs
+// downwind with the gust. The pattern lies on the world (the shared 3D noise, stretched across the wind),
+// carried along the wind; the shaders read it at each stroke's centre (flora.glsl.js pcGustBand) and lay that stroke a
+// pale step lighter. Here: its direction and strength (uPhysGust.xyz, body axes, length = strength 0..1) and how far it
+// has travelled (w, m, wrapped at GUSTBAND.along so that the pattern never jumps).
+export const GUSTBAND = Object.freeze({
+  along: 160,         // m: the noise's period along the wind (four bands a period: about 40 m each; the run wraps at
+                      //  one period, which the texture repeats exactly, so the bands never jump)
+  across: 480,        // m: ... and across it (about 120 m: a gust is wider than it is long)
+  speed: 1.5,         // the bands run at this many times the mean wind at the blades (about the 10 m wind)
+  windLo: 0.4,        // m/s at the blades where they begin to show (a light breeze: the game's near winds are mostly 0.3 to 2.5 at 2 m) ...
+  windHi: 2.2,        // ... and where they are at full strength (a fresh breeze at 10 m)
+});    // (P16: from wind.js, not air.js; air.js imports this module, and the cycle broke the browser in 6d5c02a)
 
 export const FLORA = Object.freeze({
   N: 32, cell: 8,               // bend / wind field
@@ -273,6 +290,7 @@ export class FloraField {
     this.active = 0;                             // cells of the push field that are moving
     this.rho = 1.225;
     this.wavePhase = new Float64Array(3);
+    this.gustTravel = 0;           // (group D, ?gustbands=1) m the gust bands have run
     this.flutPhase = new Float64Array(3);        // (P11) phases of the three flutter trains
     this.waveDir = new Float64Array(2); this.waveDir[0] = 1;
     this.gustMean = 0;
@@ -284,6 +302,7 @@ export class FloraField {
       uPhysFarMap: [0, 0, 1 / (FAR.N * FAR.cell), 0],   // (group D) the far field: centre (m east, north), 1/size, texels a side (0: off)
       uPhysWave: [1, 0, 0, 0],                    // xy: wave direction; z, w: flutter phases 0 and 1 (P11)
       uPhysWavePhase: [0, 0, 0, 0],
+      uPhysGust: [0, 0, 0, 0],                    // (group D, ?gustbands=1) xyz: the gust bands' direction x strength (body axes); w: m run
       uPhysShape: [FLORA.softFlex, FLORA.softMax, FLORA.stiffFlex, FLORA.stiffMax],
       // branches (P14): xyz: phases of the crown's three eddy trains (rad, wrapped), w: the twig clock (rad,
       // wrapped at 16 turns), and x: wind speed at load 1 (m/s: sqrt(2 qRef / rho)), y: gain, z: shake swing
@@ -536,6 +555,13 @@ export class FloraField {
     U.uPhysWave[0] = this.waveDir[0]; U.uPhysWave[1] = this.waveDir[1];
     U.uPhysWavePhase[0] = this.wavePhase[0] % TAU; U.uPhysWavePhase[1] = this.wavePhase[1] % TAU; U.uPhysWavePhase[2] = this.wavePhase[2] % TAU;
     U.uPhysWave[2] = this.flutPhase[0] % TAU; U.uPhysWave[3] = this.flutPhase[1] % TAU; U.uPhysWavePhase[3] = this.flutPhase[2] % TAU;
+    // (group D, ?gustbands=1) the gust bands: along the waves' own slowly turning direction, run by the mean wind
+    if (WX2.gustbands && ms > 0.05) {
+      this.gustTravel = (this.gustTravel + GUSTBAND.speed * ms * h) % GUSTBAND.along;
+      const sg = smoothstep(GUSTBAND.windLo, GUSTBAND.windHi, ms), d0 = this.waveDir[0], d1 = this.waveDir[1];
+      U.uPhysGust[0] = (frame.ex * d0 + frame.nx * d1) * sg; U.uPhysGust[1] = (frame.ey * d0 + frame.ny * d1) * sg; U.uPhysGust[2] = (frame.ez * d0 + frame.nz * d1) * sg;
+      U.uPhysGust[3] = this.gustTravel;
+    } else { U.uPhysGust[0] = U.uPhysGust[1] = U.uPhysGust[2] = 0; }
     for (let i = 0; i < 3; i++) { const p = this.branchPhase[i] % TAU; U.uPhysBranchPhase[i] = p < 0 ? p + TAU : p; }
     U.uPhysBranchPhase[3] = this.branchPhase[3];
     U.uPhysBranch[0] = Math.sqrt(2 * FLORA.qRef / Math.max(rho, 1e-6));

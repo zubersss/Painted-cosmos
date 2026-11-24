@@ -221,6 +221,9 @@ function pickKind(regime, h) {
   return ks[ks.length - 1][0];
 }
 
+// (group D, ?stormland=1) a thunderstorm's gust front at its leading edge: its outflow by side, plus carry times its motion
+const STORMGUST = Object.freeze({ rear: 0.12, carry: 0.8, max: 16.5 });   // (rear: its outflow behind it, as a share)
+export { STORMGUST };
 const _lt = { flash01: 0, nextIn: Infinity, thunderIn: Infinity, thunder01: 0, last: { t: -1e9, x: 0, y: 1, z: 0, distance: 1e9 } };   // (one storm's lightning, merged in weatherAt)
 // ---- (group D) STORMS BORN FROM THE LAND -----------------------------------------------------------------------------
 // docs/lead/WEATHER-DESIGN.md 6.2 C2. Behind wx2.js WX2.stormland, and only on a body whose convection sites have been
@@ -256,6 +259,8 @@ export const STORMLAND = Object.freeze({
   swing: 3.14,             // rad: the largest turn of the day's wind aloft from its usual direction (180 degrees: a reversal)
   speed: [0.6, 2.2],       // the day's wind aloft as a share of its usual speed
   swingDays: 1.6,          // days over which the swing changes (one knot of its smooth noise every 1.6 days)
+  driftMax: 10,            // m/s: no storm drifts faster (the coordinator, 24 Nov: at 16 a storm passed in 105 s; a passage of
+                           //  about three minutes is more to feel and more natural). Scaled by the owner's dial.
 });
 // (the owner's dial, the look data's `storms` for the body: physics/index.js passes it in; 1 = as tuned)
 let DIAL = 1;
@@ -347,7 +352,8 @@ function landDay(bodyId, seed, D) {
       const nx = site.y * ez, ny = site.z * ex - site.x * ez, nz = -site.y * ex;
       const st = swing ? S.steer : S.steer0;
       const ve0 = (_lw[0] * ex + _lw[2] * ez) * S.aloft * st, vn0 = (_lw[0] * nx + _lw[1] * ny + _lw[2] * nz) * S.aloft * st;
-      const ve = (ve0 * cr - vn0 * sr) * mul, vn = (ve0 * sr + vn0 * cr) * mul;
+      let ve = (ve0 * cr - vn0 * sr) * mul, vn = (ve0 * sr + vn0 * cr) * mul;
+      if (swing) { const sp = Math.hypot(ve, vn), cap = S.driftMax * DIAL; if (sp > cap) { ve *= cap / sp; vn *= cap / sp; } }
       // (swing) a lesser hill grows a lesser storm: smaller and weaker by its site's weight
       const lesser = swing ? site.w : 1;
       day.push({ k, j, site, tf, life, s: mix(0.75, 1, hash3(D, 30 + hk, 0, sd)) * (0.55 + 0.45 * lesser), r: mix(S.r[0], S.r[1], hash3(D, 40 + hk, 0, sd)) * (0.6 + 0.4 * lesser), ve, vn, ex, ez, nx, ny, nz });
@@ -540,14 +546,31 @@ function accumulate(a, c, ux, uy, uz, R) {
   // gust front: cold outflow spreading from the core, strongest just ahead of the rain
   if (K.outflow > 0 && d > 1) {
     const ring = smoothstep(0.15, 0.8, x) * (1 - smoothstep(0.95, WEATHER.frontReach, x));
-    const v = K.outflow * c.w * ring;
+    let v = K.outflow * c.w * ring;
     if (v > 0) {
       // direction: from the cell centre to the point, in the tangent plane at the point
       let dx = ux - c.x, dy = uy - c.y, dz = uz - c.z;
       const dn = dx * ux + dy * uy + dz * uz;
       dx -= dn * ux; dy -= dn * uy; dz -= dn * uz;
       const l = Math.hypot(dx, dy, dz);
-      if (l > 1e-9) { a.ox += dx / l * v; a.oy += dy / l * v; a.oz += dz / l * v; a.front = Math.max(a.front, ring * c.w); }
+      // (group D, ?stormland=1, the coordinator's ruling of 24 Nov: A THUNDERSTORM'S GUST FRONT, where it belongs. The
+      //  cold pool under a storm runs out AHEAD of it: the strongest wind is at its leading edge, at and just before the
+      //  rain, the outflow and much of the storm's own speed together, and behind it the wind falls away. Before, the
+      //  outflow was the same all round and peaked inside the core, so with the storm's own wind the 10 m wind was
+      //  strongest in the rain and on the REAR side. MEASURED on six mature land storms, the 10 m wind as the near grid
+      //  composes it (mean x mul + outflow, then the storm's own wind): 3 to 10 m/s at 1.2 radii ahead (1 to 4 before),
+      //  12 to 26 at the leading edge, 0.8 to 1 radius (8 to 25 before), 12 to 22 behind (13 to 39 before).)
+      if (K === KINDS.storm && WX2.stormland && l > 1e-9) {
+        let ex = c.z, ez = -c.x; const el = Math.hypot(ex, ez) || 1; ex /= el; ez /= el;
+        const nx = c.y * ez, ny = c.z * ex - c.x * ez, nz = -c.y * ex;
+        const mx = ex * c.ve + nx * c.vn, my = ny * c.vn, mz = ez * c.ve + nz * c.vn;          // its motion, body-local
+        const ms = Math.hypot(mx, my, mz), along = (dx * mx + dy * my + dz * mz) / l;           // m/s toward this place
+        const cosA = ms > 1e-6 ? along / ms : 0;
+        const lead = smoothstep(0.5, 0.95, x) * (1 - smoothstep(1.1, WEATHER.frontReach, x)); // its ring: at the edge
+        const side = ms > 0.5 ? STORMGUST.rear + (1 - STORMGUST.rear) * (0.5 + 0.5 * cosA) : 0.75;
+        v = Math.min(STORMGUST.max, (K.outflow * side + STORMGUST.carry * Math.max(0, along)) * c.w * lead);
+      }
+      if (l > 1e-9 && v > 0) { a.ox += dx / l * v; a.oy += dy / l * v; a.oz += dz / l * v; a.front = Math.max(a.front, ring * c.w); }
     }
   }
   // a great spot turns: wind circling the centre, fastest at 70 % of its radius
@@ -904,6 +927,7 @@ export function weatherAt(bodyId, ux, uy, uz, altitude, t, seed, env, o = {}) {
     //  (Up to the three storms that flash most here, each on its own schedule: the brightest flash of them, the latest one
     //  as `last`, the soonest next.)
     if (WX2.cloudmap && a.fCell >= 0 && a.topCell !== OWN_CELL) {
+      let tIn = Infinity, t01 = 0;
       for (let q = 0; q < 3; q++) {
         const cell = q === 0 ? a.fCell : q === 1 ? a.f2Cell : a.f3Cell;
         if (cell < 0) continue;
@@ -913,7 +937,11 @@ export function weatherAt(bodyId, ux, uy, uz, altitude, t, seed, env, o = {}) {
         if (L.flash01 > li.flash01) li.flash01 = L.flash01;
         if (L.nextIn < li.nextIn) li.nextIn = L.nextIn;
         if (L.last.t > li.last.t) { li.last.t = L.last.t; li.last.x = L.last.x; li.last.y = L.last.y; li.last.z = L.last.z; li.last.distance = L.last.distance; li.thunderIn = L.thunderIn; li.thunder01 = L.thunder01; }
+        // (the thunder that arrives next, or has just arrived, of the storms here: its count-down runs on smoothly when
+        //  another storm's flash is the latest, so a bang is never heard late or twice)
+        if (L.thunderIn > -0.5 && L.thunderIn < tIn) { tIn = L.thunderIn; t01 = L.thunder01; }
       }
+      if (tIn < Infinity) { li.thunderIn = tIn; li.thunder01 = t01; }
     } else {
       lightningFor(bodyId, regime, seed, a.topCell, a.topGen, a.flash, ux, uy, uz, t, atm.c, li, a.topCell === OWN_CELL ? _own : a.topCell === FORCED_CELL && _forced ? forcedCentre() : a.topCell >= LAND_BASE ? landCentre(bodyId, seed, a.topCell, a.topGen, t) : null);
     }
