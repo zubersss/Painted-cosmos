@@ -321,8 +321,9 @@ and the shore hairline (the owner's rule: no outlines) -- both said to C; the cu
 
 Built by a painter helper session at the coordinator's word (24 Nov), after its design `docs/lead/FLORA-DESIGN.md` was
 accepted. The lane follows that design's section 11 order. The coordinator merges this branch into `look-proto`; this
-lane never merges. HELD by the coordinator until the trees lane lands: package O and F4 (anything in `flora.js`,
-`floraplace.js placeUnder`, a new `underkit.js`). NOT TO BE TOUCHED by this lane: `PROP_VERT` / `PROP_FRAG`, `kitmat.js`,
+lane never merges. Package O and F4 (`flora.js`, `floraplace.js placeUnder`, the new `underkit.js`) were HELD until the
+trees lanes landed; the coordinator LIFTED the hold on 24 Nov (below: in `flora.js` only the lines that must change, A1 and
+A2 told which functions before a push). NOT TO BE TOUCHED by this lane: `PROP_VERT` / `PROP_FRAG`, `kitmat.js`,
 `chunks.js`, `post.js`, `shared.js` (a look-director session owns the shared light and paint: `docs/lead/LOOK-RULES.md`
 on branch `look-director`: READ, and followed; its R3.1 took out this lane's root step, below). In `surface.js` only ONE
 `bloomTint` call (the far-view lane edits that file).
@@ -370,6 +371,40 @@ now 0.82 for every kind (e9bdf57), and C was asked for fewer strokes in flower c
 ~60 m). From the air at the alpine view the channel adds little now (steep ground is C's rock; drifts on gentle strips).
 A merge of farview into this branch (with look-proto v39.3) conflicts in patchgen.js: the snow at `_col[c + 24]`
 ("the water took 23") with farview's 3-wide drift line. `?bloomfar` stays 0 until the look director passes a pair.
+**FV6 PASSED AND ON BY DEFAULT (for v39.6):** with C's near share 0.3 (farview dba551d) and the 0.82 palette, SEEN at the
+meadow 10 m: flower colour 15.7 per cent of the frame changed, V>0.90 2.5 per cent (C6 kept). design-flora 439c243 turns
+`bloomSwitches().far` on unless `?bloomfar=0`; C's half is farview 5b9400e (farstand.js reads the same switch). The merge
+conflict above was resolved as slot 24 for the snow plus C's three-wide line; look-proto v39.5 merged (b28c595).
+
+**PACKAGE O, THE UNDERGROWTH WITH A BODY (`?under=1`, OFF; 563e8f3; BUILT, NOT YET SEEN):** heather and gorse on the
+cliff tops first. `world/underkit.js` (new): heather, a low cushion of 10 wiry shoots each tipped with an upright lozenge
+of its flower colour (60 triangles); gorse, a mound of 34 narrow dark spines with 16 lemon-yellow touches (100 triangles);
+each a `makePropMaterial` of its own per biome, named `pc-prop-under2-<kit>-<biome>`, colours from the plant's NAMED
+PIGMENTS in the data (`FLORA_SC.plants`: `kit`, `share`, `drift`, `dens`, `size`, `hab`, `c: { leaf: [3], accent }`); no
+far form, drawn to 40 m (`REACH`). `world/floraplace.js`: `placeKits` at the end of `placeUnder`, only when `under2On()`
+(`?under=1`, or any `?bench=` so the table can ask the other way; the oil look only): a 9 x 9 grid of its own in each cell,
+in patches from two-octave noise at the plant's drift size, accepted on the habitat fit (canopy, undergrowth, rock, wet)
+and never in water; kinds `U_KIT0` (16) + k after the old placement, which is unchanged (tested). `world/flora.js`: kit
+kinds go in a list of their own per kind, one instanced mesh each (`underKit`). `core/bench.js`: 'no small plants' no
+longer takes them (`/^pc-prop-(?!tall|far|under2)/`); a row of their own, 'no undergrowth' (asked the other way when the
+run started with them off). Tests: `src/world/underkit.test.mjs` (off unchanged; on: the coast carries both kinds, in
+patches; each kit within its triangle budget with the parts its paint expects). COUNTED in Node round the coast's easel:
+1,244 kits in 9 x 9 cells (220 m square), 22 within 20 m of the easel, the densest 12 m disc 76 m east of it (43: 30
+heather, 13 gorse). NOT SEEN at the easel's three cameras (the still with them differs by 27 px: the easel faces the sea,
+the nearest kit meshes are 33-49 m out against a 40 m reach). Next: stills from inside that patch; then the density from
+the owner's ?bench=foot table; then the wetland's iris and cotton grass, the autumn wood's bracken, logs and toadstools,
+meadow cushions, canyon sage and yucca.
+
+**FOUND: THE OUTER UNDERGROWTH CELLS READ THE WRONG PLACEMENT CELLS (pre-existing since ba27b30; fix behind `?u2cells=1`,
+OFF; 8ad1b86, runtime switch 1b0444e).** In the oil look the 'under2' cells (ferns, bushes, flowers, boulders) sit at
+UNDER_LEVEL - 2, four cells across one; `_buildUnder` still asked for the 2 x 2 placement cells of the old span, so every
+under2 chunk built the plants of cells 615-754 m away: none of those plants is drawn near the eye, and their obstacles are
+not where they stand. The fix (`flora.js` `U2SPAN` = 1 << UNDER2_SHIFT with the switch) builds the 4 x 4 cells each chunk
+covers. COUNTED in Node at the autumn wood on foot: 8 meshes, 90 instances, 4,860 triangles, 7,015 px -> 29 meshes, 377
+instances, 54,756 triangles, 13,169 px (the whole frame's triangles +2.7 per cent, pixels +0.2). `flora.setU2Cells(on)`
+flips it at run time (disposes the under2 chunks); `core/bench.js` row 'outer undergrowth from its own cells' (asked the
+other way when the run started with it on). The coordinator: it becomes the DEFAULT in v39.6 once the look director passes
+the on-foot pairs (the autumn landing, the green wood, the meadow), `?u2cells=0` then the opt-out.
 
 **Done:**
 1. Speed-test rows (`core/bench.js`, after 'no small plants'): 'no near grass', 'near grass: the blades only (the fine
