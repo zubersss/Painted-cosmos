@@ -740,7 +740,9 @@ identical: a maple from 9 m (`A2_stormleaf_maple9m_storm_A_over_B.jpg`): the cro
 muted plum-maroon in the storm's light, 31.9 per cent of the picture, the changed pixels' V median 0.32 to 0.28 and S
 0.53 to 0.34 (mean colour 0.33, 0.19, 0.18 to 0.28, 0.20, 0.23); the stream view (the merge moved the river: only far
 trees in it) 0.8 per cent. Stills of the first try kept (`A2_stormleaf_first-try_*`). Fair weather NOT rendered on this
-build: unchanged by construction (uStorm 0 skips the step). OFF until F passes it.
+build: unchanged by construction (uStorm 0 skips the step). OFF until F passes it. A HALF STRENGTH (`uStormLeaf` 0.5,
+not yet a switch of its own) for F to compare: the reds kept but quieter, 25.5 per cent changed, V 0.34 to 0.32, S
+0.46 to 0.43 (`A2_stormleaf_maple9m_storm_A_half_full.jpg`: today, half, full).
 
 **MERGED look-proto v39.3 (87053ed, pull request 46, the pines live) into trees-near: f281556**, clean, nothing
 doubled; unit 328, world 124, physics 449 pass.
