@@ -60,6 +60,8 @@ vec3 pcRound(vec3 body) {
 // (materials.js FOG_VERT pcFogAmountV) and a leaf's paint, worked out once a leaf (materials.js PROP_VERT, which
 // includes the PAINT chunk below). Anything that includes VERT_PARS already has it: do not declare it again.)
 uniform vec4 uOilAir;
+uniform vec4 uLookF;   // the look director's switches and the night's two numbers (shared.js; also declared in FRAG_PARS)
+uniform vec4 uLookN;
 #endif
 `;
 
@@ -163,7 +165,46 @@ float pcGold() { return (1.0 - smoothstep(0.48, 0.86, dot(uSunDirW, uUpW))) * uD
 vec3 pcOilSunC() { return mix(pow(uLight, vec3(uOilA.z)), vec3(1.0, 0.84, 0.52), 0.75 * pcGold()); }
 // (the cool key with its green drawn down: a shade leans to violet and maroon, not to slate)
 vec3 pcOilShadeC() { return pow(uGlaze, vec3(uOilA.w)) * vec3(1.0, uOilD.z, 1.0); }
-vec3 pcBody(vec3 c) { return pcDensity(c, uOilA.y); }
+// THE NIGHT KEY'S PULL (L1, 2026-11-24): by the moon only (uMoon is 0 by day, so by day this is the colour untouched),
+// a colour goes part of the way to its own VALUE in the night key's own hue (the cool key with its green kept: blue on
+// Earth, teal on Neptune). pcBody takes it, so every paint built on a body colour -- pcTone's local and shade, AND the
+// foliage shade that leaves, blades and far crowns still build for themselves from pcBody (LOOK-AUDIT F4, until L2) --
+// is in the night's key; pcTone's lit paint, which is not built on pcBody, takes it in pcTone. uLookN.y is the world's
+// share (world/index.js); uLookF.x 0 is the night exactly as it was.
+vec3 pcNight(vec3 c) {
+  float nk = uMoon * uLookF.x;
+  if (nk <= 0.0) return c;
+  vec3 shC = pcOilShadeC();
+  vec3 kh = shC / max(dot(shC, vec3(0.3, 0.5, 0.2)), 1e-3);
+  return mix(c, clamp(vec3(dot(c, vec3(0.3, 0.5, 0.2))) * kh, 0.0, 1.0), uLookN.y * nk);
+}
+vec3 pcBody(vec3 c) { return pcDensity(pcNight(c), uOilA.y); }
+// THE ONE FOLIAGE SHADE (L2, 2026-11-24; LOOK-AUDIT F4). Leaves, blades, far crowns and green floor dabs took their
+// shade from a private recipe written out five times in materials.js -- pcBody(pcDensity(c, 1.35)) * mix(1, the cool
+// key, 0.5) * 0.80 -- which takes the autumn wood's orange leaf to (0.57, 0.20, 0.03), saturation 0.94, and a green
+// blade to (0.10, 0.27, 0.03), 0.91 at value 0.27, where the owner's references put a meadow in shade at 0.49 and 0.33
+// and a conifer at 0.31 and 0.26: the poster-paint darks the art pass of 18 Nov measured. This is that recipe ONCE,
+// and then half of it laid at its own value in a breath of the cool key's hue (so its luminance stays where it was:
+// the shade does not move up or down the value ladder, it only stops shouting), lifted a tenth. Worked through: the
+// green blade comes out (0.151, 0.238, 0.120), saturation 0.50 at value 0.24; the orange leaf (0.466, 0.257, 0.191),
+// 0.59 at 0.47. It takes pcBody, so it is in the night's key (L1). uLookF.y 0 is the recipe exactly as it was.
+vec3 pcShadeLeaf(vec3 c) {
+  vec3 shC = pcOilShadeC();
+  vec3 d = pcBody(pcDensity(c, 1.35)) * mix(vec3(1.0), shC, 0.5) * 0.80;
+  if (uLookF.y < 0.5) return d;
+  vec3 g = vec3(dot(d, vec3(0.3, 0.5, 0.2))) * mix(vec3(1.0), shC / max(dot(shC, vec3(0.3, 0.5, 0.2)), 1e-3), 0.5);
+  return mix(d, g, 0.5) * 1.10;
+}
+// ONE LIGHT (L3, 2026-11-24; LOOK-AUDIT F3, LOOK-RULES R1.2a). The level for a stroke facing the sun by x (half-
+// Lambert, 0..1, with the stroke's own jitter already in it) that the sun reaches by sunny (1 lit .. 0 in cast shadow)
+// under a canopy of the given density. It is the GROUND's own formula, which was the reference: in cast shadow a
+// thing is in the shade step (level 1) whichever way it faces, under a closed canopy the deep one, and it is modelled
+// by the sun only where the sun reaches it. Each material used to make its own -- bark x * mix(0.55, 1, sunny), crown
+// dabs x * mix(0.62, 1, sunny), rock x * mix(0.45, 1, sunny), the explorer and the creatures no shadow at all -- so one
+// shadow came out at level 1 on the floor, 2 on a trunk, 2.4 on a crown and 3 on the figure. uLookF.z picks it.
+float pcLit(float x, float sunny, float canopy, float soft) {
+  return pcLevel(mix(min(x, 0.44) - 0.10 * canopy, x, sunny), soft);
+}
 // WHICH WAY A SURFACE FACES, FOR THE LIGHT THAT KNOWS UP FROM DOWN (2026-11-22). THE CONTRACT, so a material and
 // this chunk cannot drift apart:
 //   WHAT IT IS. pcUp is dot(normalize(vBody), n) -- the body's own up against the normal the surface is shaded by.
@@ -186,8 +227,20 @@ vec3 pcBody(vec3 c) { return pcDensity(c, uOilA.y); }
 // would not compile the plants at all.)
 float pcUp = 0.5;
 vec3 pcTone(vec3 c, float level) {
-  vec3 b = pcBody(c);
   vec3 sunC = pcOilSunC(), shC = pcOilShadeC();
+  // THE NIGHT KEY (L1, 2026-11-24; docs/lead/LOOK-AUDIT.md F1; the pull itself is pcNight above). By the moon the oil look painted the day's picture: the
+  // lit paint below takes three tenths of the key's colour and none of its strength, so under Earth's night light
+  // (0.80, 0.86, 1.0) open ground was the body colour times (1.00, 1.03, 1.12) -- as bright as by day and a breath
+  // bluer -- and the last pass then excused every warm pixel from the night's grade, so lemon grass and orange leaves
+  // stood at full strength under a night sky (the stills: the autumn wood's median value 0.54 at 23:00 against 0.42 at
+  // the golden hour). Now, by the moon only (uMoon: 0 by day, so nothing here moves by day), a colour first goes part
+  // of the way to its own VALUE in the night key's own hue (the cool key with its green kept: blue on Earth, teal on
+  // Neptune), and the lit and local paints are laid at the night's own strength. Value order is kept, so snow and pale
+  // things stay the lightest; the lantern, which paints from the stroke's own colour (pcLamp), keeps its gold.
+  // uLookN is the world's (world/index.js); uLookF.x 0 is the night exactly as it was.
+  float nk = uMoon * uLookF.x;
+  c = pcNight(c);
+  vec3 b = pcDensity(c, uOilA.y);      // (pcBody of the colour already pulled: pcBody itself would pull it twice)
   // (the lights are laid in lighter, yellower paint than the local colour, as a painter mixes them: the body colour's
   // full weight under a warm light turned every sunlit leaf and every sunlit patch of the floor to one orange)
   // (the light's own colour takes three tenths of a lit paint, not four: under the golden hours' light every lit leaf
@@ -230,8 +283,8 @@ vec3 pcTone(vec3 c, float level) {
   // without their eye. On ?litcurve=0 the old paint comes back with the old curve.)
   vec3 g2 = mix(pcDensity(g1, 1.7), mix(g1, vec3(dot(g1, vec3(0.3, 0.5, 0.2))), 0.20) * 0.66, uOilAir.z);
   vec3 r = mix(g2, g1, clamp(level, 0.0, 1.0));
-  r = mix(r, loc, clamp(level - 1.0, 0.0, 1.0));
-  r = mix(r, lit, clamp(level - 2.0, 0.0, 1.0));
+  r = mix(r, loc * mix(1.0, uLookN.x, nk), clamp(level - 1.0, 0.0, 1.0));
+  r = mix(r, lit * mix(1.0, uLookN.x, nk), clamp(level - 2.0, 0.0, 1.0));
   return r;
 }
 vec3 pcToneWash(vec3 c, float level) {
@@ -297,6 +350,98 @@ vec3 pcFarLight(vec3 c, vec3 h, float f) {
   return h * clamp(1.0 + (${_fl(FAR_LIGHT)} * w) * (dot(c, vec3(0.3, 0.5, 0.2)) - lh) / max(lh, 0.08), 0.70, 1.40);
 }` : '';
 
+// THE AIR, ONCE (2026-11-24, the look director's L0; docs/lead/LOOK-AUDIT.md F15). The ground's air (FRAG_PARS) and the
+// plants' air worked out in their vertex shader (materials.js FOG_VERT, pcFogAmountV) were two hand copies of one
+// function, and on 22 Nov the copy was found to have drifted under a comment saying the two matched. Now both are made
+// from this one text: AIR_FN('pcFogAmountV') is this function under the vertex shader's name, word for word, so a change
+// here reaches both, and the 200 and 2400 live in two places only (here and world/index.js AIR_HIGH_*). It needs uFog,
+// uAirNear and, in the oil look, uOilC and uOilAir declared above it; FRAG_PARS and VERT_PARS + FOG_VERT both do.
+const AIR_SRC = /* glsl */`
+// Atmospheric perspective in soft stacked bands. Returns 0..1.
+float pcFogAmount(float dist) {
+  #ifdef PC_OIL
+    // (the clip's wood stands in a thick pale air: a trunk thirty metres off is half gone. From the ship the land must
+    // read, so the thickening eases off as the air's own reach grows with the eye's height)
+    // (from the air the land must still go back into the air's colour toward the horizon: at 1.6 times, with the curve
+    // below, the land a kilometre off stood as strong as the land underfoot, and the wood from the ship was one flat
+    // sheet of colour: the stills from 150 m. So 2.4 times there, and the curve only on the ground.)
+    // THE 200 AND THE 2400 STAND IN TWO PLACES AND NEITHER MAY BE CHANGED ALONE: here (which since 2026-11-24 is also
+    // the plants' pcFogAmountV, made from this text: AIR_FN) and world/index.js AIR_HIGH_0 / AIR_HIGH_W (the lit air).
+    // (Until 2026-11-24 a third hand copy stood in materials.js.) CHANGED 2026-11-23 from 400 to 2400,
+    // in all three in one commit (v34), because the day's reading measured what the 400 was doing: climbing in the autumn wood, the share of its own paint the land a mile off
+    // keeps goes 24 % on foot, 18 % at 30 m, 6 % at 40 m, 0 % at 50 m and 60 m, 2 % at 70 m, 10 % at 100 m, 21 % at
+    // 160 m -- a hilltop and a low hover are the worst places in the game to look far, because this lets the
+    // ceiling below go at 45 m of height, where the visibility is still only 723 m and far too short to carry the
+    // land instead. 2400 would let it go exactly as the visibility finishes its own ramp to 2600 m, measured as a
+    // steady 19-25 % all the way up and at most 0.013 of haze different on the ground -- which is what was done.
+    // It is a change to the air itself, in three files, and it still wants a still taken from a hilltop.
+    float pcHigh = clamp((1.0 / max(uFog.x, 1e-6) - 200.0) / 2400.0, 0.0, 1.0);
+    dist *= mix(uOilC.w, 2.4, pcHigh);
+  #endif
+  float f = 1.0 - exp(-dist * uFog.x);
+  #ifdef PC_OIL
+    f = mix(f * f * (3.0 - 2.0 * f), f, pcHigh);      // (on the ground: thin near the eye, where colour and detail must stand whole; thick far off)
+  #endif
+  float q = f * uFog.y;
+  float fl = floor(q);
+  f = (fl + smoothstep(0.15, 0.85, q - fl)) / uFog.y;
+  #ifdef PC_OIL
+    // A CEILING ON THE GROUND, NOT A LIMIT (2026-11-22, the owner: "i want things to look high quality and fully
+    // rendered even from 300 yards away"). MEASURED on the autumn wood (visibility 259 m, so the dial above takes the
+    // distance 2.66 times): this function returned EXACTLY 1.000 for anything 230 m off or farther, which means every
+    // pixel out there was one flat haze colour and nothing the ground, the trees or the water worked out was ever
+    // seen. The curve is not touched -- lowering uOilC.w is a rejected change, and the near thick pale air is the
+    // owner's own reference -- so instead the TOP of it is bent over with a soft knee: nothing changes below the knee
+    // (uOilAir.y, 0.46, which the wood's curve reaches at 60 m), the slope is still 1 at the knee, and the far end
+    // comes to rest at 1 - uOilAir.x so a thing at 275 m keeps a quarter of its own paint.
+    // The shape is the cubic with slope 1 at the knee and flat at the end, written out without a divide for the
+    // slope; the knee is held at or under 1 - 2 * keep, which is exactly the bound that keeps it RISING everywhere
+    // (slacker than that and the knee dips, and a far ridge would read clearer than a nearer one).
+    // Eased off by pcHigh SQUARED, not pcHigh: from the air the land must still go right back into the air's colour
+    // (the stills from 150 m, the note above), but pcHigh is already 0.15 standing in the wood, and a straight mix
+    // would hand a fifth of the ceiling back before the eye had left the ground.
+    // MEASURED after, on the wood, the ceiling and the oil look's ten bands together (they ship together, and this is
+    // what the player sees) -- haze before, haze now: 30 m 0.167 to 0.200, 60 m 0.468 to 0.434, 100 m 0.668 to 0.656,
+    // 150 m 0.836 to 0.738, 200 m 0.968 to 0.749, and from 230 m out 1.000 to 0.755. So a thing at 275 m keeps 0.245
+    // of its own paint where it kept nothing. ?air=0 is the air exactly as it was, ?bands=6 the bands as they were.
+    // WHAT THIS DOES NOT DO: it does not put DEPTH back past about 230 m, because the curve itself has already
+    // reached 1 there and there is nothing left to tell 275 m from 500 m. What comes back is the thing's own colour
+    // and its value steps, which is what the owner asked for. More depth than that wants a longer visibility or a
+    // smaller uOilC.w, and the second of those is a rejected change.
+    // And on the CLEAR worlds (Mercury 1400 m, Pluto 1600 m) and from the air, pcHigh is 1 and this does nothing at
+    // all: there the air at 275 m was only a third anyway.
+    if (uOilAir.x > 0.004) {
+      float keep = uOilAir.x, cap = 1.0 - uOilAir.x;
+      float knee = min(uOilAir.y, 1.0 - 2.0 * keep);
+      float U = 1.0 - knee, D = cap - knee;
+      float u = clamp((f - knee) / U, 0.0, 1.0);
+      float fc = knee + U * u * (u - 1.0) * (u - 1.0) + D * u * u * (3.0 - 2.0 * u);
+      f = mix(min(fc, f), f, pcHigh * pcHigh);      // (the min is both the identity below the knee and the promise that this can never make the air THICKER than it was)
+    }
+  #endif
+  return clamp(max(f * uFog.z, uAirNear.x * (1.0 - exp(-dist / max(uAirNear.y, 0.1)))), 0.0, 1.0);
+}
+
+`;
+export const AIR_FN = (name) => (name === 'pcFogAmount' ? AIR_SRC : AIR_SRC.replace('float pcFogAmount(float dist) {', 'float ' + name + '(float dist) {'));
+
+// (the sun at a place in the eye's space, L3: a piece of its own, so the creatures' vertex shader can take it too,
+// beastmat.js, with its own declarations of uShV, uSunV, uShTex and uShK)
+export const SUN_VIEW_SRC = /* glsl */`
+// THE SUN AT A PLACE GIVEN IN THE EYE'S SPACE (L3, 2026-11-24): for what has no place on the body to hand -- the
+// explorer, the creatures -- the shadow map asked through uShV. The place is taken a little toward the sun (lift, m)
+// so a figure is not shadowed by itself (it is drawn into the map: shadow.js); outside the square, and with no map,
+// it is in the sun. 1 lit .. 0 shaded. Needs uShV, uSunV, uShTex, uShK.
+float pcSunAtView(vec3 viewPos, float lift) {
+  if (uShK.x < 0.004) return 1.0;
+  vec3 q = (uShV * vec4(viewPos + uSunV * lift, 1.0)).xyz;
+  vec2 a = abs(q.xy);
+  float inside = (1.0 - smoothstep(uShK.w, 0.97, max(a.x, a.y))) * uShK.x;
+  if (inside < 0.004) return 1.0;
+  return mix(1.0, step(q.z - uShK.y, textureLod(uShTex, q.xy * 0.5 + 0.5, 0.0).r), inside);
+}
+`;
+
 export const FRAG_PARS = /* glsl */`
 #include <common>
 #include <logdepthbuf_pars_fragment>
@@ -331,9 +476,13 @@ uniform vec4 uOilD;
 uniform vec4 uOilS;
 uniform vec4 uOilG;
 uniform vec4 uOilAir;  // the air's ceiling and the light's four values (shared.js OIL.uOilAir; also declared in VERT_PARS)
+uniform vec4 uLookF;   // the look director's switches (shared.js OIL.uLookF; also declared in VERT_PARS)
+uniform vec4 uLookN;   // the night's two numbers for the world the eye is on (shared.js OIL.uLookN)
 uniform vec4 uOilL;    // x 1: the lighter paint (phones); y the speed test's flat modes (shared.js)
 uniform vec4 uOilPx;
 uniform mat4 uShM;
+uniform mat4 uShV;     // (the eye's space to the shadow map's square, shadow.js; L3: pcSunAtView)
+uniform vec3 uSunV;    // (the way to the sun in the eye's space, shadow.js)
 uniform highp sampler2D uShTex;
 uniform vec4 uShK;
 uniform sampler2D uShAir;
@@ -389,70 +538,7 @@ float pcLineF(float e0, float e1, float a, float gpx, float cell, float cov) {
 }
 
 ${PAINT}
-// Atmospheric perspective in soft stacked bands. Returns 0..1.
-float pcFogAmount(float dist) {
-  #ifdef PC_OIL
-    // (the clip's wood stands in a thick pale air: a trunk thirty metres off is half gone. From the ship the land must
-    // read, so the thickening eases off as the air's own reach grows with the eye's height)
-    // (from the air the land must still go back into the air's colour toward the horizon: at 1.6 times, with the curve
-    // below, the land a kilometre off stood as strong as the land underfoot, and the wood from the ship was one flat
-    // sheet of colour: the stills from 150 m. So 2.4 times there, and the curve only on the ground.)
-    // THE 200 AND THE 2400 STAND IN THREE PLACES AND NONE MAY BE CHANGED ALONE: here, materials.js pcFogAmountV
-    // (the plants) and world/index.js AIR_HIGH_0 / AIR_HIGH_W (the lit air). CHANGED 2026-11-23 from 400 to 2400,
-    // in all three in one commit (v34), because the day's reading measured what the 400 was doing: climbing in the autumn wood, the share of its own paint the land a mile off
-    // keeps goes 24 % on foot, 18 % at 30 m, 6 % at 40 m, 0 % at 50 m and 60 m, 2 % at 70 m, 10 % at 100 m, 21 % at
-    // 160 m -- a hilltop and a low hover are the worst places in the game to look far, because this lets the
-    // ceiling below go at 45 m of height, where the visibility is still only 723 m and far too short to carry the
-    // land instead. 2400 would let it go exactly as the visibility finishes its own ramp to 2600 m, measured as a
-    // steady 19-25 % all the way up and at most 0.013 of haze different on the ground -- which is what was done.
-    // It is a change to the air itself, in three files, and it still wants a still taken from a hilltop.
-    float pcHigh = clamp((1.0 / max(uFog.x, 1e-6) - 200.0) / 2400.0, 0.0, 1.0);
-    dist *= mix(uOilC.w, 2.4, pcHigh);
-  #endif
-  float f = 1.0 - exp(-dist * uFog.x);
-  #ifdef PC_OIL
-    f = mix(f * f * (3.0 - 2.0 * f), f, pcHigh);      // (on the ground: thin near the eye, where colour and detail must stand whole; thick far off)
-  #endif
-  float q = f * uFog.y;
-  float fl = floor(q);
-  f = (fl + smoothstep(0.15, 0.85, q - fl)) / uFog.y;
-  #ifdef PC_OIL
-    // A CEILING ON THE GROUND, NOT A LIMIT (2026-11-22, the owner: "i want things to look high quality and fully
-    // rendered even from 300 yards away"). MEASURED on the autumn wood (visibility 259 m, so the dial above takes the
-    // distance 2.66 times): this function returned EXACTLY 1.000 for anything 230 m off or farther, which means every
-    // pixel out there was one flat haze colour and nothing the ground, the trees or the water worked out was ever
-    // seen. The curve is not touched -- lowering uOilC.w is a rejected change, and the near thick pale air is the
-    // owner's own reference -- so instead the TOP of it is bent over with a soft knee: nothing changes below the knee
-    // (uOilAir.y, 0.46, which the wood's curve reaches at 60 m), the slope is still 1 at the knee, and the far end
-    // comes to rest at 1 - uOilAir.x so a thing at 275 m keeps a quarter of its own paint.
-    // The shape is the cubic with slope 1 at the knee and flat at the end, written out without a divide for the
-    // slope; the knee is held at or under 1 - 2 * keep, which is exactly the bound that keeps it RISING everywhere
-    // (slacker than that and the knee dips, and a far ridge would read clearer than a nearer one).
-    // Eased off by pcHigh SQUARED, not pcHigh: from the air the land must still go right back into the air's colour
-    // (the stills from 150 m, the note above), but pcHigh is already 0.15 standing in the wood, and a straight mix
-    // would hand a fifth of the ceiling back before the eye had left the ground.
-    // MEASURED after, on the wood, the ceiling and the oil look's ten bands together (they ship together, and this is
-    // what the player sees) -- haze before, haze now: 30 m 0.167 to 0.200, 60 m 0.468 to 0.434, 100 m 0.668 to 0.656,
-    // 150 m 0.836 to 0.738, 200 m 0.968 to 0.749, and from 230 m out 1.000 to 0.755. So a thing at 275 m keeps 0.245
-    // of its own paint where it kept nothing. ?air=0 is the air exactly as it was, ?bands=6 the bands as they were.
-    // WHAT THIS DOES NOT DO: it does not put DEPTH back past about 230 m, because the curve itself has already
-    // reached 1 there and there is nothing left to tell 275 m from 500 m. What comes back is the thing's own colour
-    // and its value steps, which is what the owner asked for. More depth than that wants a longer visibility or a
-    // smaller uOilC.w, and the second of those is a rejected change.
-    // And on the CLEAR worlds (Mercury 1400 m, Pluto 1600 m) and from the air, pcHigh is 1 and this does nothing at
-    // all: there the air at 275 m was only a third anyway.
-    if (uOilAir.x > 0.004) {
-      float keep = uOilAir.x, cap = 1.0 - uOilAir.x;
-      float knee = min(uOilAir.y, 1.0 - 2.0 * keep);
-      float U = 1.0 - knee, D = cap - knee;
-      float u = clamp((f - knee) / U, 0.0, 1.0);
-      float fc = knee + U * u * (u - 1.0) * (u - 1.0) + D * u * u * (3.0 - 2.0 * u);
-      f = mix(min(fc, f), f, pcHigh * pcHigh);      // (the min is both the identity below the knee and the promise that this can never make the air THICKER than it was)
-    }
-  #endif
-  return clamp(max(f * uFog.z, uAirNear.x * (1.0 - exp(-dist / max(uAirNear.y, 0.1)))), 0.0, 1.0);
-}
-
+${AIR_SRC}
 // Each distance band is lighter, cooler, lower in contrast; the far end is bare paper.
 #ifdef PC_OIL
 // (the oil look: the far end is the air's own colour, and toward the sun the air glows with the light's; the distance
@@ -676,7 +762,7 @@ float pcSunAtSoft(vec3 bodyPos, float canopy, float lift, float w, float r) {
   }
   return pcDappleS(bodyPos, canopy, lift, w);
 }
-#endif
+${SUN_VIEW_SRC}#endif
 
 // The shade the explorer and the ship lay on the ground: a soft-edged glaze under and beside
 // them (0 none .. 1 full), so they stand on the land instead of floating over it. rag: any

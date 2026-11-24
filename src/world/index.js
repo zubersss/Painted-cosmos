@@ -36,12 +36,11 @@ function lerp3(out, a, b, t) { out.set(a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - 
 // chunks.js pcFogAmount reads the eye's "height" from the AIR'S OWN REACH, not from the altitude:
 // `pcHigh = clamp((1/uFog.x - 200) / 400)`. post.js's lit air (SHADOW.air in castShade below) must agree with the
 // ground's air to the number, so those two numbers are written out here too.
-// THE SAME TWO NUMBERS NOW STAND IN THREE PLACES AND NONE MAY BE CHANGED ALONE (checked 2026-11-23):
-//     src/render/chunks.js:336   pcFogAmount  -- the ground, the water, the far trees
-//     src/render/materials.js:93 pcFogAmountV -- the plants, in the vertex shader (that file's own note says it is
-//                                chunks.js "line for line, and it must stay so"; it had drifted once, 2026-11-22,
-//                                and went unseen because on Earth's 185 m pcHigh is 0 on foot)
-//     here                       SHADOW.air   -- the light in the air, post.js OIL_FRAG
+// THE SAME TWO NUMBERS STAND IN TWO PLACES AND NEITHER MAY BE CHANGED ALONE (since 2026-11-24, L0):
+//     src/render/chunks.js AIR_SRC  pcFogAmount -- the ground, the water, the far trees, AND the plants' vertex-shader
+//                                   pcFogAmountV, which is made from the same text (AIR_FN); until 2026-11-24 that was
+//                                   a hand copy in materials.js, and it had drifted once, 2026-11-22
+//     here                          SHADOW.air  -- the light in the air, post.js OIL_FRAG
 // 2026-11-23: the reading's fix for the hilltop fault (the far land vanishing between 40 and 90 m of height)
 // raises the 400 to 2400. It is a change in all THREE, in one breath, or a tree stands in a different air from
 // the ground under it and the lit air says one thing while the air itself says another.
@@ -241,6 +240,48 @@ export function createWorld(scene) {
     try { if (typeof process !== 'undefined' && process.env && process.env.PC_MTNAIR != null && isFinite(+process.env.PC_MTNAIR)) return +process.env.PC_MTNAIR ? 1 : 0; } catch { /* not node */ }
     return 1;
   })();
+  // THE SKY'S CEILING (2026-11-24, the weather group's design, docs/lead/WEATHER-DESIGN.md 4.2 A1 and 8.4 T1, built by
+  // the look director). The owner flies up to a mile, and the sky turned to space -- black with stars -- between 440 m
+  // and 920 m above the land on Earth (`space01`, 0.55 to 1.15 of the 800 m atmosphere): from a mile up it was night at
+  // noon over a sunlit land. In the oil look the SKY now reads its own number, `skySpace01`: the eye's height above the
+  // land, starting to go at SKYCEIL[0] and gone at SKYCEIL[1], which for Earth is 2,800 m and 6,000 m; every other
+  // world with air keeps the same proportion of its own atmosphere (2,800 / 800 = 3.5 of it, 7.5 at the top) until its
+  // own `weather.ceiling` row says otherwise (the weather group writes those, Earth first). What reads it: the sky
+  // (`uAtmo.x`: its stars, its space, its gold), the aurora, the night key and the moon on the land, the dusk and night
+  // grade, the far air under a closed sky and a ringed world's ring painted in its sky. What does NOT: the weather
+  // (`air`, PHYSICS' numbers near the ground), the ground's own air (`air01`, the far-view group's and the look
+  // director's L5, held), the limb seen from orbit and the leaves in the air. So the land and the sky now go to space
+  // on different heights; that is said, and looked at, in docs/lead/LOOK-BUILD.md (T1).
+  // `?skyceil=a,b` sets the two heights in metres for every world (for looking); `?skyceil=0` is the sky exactly as it
+  // was. The watercolour game never reads it.
+  const SKYCEIL = (() => {
+    if (!LOOK.oil) return null;
+    try {
+      const q = new URLSearchParams(location.search).get('skyceil');
+      if (q === '0') return null;
+      if (q) { const p = q.split(',').map(Number); if (p.length === 2 && p.every(isFinite) && p[1] > p[0] && p[0] >= 0) return { given: p }; }
+    } catch { /* no address */ }
+    return { k: [3.5, 7.5] };
+  })();
+  function skyCeiling(body, look) {
+    if (SKYCEIL.given) return SKYCEIL.given;
+    const c = look && look.weather && look.weather.ceiling;
+    if (c && c.length === 2 && c[1] > c[0]) return c;
+    const a = Math.max(1, body.atmosphereHeight || 1);
+    return [a * SKYCEIL.k[0], a * SKYCEIL.k[1]];
+  }
+  // THE WEATHER GROUP'S HOOKS (WEATHER-DESIGN.md 8.4 T1 b-d): the 3D clouds (`src/world/clouds.js`, createClouds(scene),
+  // update(dt, camL, root, sun, fields, uniforms), eyeInCloud01, renderShadow) and the weather field's textures
+  // (`src/world/wxfield.js`, update(fields)). Neither file exists yet: they are group D's (W1) to write. So both are
+  // fetched on first use, and only where `?clouds3d=` asks (default 0 until W1's first commit flips the default below,
+  // one line, with the look director's leave): a module that is not there is never asked for, so no request fails.
+  const CLOUDS3D = (() => { if (!LOOK.oil) return 0; try { const q = new URLSearchParams(location.search).get('clouds3d'); if (q != null && isFinite(+q)) return Math.max(0, +q); } catch { /* no address */ } return 0; })();
+  const WXHOOK = { asked: false, clouds: null, wxfield: null };
+  function askWeatherModules() {
+    if (WXHOOK.asked || !CLOUDS3D) return; WXHOOK.asked = true;
+    import('./clouds.js').then((m) => { if (m && m.createClouds) WXHOOK.clouds = m.createClouds(scene); }).catch((e) => console.warn('clouds.js: ' + e.message));
+    import('./wxfield.js').then((m) => { if (m && m.createWxField) WXHOOK.wxfield = m.createWxField(); else if (m && m.update) WXHOOK.wxfield = m; }).catch((e) => console.warn('wxfield.js: ' + e.message));
+  }
   // The wash clock (s): what washes in, eases and grows runs on it. It follows the game's own frame time
   // while the game's clock runs (a test that steps the clock sees what a player sees at that pace) and the
   // wall's when the game's clock stands (so a held picture still settles).
@@ -255,7 +296,7 @@ export function createWorld(scene) {
   const prof = { terrain: 0 };
   let physics = null;
   let lastActive = null;
-  const lighting = { bodyId: null, sunElevation: 1, hours: 12, dayness: 1, altitude: 0, space01: 0 };
+  const lighting = { bodyId: null, sunElevation: 1, hours: 12, dayness: 1, altitude: 0, space01: 0, skySpace01: 0 };
   const _storm = new THREE.Vector3(), _dust = new THREE.Vector3(), _pale = new THREE.Vector3(), _white = new THREE.Vector3(1, 1, 1);
   const _fogC = new THREE.Vector3();
   const dustOf = new Map();   // body -> { biomeId: the pigment its dust carries (the mid ground wash) }
@@ -464,7 +505,7 @@ export function createWorld(scene) {
       st.farTier = tier;
       const seen = tier === 2;
       st.terrain.group.visible = seen;
-      if (st.ring) st.ring.visible = tier > 0 && !(st === active && lighting.bodyId === st.id && lighting.space01 < 0.55);
+      if (st.ring) st.ring.visible = tier > 0 && !(st === active && lighting.bodyId === st.id && (lighting.skySpace01 != null ? lighting.skySpace01 : lighting.space01) < 0.55);
       const dabOn = st !== active && tier > 0 && st.dabFade > 0.004;
       if (dabOn && !st.dab) st.dab = makeDab(st);
       if (st.dab) { st.dab.visible = dabOn; if (dabOn) st.dab.material.uniforms.uFade.value = st.dabFade; }
@@ -634,12 +675,14 @@ export function createWorld(scene) {
       // the ground does. ?mtnair=0 gives back exactly the old pair.
       const spaceH = MTN_AIR ? alt : camR - body.radius;
       const space01 = body.atmosphereHeight > 0 ? THREE.MathUtils.smoothstep(spaceH, atmH * 0.55, atmH * 1.15) : 1;
+      // (the SKY's own number in the oil look: SKYCEIL above. Where it is off, or on an airless world, it is space01.)
+      const skySpace01 = SKYCEIL && body.atmosphereHeight > 0 ? (() => { const c = skyCeiling(body, look); return THREE.MathUtils.smoothstep(alt, c[0], c[1]); })() : space01;
       const e = bu.uSunDirL.value.dot(_up);
       _east.crossVectors(Y, _up).normalize();
       const am = bu.uSunDirL.value.dot(_east) > 0;
       let wNight = 1 - THREE.MathUtils.smoothstep(e, -0.24, -0.03);
       // (the night's own light, PAINTER 16: under an air, with the sun down, the moon is the light: chunks.js pcLevel)
-      const moon = wNight * (1 - space01);
+      const moon = wNight * (1 - skySpace01);      // (the night's light on the land goes to space with the sky, T1)
       let wDay = THREE.MathUtils.smoothstep(e, 0.06, 0.42);
       const wTwi = Math.max(0, 1 - wNight - wDay);
       const lost = wDay * twi;
@@ -649,6 +692,9 @@ export function createWorld(scene) {
       wDay -= lost; wNight += lost * 0.24;
       blendKeys(look, wDay, (am ? wTwi : 0) + lost * 0.40, (am ? 0 : wTwi) + lost * 0.36, wNight);
       const dayness = 1 - wNight;
+      // (the night key's two numbers for this world, L1: a look's oil.night.v and .c, else 0.60 and 0.45, or 0.85 and
+      // 0.20 where the world has a night key of its own -- Neptune's teal night, which the owner liked as it was)
+      if (LOOK.oil) { const on = look.oil && look.oil.night, nv = on && on.v != null ? on.v : on ? 0.85 : 0.60, nc = on && on.c != null ? on.c : on ? 0.20 : 0.45; OIL.uLookN.value.set(nv, nc, 0, 0); }
       // ---- weather in the picture (PHYSICS' sky numbers; they belong to the air near the ground)
       // the sky numbers are eased over about two seconds before anything is painted from them
       // (PHYSICS' may move by 8 to 15 % a second: a wash must not jump). A forced sky, a first
@@ -712,7 +758,7 @@ export function createWorld(scene) {
       // post.js). The sky's own washes are laid that much lighter here, so that they land on
       // the values the look gives them.
       // (a wet night under a closed sky is dark enough by its own washes: the key is eased there)
-      const nightK = (1 - dayness) * (1 - space01) * (1 - 0.30 * oc);
+      const nightK = (1 - dayness) * (1 - skySpace01) * (1 - 0.30 * oc);
       SHEET.night = nightK; SHEET.nightNear = look.nightNear || 0;   // (PAINTER 19 re-fix: Mars only; post.js)
       if (nightK > 0.003) { const k = 0.40 * nightK; for (const c of [tmpKey.zenith, tmpKey.horizon, tmpKey.haze, _storm, tmpKey.cloudShade]) { c.x = undens(c.x, k); c.y = undens(c.y, k); c.z = undens(c.z, k); } }
       bu.uGlaze.value.copy(tmpKey.glaze);
@@ -722,7 +768,7 @@ export function createWorld(scene) {
       // (what stands behind a far cliff there is the cloud's heavy mass, not the thin wash between clouds:
       // the storm pigment at about the density the sky lays it, sky.js `mass`)
       { const dk = 0.7 + 0.9 * storm - 1, up = (c) => c - (c - c * c) * dk;
-        bu.uHazeUp.value.set(up(_storm.x), up(_storm.y), up(_storm.z), oc * 0.92 * (1 - space01)); }
+        bu.uHazeUp.value.set(up(_storm.x), up(_storm.y), up(_storm.z), oc * 0.92 * (1 - skySpace01)); }
       bu.uUpW.value.copy(_hup);
       bu.uDayness.value = dayness;
       if (lastActive && st.id !== lastActive) freshSnow = 0;
@@ -734,7 +780,8 @@ export function createWorld(scene) {
       skyU.uWxSky.value.set(Math.min(1, oc + dustW * 0.5), storm, veilR, veilS);
       // (a dust storm thickens the near air itself: the explorer at the eye's distance is a third lost in it, the ground at
       // the feet a sixth, half at 10 m; the stacked bands of the far washes left everything inside 20 m clear)
-      G.uAirNear.value.set(0.70 * dustW * (1 - space01), 8);
+      // (and inside a cloud the near air is the cloud's: the 3D clouds' eyeInCloud01, WEATHER-DESIGN 8.4 T1 d)
+      G.uAirNear.value.set(Math.max(0.70 * dustW * (1 - space01), WXHOOK.clouds ? +WXHOOK.clouds.eyeInCloud01 || 0 : 0), 8);
       G.uAirless.value = body.atmosphereHeight > 0 ? 0 : 1;
       skyU.uStormWash.value.copy(_storm);
       WX.key = (storm * 0.34 + oc * 0.14 + dustW * 0.10) * dayness; WX.flash = sk ? sk.flash * air : 0;
@@ -776,8 +823,8 @@ export function createWorld(scene) {
       skyU.uSunDirL.value.copy(bu.uSunDirL.value);
       skyU.uCamL.value.copy(st.camLocal);
       skyU.uSkyZenith.value.copy(tmpKey.zenith);
-      if (skyU.uAurora) skyU.uAurora.value.x = aur * (1 - space01);
-      OIL.uAuroraK.value = aur * (1 - space01);
+      if (skyU.uAurora) skyU.uAurora.value.x = aur * (1 - skySpace01);
+      OIL.uAuroraK.value = aur * (1 - skySpace01);
       // (leaves in the air of an autumn wood, while the eye is among the trees: none from the ship above them)
       if (leafFall) leafFall.update(cameraPos, active.root, _camL, bu, fall * (1 - space01) * (1 - THREE.MathUtils.smoothstep(camR - (here.radius || body.radius), 18, 40)));
       // (the powers, space and time: the bubble of a stopped place, and the rip torn open in
@@ -793,9 +840,15 @@ export function createWorld(scene) {
       // cloud cover: the world's own share in fair weather, closing in as the weather says
       const cover = sk ? look.cloud * 0.8 + (Math.max(look.cloud, 0.82) - look.cloud * 0.8) * THREE.MathUtils.smoothstep(Math.max(sk.cloud * air, dustW * 0.8), 0.12, 0.9) : look.cloud;
       skyU.uCloud.value.set(body.radius + atmH * 0.55, cover, Math.max(900, atmH * 3.2), 0.0006);
-      skyU.uAtmo.value.set(space01, dayness, 0.042, body.radius);
+      skyU.uAtmo.value.set(skySpace01, dayness, 0.042, body.radius);
+      // (the weather group's hooks, T1 b and c: fetched on first use where ?clouds3d= asks; nothing at all otherwise)
+      if (CLOUDS3D) {
+        askWeatherModules();
+        if (WXHOOK.wxfield && WXHOOK.wxfield.update) WXHOOK.wxfield.update(physics ? physics.fields : null);
+        if (WXHOOK.clouds && WXHOOK.clouds.update) WXHOOK.clouds.update(dt, st.camLocal, active.root, bu.uSunDirL.value, physics ? physics.fields : null, skyU);
+      }
       // a ringed world's rings are laid into the sky's wash while one stands under them; the ring's geometry takes over in space
-      { const rg = st.look.rings; if (rg) { skyU.uRingS.value.set(body.radius * rg.inner, body.radius * rg.outer, 1 - THREE.MathUtils.smoothstep(space01, 0.55, 0.9), 0); skyU.uRingC.value.fromArray(rg.color); } else skyU.uRingS.value.z = 0; }
+      { const rg = st.look.rings; if (rg) { skyU.uRingS.value.set(body.radius * rg.inner, body.radius * rg.outer, 1 - THREE.MathUtils.smoothstep(skySpace01, 0.55, 0.9), 0); skyU.uRingC.value.fromArray(rg.color); } else skyU.uRingS.value.z = 0; }
       // (and a banded world's belts, a cloud sea's far reach: looks.js `skyBelts` [belts, wander, strength], `seaDeck` [top (m), strength, heads])
       { const sb = st.look.skyBelts, sd = st.look.seaDeck; if (sb) skyU.uBelt.value.set(sb[0], sb[1], sb[2], 0); else skyU.uBelt.value.z = 0; if (sd) skyU.uSeaC.value.set(sd[0], sd[1], sd[2] == null ? 1 : sd[2], 0); else skyU.uSeaC.value.y = 0; }
       // AND HOW STRONGLY THIS WORLD'S SKY IS LAID IN BRUSH STROKES (looks.js `skyStrokes`, 0..1; the oil look only,
@@ -804,7 +857,7 @@ export function createWorld(scene) {
       { const ss = SKY_STROKE != null ? SKY_STROKE : (LOOK.oil ? st.look.skyStrokes || 0 : 0); skyU.uSkyOil.value.w = ss; }
       st.root.getWorldQuaternion(_q);
       skyU.uBodyInv.value.setFromMatrix4(new THREE.Matrix4().makeRotationFromQuaternion(_q.invert()));
-      SHEET.grade.copy(tmpKey.grade).lerp(new THREE.Vector3(1, 1, 1), space01);
+      SHEET.grade.copy(tmpKey.grade).lerp(new THREE.Vector3(1, 1, 1), skySpace01);
       SHEET.valid = true;
       // the moon stands where the sun is not: from the middle of twilight on, every painted thing of this world is
       // handed its direction in the sun's place (the sky keeps the sun; the hours are told from the sun)
@@ -821,7 +874,7 @@ export function createWorld(scene) {
       // objects painted with the default wash (explorer, ship, stand-ins) share this light
       const du = defaultBodyUniforms();
       for (const k of Object.keys(bu)) { const a = du[k].value, b = bu[k].value; if (a && a.copy) a.copy(b); else du[k].value = b; }
-      lighting.bodyId = st.id; lighting.sunElevation = e; lighting.dayness = dayness; lighting.altitude = alt; lighting.space01 = space01;
+      lighting.bodyId = st.id; lighting.sunElevation = e; lighting.dayness = dayness; lighting.altitude = alt; lighting.space01 = space01; lighting.skySpace01 = skySpace01;
       lighting.hours = (12 + Math.atan2(-_sunTrue.dot(_east), e) * 12 / Math.PI + 24) % 24;
       // ---- THE ANIMALS' OWN FRAME -------------------------------------------------------------------
       // The lives are stepped FIRST and the crowd is written from them in the same frame: an animal is born
@@ -858,7 +911,7 @@ export function createWorld(scene) {
       G.uAirNear.value.x = 0;
       const du = defaultBodyUniforms();
       du.uSunDirW.value.copy(skyU.uSunDirL.value); du.uFog.value.set(1e-7, 6, 0, 0); du.uMoon.value = 0;
-      lighting.bodyId = null; lighting.space01 = 1;
+      lighting.bodyId = null; lighting.space01 = 1; lighting.skySpace01 = 1;
     }
     castShade(active, cameraPos);
     lastActive = active ? active.id : null;
@@ -1005,6 +1058,8 @@ export function createWorld(scene) {
     // { fixed: true } pins the slice (no larger share of slow frames): for checking the 5 ms budget in software GL
     setBuildBudget(ms, opts) { budgetMs = Math.max(0.5, +ms || 5); fixedSlice = !!(opts && opts.fixed); },
     getLighting() { return lighting; },
+    // (the 3D clouds, once group D's clouds.js is fetched: render/index.js asks it for its shadow map, WEATHER-DESIGN 8.4 T5)
+    get clouds() { return WXHOOK.clouds; },
     getBiomes(bodyId) { return getLook(bodyId).biomes.map((b) => ({ id: b.id, name: b.name })); },
     // a place to arrive at in a biome: level, dry, and showing what the biome is whichever
     // way one faces (src/art/easels.js, STANDS), with the best way to face (yaw from local
