@@ -92,3 +92,29 @@ test('the budget: build, memory and the cost of a sample', () => {
   const us = (performance.now() - t) * 1000 / N;
   assert.ok(us < 4, 'a sample in the wood ' + us.toFixed(2) + ' us');
 });
+
+test('no seam: walking away from the rivers, the ground steps no more often than today\'s does along the same lines', () => {
+  const o = makeSample(S.nB), R = S.R;
+  const walk = () => {
+    let big = 0, band = 0;
+    for (let s = 0; s < net.nSeg; s += 61) {
+      const a = s * 3, mx = (net.sA[a] + net.sB[a]) / 2, my = (net.sA[a + 1] + net.sB[a + 1]) / 2, mz = (net.sA[a + 2] + net.sB[a + 2]) / 2;
+      const ml = Math.hypot(mx, my, mz), ux = mx / ml, uy = my / ml, uz = mz / ml;
+      const bx = net.sB[a] - net.sA[a], by = net.sB[a + 1] - net.sA[a + 1], bz = net.sB[a + 2] - net.sA[a + 2];
+      let px = uy * bz - uz * by, py = uz * bx - ux * bz, pz = ux * by - uy * bx; const pl = Math.hypot(px, py, pz) || 1; px /= pl; py /= pl; pz /= pl;
+      for (const side of [1, -1]) {
+        let prev = null;
+        for (let d = 60; d <= 160; d += 0.5) {
+          let x = mx + px * d * side, y = my + py * d * side, z = mz + pz * d * side; const l = Math.hypot(x, y, z); x /= l; y /= l; z /= l;
+          S.sample(x, y, z, o, false);
+          if (prev !== null) { const j = Math.abs(o.h - prev); if (j > 1) { big++; if (d > 95 && d < 105) band++; } }
+          prev = o.h;
+        }
+      }
+    }
+    return { big, band };
+  };
+  const t = walk(); const keep = S.rivers; S.rivers = null; const v = walk(); S.rivers = keep;
+  assert.ok(t.big <= v.big * 1.1 + 5, 'steps over 1 m: tree ' + t.big + ', today ' + v.big);
+  assert.ok(t.band <= v.band + 3, 'steps over 1 m at the 100 m switch: tree ' + t.band + ', today ' + v.band);
+});

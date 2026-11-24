@@ -285,7 +285,12 @@ class RiverNet {
     const t0 = now();
     const D = this.D, g = D.g, len = g.len, R = this.R, o = this.o, nS = this.nSeg;
     const reach = o.near + D.cell * 0.75;              // (a cell's half diagonal is at most 0.71 of its width)
-    const lists = new Map();
+    // (the (node, segment) pairs gathered flat, then sorted by node into one packed list: no per-node arrays to collect)
+    let pairN = new Int32Array(1 << 16), pairS = new Int32Array(1 << 16), nPair = 0;
+    const addPair = (p, s2) => {
+      if (nPair === pairN.length) { const a = new Int32Array(nPair * 2), b = new Int32Array(nPair * 2); a.set(pairN); b.set(pairS); pairN = a; pairS = b; }
+      pairN[nPair] = p; pairS[nPair] = s2; nPair++;
+    };
     const nb = new Int32Array(8);
     const sA = this.sA, sB = this.sB;
     // segments in chunks of eight: one walk of the grid round each chunk's middle, every segment of the chunk tested
@@ -314,7 +319,7 @@ class RiverNet {
           const dm = Math.hypot(px - mx, py - my, pz - mz);
           if (dm < lim) {
             for (let s = c0; s < c1; s++) {
-              if (segDist(sA, sB, s, px, py, pz) < reach) { let L = lists.get(p); if (!L) { L = []; lists.set(p, L); } L.push(s); }
+              if (segDist(sA, sB, s, px, py, pz) < reach) addPair(p, s);
             }
           }
           // walk on while still within reach of the chunk, and a cell beyond (so a node just inside is not missed)
@@ -328,11 +333,10 @@ class RiverNet {
     }
     // pack the lists
     const off = new Int32Array(len + 1);
-    let total = 0;
-    for (let p = 0; p < len; p++) { off[p] = total; const L = lists.get(p); if (L) total += L.length; }
-    off[len] = total;
-    const items = new Int32Array(total);
-    for (const [p, L] of lists) items.set(L, off[p]);
+    for (let k = 0; k < nPair; k++) off[pairN[k] + 1]++;
+    for (let p = 0; p < len; p++) off[p + 1] += off[p];
+    const items = new Int32Array(nPair), fill = off.slice(0, len);
+    for (let k = 0; k < nPair; k++) items[fill[pairN[k]]++] = pairS[k];      // (stable: each node's segments in the order found)
     this.off = off; this.items = items;
     // the coarse field: exact where a node has segments listed, spread from there by a shortest path over the grid
     const dn = new Float32Array(len).fill(1e9), pn = new Float32Array(len).fill(0), sg = new Float32Array(len).fill(0);
@@ -445,14 +449,18 @@ class RiverNet {
         acc = this.sQ[si];
       }
     }
-    if (dC > o.near) {
+    // (past `near` the coarse field answers, and the two must MEET there: the distance never under `near` (the coarse field
+    //  undercut it at 1 % of such samples, by up to 37 m, measured 24 Nov, which would dip the hills along a line a hundred
+    //  metres from every river), and the river's level eased from the exact one to the coarse one over the last 25 m)
+    if (dC > o.near - 25) {
       const p = dr._p, tu = dr._tu, tv = dr._tv, w = g.w, dn = this.dn, pn = this.pn;
-      const db = dn[p] + (dn[p + 1] - dn[p]) * tu, dt = dn[p + w] + (dn[p + w + 1] - dn[p + w]) * tu, dF = db + (dt - db) * tv;
-      if (dF < dC) {
-        dC = dF; sd = dF; si = -1;
-        const pb = pn[p] + (pn[p + 1] - pn[p]) * tu, pt = pn[p + w] + (pn[p + w + 1] - pn[p + w]) * tu;
-        Pr = pb + (pt - pb) * tv;
-      }
+      const pb = pn[p] + (pn[p + 1] - pn[p]) * tu, pt = pn[p + w] + (pn[p + w + 1] - pn[p + w]) * tu, pF = pb + (pt - pb) * tv;
+      if (dC > o.near) {
+        const db = dn[p] + (dn[p + 1] - dn[p]) * tu, dt = dn[p + w] + (dn[p + w + 1] - dn[p + w]) * tu, dF = db + (dt - db) * tv;
+        dC = Math.max(Math.min(dF, dC), o.near);
+        sd = si >= 0 && sd < 0 ? -dC : dC;
+        Pr = pF;
+      } else if (si >= 0) Pr += (pF - Pr) * smoothstep(o.near - 25, o.near, dC);
     }
     // 2. the channel, in the terms the land's recipes read (as _riversOil's `lay`)
     let best = 1e9, bar = 0, deep = 0, win = 0;

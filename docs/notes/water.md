@@ -70,6 +70,11 @@ The weather group lands the rain field (its section 9.3: `fields.rain` at 32 a f
   as-set rows and the bank and shore views' no-water rows.
 - Stills: `docs/shots/painter/water-w1/` (A today | B tree, at the bank, 150 m over the landing, 150 m over the new main river,
   1 km, the coast; the tree maps; the game's landing and bank views).
+- AFTER THE PUSH (polish): the index packed flat (no per-node arrays: the same network to the pixel); the seam at the
+  exact/coarse switch (100 m) closed -- the coarse field undercut 100 m at 0.97 % of samples past it, by up to 37 m, which
+  would dip the hills along a line; now the two meet at 100 m and the river's level eases across the last 25 m. Test 7
+  walks out from the rivers and holds the ground's steps over 1 m to today's along the same lines (9,455 steps over 0.25 m
+  against today's 17,411; at the switch line no more than today's).
 - NOT DONE (said plainly): the drop to the sea at each mouth (W2's mouth cut and fall: the wood stands at least 12 m over the
   sea everywhere on Earth); grey from the air (W3); basins flood only along channels (W2's lake beds); the build is 10-25 ms
   over the design's 150 ms here.
