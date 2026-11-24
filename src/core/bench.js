@@ -593,6 +593,9 @@ export function attachBench(pc) {
         ['ground one flat colour', () => B({ flat: 1 }), () => B({ flat: 0 })],
         T0.noFar, T0.farFlat, T0.blob, T0.imp,
         ['no water drawn', () => show(/^pc-water/, false), () => show(/^pc-water/, true)],
+        // (the far view's canopy painted into the ground, FV2: render/farground.js; the same picture as ?canopy=0)
+        ['canopy painted off (FV2)', async () => { try { (await import('../render/farground.js')).CANOPY_BENCH.off = true; } catch { /* none */ } },
+          async () => { try { (await import('../render/farground.js')).CANOPY_BENCH.off = false; } catch { /* none */ } }],
         T0.a2c,
         ['no shadows at all', () => B({ shadow: false }), () => B({ shadow: true })],
       ]),

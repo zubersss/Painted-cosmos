@@ -124,7 +124,9 @@ export default {
   // (the oil look: Earth takes the look's golden hours whole: its wood is the owner's reference clip's)
   // (and in the oil look the explorer lands in the autumn wood: the first site and the first autumn site change places)
   // (rivers: the oil look's river system, src/world/surface.js _riversOil: channels that split and rejoin, pools, side streams)
-  oil: { gold: 1, sites: { 0: 'autumn_woodland', 4: 'temperate_forest' }, rivers: 1, riverAt: [53.82, -8.34, -2.78], leaves: 0.5,
+  // (airTop: the far-view design's FV1 on this world -- the ground's air, the cloud deck, the relief's rounding and the
+  // visibility follow the horizon's dip; world/index.js AIRTOP. Earth is the only world it has been looked at on.)
+  oil: { gold: 1, sites: { 0: 'autumn_woodland', 4: 'temperate_forest' }, rivers: 1, riverAt: [53.82, -8.34, -2.78], leaves: 0.5, airTop: 1,
     // (?rivers=tree, world/rivers.js: the landing keeps a brook -- catchment added four nodes up the drainage tree from it)
     springs: [{ at: 'landing', up: 4, acc: 30 }],
     // (the bodies of water, world/hydro.js; each read only behind its own switch, ?lakes= ?ponds= ?puddles= ?fjord=:

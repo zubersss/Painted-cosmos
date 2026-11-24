@@ -21,6 +21,24 @@ HELD: L5 and L6 (until the far-view group's design is in), L4 (the morning: the 
 Also: review requests from the other groups' builders (the 15 checks; a group fails only where its B is worse than
 its A).
 
+## THE SWITCH `?light=old` (24 Nov; the owner: "No do make it look different")
+
+The night key (L1), the foliage shade and quiet darks (L2 + L7), one light (L3) and the sky's ceiling with the air's
+top and FV1 (T1 reworked) are ON by default. `?look=oil&light=old` turns all of them off together: the oil look
+exactly as it was before them (the proof: the six standard stills against look-proto, pixel by pixel, below), for
+the owner to compare. Each part keeps its own switch either way. L0 (bit-identical) is always on. L5 (the air from
+the air) is OFF until it passes the coordinator's eye (`?airfar=1`). L6 is off (`?shadehue=1`). (An opt-in
+`?light=new` was built first and replaced the same hour by the owner's word.)
+
+| what | the new look | the "before" |
+| --- | --- | --- |
+| everything | `?look=oil` | `?look=oil&light=old` |
+| L1 the night key | on | `&nightkey=0` |
+| L2 + L7 the foliage shade and quiet darks | on | `&leafshade=0&postdark=0` |
+| L3 one light (figure, creatures, bark, rock) | on | `&onelight=0` |
+| T1 + the air's top + FV1 (the sky from the air) | on | `&skyceil=0&airtop=0` |
+| L5 the air from the air (not yet in) | `&airfar=1` | off |
+
 ## How the stills are taken (so a later session can repeat them exactly)
 
 - The scratch tools live in the session's scratchpad and are lost on a restart; what they do: `tools/lab.mjs serve`
@@ -106,6 +124,11 @@ its A).
   the limb (S 0.54 level, 0.36 looking down 29 degrees); at the golden hour A is flat beige, B a warm sky graded
   in bands; at 2,420 m the same (A S 0.10, B 0.54); at 1,020 m B is the same painted blue; at 3,520 m B is the
   turn begun, the sky deepening toward indigo (sky 0.38), the world a small ball below.
+- S4 at 420 m (A over B opened): the same picture but for a band of the painted blue now at the top of the frame;
+  the land does not move to the eye (the visibility grows 312 m there); S 0.10 -> 0.15, V over 0.90 5.1 -> 5.8 %
+  (both over C6 before this change). The sky at 420 m is still mostly the flat band: the remap is only a fifth in
+  at that height. Starting it lower (a dip of 10 degrees, Earth 62 m) would paint the sky from 150 m too; held,
+  for the coordinator's word, because it moves the over-the-wood view the owner has seen.
 - STILL WRONG, said plainly: under the thick air FV1 keeps to 1.76 km the land at the mile is pale and pastel
   (L5's job: a share of far paint kept and the air's hue); at 1,020 m a thin pale arc and some lilac wisps stand
   near the limb (the sky's own cloud layer seen from above and the low band's stepped edge; not yet traced); the
@@ -212,3 +235,15 @@ to lookstats' two decimals. NOT SEEN: a creature in frame (`beasts=1` put none i
 and are the same call as the explorer's. Lines at this commit: materials.js 2134 (bark base), 2169 (bark streaks),
 2207 (crown dabs), 2347 (rock), 2705-2706 (FIG_FRAG); beastmat.js 536-537 (flat pieces, vertex), 609-610 (painted
 pieces).
+
+## PROPOSED, NOT BUILT: the bark lit the right way round (found by A2, 24 Nov)
+
+Every tube in the plant kits (kitbuild.js tube: every trunk and bough) is wound with its front facing INWARD (A2
+counted in Node: 953 of 954 wood triangles of a roundmaple, 1912 of 1924 of a birch). The trees are drawn
+DoubleSide in the oil look, so the eye sees a back face, and PROP_FRAG's bark branch turns the normal round
+(`if (!gl_FrontFacing) nV = -nV`): TODAY'S BARK IS LIT WITH ITS NORMALS POINTING INTO THE TRUNK, the sun side
+painted as the side away. A2 saw it the right way round by accident (its BackSide wood program: birches cream on the
+sun side at noon where today's are an even lilac) and put the old facing back (PC_WOOD_FLIP) so its A/B stays the
+same picture. Flipping it is one line in PROP_FRAG and dropping that define, in one commit, but it changes every
+trunk in the approved picture: it wants A/B stills (S1, S2 at noon, the 275 m view) in front of the coordinator and
+the owner first. Not started.
