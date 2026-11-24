@@ -372,7 +372,7 @@ export function attachBench(pc) {
         const g = sm({ x: d[0], y: d[1], z: d[2] }), r = Math.max(g.radius, g.liquidRadius || 0);
         const G = frameAt(d), cy = Math.cos(yaw * Math.PI / 180), sy = Math.sin(yaw * Math.PI / 180);
         const f = { x: G.n[0] * cy + G.e[0] * sy, y: G.n[1] * cy + G.e[1] * sy, z: G.n[2] * cy + G.e[2] * sy };
-        pin = { t: landing.t, p: { x: d[0] * r, y: d[1] * r, z: d[2] * r }, v: { x: 0, y: 0, z: 0 }, fwd: { ...f }, view: { ...f }, pitch: v.pitch, boom: landing.boom };
+        pin = { t: landing.t, p: { x: d[0] * r, y: d[1] * r, z: d[2] * r }, v: { x: 0, y: 0, z: 0 }, fwd: { ...f }, view: { ...f }, pitch: v.pitch, boom: landing.boom, flying: false };
       }
       putBack();
       await wait(600);

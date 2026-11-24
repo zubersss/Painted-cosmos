@@ -33,8 +33,15 @@ The weather group lands the rain field (its section 9.3: `fields.rain` at 32 a f
   5. the coast branch of `_generic`, right before `h = hh + C.n3(x * R / 9 ...`: `let lqC = NaN; if (this.hydro) { hh =
      this.hydro.coast(this, c, hh, T); lqC = c.lqC; }`, and right after `lq = this.sea == null ? 0 : this.sea;`:
      `if (lqC === lqC) lq = lqC;`;
-  6. `sample`: `c.still = c.bank = c.cap = c.swell = 0` beside `c.fu = 0; c.fv = 0;`, and `o.still = c.still; ...` beside
-     `o.fu = c.fu; o.fv = c.fv;` (written EVERY time: the v37 rule).
+  6. `sample`: `c.still = c.bank = c.cap = c.swell = 0; c.lvR = NaN; c.turbW = NaN; c.fspdW = 0` beside `c.fu = 0; c.fv = 0;`,
+     and `o.still = c.still; ...` beside `o.fu = c.fu; o.fv = c.fv;` (written EVERY time: the v37 rule);
+  7. (added 24 Nov for E-W2) right after the drainage block that sets `o.turb` and `o.fspd`: `if (c.turbW === c.turbW)
+     { o.turb = c.turbW; o.fspd = c.fspdW; }` -- a water part that owns the water there (a mouth cut, a pond, a fall) MAY set
+     c.turbW (0..1) and c.fspdW (m/s); without it E-W2's 380 m cut through the coast's berm painted white end to end;
+  8. (W1) in `_forest` right after the water level: `if (c.lvR === c.lvR) b.lq = c.lvR;` (the rivers' own level).
+- FOUND BY E-W2 (24 Nov): the flat 26 m shelf and sheer wall at Earth's coast (stills w10, w11 of the design) are sample()'s
+  BERM (a water group's ground lifted where its weight falls under 0.55-0.78), not the coast recipe; W2 cuts through it with
+  lane 0's hooks only.
 - `src/world/index.js`: a `let WATERH` beside `DRAIN`; two lines after `DRAIN.ensureDrainage` (fetch the hooks on first
   use when `MODE.water.on`; `WATERH.ensureWater(active.id)`), one line after the animals' block (`WATERH.frame(...)`).
 - `src/core/bench.js`: THE WATER VIEWS. The speed test's own view (the landing) has 0.0 % water, so two places on Earth
