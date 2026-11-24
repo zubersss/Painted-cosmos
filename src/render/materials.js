@@ -1538,7 +1538,14 @@ void main() {
       vec4 wo4 = pcStrokeOct4(dist * graze * 1.1, uOilPx.z * 1.1);
       vec3 woc3 = vec3(wo4.w - wo4.z, dFdx(wo4.w), dFdy(wo4.w));
       // (with the new colour, still water's strokes are longer, as calm water is laid: the look director, on E3)
-      pcWStrokes(wch, wdx, wdy, dS, v0 * (1.0 - still), wo4.x, uWPaint > 1.5 && still > 0.5 ? 10.0 : 6.0, woc3, wr1, wr2, wown);
+      // THE SEA FROM THE AIR (E-W2, F's note of 24 Nov: "large blocky dabs in a dark-and-light checker"): still water's
+      // strokes are long at every level of the paint, and kept long ON THE SCREEN whichever way they lie: a stroke that
+      // runs away from the eye is foreshortened by the way the eye looks along it (the crests of the sea's waves run
+      // toward the coast here and there, and from the air their strokes were squares), so it is laid longer by as much,
+      // up to three times -- the same care the rows' squeeze already has above (graze), for the other axis.
+      float lenF = length(cross(dot(d3, d3) > 1e-6 ? normalize(d3) : k3, Vd));
+      float aspW = still > 0.5 ? 10.0 / max(lenF, 0.34) : 6.0;
+      pcWStrokes(wch, wdx, wdy, dS, v0 * (1.0 - still), wo4.x, aspW, woc3, wr1, wr2, wown);
       // (the lace: along the current wherever there is one, at the water's own pace, on its own octaves)
       aDir = coh > 0.02 ? fc : kc; aSpd = coh > 0.02 ? v0 : 0.0;
       ao4 = pcStrokeOct4(dist * graze * 1.1, uOilPx.z * 0.40);
@@ -1640,6 +1647,18 @@ void main() {
       vec3 lN = mix(body, mix(cRef, skyc, 0.35), mix(0.62, 0.30, wStill));
       c = mix(c, cN, bk); cdeep = mix(cdeep, dN, bk); clight = mix(clight, lN, bk);
       wThL = mix(0.62, mix(mix(0.72, 0.50, fres), 0.86, wStill), bk); wThD = mix(0.30, mix(mix(0.36, 0.22, fres), 0.16, wStill), bk);
+    }
+    #endif
+    #ifdef PC_WPAINT
+    if (uWPaint > 0.5 && uWPaint < 1.5) {
+      // THE SEA FROM THE AIR (E-W2, F's note): with the new strokes and v37's colour, still water far off kept v37's three
+      // steps in near equal shares, the deep one very deep: where strokes of two cells and two octaves lie over one another
+      // that read as a checker of dark and light blocks. Far still water is laid as the calmest thing on the map, as the
+      // new colour already lays it: most strokes the body, few light ones, few deep ones, and those a closer step.
+      float sk = wStill * smoothstep(40.0, 220.0, dist) * liq;
+      wThL = mix(wThL, 0.74, sk); wThD = mix(wThD, 0.22, sk);
+      cdeep = mix(cdeep, pcDensity(c, 1.65) * vec3(0.92, 0.94, 1.0), sk);
+      clight = mix(clight, mix(c, wLightC, 0.40), sk);
     }
     #endif
     float wsp = pow(max(dot(reflect(-normalize(vToCam), up), uSunDirL), 0.0), wSunE) * wSunK * max(uDayness, uMoon) * (1.0 - uWx.x);
