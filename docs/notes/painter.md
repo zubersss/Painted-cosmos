@@ -298,6 +298,28 @@ on branch `look-director`: READ, and followed; its R3.1 took out this lane's roo
 `?bloomair=0` the drifts' colour in the ground alone. The watercolour game: SEEN pixel for pixel the same as the clean
 commit (the alpine meadow's easel, every change of this lane in).
 
+**AUDIT 2, THE NEAR GROUND (24 Nov, late; the look director's audit-2 note, its order; all behind switches, on by
+default, off with `?flora=old` too):** `?tuft=0` a tuft takes one of the three blade greens (or is a dark accent tuft,
+one in seven) and its blades differ by value only; in the middle band seven touches in ten take their 1.9 m cell's green
+(`nearground.js bladeTone`, `layBroad`). `?comb=0` the middle band's touches lean 0.16-0.28 with the meadow's comb
+(`combUV`, the same slow west wind as `grassTurn`). `?driftpatch=0` THE DRIFT AS ONE PATCH: where a drift is thick
+(cover > 0.22) a middle-ring cell lays 1-3 round touches of the drift's colour gathered round one centre (far ring 1-2),
+with 2 heads (far 1) over them; its own mark code `PATCH` = dab + 0.4, which `NEAR_VERT` brings in only past 11-16 m
+(nearer, the near ring's own flowers carry the drift); PIXEL-NEUTRAL by the look director's condition: the cell's freed
+room is NOT given to grass (COUNTED in Node, scratch overdraw counter taught the patch's fade, 1024x480: the meadow on foot
+265,452 -> 268,434 near-ground pixels, +1.1 per cent; the landing -0.4). `?patchfloor=1` lowers the heads' floor in the
+middle and far rings (0.85 -> 0.55, 0.6 -> 0.4): not yet judged. SEEN round 1 (`a2-*-today-allon.jpg`): the patch was
+WRONG (its height set against its half-width: thin horizontal lines of red and white), fixed to round touches (845a7a6);
+tuft and comb hardly move the numbers (meadow 10 m colour pattern 4.6 -> 4.8 px, edge 23.7 -> 23.9 per cent). The look
+director's rulings: keep tuft and comb; NO change to the ground's own strokes (the clip's floor is just that; the 6-10 px
+aim withdrawn for the near ground); the round-patch pair decides the patch.
+**FV6 WITH THE FAR VIEW (C):** `bloomTint` writes `o.fd` (cover), `o.fi` (the drift's kind, palette index) and, only with
+`?bloomfar=1`, `o.fi2` (the SLOPE's kind: the strongest of the kinds that can grow there on its own ~600 m field; COUNTED
+along 5 km: fi changes 154 times, fi2 23). C packs them (aBloom) and takes fi2 from 250-400 m, and fades the cover on
+steep ground (its mesh's normals; the sample has no slope). SEEN twice (`fv6-*`, `fv6b-*`): with C's fixes the cliffs are
+clear and the drifts lie in regions of one or two colours; still to fix (C's side, sent): a whole hillside in one strong
+red at 1 km, red on a peak. `?bloomfar` stays 0 until the look director judges the next pair.
+
 **Done:**
 1. Speed-test rows (`core/bench.js`, after 'no small plants'): 'no near grass', 'near grass: the blades only (the fine
    ring)', 'grass not culled off-screen'. The near grass was in no row before (its material is `pc-near`).
@@ -480,6 +502,18 @@ still of the set inside C6 but the landing at 10 m in autumn, 4.2 % (4.9 % in th
 the old: its cliffs and sea). A2 (trees near) counted the lane at the landing: 26,928 marks against 12,967, 357k fragments
 against 272k (the rebuilt middle band halves today's 176k to 92k); its rows in ?bench=foot price it on the phone. A2's hooks
 (NEAR_VERT uNearCut, NEAR_FRAG flat mode 8) are to be kept when they reach look-proto.
+**THE FINAL SET PASSED** (24 Nov): batch 1 ACCEPTED by the coordinator and PASS by the look director (live in v39.1); batch 2
+PASS by the look director after its three data notes (ceb7f3a: the green wood's darkest blades olive, the thrift grey-green
+with its flowers on top, the near rings' stones light). The coast's and wetland's S(V<.3) rose only because their darks
+all but went (the share under V 0.30, 0.87 -> 0.52 % and 2.97 -> 1.28 %); the remainder, cushions in shade, is taken by the
+look director in the shared shade (pcShadeLeaf now also quiets dark saturated yellow-greens, on look-director): it reaches
+this lane through look-proto. FV6 (meadows from the air), THE FLORA HALF DONE (f7b710a, 3783688; behind ?bloomfar=1, 0 by default): bloomTint writes
+into every full sample o.fd (the drift's cover, 0..1) and o.fi (its colour as an index 0..15 into bloomPalette(S).colours,
+16 colours built once a world from its flower kinds, whites held to 0.80; o.fc, RGB565, also written), and with the switch
+on stops mixing the drift into the far colour (o.r2..b2). AGREED WITH C: C adds one 4-byte attribute plus its parent in
+patchgen.js (cover, index / 15, two bytes spare), hands the palette to TERRAIN_FRAG as a uniform vec3[16], and lays a dab
+whose hash is under cover x 0.9 in the flower colour whole; C starts it after the coast cliff is reviewed. THEN: A/B stills
+at 150 m, 400 m and 1 km (the meadow, the autumn wood's glades), ?bloomfar=0 against 1, to C and F; flip it on together.
 A lesson recorded: af83f25 copied data/looks/earth.js from a scratch copy older than a merge and dropped the look director's
 `airTop` (found by the 420 m proof, fixed in 2f779d8); never copy a whole shared file over a merge, apply the lane's diff. ASKED OF THE FAR-VIEW LANE through the coordinator: a ground dab that takes a drift's colour WHOLE
 (pointillist) from `bloomAt`, the one thing that would make drifts read from 150 m and a mile.

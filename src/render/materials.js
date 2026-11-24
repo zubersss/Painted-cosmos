@@ -3795,6 +3795,13 @@ void main() {
         float fk = max(1.0, wPx * hf * grow / max(dw, 1e-5));
         dl *= fk * yrS; dw *= fk * yrS;     // (yrS: a head about to go out of flower shrinks first, the year above)
       }
+      // (audit 2, nearground.js PATCH: a drift's patch in the middle and far rings comes in only past 11-16 m, where the
+      // near ring's flowers end; nearer than that it would be a blob of colour over the flowers themselves)
+      if (kind > 5.35 && kind < 5.45) {
+        float pk = smoothstep(11.0, 16.0, di) * yrS;
+        if (pk < 0.02) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); return; }
+        dl *= pk; dw *= pk;
+      }
       #endif
       rel = ax * (iCol.a * (len / max(iAxis.w, 1e-4)) + max(dl, wPx * 1.3 * grow) * t) + sd * (side * max(dw, wPx * 1.3) * grow);
       #ifdef PC_OIL
@@ -4023,7 +4030,9 @@ void main() {
   }
   // (a flick carries little more pigment than the ground it stands on: a loaded, crisp, wet
   // mark pooled by the sheet as well was a black comma)
-  float d = 1.0 + (0.55 - vS.x) * (vKind > 4.5 && vKind < 5.5 ? 1.5 : 0.7) * vLoad + (vS.z - 0.5) * 0.5 * vLoad + (n1.r - 0.5) * 0.5;
+  // (a drift's patch, kind 5.4, nearground.js PATCH, is one flat colour, LOOK-RULES R3.1: SEEN 24 Nov, the dab's loaded-brush
+  // step darkened a white drift's touches to a grey-beige that read as pebbles)
+  float d = 1.0 + (0.55 - vS.x) * (vKind > 5.35 && vKind < 5.45 ? 0.0 : (vKind > 4.5 && vKind < 5.5 ? 1.5 : 0.7)) * vLoad + (vS.z - 0.5) * 0.5 * vLoad + (n1.r - 0.5) * 0.5;
   vec3 c = pcWetWash(pcDensity(vCol, d), mix(1.0, 0.4, 1.0 - vLoad));
   c = mix(c, vec3(1.0), max(uWx.z * smoothstep(0.35, 0.9, vS.x) * 0.8, vFlat * 0.16));     // snow on the tips; trodden grass shows its pale side
   vec3 nV = normalize(vNV);
