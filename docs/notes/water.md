@@ -431,7 +431,17 @@ Branch `water-bodies` = lane 0 + look-proto v37.1 + `origin/design-water` (W1's 
   replies came: left as it is.) Heads-up passed on: water-paint's runoff slots 24-25 against C's snow at 24 in v39.2.
 - C (far view) paints the coast's wall (?rockfield=1); agreed: no geometry change within 30 m of any fall, and C runs
   hydro.test and falls.test on its merge.
-- NEXT: F's word on the sea's shore and chop; after the branches meet (the coordinator's call): the pool's pcThinLayer to W3's
+- **F on da7baa7: NOT YET** (keep ?wsea off): (a) the radial line-up read as planks; (b) the shore's curl as current lines
+  and whirlpools; also the new sea flatter in value than v37 (sparkle) and cool under a gold sky (shared with F). Done on
+  water-sea 9ec9b3a: (a) the sea's crest turned toward the eye's sideways axis by how grazing the eye looks (smoothstep
+  0.35 .. 0.85 of 1 - |forward . up|), from the EYE'S forward, one value a frame (per pixel it sheared every cell's rows);
+  so at a grazing look the strokes turn as the eye turns -- told F plainly, only the owner's device can judge it moving;
+  chop 3 widths. (b) the turn at most 35 degrees, within ~120 m of land (near 1 / 0.3 / 0 / 0), none from stacks (share
+  0.2 .. 0.5). The sea-only lines where vOpen >= 0.75 (wpL always the sea there). SEEN: the strait's chop across the view,
+  the coast in level bands (`sea-foreshortened-...-v37-before-now.jpg`, `sea-strait150-crop-v37-before-now.jpg` on
+  water-sea). PROVEN: default against water-paint 05bfe0a's files, at most 28 of 518400 pixels by 2 of 255.
+- NEXT: F's word on 9ec9b3a; then the sea's sparkle (sparse light strokes toward the sun, a few dark troughs) if F wants
+  it; after the branches meet (the coordinator's call): the pool's pcThinLayer to W3's
   pcWStrokes, pcFallMilk and the FALL_ colours into waterchunk.js.
 - Camera places for the falls views: `fallsView(S)` and the scratch `fallcams.mjs` (sea60, sea150, air400, bank, E7).
 
