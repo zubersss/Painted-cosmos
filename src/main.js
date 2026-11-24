@@ -103,13 +103,14 @@ const isUpright = () => PRESET.id === 'phone' && window.innerHeight > window.inn
 // coordinator, after this lane's finding that a phone in play climbs to TIER 2 within seconds and stays there: the
 // owner has been playing at tier 2, and in the oil look a tier is reach and density). So a phone or a tablet in the oil
 // look keeps everything it had -- tier 2 as its top, the ladder climbing only from the top of everything, from rung 0 --
-// and the sharpening is ADDED ON TOP where frames allow, up to two rungs (1.2 then 1.4 times as sharp each way), never
-// instead of anything. What is new is the touch device's guard (core/dynres.js): a rung is given back first when the
-// smoothed frame is over 27 ms for half a second, climbed only after 6 s under 20 ms, and a rung lost within a minute of
+// and the sharpening is ADDED ON TOP where frames allow, one rung (1.2 times as sharp each way), never instead of
+// anything. What is new is the touch device's guard (core/dynres.js): the rung is given back first when the smoothed
+// frame is over 21 ms for half a second, climbed only after 6 s under 18.6 ms (frames mostly at the display's sixty), so
+// the sharpness stays only while the phone is smooth, and anywhere heavier it looks exactly as v39.5; a rung lost within a minute of
 // being climbed ends the climbing until the next rest, so a borderline view settles instead of stepping up and down. The
 // worst case is v39.5 exactly (tier 2, the size it was given). ?sharp=0: no ladder guard of its own, as before.
 const SHARP_TOUCH = params.get('look') === 'oil' && (PRESET.id === 'phone' || PRESET.id === 'tablet') && params.get('sharp') !== '0';
-const SHARP_TOUCH_RUNGS = 2;      // the most rungs it may climb to (1.4 times as sharp each way)
+const SHARP_TOUCH_RUNGS = 1;      // the most rungs it may climb to: one, 1.2 times as sharp each way (the coordinator: sharper AND smoother; the second rung modelled at 26 ms with over half its frames held twice)
 // (the speed test asks its questions at the tier the device reaches in play: a phone or a tablet in the oil look climbs
 //  to tier 2 within seconds of play, so its test starts there and prices tier 1 in a row of its own, core/bench.js)
 const TOUCH_OIL = params.get('look') === 'oil' && (PRESET.id === 'phone' || PRESET.id === 'tablet');
@@ -249,7 +250,7 @@ async function boot() {
           // (sharpFailWithin and sharpGiveUp 1: a rung lost within a minute of being climbed -- or of the start -- ends
           //  the climbing until the next rest, so a borderline view settles on the lower rung instead of stepping up
           //  and down every few seconds, each step a hitch: the independent review of v39.6, core/dynres.js)
-          ...(SHARP_TOUCH ? { sharpHighMs: 27, sharpLowMs: 20, sharpDownAfter: 0.5, sharpFailWithin: 60, sharpGiveUp: 1 } : {}) },
+          ...(SHARP_TOUCH ? { sharpHighMs: 21, sharpLowMs: 18.6, sharpDownAfter: 0.5, sharpFailWithin: 60, sharpGiveUp: 1 } : {}) },
     // Start at the best picture (top tier, full resolution) and give some of it up only when
     // the measured frame time asks: under 30 fps the controller sheds load within a second or
     // two, and it climbs back by careful steps (src/core/dynres.js). ?quality=0|1|2 pins the

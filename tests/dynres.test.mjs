@@ -277,7 +277,7 @@ test('dynres: one rebuilt-targets hitch a rung does not send it back down', () =
 // pin the wobble, so two machines: J 0.15 (a 4.6, b 10.5 ms/MP: the slope of the v26 fit above) and the harsher J 0.20
 // (a 12.1, b 4.0). TIER 2 HAS NEVER BEEN TIMED ON THE PHONE: it is taken here as 15 per cent more work than tier 1 (an
 // assumption, to be replaced by the bench's new 'tier 1' row on the owner's next run).
-const TOUCH = { minScale: 0.85, targetMs: 33.3, highMs: 37, lowMs: 27, panicMs: 62, tierUpMs: 22, sharpHighMs: 27, sharpLowMs: 20, sharpDownAfter: 0.5, sharpFailWithin: 60, sharpGiveUp: 1 };
+const TOUCH = { minScale: 0.85, targetMs: 33.3, highMs: 37, lowMs: 27, panicMs: 62, tierUpMs: 22, sharpHighMs: 21, sharpLowMs: 18.6, sharpDownAfter: 0.5, sharpFailWithin: 60, sharpGiveUp: 1 };
 const TIER2 = 1.15;
 function touchPhone({ a, b, J, css = 823 * 384, dpr0 = 1.25, seed = 11 }) {
   let s = seed;
@@ -289,7 +289,7 @@ function touchPhone({ a, b, J, css = 823 * 384, dpr0 = 1.25, seed = 11 }) {
     return Math.max(T, Math.ceil(w / T) * T);
   };
 }
-const touchCtrl = (o = {}) => new DynamicResolution({ scale: 1, quality: 1, maxQuality: 2, sharpMax: 2, sharp: 0, tuning: TOUCH, ...o });
+const touchCtrl = (o = {}) => new DynamicResolution({ scale: 1, quality: 1, maxQuality: 2, sharpMax: 1, sharp: 0, tuning: TOUCH, ...o });
 function run(ctrl, cost, seconds) {
   let t = 0, n = 0, twice = 0, minScale = ctrl.scale, steps = 0, last = ctrl.sharp, sum = 0;
   while (t < seconds) { const ms = cost(ctrl); ctrl.frame(ms); t += ms / 1000; n++; sum += ms; if (ms > 25) twice++; if (ctrl.sharp !== last) { steps++; last = ctrl.sharp; } if (t > 20) minScale = Math.min(minScale, ctrl.scale); }
@@ -303,14 +303,18 @@ test('dynres touch: the defaults leave the ladder exactly as it was (?sharp=0 an
   assert.equal(c.sinceClimb, Infinity, 'a ladder without sharpFailWithin does not time its climbs');
 });
 
-test('dynres touch: a 60 Hz phone on foot reaches tier 2 first, then the sharper rungs where its frames allow', () => {
+test('dynres touch: a 60 Hz phone on foot reaches tier 2 first, then the one sharper rung only where it stays smooth', () => {
+  // the gentler wobble: tier 2, then rung 1, and the frames at rung 1 still all at the display's sixty
   const g = touchCtrl(); const rg = run(g, touchPhone({ a: 4.6, b: 10.5, J: 0.15 }), 180);
   assert.equal(g.quality, 2, 'the phone did not reach tier 2, which it plays at: tier ' + g.quality);
-  assert.ok(g.sharp >= 1, 'with frames to spare at tier 2 it took no sharper rung: rung ' + g.sharp);
+  assert.equal(g.sharp, 1, 'with frames to spare at tier 2 it did not take the sharper rung: rung ' + g.sharp);
   assert.equal(rg.minScale, 1, 'the picture was shrunk after the climb');
-  // the harsher machine: tier 2 all the same, and whatever rung its frames allow, never at the cost of the tier or the scale
+  const held = run(g, touchPhone({ a: 4.6, b: 10.5, J: 0.15, seed: 5 }), 60);
+  assert.ok(held.twice < 0.02, 'on rung 1 ' + (100 * held.twice).toFixed(0) + ' per cent of frames were held twice');
+  // the harsher wobble: tier 2 all the same and NO rung -- the phone looks exactly as in v39.5
   const h = touchCtrl(); const rh = run(h, touchPhone({ a: 12.1, b: 4.0, J: 0.20 }), 180);
   assert.equal(h.quality, 2, 'the harsher machine did not keep tier 2: tier ' + h.quality);
+  assert.equal(h.sharp, 0, 'the harsher machine was given a sharper rung it cannot hold smoothly: rung ' + h.sharp);
   assert.equal(rh.minScale, 1, 'the harsher machine had its picture shrunk');
 });
 
@@ -350,7 +354,7 @@ test('dynres touch: at the bank the rung is given back once and the ladder stays
 });
 
 test('dynres touch: a sudden heavy load empties the ladder before the picture or the tier is touched', () => {
-  const c = touchCtrl({ quality: 2, sharp: 2 });
+  const c = touchCtrl({ quality: 2, sharp: 1 });
   const sharp0 = c.sharp, scale0 = c.scale, q0 = c.quality;
   let r = null;
   for (let i = 0; i < 200; i++) { r = c.frame(45); if (r.sharp === 0) break; }
