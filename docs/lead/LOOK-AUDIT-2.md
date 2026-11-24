@@ -20,7 +20,12 @@ stream (`cam=stream`), the green wood's painter's vantage (`temperate_forest`, `
 (`cam=high`: 150 m with `dy=-270`, 420 m with `dy=0`, about 1 km with `dy=600`). Every still was opened and looked
 at; every number was measured on the PNGs (HSV value V and saturation S; families as in the 18 Nov colour table;
 "pattern length" = the shift in pixels at which the picture stops looking like itself, i.e. where its
-autocorrelation falls to one half, for colour (red minus green) and for lightness).
+autocorrelation falls to one half, for colour (red minus green) and for lightness); "edge share" = the share of
+pixels whose lightness (0.3 R + 0.5 G + 0.2 B) steps by more than 0.08 to the next pixel (the step to the right and
+the step below, taken together as sqrt(gx^2 + gy^2)). At 420 m and 1 km the summer stills were taken in the same page
+as the autumn ones, the season set to summer in the page; the `?canopy=0` A/B was its own page.
+v39.2 as MERGED (pull request 45) holds the water back; the water in these stills is design-water's with the old
+strokes (`?wpaint=0`), which paints the river and the sea as v39.2 does.
 
 **What software drawing cannot tell:** how any of it moves, and what anything costs on the phone. Costs below are
 derived, not measured.
@@ -42,9 +47,9 @@ The three things that most stop it looking like the references, worst first:
 
 | # | what is wrong | where | measured | lane |
 | --- | --- | --- | --- | --- |
-| 1 | **From the air the wood is confetti, not trees.** No crown reads as a tree: the colour changes every 2-3 pixels, stroke by stroke, where the references change it crown by crown; at noon the autumn roof is also far too light | every view from 150 m up, both seasons | pattern length 2-3 px at 150 m (a crown there is about 15-30 px); autumn roof at noon V 0.90 (references 0.68), at 16.8 V 0.74 | C (the canopy in the ground) with A1 (impostors): A/B below |
-| 2 | **The water is grain.** On foot the river is a field of hair-thin bright scratches, finer than anything else in the picture | every stream on foot | 70 per cent of the river's pixels sit on a light-dark edge (grass 33-39, near crowns 16-20); the dashes are 1-2 px tall | E (water paint) |
-| 3 | **Mountains are rainbow polygons.** Each mountain is a heap of tall pastel shapes, rose, lime, lemon, lilac, with no lit face and no shaded face | every view with a mountain, from the air | top-left mountain at 150 m: 0.2 per cent of its pixels under V 0.3 (no shade side at all); hue changes shape to shape | C (FV4 rock faces, finished and made the default) |
+| 1 | **From the air the wood is confetti, not trees.** No crown reads as a tree: the colour changes every 2-3 pixels, stroke by stroke, where the references change it crown by crown; at noon the autumn roof is far too light, and from 1 km the wood has no darks at all | every view from 150 m to 1 km, both seasons, both hours | pattern length 2-3 px at 150 and 420 m (a crown at 150 m is about 15-30 px); autumn roof at noon V 0.89-0.90 (references 0.68); under V 0.3 at 1 km: 0.0 per cent | **A1** (the far trees' paint: proven by the `?canopy=0` A/B, below), with C (glades and crown shadows on the floor) and F (the air at 1 km) |
+| 2 | **The water is grain.** On foot the river and the sea are a field of hair-thin bright scratches, finer and busier than anything else in the picture, and the sea stays cold under a gold sky | every stream and the sea, on foot | 70 per cent of the river's pixels and 72 of the sea's sit on a light-dark edge (grass 33-39, near crowns 16-20); the dashes are 1-2 px tall | **W3** (water paint), with E-W2 (the sea's direction) and F (the sky's gold on the water) |
+| 3 | **Rock is rainbow polygons.** Each mountain, and the coast's cliff, is a heap of tall pastel leaf shapes, rose, lime, lemon, lilac, with no lit face and no shaded face | every view with a mountain from the air; the cliff from the shore | mountain at 150 m and 420 m: 0.1-0.3 per cent of its pixels under V 0.3 (no shade side at all); hue changes shape to shape | **C** (FV4 rock faces and its mountains, f8530e6, finished and made the default) |
 
 Then, shorter (section 4): near leaves are big flat shards; the light has no design (no rest, no glowing distance);
 the storm leaves the land lit like a fair noon.
@@ -82,15 +87,29 @@ wood in front of the mountains), summer V 0.78 S 0.41 (pale mint), autumn V 0.85
 im flying high in the sky up to a mile I want trees from a distance to look good." This is that view, and it is the
 view in which the game least looks like the pictures the owner sent.
 
-**Which lane.** Part of it is MINE: at 1 km the air from the air (L5) lifts the last darks out of the wood. Haze
-is a flat step of pale colour; it must not erase the value steps under it (R1.5). I will take the wood's darks at
-1 km back to at least about 8 per cent of the land's pixels without greying the near view. The rest PENDING the A/B (`?canopy=0`, same view): whether the flecks are the canopy painted into the ground
-(C, farground.js: each ground dab asks which crown its centre lies on) or the impostor trees standing on it (A1), or
-both. What the fix must do, either way: **one crown, one colour family, chosen per tree, never per stroke** (R1.3c),
-the crown's lit and shaded side in two or three whole strokes, its shadow on the floor beside it (R1.3d), and the
-autumn roof's lit value brought to about 0.70 at noon. Cost: choosing a colour per crown instead of per stroke costs
-nothing on the phone; the crown's cast shadow is one more read of the crown grid per ground dab (derived: under
-0.3 ms).
+**The A/B that settles the lane** (`audit2/canopy_ab_150.jpg`, `canopy_ab_150_crop.jpg`: the same view and hour,
+the default above, `?canopy=0` below). With C's canopy taken out of the ground the crowns are the SAME confetti:
+pattern length 3 px (colour) and 2 px (lightness) both ways, V median 0.87 both ways, S 0.75 against 0.76. What
+changes (13.6 per cent of the pixels) is only the floor between the crowns: C's canopy lays it in under-canopy shade
+(darks 15.5 against 13.1 per cent), without it the bare yellow ground shows. So the flecks are the FAR TREES'
+OWN PAINT. A1's own 600 m zoom today (trees-far, A1_gust_600m_zoom5x_off_over_on.jpg) shows the same thing from the
+other side: a crown of 2-5 px is still bright strokes and dark gaps. The near trees mix red, orange and yellow
+leaves inside one crown (right up close, as reference 1 does), and the far trees carry that mix down to a few pixels.
+
+**Which lane, and what the fix must do.**
+- **A1 (the far trees, first):** from the distance where a crown is under about 30 px, its strokes take ONE COLOUR
+  FAMILY, the tree's own (seeded per tree: four yellow, four orange, two red, as the far trees already split),
+  with only a VALUE step between its lit cap, its body and its shaded side (two or three whole strokes, never a
+  coin toss per stroke, R1.3c); under about 4-6 px, one tone, the crown's mean (A1 built exactly this today for
+  the gust bands, as one input; the general version is the same block without the band). The autumn roof's lit
+  value comes down to about 0.70 at noon (today 0.89). Cost: choosing per tree instead of per stroke costs nothing.
+- **C (the floor):** glades where the stand thins (the canopy already knows the stand), and each crown's shadow
+  laid on the floor beside it, away from the sun (R1.3d); at 16.8 the shadows long. Cost: one more read of the
+  crown grid per ground dab (derived: under 0.3 ms).
+- **F (mine):** at 1 km the air from the air (L5) lifts the last darks out of the wood. Haze is a flat step of pale
+  colour; it must not erase the value steps under it (R1.5). I take the wood's darks at 1 km back to at least about
+  8 per cent of the land's pixels without greying the near view. And A2's pines (dense dark tops in the middle and
+  far forms, asked today) give the wood its dark conifers back from the ground up.
 
 ---
 
@@ -175,14 +194,13 @@ side; (c) one rock family per mountain (grey-violet, with the bed tones as small
   (sky, mist, shade) for the busy parts to read against. At 16.8 the far wood does not step back into a pale gold
   glow. The green wood at 16.8 (`green_vista_16.8.jpg`) is the closest the game comes: long shadows across the
   floor; but its back is not lit.
-- **A broken white hairline arcs across the sky at 1 km** (F, mine or W1's: `crop_arc1km.jpg`, x2, in
-  `aut_1km_12` and `sum_1km_12`, from the horizon up to the right). Most likely the far edge of the cloud deck at
-  that height (the deck is hidden by the eye's dip only from 52 degrees; at 1 km the dip is 37). Not yet found in
-  the code; mine to chase, since v39.2 draws the sky's own cloud.
+- **A broken white hairline arced across the sky at 1 km**: FIXED, SEEN (look-director 63b8d2c, ?skylimb=0 the sky
+  as before). It was the limb of the sky's own painted cloud shell (Earth: 440 m up) seen from above, where the rays
+  meet the shell edge-on and squash the masses into hairlines; now the masses there shrink away whole. Stills:
+  `build/skylimb/skylimb_1km_crop_x2_off_over_on.jpg`, `build/skylimb/skylimb_620m_off_over_on.jpg`.
 - **A storm leaves the land lit like a fair noon** (F, mine; seen in D-W1's stills today, W1_WG_13_stormover_*).
 
 ## What I could not settle
 
-- Which of C's canopy and A1's impostors makes the confetti: the `?canopy=0` A/B is in the queue.
 - How any of this moves, and the reflections in the game (the gallery shows the water's fallback).
 - The cost of the fixes on the phone (derived only).
