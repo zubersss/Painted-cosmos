@@ -66,6 +66,7 @@ uniform vec4 uOilS;         // x: how far the far air leans to the blue-violet o
 uniform vec4 uSkyOil;       // x cloud shaping, y the ceiling on the sky's value, z the cloud's lit side (the dials above)
 uniform vec4 uSkyAir;       // x: how far the lowest band is the land's own air   y: how high that band stands (dot(view, up))
 uniform vec4 uLookN;        // w: the air from the air (L5; render/shared.js OIL.uLookN, set by world/index.js)
+uniform vec4 uLookG;        // x: the golden hour's sky painted by direction and in bands (render/shared.js OIL.uLookG)
 #endif
 
 vec3 dens(vec3 c, float d) { return clamp(c - (c - c * c) * (d - 1.0), 0.0, 1.0); }
@@ -641,7 +642,26 @@ void main() {
     col = mix(col, vec3(0.93, 0.87, 0.72), pow(max(sd, 0.0), 3.0) * 0.60 * uAtmo.y * (1.0 - uAtmo.x) * (1.0 - uWxSky.x));
     // (the golden hours, as chunks.js pcGold: the whole sky warms, most of all low down, where it meets the air's pale gold)
     float gold = (1.0 - smoothstep(0.48, 0.86, sunE)) * uAtmo.y * (1.0 - uAtmo.x) * (1.0 - uWxSky.x) * uOilG.w;
-    col = mix(col, vec3(0.92, 0.80, 0.58), gold * mix(0.80, 0.45, smoothstep(0.0, 0.7, e)));
+    if (uLookG.x < 0.5) {
+      col = mix(col, vec3(0.92, 0.80, 0.58), gold * mix(0.80, 0.45, smoothstep(0.0, 0.7, e)));
+    } else {
+      // THE GOLDEN HOUR'S SKY, PAINTED (24 Nov; the coordinator: from the air and from the ground at 16.8 the sky was one
+      // flat ochre wash). The wash above laid the same gold all round the sky, 0.80 of it low down and 0.45 high, so
+      // every direction came out the same ochre and the bands and strokes under it were lost. A painter's golden hour
+      // keeps the gold where the light is: warm and strongest low toward the sun, cooling round the sky and deepening
+      // overhead and away from it, where the zenith key's blue shows and the low sky goes a cool lilac. Laid in four
+      // steps round the sky (by the angle to the sun, its edges a pixel wide and wandering with the sky's own noise)
+      // and on the sky's own height bands (tq), so it is painted, not a glow. ?goldsky=0 is the wash as it was.
+      float gT = smoothstep(-0.45, 0.90, sd) * 4.0 + (n1.g - 0.5) * 0.9;
+      float gTi = floor(gT), fwg = max(fwidth(gT), 1e-4);
+      float side = clamp((gTi + smoothstep(0.5 - fwg, 0.5 + fwg, gT - gTi)) / 4.0, 0.0, 1.0);      // 0 away from the sun .. 1 toward it
+      float low = tq;                                                                                  // 0 overhead .. 1 at the horizon band
+      col = mix(col, vec3(0.92, 0.80, 0.58), gold * mix(0.10, 0.82, side) * mix(0.30, 1.0, low));
+      // (away from the sun: the sky's own blue a step deeper overhead, and the low sky a cool lilac, not ochre)
+      float away = gold * (1.0 - side);
+      col = dens(col, 1.0 + 0.30 * away * (1.0 - 0.6 * low));
+      col = mix(col, vec3(0.72, 0.68, 0.86), away * low * 0.32);
+    }
     {
       // THE NIGHT SKY'S STREAKS (the owner, 2026-11-16: "make the lines on the sky at night time near the northern lights
       // closer to the ... references ... the patterns in the sky"). The clip's night sky, looked at closely: LONG, THIN,
