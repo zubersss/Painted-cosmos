@@ -298,27 +298,37 @@ on branch `look-director`: READ, and followed; its R3.1 took out this lane's roo
 `?bloomair=0` the drifts' colour in the ground alone. The watercolour game: SEEN pixel for pixel the same as the clean
 commit (the alpine meadow's easel, every change of this lane in).
 
-**AUDIT 2, THE NEAR GROUND (24 Nov, late; the look director's audit-2 note, its order; all behind switches, on by
-default, off with `?flora=old` too):** `?tuft=0` a tuft takes one of the three blade greens (or is a dark accent tuft,
-one in seven) and its blades differ by value only; in the middle band seven touches in ten take their 1.9 m cell's green
-(`nearground.js bladeTone`, `layBroad`). `?comb=0` the middle band's touches lean 0.16-0.28 with the meadow's comb
-(`combUV`, the same slow west wind as `grassTurn`). `?driftpatch=0` THE DRIFT AS ONE PATCH: where a drift is thick
-(cover > 0.22) a middle-ring cell lays 1-3 round touches of the drift's colour gathered round one centre (far ring 1-2),
-with 2 heads (far 1) over them; its own mark code `PATCH` = dab + 0.4, which `NEAR_VERT` brings in only past 11-16 m
-(nearer, the near ring's own flowers carry the drift); PIXEL-NEUTRAL by the look director's condition: the cell's freed
-room is NOT given to grass (COUNTED in Node, scratch overdraw counter taught the patch's fade, 1024x480: the meadow on foot
-265,452 -> 268,434 near-ground pixels, +1.1 per cent; the landing -0.4). `?patchfloor=1` lowers the heads' floor in the
-middle and far rings (0.85 -> 0.55, 0.6 -> 0.4): not yet judged. SEEN round 1 (`a2-*-today-allon.jpg`): the patch was
-WRONG (its height set against its half-width: thin horizontal lines of red and white), fixed to round touches (845a7a6);
-tuft and comb hardly move the numbers (meadow 10 m colour pattern 4.6 -> 4.8 px, edge 23.7 -> 23.9 per cent). The look
-director's rulings: keep tuft and comb; NO change to the ground's own strokes (the clip's floor is just that; the 6-10 px
-aim withdrawn for the near ground); the round-patch pair decides the patch.
-**FV6 WITH THE FAR VIEW (C):** `bloomTint` writes `o.fd` (cover), `o.fi` (the drift's kind, palette index) and, only with
-`?bloomfar=1`, `o.fi2` (the SLOPE's kind: the strongest of the kinds that can grow there on its own ~600 m field; COUNTED
-along 5 km: fi changes 154 times, fi2 23). C packs them (aBloom) and takes fi2 from 250-400 m, and fades the cover on
-steep ground (its mesh's normals; the sample has no slope). SEEN twice (`fv6-*`, `fv6b-*`): with C's fixes the cliffs are
-clear and the drifts lie in regions of one or two colours; still to fix (C's side, sent): a whole hillside in one strong
-red at 1 km, red on a peak. `?bloomfar` stays 0 until the look director judges the next pair.
+**AUDIT 2, THE NEAR GROUND (24 Nov, late; the look director's audit-2 note; ALL THREE PASSED AS DEFAULTS; for v39.4 the
+coordinator was given design-flora 4411130 = look-proto v39.3 merged + these):** `?tuft=0` off: a tuft takes one of the
+three blade greens (or is a dark accent tuft, one in seven), its blades differ by value only; in the middle band seven
+touches in ten take their 1.9 m cell's green (`nearground.js bladeTone`, `layBroad`). `?comb=0` off: the middle band's
+touches lean 0.16-0.28 with the meadow's comb (`combUV`, the same slow west wind as `grassTurn`). `?driftpatch=0` off:
+THE DRIFT AS ONE PATCH: where a COLOURED drift is thick (cover > 0.22) a middle-ring cell lays 1-3 round flat touches of
+its colour (half-width 0.09-0.14 m, height 1.5-1.9 of it) gathered round one centre (far ring 1-2, 0.20-0.38 m, a
+little squat), with 2 heads (far 1) over them; a WHITE drift keeps its heads (a plain disc loses the daisy's eye: it read
+as pebbles); its own mark code `PATCH` = dab + 0.4, which `NEAR_VERT` brings in only past 11-16 m and `NEAR_FRAG` paints
+as one flat colour (R3.1; the loaded-brush step greyed it); PIXEL-NEUTRAL by the look director's condition: the cell's
+freed room is NOT given to grass (COUNTED in Node, scratch overdraw counter taught the patch's fade, 1024x480: the meadow
+on foot 265,452 -> 267,321 near-ground pixels, +0.7 per cent; the landing -0.4). `?patchfloor=1` lowers the heads'
+floor in the middle and far rings (0.85 -> 0.55, 0.6 -> 0.4): never judged. History, SEEN: the first patch was thin
+horizontal lines (height set against half-width); round ones made white pebbles; a stronger ground tint in a drift's
+heart made pools from 10 m but the bare ground between strokes read it per pixel, a milky veil, the blur (taken out,
+a494aee). The look director's rulings: NO change to the ground's own strokes (the clip's floor is just that; the 6-10 px
+pattern aim withdrawn for the near ground); the POOL is to come from whole strokes: C's FV6 dab channel, with the bare
+ground taking none of the drift under 150 m (C did it, farview 1ed9553). For later (not blocking): a poppy's dark centre
+on the larger red patch touches (over ~6 px). Numbers barely move with all three (meadow 10 m colour pattern 4.6 -> 4.9
+px, edge 23.7 -> 23.6 per cent); the look director judged by eye.
+**THE SNOW LINE (passed for v39.5, landed in v39.4's commit):** `bloomAt` fades a drift by the sample's `snowK` (C's line,
+dd86fb3): no flower stands in snow; with C's clamp (farview 6cf9c7a) it clears the dark red smudges on the alpine ridges.
+**FV6 WITH THE FAR VIEW (C):** `bloomTint` writes `o.fd` (cover), `o.fi` (the drift's kind, palette index), and with
+`?bloomfar=1` only `o.fi2` (the SLOPE's kind: the strongest of the kinds that can grow there on its own ~600 m field;
+COUNTED along 5 km: fi changes 154 times, fi2 23); a white's far colour is cream (a fifth of its eyes' colour, top 0.80).
+C packs them (aBloom) and takes fi2 from 250-400 m, fades the cover on steep ground from 30 degrees (gone by 45), and
+gives the bare ground none of the drift under 150 m, 0.45 by 250 m, 0.2 by 400 m. SEEN: with C's 21cb6fe the cliffs were
+clear and the drifts lay in regions of one or two colours (`fv6b-*`); a whole hillside in one red at 1 km and red on a
+peak were fixed by C in d4cab64, BUT d4cab64 also put patchgen.js's two index writes after a `//` comment (every dab
+palette 0: violet near the eye, `fv6c-am02-off-on-index-bug.jpg`); sent to C twice; the pair to re-render when C fixes it.
+`?bloomfar` stays 0 until the look director judges that pair.
 
 **Done:**
 1. Speed-test rows (`core/bench.js`, after 'no small plants'): 'no near grass', 'near grass: the blades only (the fine
