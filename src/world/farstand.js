@@ -30,6 +30,16 @@ import { MODE } from '../data/mode.js';
 const _q = (() => { try { return new URLSearchParams(location.search); } catch (e) { return null; } })();
 export const CANOPY = (() => { const v = _q && _q.has('canopy') ? +_q.get('canopy') : 1; return isFinite(v) ? Math.max(0, v) : 1; })();
 
+// ?groundseason=0|1: the floor and the far colour follow the year (the far view's FV3, render/farground.js). 1, the
+// default, lays it; 0 is the picture before it to the bit. Read once.
+export const GROUND_SEASON = (() => { const v = _q && _q.has('groundseason') ? +_q.get('groundseason') : 1; return isFinite(v) && v > 0; })();
+export function groundSeasonOn(bodyId) { return !!(MODE.oil && GROUND_SEASON && CANOPY_WORLDS[bodyId]); }
+
+// ?rockfield=0|1: ROCK FACES, STRATA AND SNOW THAT READ FROM AFAR (the far view's FV4: render/farground.js ROCK_FRAG, and
+// the snow shed off steep faces by patchgen.js). Read once.
+export const ROCKFIELD = (() => { const v = _q && _q.has('rockfield') ? +_q.get('rockfield') : 0; return isFinite(v) && v > 0; })();
+export function rockfieldOn(bodyId) { return !!(MODE.oil && ROCKFIELD && CANOPY_WORLDS[bodyId]); }
+
 // The worlds whose woods are roofs of round crowns seen from above. Earth only: the other worlds' tall things are
 // crystals, spires, kelp, fungus and snow firs, which from the air are not crowns, and each would want its own look.
 export const CANOPY_WORLDS = { earth: 1 };
