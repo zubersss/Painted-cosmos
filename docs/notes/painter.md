@@ -87,13 +87,14 @@ FV7 of `docs/lead/FARVIEW-DESIGN.md`. A second session (A2, branch `trees-near`)
 the same time: this lane touches only the far parts of `flora.js`, `florakit.js`, the plant material's far branch,
 `render/impostor.js`, `render/shadow.js` and new rows in `core/bench.js`.
 
-**State (update this line every step):** (24 Nov, about 16:30) F's binding for the gust (PHYS.uPhysGust) is on
-look-director 43540c5 (not yet merged here, so the crowns' gust stays dormant on trees-far). F ACCEPTED 150 m as it is;
-600 m NOT YET (a salt of pale specks). Done as F asked: the threshold spread narrows to none under 4 px (full at 10 px),
-a small crown's step two thirds; MEASURED no fewer specks, and a band smoothing tried and taken out (more islands). SEEN
-at 5x: the specks are the turned crowns' own lit strokes (2-5 px crowns). Asked F to pick: (a) a small turned crown's
-strokes pulled to one pale tone, (b) fewer bolder far bands (core only), (c) no band under ~4 px. Scratch `gw` (trees-far
-+ design-weather d2f4277 + D's two patches, never pushed) kept for the next pair. Before that: THE FAR CROWNS IN D'S GUST BANDS built and pushed,
+**State (update this line every step):** (24 Nov, about 17:00) THE GUST BANDS ON THE FAR CROWNS: F accepted 150 m;
+for 600 m F picked (a): under a band a crown under about 4-6 px is ONE tone (the tree's colour stepped paler, at the
+crown's mean light), fading in over 4-10 px of crown width. BUILT and pushed (dormant until F's binding PHYS.uPhysGust,
+look-director 43540c5, is merged here). SEEN in the scratch merge `gw` (trees-far + design-weather d2f4277 + D's two
+patches, never pushed): 600 m patches quieter and unified, not paler on the mean (V 0.67 -> 0.66); asked F how far to
+raise the tone toward the cap. F's audit finding 1 (the whole wood confetti from the air: one tone for EVERY crown under
+4-6 px) is proposed to the coordinator; the code is shaped for it (the band is one input) but NOT built until the
+coordinator gives it a lane. Before that: THE FAR CROWNS IN D'S GUST BANDS built and pushed,
 DORMANT until F's binding (render/shared.js PHYS.uPhysGust): render/impostor.js GUST (per tree, read once at its foot,
 each tree at its own threshold 0.15 + 0.45 seed, the ground's pale cooler step; ?gustbands=1 or ?wx2=1 from the address),
 flora.setImpGust, row 'far crowns: no gust bands' at 150 m. SEEN in a scratch merge with design-weather d2f4277 and D's
