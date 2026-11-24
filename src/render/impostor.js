@@ -575,8 +575,9 @@ flat varying vec3 vDepth;
 flat varying vec2 vKB;
 void main() {
   #include <logdepthbuf_fragment>
-  // (the speed test, shared.js uOilL.y = 4: written at once, before the atlas is read or anything is cut away)
-  if (uOilL.y > 3.5 && uOilL.y < 4.5) { pcWrite(vec3(0.42, 0.40, 0.32), 0.0, vec3(0.0, 0.0, 1.0), -vView.z, 3.0); return; }
+  // (the speed test, shared.js uOilL.y = 4: written at once, before the atlas is read or anything is cut away; alpha 1,
+  //  the whole quad covered, or alpha to coverage on a multisampled picture would lay none of it)
+  if (uOilL.y > 3.5 && uOilL.y < 4.5) { pcWrite(vec3(0.42, 0.40, 0.32), 1.0, vec3(0.0, 0.0, 1.0), -vView.z, 3.0); return; }
   // THE SILHOUETTE BY COVER, NOT BY THE TEXEL'S SQUARE (the look director: stair-steps at the pixel). The four texels
   // round the point are read; how much of them is tree, weighed as the point lies among them, is the cover. Where it is
   // under a half (a quarter on a multisampled picture, which alpha to coverage then edges) nothing is laid; the paint
@@ -618,10 +619,11 @@ void main() {
     // (?impdebug=1: what an impostor reads, flat: wood brown, leaves by the level read (0 green, 1 cyan, 2 yellow,
     //  3 magenta, 4 red, 5 white), the core grey)
     vec3 lvc = vLod < 0.5 ? vec3(0.2, 0.8, 0.2) : vLod < 1.5 ? vec3(0.2, 0.8, 0.9) : vLod < 2.5 ? vec3(0.95, 0.9, 0.2) : vLod < 3.5 ? vec3(0.9, 0.2, 0.9) : vLod < 4.5 ? vec3(0.9, 0.2, 0.1) : vec3(1.0);
-    pcWrite(cls < 0.5 ? vec3(0.45, 0.3, 0.15) : cls > 2.5 ? vec3(0.4) : lvc, 0.0, vec3(0.0, 0.0, 1.0), -vView.z, 3.0); return;
+    pcWrite(cls < 0.5 ? vec3(0.45, 0.3, 0.15) : cls > 2.5 ? vec3(0.4) : lvc, clamp(cover, 0.0, 1.0), vec3(0.0, 0.0, 1.0), -vView.z, 3.0); return;
   #endif
-  // (the speed test's flat plants, 2 and 3: every far tree one flat colour, its outline kept)
-  if (uOilL.y > 1.5 && uOilL.y < 3.5) { pcWrite(cls < 0.5 ? vBB : vLA * 0.7, 0.0, vec3(0.0, 0.0, 1.0), -vView.z, 3.0); return; }
+  // (the speed test's flat plants, 2 and 3: every far tree one flat colour, its outline kept; the cover as the paint's
+  //  alpha, as below, or alpha to coverage on a multisampled picture would lay none of it)
+  if (uOilL.y > 1.5 && uOilL.y < 3.5) { pcWrite(cls < 0.5 ? vBB : vLA * 0.7, clamp(cover, 0.0, 1.0), vec3(0.0, 0.0, 1.0), -vView.z, 3.0); return; }
   vec3 r3 = vec3(id, fract(id * 13.7), fract(id * 5.1));
   float ms = dot(n, vSunK);
   ${SKYUP('dot(n, vUpK)')}
