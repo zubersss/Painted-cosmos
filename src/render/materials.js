@@ -1685,6 +1685,7 @@ uniform vec4 uOilG;
 uniform float uNeedle;    // (?pines: a conifer's needles never narrower on the screen than this many pixels; 0 off, as before)
 uniform float uNearLeaf;  // (?nearleaf: 1 the leaves within arm's length shrink about their centres; 0 off, as before)
 uniform float uLeafGrow;  // (?leafgrow: the most a thinned broadleaf's kept leaf grows within 15 m of the eye, e.g. 1.15; 0 off, as before)
+uniform float uStormLeaf; // (?stormleaf: 1 a tree's leaves step a level down under a storm, as the land does; 0 off, as before)
 uniform vec4 uOilPx;      // (x: the angle one pixel of the scene pass takes, radians: shared.js)
 uniform mat4 uShM;
 uniform highp sampler2D uShTex;
@@ -2047,6 +2048,14 @@ void main() {
       // It is laid in the deep tone whatever the sun: the dark the leaves stand on. Nothing else has a shade over 1.)
       if (aData.z > 1.5) xl = 0.2;
       float lvL = pcLevel(xl, 0.03);
+      // THE CROWNS UNDER A STORM (?stormleaf, 24 Nov, the coordinator after the look director's storm light, LOOK-BUILD.md
+      // 'The land under a storm'): the land steps a level down under a storm (chunks.js pcLevel, uLookS), but a lit leaf
+      // stands at the local level either way (its x lands between the second and third steps with or without that
+      // step), so the red crowns glowed as in fair weather under a storm sky. Here the leaf's own level is taken down by
+      // the storm: a whole level at a full storm (uStorm, at most 0.9 by day), so a lit leaf goes from its local colour
+      // toward the one foliage shade and a shaded one stays in it. A level, never a darkening multiplied on (R1.3b);
+      // with no storm (uStorm 0) the same picture to the bit. 0: as before.
+      lvL = max(0.0, lvL - uStorm * uStormLeaf);
       vec3 deepL = pcShadeLeaf(cs);      // (L2: the one foliage shade, chunks.js)
       vLeafC.rgb = mix(deepL, pcTone(cs, lvL), smoothstep(1.2, 2.0, lvL));
       // (?pines: a conifer's needle mass from 20 m out sits at the references' deep green, about V 0.26 (#39432e), not
@@ -3001,6 +3010,7 @@ export function makePropMaterial(bodyU, opts = {}) {
     uNeedle: { value: opts.needle || 0 },      // (?pines: flora.js; 0 for every plant but a conifer with the switch on)
     uNearLeaf: { value: opts.nearLeaf || 0 },  // (?nearleaf: flora.js; 0 for every plant but a tree with the switch on)
     uLeafGrow: { value: opts.leafGrow || 0 },  // (?leafgrow: flora.js; 0 for every plant but a tree with the switch on)
+    uStormLeaf: { value: opts.stormLeaf || 0 },  // (?stormleaf: flora.js; 0 for every plant but a tree with the switch on)
     uOilDarkA: v3(opts.oilDark && opts.oilDark[1], [0.5, 0.4, 0.4]), uOilDarkB: v3(opts.oilDark && opts.oilDark[2], [0.2, 0.15, 0.2]),
   };
   const defines = {};
