@@ -524,18 +524,25 @@ whether the performance work is one more version or a redesign.** Their own row 
 
 ## 3. State right now (update this before you stop)
 
-**STATE 24 Nov, 13:20 (first account; the owner asleep since 10:25, hourly check-ins until about 18:25): TWELVE HELPER SESSIONS BUILDING, EACH ON ITS OWN BRANCH. `main` is v39.1.**
-- v39.1 is LIVE (pull request #44, main 038b885; look-proto 402a7c8): the split near trees and the impostor far trees
-  are the default oil look (each with a compile guard; ?trees2=0, ?fartree=old), the far trees' stand-in while the
-  atlas bakes, F's L5 (?airfar=0), golden-hour sky (?goldsky=0), summer canopy (?canopygreen=0), flora batch 1
-  (?flora=old). Gate: watercolour 0 pixels; oil with all new parts off 0 pixels; on foot and from high OPENED.
-- v39.2 IN ITS GATE (scratch copy /home/user/wt-v392, c8ebc71, not pushed; log scratchpad/v392.log): + look-director
-  to 64f1742 (each summer tree its own green, ?treevar=0), farview 0e6dd1e (FV3 the year in the far colour and the
-  floor, ?groundseason=0; FV4 rock faces compiled out), trees-far ?shwhole default (19 fewer draws, byte-identical),
-  design-water 2d40220 (rivers from the flow tree with the landing's 18.8 m river, lakes, ponds, puddles, fjord, FALLS
-  on; water paint ?wpaint=0 = v37 strokes, because the sea from the air was a checker with the new strokes),
-  trees-near ?bench=foot. If the gate passes: push look-proto, pull request, merge, then tell A1 (impsmall default),
-  E and C (merge look-proto; C checks ?rockfield=1 after the patchgen slot move to 24).
+**STATE 24 Nov, 15:30 (first account; the owner asleep since 10:25, hourly check-ins until about 18:25): TWELVE HELPER SESSIONS BUILDING, EACH ON ITS OWN BRANCH. `main` is v39.2.**
+- v39.2 is LIVE (pull request #45, main e8f655d; look-proto c7d8d9e): each summer tree its own green (?treevar=0), the
+  year in the far colour and the floor (FV3, ?groundseason=0), the far small crowns (?impsmall=0), split trees whole in
+  the shadow pass (?shwhole=0), the final flora set (?flora=old), ?bench=foot with the start-up note. Gate: watercolour
+  0 pixels; all new parts off 0 pixels; on foot, from high, summer from high OPENED.
+- THE WATER WAS PULLED from v39.2 (the first gate's cam=high showed no water from the air: the far canopy covers the
+  new rivers; and the first view had less water than v39.1): E fixed the first view (design-water 05aa102: 8.5 % water
+  against 6.4 %), the air next (E with C, A1). E owns the ground-sample slots: when design-water meets look-proto, CS
+  25, water still 23, C's snow 24 (written and read), W3's runoff 25-26.
+- v39.1 is LIVE (pull request #44): split near trees and impostor far trees with compile guards, F's L5, golden-hour
+  sky, summer canopy, flora batch 1.
+- v39.3 PLAN: D's 'weather-release' (W1's clouds and D's storms as the default, ?clouds3d=0 and ?weather=old, wxguard
+  on every program; F gave leave for the CLOUDS3D line) + the water once it reads from the air + W3's river strokes if
+  they cure the grain + C's canopy floor (160b92c/8a1e04d) and short uniform list (A2 adds its bench row) + A2's pines
+  (?pines) if F passes + C's cliff/rock faces if F passes the air sheets.
+- F's FRESH-EYES AUDIT (look-director 70558d0, docs/lead/LOOK-AUDIT-2.md; final three still to come): colour up close is
+  on the references; the MARKS are wrong: (1) from the air the wood is confetti (C or A1); (2) the river on foot is grain
+  (W3, top job); (3) mountains are rainbow polygons (C, top job). Also leaf cards as shards (A2), the light has no design
+  and the storm leaves the land lit (F).
 - FOR THE OWNER ON WAKING: one speed-test run of bench=trees, bench=air and bench=foot on the newest version (A2
   derives about 22 ms on foot for v39.1, never measured; only the phone can say), and the two visual checks.
 - DECISIONS THIS MORNING (log): water-paint held as a default until F passes E-W2/W3's sea fix (water-sea 9525b16);
