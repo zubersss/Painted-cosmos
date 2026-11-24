@@ -2048,15 +2048,22 @@ void main() {
       // It is laid in the deep tone whatever the sun: the dark the leaves stand on. Nothing else has a shade over 1.)
       if (aData.z > 1.5) xl = 0.2;
       float lvL = pcLevel(xl, 0.03);
-      // THE CROWNS UNDER A STORM (?stormleaf, 24 Nov, the coordinator after the look director's storm light, LOOK-BUILD.md
-      // 'The land under a storm'): the land steps a level down under a storm (chunks.js pcLevel, uLookS), but a lit leaf
-      // stands at the local level either way (its x lands between the second and third steps with or without that
-      // step), so the red crowns glowed as in fair weather under a storm sky. Here the leaf's own level is taken down by
-      // the storm: a whole level at a full storm (uStorm, at most 0.9 by day), so a lit leaf goes from its local colour
-      // toward the one foliage shade and a shaded one stays in it. A level, never a darkening multiplied on (R1.3b);
-      // with no storm (uStorm 0) the same picture to the bit. 0: as before.
-      lvL = max(0.0, lvL - uStorm * uStormLeaf);
       vec3 deepL = pcShadeLeaf(cs);      // (L2: the one foliage shade, chunks.js)
+      // THE CROWNS UNDER A STORM (?stormleaf, 24 Nov, the coordinator after the look director's storm light, LOOK-BUILD.md
+      // 'The land under a storm'). MEASURED in the gallery under wx=storm (uStorm 0.9, overcast 1.0): a lit leaf's level
+      // is already about 1.4 there, so it is painted almost wholly in the foliage shade above -- and that shade is the
+      // fair-weather one, a deep SATURATED red for an autumn leaf, which does not know the weather. The land at the same
+      // levels takes pcTone's glaze (level 1: half way to the shade's grey, plus the sky's fill) and the deep wash under
+      // it: a cool grey-green. So the red crowns glowed under the storm sky whatever the level did (a first try, the
+      // level taken down a whole step, changed 10,204 pixels by at most 24 of 255). Here, under a storm, a crown is
+      // painted as the land is: nothing lit (a leaf's level held to the glaze, 1, at a full storm) and the shade the
+      // land's own glaze and deep wash at the leaf's level instead of the foliage shade. A level and the land's own
+      // paint, never a darkening multiplied on (R1.3b); with no storm (uStorm 0) the same picture to the bit. 0: as before.
+      float kSt = clamp(uStorm * uStormLeaf / 0.9, 0.0, 1.0);      // (uStorm is at most 0.9 by day: world/index.js)
+      if (kSt > 0.0) {
+        lvL = mix(lvL, min(lvL, 1.0), kSt);
+        deepL = mix(deepL, pcTone(cs, lvL), kSt);
+      }
       vLeafC.rgb = mix(deepL, pcTone(cs, lvL), smoothstep(1.2, 2.0, lvL));
       // (?pines: a conifer's needle mass from 20 m out sits at the references' deep green, about V 0.26 (#39432e), not
       //  near-black: the look director's ruling. A needle darker than that is lifted to it, its hue kept, from 12 m to

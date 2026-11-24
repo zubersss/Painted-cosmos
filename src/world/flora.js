@@ -92,9 +92,9 @@ const NEARLEAF = typeof location !== 'undefined' && /[?&]nearleaf=1\b/.test(loca
 // 1.15 times within 15 m of the eye (today up to 1.65 at 15 m on the phone's picture), back to today's by 25 m
 // (materials.js PROP_VERT, uLeafGrow); ?leafgrow=<1 to 2.4> another most. The same leaves, smaller, with the sky between
 // them; the needle kinds untouched. It changes the near trees the owner approved: OFF, never default without the owner.
-// ?stormleaf=1 (24 Nov, the coordinator after the look director's storm light): a tree's leaves step a level down under a
-// storm, a whole level at a full storm, as the land does (materials.js PROP_VERT, uStormLeaf); with no storm nothing
-// changes. OFF until the look director passes it.
+// ?stormleaf=1 (24 Nov, the coordinator after the look director's storm light): under a storm a tree's crown is painted
+// as the land is, nothing lit and the land's own glaze and deep wash in place of the fair-weather foliage shade
+// (materials.js PROP_VERT, uStormLeaf); with no storm nothing changes. OFF until the look director passes it.
 const STORMLEAF = typeof location !== 'undefined' && /[?&]stormleaf=1\b/.test(location.search || '');
 const LEAFGROW = (() => { try { const v = new URLSearchParams(location.search).get('leafgrow'); if (v == null) return 0; const n = +v; return n === 1 ? 1.15 : n > 1 && n <= 2.4 ? n : 0; } catch { return 0; } })();
 // (only a kind whose crown is leaves one by one, and nothing else, can be split: parts 0 bark, 5 leaf, 6 snow on a
