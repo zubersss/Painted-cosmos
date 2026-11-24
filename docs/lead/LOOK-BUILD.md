@@ -289,3 +289,15 @@ the owner first. Not started.
   gold rings where the old is flat ochre; away from it a cool deep blue with its clouds and a rose band low where the
   old is the same flat ochre.
 
+## The summer canopy (24 Nov; the coordinator: the summer wood from the air a carpet of lime crowns)
+
+- world/flora.js, behind LOOK.canopyGreen (on unless `?light=old`; `?canopygreen=0` alone): each tree kind's summer
+  dress (leafSum) through a scale per channel: the lightest green to an olive-gold (hue 73 to 59, V 0.92 to 0.78), the
+  middle a step deeper (V 0.80 to 0.66), the darkest toward a blue-green (V 0.58 to 0.46). Autumn dress, conifers and
+  the undergrowth (B's) untouched; the same uniforms feed near trees, far trees and impostors.
+- SEEN (opened; one page each, A `canopygreen=0`): with the impostors on (`fartree=impostor`), 150 m: a carpet of bright
+  lime crowns becomes a deeper olive-green with gold lights (V median 0.57 to 0.49, V over 0.90 5.3 to 3.7 %); 420 m the
+  same, calmer (V median 0.69 to 0.64). On foot S2: the leaves a step deeper; the bright lime left there is the floor
+  grass (B's sward and C's ground, not this). Honest limit: B reads a little greyer than ideal; more variety between
+  crowns (some warmer, some bluer) would be the next step if wanted.
+
