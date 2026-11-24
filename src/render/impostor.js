@@ -578,8 +578,16 @@ void main() {
   // tree turns at its own threshold (its seed), so a band is a ragged patch of turned crowns, not a stripe with a soft
   // edge, and a weaker wind (lower band values) turns fewer of them. The colour step is the ground's own (materials.js
   // pcGroundPaint, PC_GUST): paler, a little cooler, so a band crosses meadow and wood as one thing.
+  // (the look director, 24 Nov, from 600 m: "the turned crowns are 2 to 3 pixels and each tree turns at its own
+  //  threshold, so the band becomes a salt of pale specks over the whole wood ... grain". So the spread of the trees'
+  //  thresholds narrows with the crown's width on the screen: under about 4 px every tree under a band turns at the same
+  //  value and the band is one patch with only its own ragged edge; from about 8 px up the spread is as it was, which
+  //  150 m keeps. And a small crown's step is two thirds as strong, so the far bands do not outshout the near ones.)
   #ifdef PC_GUST
-    vGust = step(mix(0.15, 0.6, fract(inst.z * 4.37 + 0.11)), pcGustBand(io + uOrigin)) * 0.85 * uImpGust;
+    float gPx = 2.0 * hwv.x * length(ir[0]) / max(di * uOilPx.x, 1e-4);      // (the crown's width on the screen, px)
+    float gK = smoothstep(4.0, 8.0, gPx);
+    float gTh = 0.375 + (fract(inst.z * 4.37 + 0.11) - 0.5) * 0.45 * gK;
+    vGust = step(gTh, pcGustBand(io + uOrigin)) * 0.85 * mix(0.67, 1.0, gK) * uImpGust;
   #endif
   // the sun, up and the line of sight in the kit's own space (the crown's mass normals are measured there)
   mat3 rot = mat3(normalize(ir[0]), normalize(ir[1]), normalize(ir[2]));
