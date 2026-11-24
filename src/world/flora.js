@@ -232,7 +232,7 @@ const UNDER2_SHIFT = (() => {
 // ferns, bushes, flowers and boulders where those stand, 615-754 m away, past the 110 m reach, so none of them is drawn
 // near the eye in the oil look (and the obstacles, which read the right cells, are bushes and rocks one cannot see).
 // With it on, a cell reads its own (1 << shift) a side.
-const U2SPAN = (() => { let on = false; try { on = new URLSearchParams(location.search).get('u2cells') === '1'; } catch { /* no address */ }
+let U2SPAN = (() => { let on = false; try { on = new URLSearchParams(location.search).get('u2cells') === '1'; } catch { /* no address */ }
   return on && LOOK.oil ? 1 << UNDER2_SHIFT : 2; })();
 
 // WHICH KITS ARE DRAWN FAR OFF AS LEAF CARDS and not as the old lump (the oil look's far tree, v13). A kit left out
@@ -1121,6 +1121,19 @@ export class Flora {
   get shadowWhole() { return SHADOW_OPTS.whole; }
   // The far impostors' crown mass (render/impostor.js PC_MASS; the default, ?crownmass=0 the old way), switched while the
   // game runs for the speed test's row: only the impostor program is compiled again. Returns the setting before, or null.
+  // (the speed test, core/bench.js: the outer undergrowth cells built from their own placement cells, or as before;
+  //  every outer cell is let go and asked for again, so the row waits for `busy` to fall to 0. The flora lane's ?u2cells.)
+  get u2cells() { return U2SPAN !== 2; }
+  setU2Cells(on) {
+    const span = on && LOOK.oil ? 1 << UNDER2_SHIFT : 2;
+    if (span === U2SPAN) return;
+    U2SPAN = span;
+    for (const ch of this.under2Chunks.values()) {
+      if (ch.queued) { const qi = this.queue.indexOf(ch); if (qi >= 0) this.queue.splice(qi, 1); ch.queued = false; }
+      this._disposeChunk(ch);
+    }
+    this.under2Chunks.clear(); this.lastUnderEval.set(1e9, 0, 0);
+  }
   setCrownMass(on) { const m = this.mats && this.mats.imp; if (!m) return null; const was = !!m.defines.PC_MASS; if (on) m.defines.PC_MASS = 1; else delete m.defines.PC_MASS; m.needsUpdate = true; return was; }
   get crownMass() { const m = this.mats && this.mats.imp; return !!(m && m.defines.PC_MASS); }
   // The far crowns' shadows on the ground from the air (render/shadow.js FAR_SHADOW, ?farshadow=1), for the speed test's

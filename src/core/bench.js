@@ -742,6 +742,8 @@ export function attachBench(pc) {
     // two short programs and the impostors as the default trees the frame is expected near 22 ms (derived, never
     // measured), so these rows are asked off the cap, where they can be read: each against the "as set" row before it.
     const UNDER0 = (() => { try { return new URLSearchParams(location.search).get('under') === '1'; } catch (e) { return false; } })();
+    const U2C0 = (() => { const f = flora(); return !!(f && f.u2cells); })();
+    const standing = async () => { const t0 = performance.now(); while (performance.now() - t0 < 30000) { const f = flora(); if (!f || f.busy === 0) return; await wait(250); } };
     const footSteps = [
       [AS, null, null],
       ...GRASS,
@@ -750,6 +752,10 @@ export function attachBench(pc) {
       // (the flora lane's undergrowth with a body, package O, world/underkit.js: in a speed test the kits are always placed,
       //  shown only if the run started with ?under=1, and this row asks the other way; 'no small plants' leaves them alone)
       [UNDER0 ? 'no undergrowth' : 'with the undergrowth', () => show(/^pc-prop-under2/, !UNDER0), () => show(/^pc-prop-under2/, UNDER0)],
+      // (the outer undergrowth cells from their own placement cells, the flora lane's ?u2cells: the row asks the other way
+      //  from how the run started; flora.setU2Cells lets every outer cell go and asks for it again, so each switch waits
+      //  for the plants to be standing before the row is timed)
+      [U2C0 ? 'outer undergrowth as before 24 Nov' : 'outer undergrowth from its own cells', async () => { const f = flora(); if (f && f.setU2Cells) { f.setU2Cells(!U2C0); await standing(); } }, async () => { const f = flora(); if (f && f.setU2Cells) { f.setU2Cells(U2C0); await standing(); } }],
       ['no ground drawn', () => ground(false), () => ground(true)],
       ['ground one flat colour', () => B({ flat: 1 }), () => B({ flat: 0 })],
       [AS, null, null],
