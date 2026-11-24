@@ -947,7 +947,9 @@ SOLVED.** The split saves 7.7 ms; bark flat 0.2-0.7, wind 0.2, one-sided +0.5; '
 the far trees behind them, A1's). Clusters CLOSED (near +1.7, middle -0.6 noise, with a depth pass +0.8): their bench
 rows are gone, the code stays off behind ?trees2=cards until a clean-up. 'Near trees after the ground' -0.8 ms: THE
 DEFAULT now (flora.js TREES_AFTER_GROUND, renderOrder 6 after the ground's 5; ?treeorder=0 as before; the bench row asks
-the other way round); the 0-pixel proof on a settled page is in the next entry when done.
+the other way round). SEEN, 0 PIXELS: the gallery, autumn noon, phone settings 1024 x 480, each view let settle (two
+grabs equal) then the default against the old order flipped live and the default again: the stream view (19 tall
+meshes, all at 6 by default) 0 and 0 pixels; a maple from 9 m (27 tall meshes) 0 and 0 pixels.
 
 **THE SHARPER PICTURE ON A TOUCH DEVICE (the coordinator's job for this lane, 24 Nov late; 0c0a198, PILOT files:
 main.js, core/dynres.js, core/bench.js, tests/dynres.test.mjs).** A phone or a tablet in the oil look starts on RUNG 1 of
