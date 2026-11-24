@@ -131,3 +131,28 @@ float pcWStrokes(vec2 ch, vec2 wdx, vec2 wdy, vec2 d, float spd, float w0, float
   return 0.0;
 }
 `;
+
+// THE FAR WATER (WATER-DESIGN 5.6, FARVIEW FV5), for a ground that draws water too thin for the water's own mesh (group
+// C's far ground: a coarse patch keeps its water only at level 5 or over 8 % of the patch, and surface.js draws a river
+// into the far wash as wide as the samples lie apart). So that a river looks the same where it passes from the water's
+// mesh to the ground's far colour, the ground lays this over its own paint by the share of the sample that is water.
+// Interface (kept stable; included under PC_OIL by whoever draws far water; needs chunks.js pcDensity, pcOilSunC):
+//   vec3 pcWaterFarC(vec3 own, vec3 skyRefl, float shine)        the far water's own paint
+//   vec3 pcWaterFar(vec3 ground, vec3 own, vec3 skyRefl, float shine, float frac)   laid over the ground by frac
+// own: the liquid's wash there (the body's liquid colour); skyRefl: the sky mirrored there (uSkyHorizon to uSkyZenith by
+// the reflected ray's height, NOT whitened: the new paint's rule); shine: the sun's path there, 0..1 (pcWaterShine);
+// frac: 0..1. The same recipe the water mesh's new paint lays from the air: its body laid heavy as a deep water's,
+// two fifths of the sky in it, the sun's broken light on the path.
+export const WATERCHUNK_FAR_GLSL = /* glsl */`
+// the sun's path on far water: the reflected ray against the sun, the lobe widened as the water mesh's is from a kilometre
+float pcWaterShine(vec3 up, vec3 toEye, vec3 sunDir) {
+  return pow(max(dot(reflect(-normalize(toEye), up), sunDir), 0.0), 22.0) * 0.45 * max(uDayness, uMoon) * (1.0 - uWx.x);
+}
+vec3 pcWaterFarC(vec3 own, vec3 skyRefl, float shine) {
+  vec3 c = mix(pcDensity(own, 2.15) * vec3(0.80, 0.95, 1.06), skyRefl, 0.40);
+  return mix(c, min(mix(pcOilSunC(), vec3(1.0), 0.35) * 1.06, vec3(1.0)), clamp(shine, 0.0, 1.0));
+}
+vec3 pcWaterFar(vec3 ground, vec3 own, vec3 skyRefl, float shine, float frac) {
+  return mix(ground, pcWaterFarC(own, skyRefl, shine), clamp(frac, 0.0, 1.0));
+}
+`;

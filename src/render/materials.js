@@ -1179,7 +1179,16 @@ void main() {
   float line = uTreeLine + (r3.r - 0.5) * 0.30;
   float skyAmt = smoothstep(line - 0.05, line + 0.05, re + (r1.g - 0.5) * 0.18);
   vec3 skyc = mix(uSkyHorizon, uSkyZenith, clamp(re * 1.2, 0.0, 1.0));
+  #ifdef PC_WPAINT
+  vec3 skyT = skyc;
+  #endif
   skyc = mix(skyc, vec3(1.0), 0.30);
+  #ifdef PC_WPAINT
+  // (THE WATER'S NEW PAINT, lane W3, ?wpaint=2: the sky as it is, not mixed with three tenths of white. From the air
+  // the reflected ray points at the zenith, and the white made every water seen from above a pale grey: the design's
+  // w06, w09, w15, w16. Until the look director's sky as painted (LOOK-AUDIT L9, pcSkyAt) is in, the keys' own sky.)
+  if (uWPaint > 0.5) skyc = skyT;
+  #endif
   vec3 dark = pcDensity(uReflDark, 1.0 + (r3.g - 0.5) * 0.9);
   vec3 c = mix(dark, skyc, skyAmt);
 
@@ -1243,9 +1252,24 @@ void main() {
   float fres = pow(1.0 - max(dot(Vd, up), 0.0), 2.5);
   float shallow = 1.0 - smoothstep(0.02, 0.42, vDep);
   vec3 bed = pcDensity(uBed, 1.0 + (r3.b - 0.5) * 0.8);
-  c = mix(c, bed * mix(vec3(1.0), c, 0.45), clamp((1.0 - fres) * 0.42 + shallow * 0.7, 0.0, 0.9) * (1.0 - vLiqP.y) * (1.0 - vLiqP.x * 0.8));
+  float bedK = clamp((1.0 - fres) * 0.42 + shallow * 0.7, 0.0, 0.9);
+  #ifdef PC_WPAINT
+  // (the new paint: the bed shows through by HOW DEEP the water is, not by the angle alone. Seen from above, v37 laid
+  // four tenths of the sand's colour over every water however deep, and that is most of why all water from the air was
+  // grey-beige. Now two metres of water from straight above shows a twentieth of its bed, half a metre two fifths, so
+  // a brook and the shallows stay light and a river's middle and a lake go deep. And the shallows' own band (under
+  // 0.42 m) is let go with the distance: round a submerged bump it is a ring, and from afar a thin pale line.)
+  if (uWPaint > 0.5) bedK = clamp((1.0 - fres) * 0.42 * exp(-vDep / 0.6) + shallow * 0.7 * (1.0 - 0.92 * smoothstep(30.0, 150.0, dist)), 0.0, 0.9);
+  #endif
+  c = mix(c, bed * mix(vec3(1.0), c, 0.45), bedK * (1.0 - vLiqP.y) * (1.0 - vLiqP.x * 0.8));
   // pigment pools at the water's edge
-  c = pcDensity(c, 1.0 + (1.0 - smoothstep(0.0, 0.09, vDep)) * 0.35);
+  float edgeK = (1.0 - smoothstep(0.0, 0.09, vDep)) * 0.35;
+  #ifdef PC_WPAINT
+  // (the new paint: the pigment's band at the waterline is nine centimetres wide; beyond a few tens of metres it is
+  // under a pixel, and it drew every shore and every submerged bump as a dark hairline, an outline)
+  if (uWPaint > 0.5) edgeK *= 1.0 - smoothstep(20.0, 80.0, dist);
+  #endif
+  c = pcDensity(c, 1.0 + edgeK);
   // bare-paper glints: broken dashes where ripples catch the light
   float glint = smoothstep(0.715, 0.76, r2.r * 0.62 + r1.b * 0.38) * smoothstep(0.04, 0.2, vDep) * max(uDayness, uMoon);
   glint *= (1.0 - smoothstep(40.0, 120.0, dist)) * (1.0 - vLiqP.y) * (1.0 - 0.7 * wavy);
@@ -1480,12 +1504,55 @@ void main() {
     // (water is deeper and bluer than the air over it: looking toward the sun a stream took the pale sky whole and a
     // wide share of its dashes were the sun's own, and the river was a pale gravel road through the grass: the stills
     // of 2026-11-16. Its body is half the water's own wash laid heavy and blue, whatever the sky gives it, and the sun's path is a narrow run of marks.)
-    c = mix(c, pcDensity(vLiq.rgb, 1.9) * vec3(0.80, 0.95, 1.06), 0.55 * (1.0 - vLiqP.x) * (1.0 - vLiqP.y));
-    vec3 cdeep = pcDensity(c, 2.1) * vec3(0.90, 0.92, 1.0), clight = mix(c, mix(skyc, vec3(1.0), 0.25), 0.45);
-    float wsp = pow(max(dot(reflect(-normalize(vToCam), up), uSunDirL), 0.0), 56.0) * 0.6 * max(uDayness, uMoon) * (1.0 - uWx.x);
+    float wBodyD = 1.9, wBodyK = 0.55, wSunE = 56.0, wSunK = 0.6;
+    vec3 wLightC = mix(skyc, vec3(1.0), 0.25);
+    #ifdef PC_WPAINT
+    if (uWPaint > 0.5) {
+      // THE WATER'S BODY BY ITS DEPTH (the new paint): its own wash laid heavier the deeper it is -- a brook and the
+      // shallows a lighter blue, a river's middle and a lake deep (the owner's aerial river sheets: deep blue in the
+      // middle, lighter at the edges); the light strokes carry the sky as it is, not whitened; and THE SUN'S PATH
+      // carries far: its lobe widens with the distance (56 near, 22 from a kilometre), so a sea or a lake looked at
+      // toward the sun keeps a path of broken light to the horizon, where v37's lobe shrank under a stroke.
+      // (and from the air a step deeper still, as every one of the owner's aerial references lays far water darker than
+      // the land's haze: measured at E3 from 150 m the water stood at median value 0.80 against the land's 0.51)
+      float dk = smoothstep(0.25, 2.5, vDep), dfar = smoothstep(80.0, 450.0, dist);
+      wBodyD = mix(1.45, 2.15, dk) + 0.9 * dfar; wBodyK = mix(0.42, 0.62, dk);
+      wLightC = skyc;
+      float fs = smoothstep(120.0, 1200.0, dist);
+      wSunE = mix(56.0, 22.0, fs); wSunK = mix(0.6, 0.45, fs);
+    }
+    #endif
+    #ifdef PC_WPAINT
+    vec3 cRef = c;      // (what the water mirrors and shows here, before its own body is laid: the new paint, below)
+    #endif
+    c = mix(c, pcDensity(vLiq.rgb, wBodyD) * vec3(0.80, 0.95, 1.06), wBodyK * (1.0 - vLiqP.x) * (1.0 - vLiqP.y));
+    vec3 cdeep = pcDensity(c, 2.1) * vec3(0.90, 0.92, 1.0), clight = mix(c, wLightC, 0.45);
+    float wThL = 0.62, wThD = 0.30;
+    #ifdef PC_WPAINT
+    if (uWPaint > 0.5) {
+      // BROKEN COLOUR, NOT A MIXTURE (the new paint). v37 mixed the water's blue body into what it mirrors, pixel by
+      // pixel, and laid its strokes a step lighter and darker than that mixture: under a golden sky a blue body and a
+      // cream sky mixed make GREY, and from the air every water was grey (the design's w06, w09, w15, w16). Now the
+      // strokes keep the two apart, as a painter lays water: the deep strokes are the water's own body, the light ones
+      // what it mirrors (the sky as it is, the land's reflection where the last frame gives it), the middle ones the
+      // two in the share the angle gives (more of the mirror the lower the eye looks across the water). And the lower
+      // the angle the more of the strokes are the mirror's, as far water is. Lava and a sea of cloud keep v37's way.
+      // (FROM FORTY METRES OUT, all of it by two hundred: near the eye v37's strokes -- navy, the body, a step lighter --
+      // are what the design found reads well from the bank, and laid as broken colour there the brook went a pale flat
+      // cyan in the first stills of this paint, E2.)
+      vec3 body = pcDensity(vLiq.rgb, wBodyD) * vec3(0.80, 0.95, 1.06);
+      // (the mirror's share held under three fifths, and the light strokes a quarter the body's: with more, the water
+      // from the air went LIGHTER than the land, median value 0.80 at E3, where the look rules hold it inside the land's)
+      float fr = clamp(0.12 + 0.45 * fres, 0.0, 0.60), bk = smoothstep(40.0, 220.0, dist) * liq;
+      vec3 cN = mix(body, cRef, fr), dN = pcDensity(body, 1.3) * vec3(0.90, 0.92, 1.0), lN = mix(body, mix(cRef, skyc, 0.35), 0.75);
+      c = mix(c, cN, bk); cdeep = mix(cdeep, dN, bk); clight = mix(clight, lN, bk);
+      wThL = mix(0.62, mix(0.72, 0.50, fres), bk); wThD = mix(0.30, mix(0.36, 0.22, fres), bk);
+    }
+    #endif
+    float wsp = pow(max(dot(reflect(-normalize(vToCam), up), uSunDirL), 0.0), wSunE) * wSunK * max(uDayness, uMoon) * (1.0 - uWx.x);
     vec3 wsun = min(mix(pcOilSunC(), vec3(1.0), 0.35) * 1.06, vec3(1.0));
     float wau = uAuroraK * (1.0 - uDayness);
-    vec3 w1 = wr1.x > 0.62 ? clight : (wr1.x < 0.30 ? cdeep : c), w2 = wr2.x > 0.62 ? clight : (wr2.x < 0.30 ? cdeep : c);
+    vec3 w1 = wr1.x > wThL ? clight : (wr1.x < wThD ? cdeep : c), w2 = wr2.x > wThL ? clight : (wr2.x < wThD ? cdeep : c);
     w1 = wr1.z < 0.34 * wau ? mix(vec3(0.10, 0.74, 0.60), vec3(0.24, 0.96, 0.56), step(0.5, fract(wr1.z * 31.7))) : w1;
     w2 = wr2.z < 0.34 * wau ? mix(vec3(0.10, 0.74, 0.60), vec3(0.24, 0.96, 0.56), step(0.5, fract(wr2.z * 31.7))) : w2;
     w1 = wr1.y < wsp * 1.2 ? wsun : w1; w2 = wr2.y < wsp * 1.2 ? wsun : w2;
@@ -1535,6 +1602,11 @@ void main() {
   }
   #endif
   float f = pcFogAmount(dist) * (1.0 - 0.45 * farSea) * (1.0 - 0.6 * vLiqP.x);
+  #ifdef PC_WPAINT
+  // (the new paint: water is a glossy surface and reads darker than the land's haze at a distance in every one of the
+  // owner's aerial references; from 60 m the air takes less of it, a third less from 450 m. To be agreed with the look director.)
+  if (uWPaint > 0.5) f *= 1.0 - 0.35 * smoothstep(60.0, 450.0, dist) * liq;
+  #endif
   c = pcAtmosV(c, f, vView);
   pcWrite(c, mix(mix(0.7, 0.22, white), 1.0, vLiqP.y), normalize(normalMatrix * up), -vView.z, 2.0);
 }

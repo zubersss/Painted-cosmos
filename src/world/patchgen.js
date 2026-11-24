@@ -39,7 +39,8 @@ export const PATCH_VERTS = V * V + 4 * V;
 const _d = [0, 0, 0];
 const _px = new Float64Array(E * E), _py = new Float64Array(E * E), _pz = new Float64Array(E * E);
 const _hh = new Float32Array(E * E), _lq = new Float32Array(E * E);
-const CS = 22;   // floats kept per sample: wash, far wash, parameters, liquid look, strata, the current, the fall, how still
+const CS = 24;   // floats kept per sample: wash, far wash, parameters, liquid look, strata, the current, the fall, (21, 22: the far
+                 // view's stand, branch farview), how still
 const _col = new Float32Array(E * E * CS);
 let _s = null;
 let _stillGrid = new Float32Array(0), _stillSamp = null;      // (scratch: the water's section, how still, on a coarse grid)
@@ -119,7 +120,7 @@ export function stepPatch(job, deadline) {
         _col[c + 10] = s.qr; _col[c + 11] = s.qg; _col[c + 12] = s.qb; _col[c + 13] = s.qk; _col[c + 14] = s.qglow; _col[c + 15] = s.qcloud; _col[c + 16] = s.strata;
         _col[c + 17] = s.fu || 0; _col[c + 18] = s.fv || 0;      // (the oil look's rivers: the current, surface.js; 0 everywhere else)
         _col[c + 19] = s.fspd || 0; _col[c + 20] = s.turb || 0;  // (the drainage field's own speed and churn, where a surface gives them; 0 otherwise)
-        _col[c + 21] = s.still || 0;                              // (the water's: how still, where a water part says; 0 otherwise)
+        _col[c + 23] = s.still || 0;                              // (the water's: how still, where a water part says; 0 otherwise)
       }
     }
   }
@@ -329,7 +330,7 @@ export function stepPatch(job, deadline) {
       }
       for (let j = 0; j < V; j++) for (let i = 0; i < V; i++) {
         const k = (j + 1) * E + (i + 1), q = (j * V + i) * 4;
-        let sv = _col[k * CS + 21];
+        let sv = _col[k * CS + 23];
         if (_lq[k] > -1e5 && _lq[k] > _hh[k] - 0.5) {
           if (_col[k * CS + 17] === 0 && _col[k * CS + 18] === 0) sv = 1;
           else {

@@ -56,6 +56,23 @@ sea of cloud keep their own colour). Not behind `?wpaint`: it is the look direct
 pixel by night. Waiting on the look director's word on the exact line (asked 24 Nov). Not done: the aurora's green on
 Neptune's lake (every other dash: LOOK-AUDIT) -- its share is `wau` in `WATER_FRAG`, for the look director to rule.
 
+**Step 3, DONE (24 Nov), `?wpaint=2`: the water's colour and its far shine (design 3.4; FARVIEW FV5 in part).** Why water
+from the air was grey, found in `WATER_FRAG`: (1) seen from above v37 laid 42 % of the bed's SAND colour over every water
+however deep; (2) the mirrored sky was mixed with 30 % white; (3) a blue body and a cream golden-hour sky MIXED pixel by
+pixel make grey; (4) the haze. The new paint: the bed shows by depth (`exp(-depth / 0.6)` from above; the shallows' 0.42 m
+band let go from 30 to 150 m, it drew contour lines round submerged bumps); the sky as it is (the keys'; LOOK-AUDIT L9's
+`pcSkyAt` not in yet); the body laid heavier the deeper and the farther (`wBodyD` 1.45 to 2.15 by depth, + 0.9 from 80 to
+450 m); from 40 m out (all by 220 m) the strokes are BROKEN COLOUR -- the deep ones the body, the light ones the mirror
+(three quarters, a quarter body), the middle ones the two by the angle (mirror share 0.12 + 0.45 x fresnel), more light
+strokes the lower the angle; near the eye v37's strokes (the bank view reads as before: E2); the sun's lobe widened with
+the distance (56 near, 22 from a kilometre: a path of broken light); the haze on water a third less from 450 m (a
+water-only factor on `pcAtmosV`'s amount: TO BE AGREED with the look director); the waterline's dark band let go beyond
+20 to 80 m (it was an outline). `waterchunk.js` gained `WATERCHUNK_FAR_GLSL` (`pcWaterFar`, `pcWaterFarC`,
+`pcWaterShine`) for group C's far ground: interface sent to C, the byte for `frac` asked of C, not wired yet.
+SEEN and MEASURED: see the step 3 commit and `docs/shots/painter/water-paint/s3-*`.
+NOT done of FV5: shore-tangent dashes (they would bring the whorl back; the design lays still water along the wind)
+and the shore hairline (the owner's rule: no outlines) -- both said to C; the current made visible from 400 m.
+
 ## Hand-over of THE FAR TREES (trees lane A1, branch `trees-far`; kept current by that session)
 
 Started 24 Nov 2026 by helper session A1 (TREES FAR) of the coordinator. Branch `trees-far`, cut from `look-proto` =
