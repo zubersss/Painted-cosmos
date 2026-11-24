@@ -430,3 +430,15 @@ the owner first. Not started.
   sun, lit rock S 0.12-0.16).
 - For the owner's phone check: A2's ?leafgrow=1; the water rows; ?farshadow's bench row.
 - My open lane: the light's design (a dark frame round a bright warm middle distance). Not started.
+
+## State at 20:40, 24 Nov
+
+- v39.5 is LIVE (pull request 48). look-director merged look-proto 1cb697c (ee63814): src/ is now IDENTICAL to
+  look-proto, so every light change of mine is live (night key, one shade and quiet darks, one light, air from the
+  air, golden-hour sky, summer canopy and tree variety, the air's top, skylimb, olive darks, airdark, water gold,
+  storm light). Suites 328 / 127 / 449.
+- Settled with C this evening: the noon lit plane keeps a two-value split only (no colour); front-lit grey rock at
+  noon is accepted. Far shadows: C's hook level to 0.40; default after the owner's bench row (running now).
+- Waiting: W3's river paint with its cost cut (v39.6) and the per-stroke direction (the banding at bending reaches);
+  E-W2's sea sheet; B's FV6 pools at half strength; C's glades from the air; A2's ?leafgrow for the owner.
+- My open lane: the light's design. Not started.
