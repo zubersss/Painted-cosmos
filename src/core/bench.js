@@ -52,6 +52,7 @@
 
 import { BUILD } from './build.js';
 import { MAX_PIXELS } from './preset.js';   // (the ceiling on the 'every pixel the screen has' row)
+import { WX2 } from '../physics/wx2.js';     // (group D's switches: its rows run only while its pieces are on)
 
 export function attachBench(pc) {
   // which table (tenth form): '1' the whole of it, 'trees' the tree questions, 'air' or 'air,<metres>' the air table,
@@ -99,7 +100,9 @@ export function attachBench(pc) {
   document.body.appendChild(copyBtn);
   const P = pc.painter, R = pc.renderer;
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
-  const mats = (re) => { const s = new Set(); pc.scene.traverse((o) => { const m = o.material; if (m && m.name && re.test(m.name)) s.add(m); }); return s; };
+  // (a tree drawn by two programs, ?trees2=, carries an ARRAY of materials, wood then leaves: both are counted)
+  const mats = (re) => { const s = new Set(); pc.scene.traverse((o) => { for (const m of [].concat(o.material || [])) if (m && m.name && re.test(m.name)) s.add(m); }); return s; };
+  const mname = (o) => { const m = Array.isArray(o.material) ? o.material[0] : o.material; return (m && m.name) || ''; };
   const show = (re, on) => { for (const m of mats(re)) m.visible = on; };
   // the script's own time and the frame's draw calls, taken round the game's frame while a row is measured
   const acc = { ms: 0, n: 0, calls: 0, tris: 0 };
@@ -228,12 +231,21 @@ export function attachBench(pc) {
     if (pc.settle) await Promise.race([pc.settle(12), wait(20000)]);
     const hasB = typeof P._bench === 'function', lite0 = !!P.lite;
     const B = (o) => hasB && P._bench(o);
-    const farMeshes = (fn) => pc.scene.traverse((o) => { if (o.isMesh && o.material && /^pc-prop-far/.test(o.material.name || '')) fn(o); });
-    const treeMeshes = (fn) => pc.scene.traverse((o) => { if (o.isMesh && o.material && /^pc-prop-(tall|far)/.test(o.material.name || '')) fn(o); });
+    const farMeshes = (fn) => pc.scene.traverse((o) => { if (o.isMesh && o.material && /^pc-prop-far/.test(mname(o))) fn(o); });
+    const treeMeshes = (fn) => pc.scene.traverse((o) => { if (o.isMesh && o.material && /^pc-prop-(tall|far)/.test(mname(o))) fn(o); });
     const flora = () => (pc.world && pc.world._flora) || null;
     // (the far trees' form swapped while the test runs, world/flora.js setFarCards: the two forms are then timed in the
     // same minute, on a phone as warm for the one as for the other)
     const cards0 = !!(flora() && flora().species && flora().species.some((sp) => sp.cardFar));
+    // (the trees' two short programs, and the trees of clusters, swapped in while the test runs, world/flora.js
+    // setTrees2: the trees' patches are built again, so each is timed in the same minute as the trees it replaces)
+    const t2a = (flora() && flora().trees2) || '', t2d = !!(flora() && flora().treeDepth);
+    const swapT2 = async (mode, depth) => {
+      const f = flora();
+      if (!f || !f.setTrees2 || f.setTrees2(mode, depth == null ? t2d : depth) == null) return;
+      await wait(400);
+      if (pc.settle) await Promise.race([pc.settle(12), wait(20000)]);
+    };
     const swapFar = async (on) => {
       const f = flora();
       if (!f || !f.setFarCards || f.setFarCards(on) == null) return;
@@ -268,9 +280,18 @@ export function attachBench(pc) {
       if (pc.settle) await Promise.race([pc.settle(12), wait(20000)]);
     };
     const AS = 'as set';
+    // (the trees-near lane's rows, in the full table and in ?bench=trees: the near and middle trees drawn by two short
+    //  programs, wood and leaves, with no hair twigs (T2, ?trees2=1); the leaves as clusters on cards (?trees2=cards);
+    //  the cards laid in depth first (T5). Each against the "as set" row above it, built afresh while the test runs.)
+    const T2ROWS = [
+      [t2a ? 'trees in one program as before' : 'trees: two short programs', () => swapT2(t2a ? '' : 'split'), () => swapT2(t2a)],
+      ['near trees as clusters', () => swapT2('cards-near', false), () => swapT2(t2a)],
+      ['middle trees as clusters', () => swapT2('cards-mid', false), () => swapT2(t2a)],
+      ['clusters with a depth pass first', () => swapT2('cards', true), () => swapT2(t2a)],
+    ];
     // ---- THE TENTH FORM'S HANDLES (see the top of this file) ----------------------------------------------------
     const tallMats = () => mats(/^pc-prop-tall/);
-    const tallMeshes = (fn) => pc.scene.traverse((o) => { if (o.isMesh && o.material && /^pc-prop-tall/.test(o.material.name || '')) fn(o); });
+    const tallMeshes = (fn) => pc.scene.traverse((o) => { if (o.isMesh && o.material && /^pc-prop-tall/.test(mname(o))) fn(o); });
     const nearPart = (v) => () => { const f = flora(); if (f) f.benchNear = v; };
     // (no wind in the near trees' vertex shader: their own uPhysOn is 0 while the rest of the world's stays as it is.
     //  The uniform is shared by every plant, so the near trees are given one of their own for the row and handed the
@@ -300,7 +321,7 @@ export function attachBench(pc) {
       await wait(400);
       if (pc.settle) await Promise.race([pc.settle(12), wait(30000)]);
     };
-    const form0 = (() => { const f = flora(); return f ? (f.farForm || (cards0 ? 'cards' : 'lump')) : 'cards'; })();
+    const form0 = (() => { const f = flora(); return f ? (f.farForm || (f.impOn ? 'impostor' : cards0 ? 'cards' : 'lump')) : 'cards'; })();
     // the rows themselves: [label, on, off]
     const T0 = {
       leaves: ['near trees: leaves only', nearPart('leaves'), nearPart(null)],
@@ -311,6 +332,9 @@ export function attachBench(pc) {
       order: ['near trees after the ground', () => tallMeshes((o) => { o.renderOrder = 6; }), () => tallMeshes((o) => { o.renderOrder = 0; })],
       a2c: ['plants without alpha-to-cov', () => a2c(false), () => a2c(true)],
       blob: ['far trees as crossed cards', () => farForm('blob'), () => farForm(form0)],
+      // (T1: the far trees as painted impostors, two triangles a tree, swapped in the same minute; render/impostor.js.
+      //  If the run was started with ?fartree=impostor this row asks the other way: the tree of flat pieces.)
+      imp: form0 === 'impostor' ? ['far trees of flat pieces', () => farForm('cards'), () => farForm(form0)] : ['far trees as impostors', () => farForm('impostor'), () => farForm(form0)],
       noFar: ['no far trees', () => show(/^pc-prop-far/, false), () => show(/^pc-prop-far/, true)],
       farFlat: ['far trees one flat colour', () => B({ flat: 3 }), () => B({ flat: 0 })],
       noNear: ['no near trees', () => show(/^pc-prop-tall/, false), () => show(/^pc-prop-tall/, true)],
@@ -437,6 +461,8 @@ export function attachBench(pc) {
         if (MK <= 1) await sharpen(1);
       }
     }
+    const WX0 = { ...WX2 };      // (group D: its switches as the address set them, put back after each of its rows)
+    const holdStorm = (on) => { const P = pc.sim && pc.sim.physics; if (P && P.forceWeather) P.forceWeather(on ? { kind: 'storm' } : null); };
     const steps = [
       [AS, null, null],
       // the far trees: their paint, their shapes, which pass, which place in the order of drawing, which form
@@ -465,7 +491,7 @@ export function attachBench(pc) {
       // (TENTH FORM, 2026-11-24: the near trees' 51.8 ms split six ways, and the depth questions; see the top)
       T0.leaves, T0.wood, T0.bark, T0.wind, T0.side, T0.order, T0.a2c,
       [AS, null, null],
-      T0.blob,
+      T0.blob, T0.imp,
       // (2026-11-23, after speed test 9: the near trees are 62.7 ms of a 101 ms frame and NOTHING in that table says
       //  why. These three rows split it. "hand over at half the distance" is not a diagnostic -- it IS the change
       //  that would be made, so the device measures the fix and not a guess. "half their leaves" drives the leaf
@@ -475,6 +501,10 @@ export function attachBench(pc) {
         () => { const f = flora(); if (f) { f.benchTreeK = null; f.lastScale = -1; } }],
       ['near trees at a third of the distance', () => { const f = flora(); if (f) { f.benchTreeK = 0.33; f.lastScale = -1; } },
         () => { const f = flora(); if (f) { f.benchTreeK = null; f.lastScale = -1; } }],
+      // (2026-11-24, the trees to 30 a second, docs/lead/TREES-DESIGN.md on r2: the near and middle trees drawn by
+      //  two short programs, wood and leaves, with no hair twigs (T2, ?trees2=1); the near tree's leaves as clusters
+      //  on cards (?trees2=cards). Each against the "as set" row above, built afresh while the test runs.)
+      ...T2ROWS,
       ['no trees', () => show(/^pc-prop-(tall|far)/, false), () => show(/^pc-prop-(tall|far)/, true)],
       ['no small plants', () => show(/^pc-prop-(?!tall|far)/, false), () => show(/^pc-prop-(?!tall|far)/, true)],
       // (2026-11-20) WHERE THE DRAW CALLS ARE. The table's header says 350 of them and 9.6 ms of script, and a draw
@@ -491,9 +521,32 @@ export function attachBench(pc) {
       ['trees cast no shadow', () => treeMeshes((o) => o.layers.disable(2)), () => treeMeshes((o) => o.layers.enable(2))],
       ['no light in the air', () => B({ shaft: false }), () => B({ shaft: true })],
       [lite0 ? 'the full paint' : 'the lighter paint', () => B({ lite: !lite0 }), () => B({ lite: lite0 })],
+      // (GROUP D, THE SECOND WEATHER: docs/lead/WEATHER-DESIGN.md section 7. Asked only while its pieces are switched on
+      //  (?wx2=1, ?windmap=1 ...): with them off the rows would time the same frame twice and say nothing.)
+      ...(WX2.windmap ? [
+        [AS, null, null],
+        // the far field the plants read beyond the bend field (physics flora.js FAR): one lookup for one lookup, so ~0
+        ['weather: no far wind on plants', () => { WX2.farwind = false; }, () => { WX2.farwind = WX0.farwind; }],
+        // the whole wind map's refresh stopped: read the script time against the row before (about 0.14 ms derived)
+        ['weather: wind map frozen', () => { WX2.freeze = true; }, () => { WX2.freeze = false; }],
+      ] : []),
+      // (group D: a STORM HELD OVERHEAD, physics.forceWeather, so the worst case is timed whatever the weather of the
+      //  moment: the sky, the rain, the wind of a thunderstorm. "storm: no rain drawn" is the same storm with the rain's
+      //  marks hidden: the gap between the two rows is what the falling rain costs.)
+      ...(WX2.cloudmap ? [
+        [AS, null, null],
+        ['weather: a storm held overhead', () => holdStorm(true), () => holdStorm(false)],
+        ['storm: no rain drawn', () => { holdStorm(true); show(/^pc-kit-rain/, false); }, () => { show(/^pc-kit-rain/, true); holdStorm(false); }],
+      ] : []),
+      // (group D: the rain shafts under distant storms and the lightning bolts, world/storms.js. Not with the storm held
+      //  overhead: a shaft is not drawn round the eye, so the row means something only with a storm in sight, about
+      //  1 to 7 km away -- the weather of the moment, as the table is run. Derived for the phone: about 0.2 ms a storm in view.)
+      ...((WX2.rainshaft || WX2.bolts) ? [
+        ['storm: no rain shafts or bolts', () => show(/^pc-storm-/, false), () => show(/^pc-storm-/, true)],
+      ] : []),
       // (TENTH FORM) THE AIR: no row had ever timed it. The same spot, from 150 m and 400 m up.
-      ...airAt(150, 30, [T0.noFar, T0.blob]),
-      ...airAt(400, 45, [T0.noFar]),
+      ...airAt(150, 30, [T0.noFar, T0.blob, T0.imp]),
+      ...airAt(400, 45, [T0.noFar, T0.imp]),
       onFoot,
       // (the water's rows come LAST, after the final as-set row: see THE WATER'S ROWS LAST below)
       // (back to the size the device really draws, so the four rows below are measured from IT and not from
@@ -522,9 +575,11 @@ export function attachBench(pc) {
       [AS, null, null],
       T0.side, T0.order, T0.a2c, T0.noNear,
       [AS, null, null],
-      T0.blob, T0.noFar, T0.farFlat,
-      ...airAt(150, 30, [T0.noFar, T0.blob, T0.farFlat, T0.a2c]),
-      ...airAt(400, 45, [T0.noFar, T0.blob]),
+      ...T2ROWS,
+      [AS, null, null],
+      T0.blob, T0.imp, T0.noFar, T0.farFlat,
+      ...airAt(150, 30, [T0.noFar, T0.blob, T0.imp, T0.farFlat, T0.a2c]),
+      ...airAt(400, 45, [T0.noFar, T0.blob, T0.imp]),
       onFoot,
       [AS + ', last', null, null],
     ];
@@ -537,12 +592,15 @@ export function attachBench(pc) {
       ...airAt(airH, 45, [
         ['no ground drawn', () => ground(false), () => ground(true)],
         ['ground one flat colour', () => B({ flat: 1 }), () => B({ flat: 0 })],
-        T0.noFar, T0.farFlat, T0.blob,
+        T0.noFar, T0.farFlat, T0.blob, T0.imp,
         ['no water drawn', () => show(/^pc-water/, false), () => show(/^pc-water/, true)],
+        // (the far view's canopy painted into the ground, FV2: render/farground.js; the same picture as ?canopy=0)
+        ['canopy painted off (FV2)', async () => { try { (await import('../render/farground.js')).CANOPY_BENCH.off = true; } catch { /* none */ } },
+          async () => { try { (await import('../render/farground.js')).CANOPY_BENCH.off = false; } catch { /* none */ } }],
         T0.a2c,
         ['no shadows at all', () => B({ shadow: false }), () => B({ shadow: true })],
       ]),
-      ...(airH < 1000 ? airAt(1000, 45, [T0.noFar]) : []),
+      ...(airH < 1000 ? airAt(1000, 45, [T0.noFar, T0.imp]) : []),
       onFoot,
       [AS + ', last', null, null],
     ];
@@ -561,7 +619,7 @@ export function attachBench(pc) {
       const r = stats(await sample(2400));
       r.fps = 1000 / Math.max(r.mean, 1e-3);
       if (k === 0 && P._shadow) sunOut = P._shadow.frames > f0;
-      if (off) { await off(); if (name.startsWith('far trees as') || name.startsWith('far trees of')) await calm(); }
+      if (off) { await off(); if (name.startsWith('far trees as') || name.startsWith('far trees of') || /program|clusters|depth pass/.test(name)) await calm(); }
       // (a row that left the ground is put down again if the table ends up there; see airAt)
       // (2026-11-19) The header quotes the first row THAT WAS REALLY DRAWING. It used to quote the first row
       // whatever it was, and at v22 that row drew nothing, so the header described the whole game as "script

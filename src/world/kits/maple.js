@@ -28,6 +28,7 @@ import { mulberry32 } from '../noise.js';
 // narrower crown, so that from the ground a wood is its trunks against the air. Without it, the open-grown tree.)
 export function mapleGeometry(seed, lod, spec) {
   const rnd = mulberry32(seed), B = new Builder();
+  B.axis = !!(spec && spec.trees2);      // (?trees2=: kitbuild.js tube, the wood's pinch at the lens)
   const near = lod === 0;
   const sl = !!(spec && spec.slender);
   // the height the tree is cut to reach: the limb lengths below are set so the topmost limb's chain of forks ends

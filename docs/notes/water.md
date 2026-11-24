@@ -358,6 +358,8 @@ Branch `water-bodies` = lane 0 + look-proto v37.1 + `origin/design-water` (W1's 
   on the lakes), more like ribbed metal than a still tarn; for F to judge. Not yet looked at in the game itself (only the
   gallery, which uses the same surface code).
 - NEXT: W3's curtain fix (then F looks at the falls, then the word to E for the falls flip); whatever F says of the tarns.
+- Camera places for the falls views: `fallsView(S)` and the scratch `fallcams.mjs` (sea60, sea150, air400, bank, E7).
+- NEXT: lake stills at E4/E5 (A/B), ponds from 150 m, the fjord; then what the review asks.
 
 ## Stations and tools
 

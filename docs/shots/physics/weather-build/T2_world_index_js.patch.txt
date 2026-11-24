@@ -1,0 +1,31 @@
+diff --git a/src/world/index.js b/src/world/index.js
+index ffb326a..e5c12c5 100644
+--- a/src/world/index.js
++++ b/src/world/index.js
+@@ -20,6 +20,7 @@ import { isArrival } from './arrival.js';
+ import { G, GLAZES, MOTION, makeBodyUniforms, SHEET, WX, PHYSW, QUALITY, FRAME_HOOKS, skyNow, syncPhysFlora, syncPhysWater , SHADOW, LOOK, OIL, syncBurnt } from '../render/shared.js';
+ import { makeLeafFall } from './leaffall.js';
+ import { makeTimeFx } from './timefx.js';
++import { WX2 } from '../physics/wx2.js';
+ import { makeKitMaterial, biomeInks, KIT_INK, KIT_PALETTE, FIRE_MATS } from '../render/kitmat.js';
+ import { MODE } from '../data/mode.js';
+ import { faunaKinds, faunaShapes, faunaLives } from '../data/looks/common.js';
+@@ -90,6 +91,10 @@ export function createWorld(scene) {
+   // (NOT a glaze: the bubble is laid in MARKS with gaps between them, in the scene pass, the same path the leaves
+   //  in the air take -- see world/timefx.js. It was built as a glaze first and was invisible for it.)
+   if (timeFx) { scene.add(timeFx.mesh); scene.add(timeFx.rip); }
++  // (group D, ?rainshaft=1 / ?bolts=1: a storm's rain shafts and its lightning, world/storms.js; the oil look only. The
++  //  module is fetched only when one of its switches is on, so the game without them loads nothing new.)
++  let storms = null;
++  if (LOOK.oil && (WX2.rainshaft || WX2.bolts)) import('./storms.js').then((m) => { storms = m.makeStorms(null, { shafts: WX2.rainshaft, bolts: WX2.bolts }); scene.add(storms.shafts); scene.add(storms.bolts); });
+ 
+   const sun = new THREE.Object3D();
+   sun.name = 'pc-sun';
+@@ -782,6 +787,7 @@ export function createWorld(scene) {
+         const psys = physics && physics.particles && physics.particles.system ? physics.particles.system : null;
+         timeFx.update(cameraPos, active.root, _camL, bu, psys ? psys.times : null, active.id, psys ? psys.rips : null);
+       }
++      if (storms) storms.update(cameraPos, active.root, _camL, bu, physics, active.id);
+       skyU.uSkyHorizon.value.copy(tmpKey.horizon);
+       skyU.uHaze.value.copy(tmpKey.haze);
+       skyU.uCloudShade.value.copy(tmpKey.cloudShade);

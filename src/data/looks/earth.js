@@ -18,13 +18,22 @@ export default {
   seed: 'earth-7',
   seaLevel: 0,
   cloud: 0.45,
+  // (group D, the weather, with ?stormland=1: HOW STORMY the land is. One number for the owner to turn; it sets how
+  //  many storms grow on a stormy afternoon and how far they drift. MEASURED over 200 game days at the spawn:
+  //    1    storms on 71 % of days, one in sight of the wood on 65 %, one over the wood on 24 % (as tuned)
+  //    0.5  in sight on 43 %, over the wood on 11 %
+  //    1.5  in sight on 67 %, over the wood on 36 %
+  //    0    no storms born from the land at all.   physics/weather.js STORMLAND.)
+  storms: 1,
   deck: { height: 560 },
   visibility: [185, 2600],   // metres at ground level, and from high up
   sky: EARTH_SKY,
   // (the oil look: Earth takes the look's golden hours whole: its wood is the owner's reference clip's)
   // (and in the oil look the explorer lands in the autumn wood: the first site and the first autumn site change places)
   // (rivers: the oil look's river system, src/world/surface.js _riversOil: channels that split and rejoin, pools, side streams)
-  oil: { gold: 1, sites: { 0: 'autumn_woodland', 4: 'temperate_forest' }, rivers: 1, riverAt: [53.82, -8.34, -2.78], leaves: 0.5,
+  // (airTop: the far-view design's FV1 on this world -- the ground's air, the cloud deck, the relief's rounding and the
+  // visibility follow the horizon's dip; world/index.js AIRTOP. Earth is the only world it has been looked at on.)
+  oil: { gold: 1, sites: { 0: 'autumn_woodland', 4: 'temperate_forest' }, rivers: 1, riverAt: [53.82, -8.34, -2.78], leaves: 0.5, airTop: 1,
     // (the rivers of the tree, world/rivers.js, the default in the oil look: the landing keeps its RIVER -- the coordinator,
     //  24 Nov: the owner's first view is a wide stream under the maples, and the first thing they see must not have less
     //  water. Catchment added sixteen nodes up the drainage tree from the landing, growing over ten of them, so the river
