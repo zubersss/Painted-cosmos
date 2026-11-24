@@ -794,21 +794,21 @@ class Ring {
         // scattered as before. The touches are kept small (about 0.5-0.7 m across in the middle ring, 2-3 m in the far):
         // MEASURED (Node, the meadow on foot) touches sized to fill the cell painted 36 per cent more of the picture
         // and, at 10 m, were blobs some 70 px across. The cell's room the heads give up goes to its grass.
-        let nh = nf;
+        let nh = nf, patched = false, np0 = 0;
         if (FLORA.patch && nf >= 2) {
           const cov = Math.min(1, o.dens * (two2 ? 1.5 : 1));
           if (cov > 0.22) {
             const np = Math.min(nf - 1, far ? (cov > 0.5 ? 2 : 1) : (cov > 0.6 ? 3 : cov > 0.38 ? 2 : 1));
             const pc = b1.c, wj = far && Math.max(pc[0], pc[1], pc[2]) - Math.min(pc[0], pc[1], pc[2]) < 0.25 * Math.max(pc[0], pc[1], pc[2]) ? 0.8 : 1;
             const st0 = b1.stalk ? 0.5 * (b1.stalk[0] + b1.stalk[1]) : 0.2;
-            const c0 = at(0.3 + 0.4 * H(918 + ho), 0.3 + 0.4 * H(919 + ho)), dw0 = far ? 0.8 + 0.8 * cov : 0.22 + 0.14 * cov;
+            const c0 = at(0.3 + 0.4 * H(918 + ho), 0.3 + 0.4 * H(919 + ho)), dw0 = far ? 0.65 + 0.6 * cov : 0.17 + 0.10 * cov;
             for (let q = 0; q < np; q++, k++) {
               const q1 = H(900 + q + ho), q2 = H(906 + q + ho), q3 = H(912 + q + ho);
               const dw = dw0 * (0.85 + 0.3 * q3), jit = (0.94 + 0.12 * q2) * wj;
               const p = np === 1 ? c0 : [c0[0] + (q1 - 0.5) * 2.4 * dw0, c0[1] + (q2 - 0.5) * 1.8 * dw0];
-              this.put(p[0], p[1], 0, 0, 0, dw * (0.45 + 0.15 * q1) * kh, dw, PATCH, q3, born, pc[0] * jit, pc[1] * jit, pc[2] * jit, st0 * 0.3, flex * 0.5, tone1);
+              this.put(p[0], p[1], 0, 0, 0, dw * (0.40 + 0.12 * q1) * kh, dw, PATCH, q3, born, pc[0] * jit, pc[1] * jit, pc[2] * jit, st0 * 0.3, flex * 0.5, tone1);
             }
-            left -= np;
+            left -= np; patched = true; np0 = np;
             nh = Math.min(nf - np, far ? 1 : 2);
           }
         }
@@ -835,7 +835,9 @@ class Ring {
             this.put(p[0], p[1], 0, 0, 0, r0 * 2, r0, sh || (DAB + CRISP), q3, born, b.c[0] * jit, b.c[1] * jit, b.c[2] * jit, st0 * 0.85 * kh, flex, tone);
           }
         }
-        left -= nh;
+        // (the look director, audit 2: the patch must be PIXEL-NEUTRAL, so the room its heads gave up is not handed to
+        // the cell's grass; the ground's own paint, already tinted by the drift, carries it)
+        left -= patched ? nf - np0 : nh;
       }
       }
     }
