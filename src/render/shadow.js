@@ -66,10 +66,14 @@ const NO_GROUPS = Object.freeze([]);
 export const FAR_SHADOW = (() => {
   try {
     const q = new URLSearchParams(location.search), v = q.get('farshadow'), r = +q.get('farshr');
-    return { on: v === '1' || v === 'true', R: isFinite(r) && r >= 200 && r <= 3000 ? r : 860 };
-  } catch (e) { return { on: false, R: 860 }; }
+    return { on: v === '1' || v === 'true', R: isFinite(r) && r >= 200 && r <= 3000 ? r : 860, cache: q.get('farshcache') !== '0' };
+  } catch (e) { return { on: false, R: 860, cache: true }; }
 })();
 const FAR_AHEAD = 0.75;      // (the square's middle this many of its half-sizes ahead of the eye: from 0.25 behind to 1.75 ahead)
+// (the kept far map: how far the square's middle may drift, in texels, before it is drawn whole again (64: 54 m with the
+//  860 m square); how far the sun may move (a quarter of a degree); at most this many frames between whole draws; and
+//  at least this many before a far crown come or gone, or the sun's move, draws it whole)
+const FAR_STEP = 64, FAR_SUNCOS = Math.cos(0.25 * Math.PI / 180), FAR_MAXAGE = 120, FAR_MINAGE = 30;
 // Looking DOWN this steeply (the sines of 48 and 58 degrees) the middle distance has left the frame, so the square
 // comes back in and the near shadow has its finest texels again. Two numbers and not one so that a view held near
 // the threshold does not change the texels a shadow is cut on from frame to frame.
@@ -190,6 +194,16 @@ void main() {
   gl_FragColor = vec4(c / 16.0, d / 16.0, 0.0, 1.0);
 }
 `;
+// (the kept far map put back, or copied: each texel as it is, and its depth with it, so a figure drawn next is tested
+//  against the crowns again)
+const KEEP_FRAG = /* glsl */`
+uniform highp sampler2D tSrc;
+void main() {
+  float v = texelFetch(tSrc, ivec2(gl_FragCoord.xy), 0).r;
+  gl_FragDepth = clamp(v, 0.0, 1.0);
+  gl_FragColor = vec4(v, 0.0, 0.0, 1.0);
+}
+`;
 
 export class ShadowMap {
   // (PILOT's speed test, core/bench.js) The square the shadows are drawn into, made another size while the game runs:
@@ -268,7 +282,8 @@ export class ShadowMap {
     //  sun: the ground under a square of half-size R lies up to R / tan(the sun's height) nearer or further along the sun)
     const farSh = FAR_SHADOW.on && alt > 60;
     if (farSh) R = FAR_SHADOW.R;
-    const D = farSh ? 400 + R * Math.min(4, Math.sqrt(Math.max(1 - Math.min(1, Z.dot(up)) ** 2, 0)) / Math.max(Z.dot(up), 0.25)) : 400;
+    const D0 = farSh ? 400 + R * Math.min(4, Math.sqrt(Math.max(1 - Math.min(1, Z.dot(up)) ** 2, 0)) / Math.max(Z.dot(up), 0.25)) : 400;
+    const D = farSh && FAR_SHADOW.cache ? Math.ceil(D0 / 100) * 100 : D0;      // (in whole hundreds while the far map is kept)
     if (D !== this.D) { this.D = D; this.cam.far = 2 * D; this.cam.updateProjectionMatrix(); this.mat.uniforms.uInv.value = 1 / (2 * D); }
     // ...AND WHEN THE EYE LOOKS ALONG THE LAND, not only when it is high. Standing on level ground the ladder above
     // leaves the square at 90 m however far the player is looking, so a wood at 150 m had no cast shadow at all and
@@ -286,7 +301,30 @@ export class ShadowMap {
     if (R !== this.R) { this.R = R; const sc = this.cam; sc.left = -R; sc.right = R; sc.top = R; sc.bottom = -R; sc.updateProjectionMatrix(); }
     const c = this._c.copy(camL).addScaledVector(up, -alt).addScaledVector(f, this.R * (farSh ? FAR_AHEAD : LEAD));
     const tx = (2 * this.R) / this.size;
-    const cx = Math.round(c.dot(X) / tx) * tx, cy = Math.round(c.dot(Y) / tx) * tx, cz = c.dot(Z);
+    // THE FAR CROWNS' PART OF THE MAP KEPT (FAR_SHADOW.cache, the look director's condition, 24 Nov: the far crowns do not
+    // move, so they need not be drawn into the map every frame). While the eye has not carried the square's middle more
+    // than FAR_STEP texels from where it was drawn whole, the sun has not moved a quarter of a degree, and no far crown has
+    // come or gone (_crowdSig), the square keeps the place, the axes and the depth it was drawn with, and only what moves
+    // -- the figures and any other crowd -- is drawn again, over the patch they took the frame before, which is first put
+    // back from the kept copy (_farKeepRT). At most FAR_MAXAGE frames between whole draws.
+    const keep = farSh && FAR_SHADOW.cache && this._ensureFarKeep();
+    let cx, cy, cz, kept = false;
+    if (keep) {
+      const K0 = this._farKeep, sig = this._crowdSig();
+      // (a crown that came or went, or the sun's move, waits FAR_MINAGE frames: in flight the far tiles are built a few a
+      //  frame and the list changed nearly every frame, MEASURED, so the map was drawn whole every second frame)
+      const hard = K0 && K0.R === this.R && K0.D === D && K0.age < FAR_MAXAGE && K0.c.distanceTo(c) < FAR_STEP * tx;
+      if (hard && (K0.age < FAR_MINAGE || (K0.sig === sig && K0.Z.dot(Z) > FAR_SUNCOS))) {
+        kept = true; K0.age++;
+        X.copy(K0.X); Y.copy(K0.Y); Z.copy(K0.Z); cx = K0.cx; cy = K0.cy; cz = K0.cz;
+      } else {
+        cx = Math.round(c.dot(X) / tx) * tx; cy = Math.round(c.dot(Y) / tx) * tx; cz = c.dot(Z);
+        this._farKeep = { R: this.R, D, sig, age: 0, Z: Z.clone(), X: X.clone(), Y: Y.clone(), c: c.clone(), cx, cy, cz };
+      }
+    } else {
+      this._farKeep = null;
+      cx = Math.round(c.dot(X) / tx) * tx; cy = Math.round(c.dot(Y) / tx) * tx; cz = c.dot(Z);
+    }
     c.set(0, 0, 0).addScaledVector(X, cx).addScaledVector(Y, cy).addScaledVector(Z, cz);
     // body-local -> (x, y in -1..1 over the square; z: 0 at the sun's side .. 1), as chunks.js pcSunAt reads it
     OIL.uShM.value.set(
@@ -302,9 +340,56 @@ export class ShadowMap {
     cam.updateMatrixWorld(true);
     const prevT = renderer.getRenderTarget(), prevA = renderer.getClearAlpha();
     renderer.getClearColor(this._keep);
-    renderer.setRenderTarget(this.rt);
     renderer.setClearColor(this._white, 1);
-    renderer.clear(true, true, false);
+    let drew = true;
+    if (!keep) {
+      // (as it always was: everything that casts, every frame)
+      renderer.setRenderTarget(this.rt);
+      renderer.clear(true, true, false);
+      this._drawScene(renderer, scene, cam);
+      this._drawFigures(renderer, scene, cam, null);
+      this._drawCrowd(renderer, cam, camera, 0, null);
+    } else if (!kept) {
+      // (the whole map: what stands still first, kept, then what moves)
+      renderer.setRenderTarget(this.rt);
+      renderer.clear(true, true, false);
+      this._drawScene(renderer, scene, cam);
+      this._drawCrowd(renderer, cam, null, 1, null);
+      this._copyKeep(renderer, false, null);
+      renderer.setRenderTarget(this.rt);
+      const box = this._farBox.makeEmpty();
+      this._drawFigures(renderer, scene, cam, box);
+      this._drawCrowd(renderer, cam, camera, 2, box);
+      this._farRect = this._rectOf(box, cam);
+    } else {
+      // (only what moves: its last patch put back from the kept copy, then drawn where it is now)
+      const last = this._farRect;
+      if (last) this._copyKeep(renderer, true, last);
+      renderer.setRenderTarget(this.rt);
+      const box = this._farBox.makeEmpty();
+      this._drawFigures(renderer, scene, cam, box);
+      this._drawCrowd(renderer, cam, camera, 2, box);
+      this._farRect = this._rectOf(box, cam);
+      drew = !!(last || this._farRect);
+    }
+    // (the map taken down and smoothed: for the light in the air and for the ground's strokes, chunks.js pcSunAtSoft)
+    if (drew) { renderer.setRenderTarget(this.rtAir); renderer.render(this.airTri, this.airCam); }
+    renderer.setClearColor(this._keep, prevA);
+    renderer.setRenderTarget(prevT);
+    // x how strong, y the bias (0.3 m toward the sun), z a texel of the square, w where the square's answer gives way
+    K.set(k, 0.3 / (2 * D), 1 / this.size, FULL);
+    // for the light in the air (post.js OIL_FRAG): the eye's space to the square, and the way to the sun in the eye's space
+    // (the body's root and the eye are in the scene, and the scene has just been walked and placed for the sun's
+    // camera: they are up to date. Walking the root's whole subtree again here was a third of a frame's placing.)
+    OIL.uShV.value.copy(root.matrixWorld).invert().multiply(camera.matrixWorld).premultiply(OIL.uShM.value);
+    OIL.uSunV.value.copy(Z).applyQuaternion(q).transformDirection(camera.matrixWorldInverse);
+    OIL.uShaft.value.x = SHADOW.shaft * k * (SHADOW.shaftK == null ? 1 : SHADOW.shaftK); OIL.uShaft.value.y = SHADOW.air;
+    this.frames++;
+    return true;
+  }
+
+  // (the pass's three parts, so the kept far map can draw them in its own order: render above)
+  _drawScene(renderer, scene, cam) {
     const ov = scene.overrideMaterial;
     scene.overrideMaterial = this.mat;
     // (each split tree one draw, as it was before the split, unless ?shwhole=0: SHADOW_WHOLE)
@@ -321,7 +406,9 @@ export class ShadowMap {
       scene.overrideMaterial = ov;
       if (whole) for (let i = 0; i < whole.length; i += 3) { whole[i].material = whole[i + 1]; whole[i].geometry.groups = whole[i + 2]; }
     }
-    // the figures (whatever in the scene is marked as a caster and is drawn by bones)
+  }
+  // the figures (whatever in the scene is marked as a caster and is drawn by bones); box: grown by each one drawn
+  _drawFigures(renderer, scene, cam, box) {
     for (const o of scene.children) {
       if (!o.visible || !o.userData || !o.userData.pcCaster) continue;
       const swapped = [];
@@ -337,53 +424,87 @@ export class ShadowMap {
         swapped.push([m, src]); m.material = sm;
       });
       if (!swapped.length) continue;
+      if (box) box.union(this._tmpBox.setFromObject(o));
       cam.layers.enableAll();
       const au = renderer.autoClear; renderer.autoClear = false;
       try { renderer.render(o, cam); } finally { for (const [m, src] of swapped) m.material = src; cam.layers.set(SHADOW_LAYER); renderer.autoClear = au; }
     }
-    // THE CROWDS (world/beasts.js): an instanced herd, posed by the SAME vertex shader that paints it, so a
-    // walking animal's shadow walks with it. Each near mesh is one more draw call in this pass and it buys the
-    // one thing that made a deer read as pasted onto the floor rather than standing on it.
-    if (SHADOW_CROWD.size) {
-      const au2 = renderer.autoClear; renderer.autoClear = false;
-      cam.layers.enableAll();
-      // (an entry marked viewCull -- the far impostors, flora.js -- is drawn only if it stands in the eye's view or within
-      //  60 m of it, which is as far as a tree's shadow reaches into the view from outside it: of the 249 far meshes
-      //  shown from 1 km up, 78. The rest lie in the sun's square but out of sight.)
-      let fr = null;
-      for (const e of SHADOW_CROWD) {
-        const mesh = e.mesh;
-        if (!mesh || !mesh.visible || !mesh.count || !mesh.parent) continue;
-        if (e.viewCull && mesh.boundingSphere) {
-          if (!fr) { fr = this._fr || (this._fr = new THREE.Frustum()); this._pm = this._pm || new THREE.Matrix4(); this._bs = this._bs || new THREE.Sphere(); fr.setFromProjectionMatrix(this._pm.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse)); }
-          const bs = this._bs.copy(mesh.boundingSphere).applyMatrix4(mesh.matrixWorld); bs.radius += 60;
-          if (!fr.intersectsSphere(bs)) continue;
-        }
-        let sm = this._figMats.get(e.material);
-        // the crowd hands in its OWN way of building the shadow twin, so this file never imports the
-        // creatures: with the animals off, not one byte of render/beastmat.js is fetched (the powers' rule).
-        if (!sm) { if (typeof e.makeShadow !== 'function') continue; sm = e.makeShadow(e.material, this.mat.uniforms.uInv); this._figMats.set(e.material, sm); }
-        const src = mesh.material;
-        mesh.material = sm;
-        try { renderer.render(mesh, cam); } finally { mesh.material = src; }
+  }
+  // THE CROWDS (world/beasts.js): an instanced herd, posed by the SAME vertex shader that paints it, so a
+  // walking animal's shadow walks with it. Each near mesh is one more draw call in this pass and it buys the
+  // one thing that made a deer read as pasted onto the floor rather than standing on it. which: 0 every entry, 1 only
+  // the far impostors (viewCull: they stand still), 2 all but them. view: the eye's camera for the view cull, or null.
+  _drawCrowd(renderer, cam, view, which, box) {
+    if (!SHADOW_CROWD.size) return;
+    this._bs = this._bs || new THREE.Sphere();
+    const au2 = renderer.autoClear; renderer.autoClear = false;
+    cam.layers.enableAll();
+    // (an entry marked viewCull -- the far impostors, flora.js -- is drawn only if it stands in the eye's view or within
+    //  60 m of it, which is as far as a tree's shadow reaches into the view from outside it: of the 249 far meshes
+    //  shown from 1 km up, 78. The rest lie in the sun's square but out of sight. When the map is kept between frames
+    //  every one in the square is drawn, as the eye may turn before the map is drawn again.)
+    let fr = null;
+    for (const e of SHADOW_CROWD) {
+      const mesh = e.mesh;
+      if (!mesh || !mesh.visible || !mesh.count || !mesh.parent) continue;
+      if (which === 1 && !e.viewCull) continue;
+      if (which === 2 && e.viewCull) continue;
+      if (view && e.viewCull && mesh.boundingSphere) {
+        if (!fr) { fr = this._fr || (this._fr = new THREE.Frustum()); this._pm = this._pm || new THREE.Matrix4(); fr.setFromProjectionMatrix(this._pm.multiplyMatrices(view.projectionMatrix, view.matrixWorldInverse)); }
+        const bs = this._bs.copy(mesh.boundingSphere).applyMatrix4(mesh.matrixWorld); bs.radius += 60;
+        if (!fr.intersectsSphere(bs)) continue;
       }
-      cam.layers.set(SHADOW_LAYER); renderer.autoClear = au2;
+      let sm = this._figMats.get(e.material);
+      // the crowd hands in its OWN way of building the shadow twin, so this file never imports the
+      // creatures: with the animals off, not one byte of render/beastmat.js is fetched (the powers' rule).
+      if (!sm) { if (typeof e.makeShadow !== 'function') continue; sm = e.makeShadow(e.material, this.mat.uniforms.uInv); this._figMats.set(e.material, sm); }
+      if (box && mesh.boundingSphere) { const bs = this._bs.copy(mesh.boundingSphere).applyMatrix4(mesh.matrixWorld); box.union(this._tmpBox.setFromCenterAndSize(bs.center, this._tmpV.setScalar(2 * bs.radius))); }
+      const src = mesh.material;
+      mesh.material = sm;
+      try { renderer.render(mesh, cam); } finally { mesh.material = src; }
     }
-    // (the map taken down and smoothed: for the light in the air and for the ground's strokes, chunks.js pcSunAtSoft)
-    renderer.setRenderTarget(this.rtAir); renderer.render(this.airTri, this.airCam);
-    renderer.setClearColor(this._keep, prevA);
-    renderer.setRenderTarget(prevT);
-    // x how strong, y the bias (0.3 m toward the sun), z a texel of the square, w where the square's answer gives way
-    K.set(k, 0.3 / (2 * D), 1 / this.size, FULL);
-    // for the light in the air (post.js OIL_FRAG): the eye's space to the square, and the way to the sun in the eye's space
-    // (the body's root and the eye are in the scene, and the scene has just been walked and placed for the sun's
-    // camera: they are up to date. Walking the root's whole subtree again here was a third of a frame's placing.)
-    OIL.uShV.value.copy(root.matrixWorld).invert().multiply(camera.matrixWorld).premultiply(OIL.uShM.value);
-    OIL.uSunV.value.copy(Z).applyQuaternion(q).transformDirection(camera.matrixWorldInverse);
-    OIL.uShaft.value.x = SHADOW.shaft * k * (SHADOW.shaftK == null ? 1 : SHADOW.shaftK); OIL.uShaft.value.y = SHADOW.air;
-    this.frames++;
+    cam.layers.set(SHADOW_LAYER); renderer.autoClear = au2;
+  }
+  // (the kept far map: its copy, made the first time it is asked for, and the copy pass both ways)
+  _ensureFarKeep() {
+    if (this._farKeepRT) return true;
+    if (!this.rt) return false;
+    this._farKeepRT = new THREE.WebGLRenderTarget(this.size, this.size, { type: THREE.FloatType, format: THREE.RedFormat, depthBuffer: false });
+    this._farKeepRT.texture.minFilter = THREE.NearestFilter; this._farKeepRT.texture.magFilter = THREE.NearestFilter; this._farKeepRT.texture.generateMipmaps = false;
+    this._copyMat = new THREE.ShaderMaterial({ name: 'pc-shadow-keep', uniforms: { tSrc: { value: null } }, vertexShader: AIR_VERT, fragmentShader: KEEP_FRAG, depthTest: true, depthFunc: THREE.AlwaysDepth, depthWrite: true });      // (a depth test that always passes: with none, nothing is written to the depth buffer)
+    this._copyTri = new THREE.Mesh(this.airTri.geometry, this._copyMat); this._copyTri.frustumCulled = false;
+    this._farBox = new THREE.Box3(); this._tmpBox = new THREE.Box3(); this._tmpV = new THREE.Vector3(); this._bs = this._bs || new THREE.Sphere();
+    this._corner = new THREE.Vector3();
     return true;
   }
-
-  dispose() { if (this.rt) this.rt.dispose(); if (this.mat) this.mat.dispose(); if (this.rtAir) this.rtAir.dispose(); if (this.airMat) this.airMat.dispose(); }
+  // back: false copies the whole map into the kept copy; true puts the kept copy back over rect [x, y, w, h] of the map,
+  // its depth with it (KEEP_FRAG writes gl_FragDepth), so what is drawn next is tested against the crowns again
+  _copyKeep(renderer, back, rect) {
+    const dst = back ? this.rt : this._farKeepRT, src = back ? this._farKeepRT : this.rt;
+    this._copyMat.uniforms.tSrc.value = src.texture;
+    if (rect) { dst.scissor.set(rect[0], rect[1], rect[2], rect[3]); dst.scissorTest = true; }
+    renderer.setRenderTarget(dst);
+    const au = renderer.autoClear; renderer.autoClear = false;      // (the copy lays every texel it covers: nothing to clear, and a clear would take the rest of the map)
+    try { renderer.render(this._copyTri, this.airCam); } finally { renderer.autoClear = au; }
+    if (rect) { dst.scissorTest = false; renderer.setRenderTarget(null); }
+  }
+  // the map's texels a box in the scene covers, as the sun's camera sees it, with a margin: [x, y, w, h], or null
+  _rectOf(box, cam) {
+    if (box.isEmpty()) return null;
+    let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+    for (let i = 0; i < 8; i++) {
+      const p = this._corner.set(i & 1 ? box.max.x : box.min.x, i & 2 ? box.max.y : box.min.y, i & 4 ? box.max.z : box.min.z).project(cam);
+      x0 = Math.min(x0, p.x); x1 = Math.max(x1, p.x); y0 = Math.min(y0, p.y); y1 = Math.max(y1, p.y);
+    }
+    const n = this.size, X0 = Math.max(0, Math.floor((x0 * 0.5 + 0.5) * n) - 4), Y0 = Math.max(0, Math.floor((y0 * 0.5 + 0.5) * n) - 4);
+    const X1 = Math.min(n, Math.ceil((x1 * 0.5 + 0.5) * n) + 4), Y1 = Math.min(n, Math.ceil((y1 * 0.5 + 0.5) * n) + 4);
+    return X1 > X0 && Y1 > Y0 ? [X0, Y0, X1 - X0, Y1 - Y0] : null;
+  }
+  // (what the far crowns in the pass's list are: their meshes and how many trees each holds; a change draws the map whole)
+  _crowdSig() {
+    let a = 0, b = 0;
+    for (const e of SHADOW_CROWD) { if (!e.viewCull) continue; const m = e.mesh; if (!m || !m.visible || !m.parent) continue; a += m.count; b = (b + m.id * 31 + m.count) % 1000000007; }
+    return a + ':' + b;
+  }
+  dispose() { if (this._farKeepRT) this._farKeepRT.dispose(); if (this._copyMat) this._copyMat.dispose(); if (this.rt) this.rt.dispose(); if (this.mat) this.mat.dispose(); if (this.rtAir) this.rtAir.dispose(); if (this.airMat) this.airMat.dispose(); }
 }
