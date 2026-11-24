@@ -246,6 +246,22 @@ water), the river still a little over the band; E5 0.12 to 0.37 saturation, valu
 note still water is the calmest thing: a step deeper, less mirror, strokes 10:1 and in close values, white only on the sun's
 path. NIGHT (F's ask): the light strokes keep a step of light over the pulled body, the moon's marks are left out of the
 pull (`s2-E1-night-23h-wpaint2-crest-ab.jpg`: water V 0.45, land 0.22).
+**WHERE THIS LANE STANDS (24 Nov, late)** -- read first. water-paint has v39.3 merged (d87f1e1). F PASSED the river on foot
+(2b869d8) on one condition, its cost; the coordinator: cut it to about +30 % of the water's cost at a bank (6 frames
+each, like for like), then ONE commit on v39.4 making the new paint the oil look's default (`?wpaint=0` the opt-out),
+carrying E-W2's sea fixes (water-sea) and the wide-lakes rule (E-W2's `S.hydro.lakeWidthAt(x, y, z)`, design-water
+ecabe30: lakes over about 150 m take the sea's level, eased 120..180 m, into the mesher's open byte aTurb.z). Asked the
+coordinator whether the sea goes on the strokes too (`wsea`). F's sea and storm notes, SEEN and measured (phone settings,
+`clouds3d=0`): the `?wsea=2` sea from 150 m S 0.57 V 0.67 -> S 0.35 V 0.61 (400 m S 0.32 V 0.58; knee from S 0.22 keeping
+0.15, value x0.92); the shallows' glow -> three flat steps, crisp edges wavering with the 4.6 m noise (`s10-shallows-C60.jpg`);
+under a storm (`wx=storm`) the new strokes a level down, light strokes the storm sky's grey and fewer: the landing's river
+from its bank V 0.71 -> 0.63 (v37 0.74; `s10-storm-river.jpg`). COST re-measured properly: the water ALONE in the frame
+(everything else hidden by material) at the landing's river from its bank: the new paint +27 % of the water's cost before
+the on-foot fix, +29 % after (6 frames each); the earlier +39/+60 % used a hide that missed part of the water.
+THE COST TEST'S STATION moved: v39.3's rivers left the bank view E2 looking at a meadow; the timing is now at `cam=trees`
+(the landing's river, 1024 x 480 phone settings, `clouds3d=0`), with the water hidden by its MATERIAL (hiding the meshes
+did nothing in v39.3: the world sets their visibility every frame). Identity checks against a release need `clouds3d=0`:
+the 3D clouds' deck rebuilds on a wall-clock timer and lands by load time.
 **THE RIVER ON FOOT (24 Nov, night; the look director's second audit, item 2, the coordinator's top job).** On foot the
 river was grain: hair-thin scratches, 70 % of its pixels on a light-dark edge (grass 33-39). FOUND: seen from a standing
 eye the water lies at 2 to 10 degrees; the strokes were laid larger for the rows' squeeze only up to 5x, and at 20x and

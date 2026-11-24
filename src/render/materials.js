@@ -1480,6 +1480,14 @@ void main() {
   // a brook and the shallows stay light and a river's middle and a lake go deep. And the shallows' own band (under
   // 0.42 m) is let go with the distance: round a submerged bump it is a ring, and from afar a thin pale line.)
   if (wpL > 1.5) bedK = clamp((1.0 - fres) * 0.42 * exp(-vDep / 0.6) * (1.0 - 0.75 * smoothstep(80.0, 400.0, dist)) + shallow * 0.7 * (1.0 - 0.92 * smoothstep(30.0, 150.0, dist)), 0.0, 0.9);      // (and a thin stream far off takes the water's tone, not its pale bed: the look director)
+  // THE SHALLOWS IN FLAT STEPS (the look director, 24 Nov: at ?wsea=2 the shallows by the coast and the islands were a soft
+  // lighter glow, a blur by the owner's rule; "two or three flat steps of colour with crisp edges, like the shadow levels").
+  // The bed's share laid in three levels, each edge a pixel wide, the edges wavering with the 4.6 m noise so no contour is
+  // a ruled line.
+  if (wpL > 1.5) {
+    float bq = bedK + (r1.b - 0.5) * 0.10, bw = max(fwidth(bedK), 0.004);
+    bedK = (smoothstep(0.10 - bw, 0.10 + bw, bq) + smoothstep(0.30 - bw, 0.30 + bw, bq) + smoothstep(0.55 - bw, 0.55 + bw, bq)) * 0.24;
+  }
   #endif
   c = mix(c, bed * mix(vec3(1.0), c, 0.45), bedK * (1.0 - vLiqP.y) * (1.0 - vLiqP.x * 0.8));
   // pigment pools at the water's edge
@@ -1825,6 +1833,14 @@ void main() {
       // references lay water about 0.56 to 0.65)
       float kV = 1.0 - 0.14 * gq;
       c *= kV; clight *= kV; cdeep *= kV;
+      // UNDER A STORM THE WATER A LEVEL DOWN (the look director's storm light, look-director e2b9c14; the coordinator): the
+      // river stayed the palest thing under a storm, its light strokes the fallback sky's pale. Under the storm cloud
+      // (uStorm) the light strokes take the storm sky's own grey (uHazeUp, the closed sky's wash overhead; else the
+      // horizon) and are fewer, and the body goes a level down: a river in a storm is slate, not ice.
+      float sq = uStorm * liq;
+      vec3 stormC = uHazeUp.a > 0.004 ? uHazeUp.rgb : uSkyHorizon * 0.85;
+      clight = mix(clight, mix(c, stormC, 0.55), sq); wThL = mix(wThL, 0.90, sq);
+      c *= 1.0 - 0.16 * sq; cdeep *= 1.0 - 0.16 * sq; clight *= 1.0 - 0.10 * sq;
     }
     if (wpL > 0.5 && wpL < 1.5) {
       // THE SEA FROM THE AIR (E-W2, F's note): with the new strokes and v37's colour, still water far off kept v37's three
@@ -1844,7 +1860,10 @@ void main() {
       // own share, so the blue grows purer the deeper it is laid: Earth's sea 0.52 0.72 0.84 came out at 0.19 0.46 0.73.
       // Above S 0.36 the saturation is now taken in, a third of what is over it kept, at the same value: the strokes
       // keep their steps of light and dark, the sun's path and an aurora's green (laid below) are untouched.
-      c = mix(c, pcWSatKnee(c, 0.36, 0.35), liq); cdeep = mix(cdeep, pcWSatKnee(cdeep, 0.36, 0.35), liq); clight = mix(clight, pcWSatKnee(clight, 0.36, 0.35), liq);
+      // (and again, 24 Nov evening: at S 0.50 still well over the references' water, S 0.28 V 0.56; the look director wants the
+      // 150 m sea about S 0.35, V 0.58 to 0.62: the knee from S 0.22 keeping 0.15 of the excess, the value a step down; from
+      // S 0.25 keeping a fifth it measured S 0.41 V 0.61)
+      c = mix(c, pcWSatKnee(c, 0.22, 0.15) * 0.92, liq); cdeep = mix(cdeep, pcWSatKnee(cdeep, 0.22, 0.15) * 0.92, liq); clight = mix(clight, pcWSatKnee(clight, 0.22, 0.15) * 0.92, liq);
     }
     #endif
     float wsp = pow(max(dot(reflect(-normalize(vToCam), up), uSunDirL), 0.0), wSunE) * wSunK * max(uDayness, uMoon) * (1.0 - uWx.x);
