@@ -61,7 +61,9 @@ The weather group lands the rain field (its section 9.3: `fields.rain` at 32 a f
   tributaries.
 - Earth's look: `oil.springs: [{ at: 'landing', up: 4, acc: 30 }]` keeps a brook by the landing.
 - MEASURED: 267 reaches (246 joins, 9 sea, 12 edge), 21 mouths, 13 lakes, 10,383 segments, 1.6 MB; sample 1.49 us against
-  2.29 us (today's rivers, same run), the river part 0.55 us; build 100 ms cold (63 warm) + drainage 57-75 ms. Game: landing
+  2.29 us (today's rivers, same run), the river part 0.55 us; BUILD, COLD, ON A QUIET MACHINE (three fresh processes, the
+  first build as the game makes it): drainage 54-55 ms (two floods 25) + rivers 90-92 ms (the index 62-66) = 143-147 ms,
+  inside the design's 150 ms (the 160-175 ms first reported were measured while test suites ran alongside). Game: landing
   view water 6.8 % (was 0.0), bank view 20.9 % (the search finds the new brook at 8 m).
 - PHONE COST, DERIVED (14 ns a water pixel, 32 ns a ground pixel, design section 2): landing view +0.33 ms of water (23,540 px;
   range 0.19-0.66), which replaces 0.75 ms of ground if the phone skips hidden ground; bank view 1.0 ms (today's 0.9). Script:
@@ -76,8 +78,9 @@ The weather group lands the rain field (its section 9.3: `fields.rain` at 32 a f
   walks out from the rivers and holds the ground's steps over 1 m to today's along the same lines (9,455 steps over 0.25 m
   against today's 17,411; at the switch line no more than today's).
 - NOT DONE (said plainly): the drop to the sea at each mouth (W2's mouth cut and fall: the wood stands at least 12 m over the
-  sea everywhere on Earth); grey from the air (W3); basins flood only along channels (W2's lake beds); the build is 10-25 ms
-  over the design's 150 ms here.
+  sea everywhere on Earth); grey from the air (W3); basins flood only along channels (W2's lake beds).
+- TRIED AND REFUSED: the index built from a full window of the grid round each chunk (face arithmetic, no walk): 200 ms
+  against the walk's 65; the walk stays.
 - NEXT for W1, if the review asks: stronger meanders on the big rivers (references: long S-bends); the main river by the
   landing is now a brook (a spring with a larger catchment would bring a wider one past it: one number in Earth's look).
 
