@@ -487,9 +487,24 @@ class Surface {
     // references show "between the stands, glades of yellow-green grass". The same glades, about the middle of the old
     // step, but open WHOLE: no tree in them, the edge a short step ragged by a finer field.)
     const gWhole = GLADES && MODE.oil;
+    // (THE LANDING KEEPS ITS WOOD, the look director: the first view is the one the owner knows best, so within about 120 m
+    // of the landing the glades stay as they were, opening whole from 180 m. The landing is the look's own fixed spot where
+    // it has one, else the found landing, once known.)
+    let kS = 0;
     if (gWhole) {
+      let sp = this._gladeSp || (this._gladeSp = (() => { const f = this.look.spawn; if (!f) return null; const k = 1 / Math.hypot(f[0], f[1], f[2]); return { x: f[0] * k, y: f[1] * k, z: f[2] * k }; })());
+      if (!sp) {
+        // (the landing found here once if no one has asked yet: the ground may be built before the game asks for it. The
+        // search's own samples see the glades as they were, so it finds the landing it always found)
+        if (!this._spawn && !this._gladeBusy) { this._gladeBusy = true; try { this.getSpawn(); } finally { this._gladeBusy = false; } }
+        sp = this._gladeBusy ? null : this._spawn;
+      }
+      // (until the landing is known the glades are as they were: the landing search itself scores places by the glade, and
+      // with whole glades it chose a spot 50 m away, SEEN; Earth has no fixed landing in its look)
+      kS = sp ? smoothstep(120, 180, Math.hypot(x - sp.x, y - sp.y, z - sp.z) * R) : 0;
       const gm = 0.5 * ((gl ? gl[0] : 0.24) + (gl ? gl[1] : 0.62));
-      glade = smoothstep(gm - 0.035, gm + 0.035, gn + 0.06 * nC(x * fv * 0.6 + 9.0, y * fv * 0.6 - 5.0, z * fv * 0.6 + 2.0));
+      const gw = smoothstep(gm - 0.035, gm + 0.035, gn + 0.06 * nC(x * fv * 0.6 + 9.0, y * fv * 0.6 - 5.0, z * fv * 0.6 + 2.0));
+      glade += (gw - glade) * kS;
     }
     const pz = smoothstep(-0.12, 0.34, nA(x * fp - 23.0, y * fp + 41.0, z * fp + 9.0) + (b.h - L) * 0.018 - 0.1) * smoothstep(7, 30, s);
     const v1 = nC(x * fv - 3.0, y * fv, z * fv + 21.0);
@@ -510,7 +525,11 @@ class Surface {
     // (the rivers of the tree's point bars: the trees stand back from the bar and 6 m beyond it, so their crowns do not hide
     //  it from the air -- F, 24 Nov; c.barZone, world/rivers.js, written every call there and read only when it is attached)
     const bz = this.rivers ? c.barZone || 0 : 0;
-    b.trees = clamp((1 - (gWhole ? 1.0 : 0.82) * glade) * (1 - rk) * open * (1 - Math.max(bar, bz)), 0, 1);
+    // (and THE STANDS CLOSE UP outside the glades, the look director: trees gathered into stands overlap, so the wood lost a
+    // sixth of its darks from the air though it lost few trees (under V 0.3, 51.5 to 45.1 per cent at 150 m); a share up to
+    // 1.25 there (the placer's and the far stand's keep both scale by it), glades mode only, never by the landing)
+    const tW = gWhole ? 0.82 + 0.18 * kS : 0.82, tS = gWhole ? 1 + 0.25 * kS : 1;
+    b.trees = clamp((1 - tW * glade) * tS * (1 - rk) * open * (1 - Math.max(bar, bz)), 0, 1.25);
     b.canopy = clamp(b.trees * 1.05 + (1 - open) * 0.35, 0, 1);
     b.birch = clamp(0.74 - pz * 0.72 + 0.3 * (1 - smoothstep(6, 18, s)), 0.06, 1);
     // (the oil look may set a wood's mix of kinds: the biome's oil.tallMix. A number: the share of the first kind, everywhere.
@@ -1179,8 +1198,14 @@ class Surface {
 
   // A good first landing spot: earth -> a clearing by the stream in the first forest site,
   // where the brook is narrow and the wood stands close around.
+  // (the landing search is marked while it runs, so the glades it scores are the old ones whoever asked first: ?glades=1
+  // opened whole glades into the search and the landing moved 50 m, SEEN)
   getSpawn() {
     if (this._spawn) return this._spawn;
+    this._gladeBusy = true;
+    try { return this._findSpawn(); } finally { this._gladeBusy = false; }
+  }
+  _findSpawn() {
     const s0 = this.sites[0];
     const o = makeSample(this.nB);
     // A first landing chosen by eye (looks.js `spawn`: [x, y, z, yaw, pitch in degrees]): the spot and the way to

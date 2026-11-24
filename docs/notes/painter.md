@@ -13,6 +13,16 @@ sky to a mile: look director), FV2-T and FV7 (the far trees and the air speed te
 `src/render/materials.js`, `src/world/terrain.js`, `src/world/patchgen.js`, `src/world/surface.js` (recipes and far
 colour only). NOT chunks.js, post.js, shared.js, world/index.js (look director), NOT flora.js, florakit.js (trees groups).
 
+**STATE (24 Nov, late night) IN SHORT:** v39.4 and v39.5 are LIVE with all of this lane's mountain work (v39.5 = farview
+87b25e8). farview has look-proto v39.5 merged (62c203d; snow at sample slot 24). Passed by the look director since:
+7f4c006 (the noon lit plane's two values inside ?rockfield; the colour part closed). Behind switches, off: ?glades=1
+(a3959b3 + the two conditions being finished: stands closed up to 1.25 outside glades, no whole glade within 120 to 180
+m of the landing, and the landing found once before glades apply, since Earth's landing search scores the glade and
+moved 50 m with them), ?farshadow=1 (A1's hook, level 0.40, passed), ?bloomfar (one switch with B's bloom.js since
+5b9400e; B flipped FV6 on in design-flora 439c243). For fair stills under v39.5's weather add ?clouds3d=0&cloudshadow=0
+(the look director). The owner's phone tables (r2 docs/lead/bench/2026-11-24-v39.5-owner-phone.md): the ground is
+cheap (no ground at all saves 1.7 ms on foot).
+
 **STATE (24 Nov, second session, night): THE MOUNTAINS PASSED for v39.4** by the look director: the coordinator takes
 farview up to cc354f3 (c1c8eaa + stills only); 62e62fa (planes and the mountain family only on whole beds) is NOT in
 v39.4 and goes to v39.5 with the alpine 420 m noon pair. THE RED SMUDGES on the alpine ridges, CAUSE FOUND: flower
