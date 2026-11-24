@@ -403,6 +403,7 @@ float gGully = 0.0;       // how far into a gully the cliff dab lies: its light 
 float gRockLw = 1.0;      // (main) the surface's metres per pixel here (lw): how many pixels a bed spans
 float gRockT = 0.0;       // the rock dab's temperature by its plane: +0.8 lit (warm) .. -1 turned away (cool), pcRockPlanes
 float gRockP = 0.0;       // how much the light planes rule this dab: bedded rock only (a cliff, a mountain's face), never snow
+float gCliffU = 0.0;      // 1 while pcCliffC paints the ground BETWEEN the dabs, per pixel (main's bare branch)
 float gFaceOn = 0.0;      // (main) this pixel is steep enough that the upright charts may lay its dabs
 float gFaceD = 0.0;       // (main) the dab being painted lies on an upright chart
 #ifdef PC_ROCKDEBUG
@@ -539,7 +540,11 @@ vec3 pcCliffC(vec3 Bc, float hB, vec3 rnd, vec3 c, float w) {
   else if (f > 0.89) tone = mix(tone, lipC, 0.6);      // (the lit lip: the only near-white on a face)
   vec3 meanC = 0.5 * (mix(uRockC0, uRockC3, 0.28) + mix(uRockC1, uRockC2, 0.4));
   vec3 meanM = 0.5 * (mix(uRockM0, uRockM3, 0.4) + mix(uRockM1, uRockM2, 0.3));
-  tone = mix(tone, mix(meanC, meanM, kM), 0.85 * kB);
+  // (the ground between the dabs is asked per pixel, not per dab: there a bed under about 3 px tall, its seams and lips
+  // a fraction of a pixel, came out as a dither of light and dark pixels, the speckle the look director saw on the far
+  // faces at 1 km. So under the dabs the beds go WHOLLY to the mean by 3 px, the way a dab's beds go to it by 7.)
+  float kBf = mix(0.85 * kB, 1.0, gCliffU * (1.0 - smoothstep(3.0, 6.0, uRockB.x / max(w, 1e-4))));
+  tone = mix(tone, mix(meanC, meanM, kM), kBf);
   tone = mix(tone, pcDensity(mix(mix(uRockC1, uRockC2, 0.4), mix(uRockM1, uRockM2, 0.5), kM), 1.15), gGully * 0.75);
   float lc = max(dot(c, vec3(0.3, 0.5, 0.2)), 0.05);
   tone = clamp(tone * mix(vec3(1.0), clamp(c / lc, vec3(0.7), vec3(1.4)), 0.08), 0.0, 1.0);
@@ -558,7 +563,10 @@ vec3 pcRockWash(vec3 c, float up, vec3 Bc, float strata, float dist, vec3 rnd, f
   float hB = length(Bc) - uBodyR;
   // (up the range, past the coast's height band, the rock begins at a gentler slope, about 30 degrees, from 80 m out:
   // the mountains' flanks were the pastel patches of the alpine wash, rose, lime and lilac, the audit's rainbow)
-  float kMt = smoothstep(uRockMH.x, uRockMH.y, hB) * smoothstep(0.05, 0.20, strata);
+  // (the mountain's family and its light planes only where the beds are WHOLE: a partly snowy place (patchgen.js reports
+  // part of its beds) took part rock and part wash, and the planes darkened the wash's red patch into soft dark red-brown
+  // smudges on the alpine ridges, SEEN by the look director)
+  float kMt = smoothstep(uRockMH.x, uRockMH.y, hB) * smoothstep(0.35, 0.50, strata);
   float far = mix(smoothstep(0.82, 0.67, up), smoothstep(0.87, 0.74, up), kMt) * smoothstep(80.0, 250.0, dist);
   float cl = smoothstep(0.66, 0.50, up) * smoothstep(0.05, 0.20, strata);
   float nr = textureLod(uNoise3D, Bc / 4.3 + 0.13, 0.0).g;
@@ -570,7 +578,7 @@ vec3 pcRockWash(vec3 c, float up, vec3 Bc, float strata, float dist, vec3 rnd, f
   gRock = max(far * uRockK * (1.0 - sn), gCliff);
   // (the planes only on BEDDED rock: a snow-laid place reports no beds (patchgen.js), and a snowfield turned from the sun
   // was laid in the deep shade plane and went dark at 1 km, SEEN; snow keeps the ordinary light)
-  gRockP = max(gCliff, far * uRockK * (1.0 - sn) * smoothstep(0.05, 0.20, strata));
+  gRockP = max(gCliff, far * uRockK * (1.0 - sn) * smoothstep(0.35, 0.50, strata));
   gGully = 0.0;
   if (gRock <= 0.0) return c;
   if (gCliff > 0.5) return pcCliffC(Bc, hB, rnd, c, gRockLw);
@@ -625,7 +633,12 @@ vec3 pcRockTemp(vec3 k) {
   if (gRockP <= 0.0) return k;
   vec3 wC = uRockM3 / max(dot(uRockM3, vec3(0.3, 0.5, 0.2)), 1e-3);
   wC = vec3(1.0) + (wC - vec3(1.0)) * 2.2;
-  vec3 t = gRockT > 0.0 ? mix(vec3(1.0), wC, gRockT) : mix(vec3(1.0), vec3(0.86, 0.84, 1.25), -gRockT);
+  // (AT NOON the side and turned-away planes lean further to the cool violet, the look director after v39.4: with the sun
+  // high their shade is shallow and the rock read as one grey, S median 0.07 at the noon views, MEASURED; 1.25 blue at a
+  // low sun as before, up to the noon key with the sun overhead)
+  float kN = smoothstep(0.55, 0.85, dot(gSunV, normalize(vUpV)));
+  vec3 cool = mix(vec3(0.86, 0.84, 1.25), vec3(0.82, 0.80, 1.34), kN);
+  vec3 t = gRockT > 0.0 ? mix(vec3(1.0), wC, gRockT) : mix(vec3(1.0), cool, -gRockT);
   return clamp(k * mix(vec3(1.0), t, gRockP), 0.0, 1.0);
 }
 #endif`;

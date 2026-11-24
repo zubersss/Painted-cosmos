@@ -198,9 +198,13 @@ export function stepPatch(job, deadline) {
           // were laid, SEEN by the look director: snow wins over rock above the snowline, so only the sheerest faces shed)
           const st = sstep(0.57, 0.34, upn);
           if (st > 0) {
+            // (the wash found under the snow is held to 0..1: anything laid over the snowy wash after the snow -- a flower
+            // drift's colour, world/bloom.js -- comes back from the undoing magnified by 1/(1 - snow), up to 16 times, and
+            // went below 0: the dark red smudges on the alpine ridges, SEEN 24 Nov, gone with ?bloomair=0)
             const k2 = sk * (1 - 0.6 * st), cc = k * CS, iv = 1 / (1 - sk);
             for (let t = 0; t < 3; t++) {
-              const base = (_col[cc + t] - SNOW[t] * sk) * iv, base2 = (_col[cc + 3 + t] - SNOW[t] * sk) * iv;
+              const base = Math.min(1, Math.max(0, (_col[cc + t] - SNOW[t] * sk) * iv));
+              const base2 = Math.min(1, Math.max(0, (_col[cc + 3 + t] - SNOW[t] * sk) * iv));
               _col[cc + t] = base + (SNOW[t] - base) * k2;
               _col[cc + 3 + t] = base2 + (SNOW[t] - base2) * k2;
             }
@@ -235,8 +239,11 @@ export function stepPatch(job, deadline) {
       // flowers keep off steep ground by their own slope test. z: the slope's own kind, o.fi2, for the far dabs)
       if (blo) {
         const upn = (nor[o] * _px[k] + nor[o + 1] * _py[k] + nor[o + 2] * _pz[k]) / Math.sqrt(_px[k] * _px[k] + _py[k] * _py[k] + _pz[k] * _pz[k]);
-        blo[q] = b8(_bl[k * 3] * (1 - sstep(0.13, 0.29, 1 - upn)));      // (from 30 degrees, gone by 45: from 46 the far patches' smoothed normals left red on the peaks' faces, SEEN by flora B)
-        blo[q + 1] = b8(_bl[k * 3 + 1] / 15); blo[q + 2] = b8(_bl[k * 3 + 2] / 15);   // (these two sat inside the comment above since d4cab64, so the far dabs' palette index was never written: the 'every dab violet' B saw; only with ?bloomfar=1)
+        // (from 30 degrees, gone by 45: from 46 the far patches' smoothed normals left red on the peaks' faces, SEEN by flora B)
+        // (the two index writes stood after this comment on one line and never ran, so every dab took palette entry 0: violet
+        // near the eye, SEEN by flora B with ?bloomfar=1; the default picture never reads this array)
+        blo[q] = b8(_bl[k * 3] * (1 - sstep(0.13, 0.29, 1 - upn)));
+        blo[q + 1] = b8(_bl[k * 3 + 1] / 15); blo[q + 2] = b8(_bl[k * 3 + 2] / 15);
       }
       if (!io && !jo) {
         // the parent's own normal here: its grid is twice as wide (at the border the apron is one cell deep)
