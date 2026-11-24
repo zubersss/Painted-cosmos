@@ -257,6 +257,9 @@ swirl and marble there, and a faint line of fine hatching remains along where th
   as v39.3's own frame shows on that bending reach. CAUSE of that (read in WATER_FRAG, v37's strokes, the default): a current
   turns the stroke chart at each pixel about the middle of a 26 m cell, so where a river bends a point 13 m from the middle
   shifts metres for a few degrees and the strokes bunch: ONE DIRECTION PER STROKE needs the paint (W3's), asked.
+- F PASSED it (20:07): ship it as the live fault's fix (14772ce). TO CHECK LATER: when W3's new river paint (one direction per
+  stroke, its own chart) becomes the default (planned v39.6), look again at this same view: the banding on bending reaches
+  should go with it.
 
 ### THE WATER FROM THE AIR (24 Nov 14:50-16:15, this session; the coordinator held the water out of v39.2 for it)
 
