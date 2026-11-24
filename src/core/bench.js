@@ -46,6 +46,7 @@
 // 400 m (45 degrees down) over the same spot and a few questions are asked there.
 //   ?bench=1      the whole table (these rows included)
 //   ?bench=trees  the tree questions only, on foot and in the air: shorter, so the phone is cooler for each row
+//   ?bench=water  the water's views only: the brook's bank, a sea shore, and any view a water part places (the falls')
 //   ?bench=air    the air table (FV7 of docs/lead/FARVIEW-DESIGN.md): 400 m up and 45 degrees down, or ?bench=air,150
 //                 for another height; the questions every air lane waits on.
 //   ?bench=foot   the frame ON FOOT at the landing, the parts that are not the trees (the owner's 33 ms, 24 Nov): the
@@ -58,7 +59,8 @@ import { MAX_PIXELS } from './preset.js';   // (the ceiling on the 'every pixel 
 import { WX2 } from '../physics/wx2.js';     // (group D's switches: its rows run only while its pieces are on)
 
 export function attachBench(pc) {
-  // which table (tenth form): '1' the whole of it, 'trees' the tree questions, 'air' or 'air,<metres>' the air table
+  // which table (tenth form): '1' the whole of it, 'trees' the tree questions, 'air' or 'air,<metres>' the air table,
+  // 'water' the water's views only (the bank, the shore, and a view a water part places, as the falls': short, for a phone)
   const MODE_B = String(new URLSearchParams(location.search).get('bench') || '1').toLowerCase();
   const el = document.createElement('pre');
   el.id = 'pc-bench';
@@ -267,6 +269,10 @@ export function attachBench(pc) {
     // (?treesway=whole: the near trees bend whole, as the middle ones do, without the crown's branch-by-branch sway;
     //  world/flora.js setTreeSway, the trees' patches built again. With the two short programs only.)
     const sw0 = !!(flora() && flora().swayWhole);
+    // (?pines: the tall pines' and spruces' needles kept a few pixels across at range, world/flora.js setNeedles: a
+    //  uniform, nothing rebuilt; with no needle kind in the world the row times the same frame twice)
+    const nd0 = !!(flora() && flora().needles);
+    const swapNeedles = async (on) => { const f = flora(); if (f && f.setNeedles) f.setNeedles(on); await wait(400); };
     const swapSway = async (whole) => {
       const f = flora();
       if (!f || !f.setTreeSway || f.setTreeSway(whole) == null) return;
@@ -316,6 +322,7 @@ export function attachBench(pc) {
       ['middle trees as clusters', () => swapT2('cards-mid', false), () => swapT2(t2a)],
       ['clusters with a depth pass first', () => swapT2('cards', true), () => swapT2(t2a)],
       [sw0 ? 'near trees: branch sway as before' : 'near trees bend whole (no branch sway)', () => swapSway(!sw0), () => swapSway(sw0)],
+      [nd0 ? 'pines: needles as thin as before' : 'pines: needles kept wide at range', () => swapNeedles(!nd0), () => swapNeedles(nd0)],
     ];
     // ---- THE TENTH FORM'S HANDLES (see the top of this file) ----------------------------------------------------
     const tallMats = () => mats(/^pc-prop-tall/);
@@ -363,7 +370,10 @@ export function attachBench(pc) {
     const handBack = () => { const f = flora(); if (!f || !f.setHandover || !hand0) return; f.setHandover(hand0[0], hand0[1]); hand0 = null; };
     const form0 = (() => { const f = flora(); return f ? (f.farForm || (f.impWant || f.impOn ? 'impostor' : cards0 ? 'cards' : 'lump')) : 'cards'; })();
     // the rows themselves: [label, on, off]
-    const shw0 = (() => { const f = flora(); return f ? !!f.shadowWhole : true; })();      // (the shadow pass's whole-draw setting as the run starts: shWhole)
+    const shw0 = (() => { const f = flora(); return f ? !!f.shadowWhole : true; })();
+    const gust0 = (() => { const f = flora(); const u = f && f.mats && f.mats.imp && f.mats.imp.uniforms.uImpGust; return !!u; })();
+    const cm0 = (() => { const f = flora(); return f ? !!f.crownMass : true; })();
+    const fsh0 = (() => { const f = flora(); return f ? !!f.farShadow : false; })();      // (the far crowns' shadows on the ground as the run starts: farShadow)      // (the far crowns as masses as the run starts: crownMass)      // (the far crowns take the gust bands: impGust)      // (the shadow pass's whole-draw setting as the run starts: shWhole)
     const T0 = {
       leaves: ['near trees: leaves only', nearPart('leaves'), nearPart(null)],
       wood: ['near trees: wood only', nearPart('wood'), nearPart(null)],
@@ -390,6 +400,14 @@ export function attachBench(pc) {
       noNear: ['no near trees', () => show(/^pc-prop-tall/, false), () => show(/^pc-prop-tall/, true)],
       // (T6, the shadow pass: a split tree (?trees2) one draw there, the default, against one a material, ?shwhole=0;
       //  the row asks the other way from how the run started; flora.setShadowWhole)
+      // (the far impostors in the gust bands, ?gustbands=1: the crowns keep their paint where a band passes; the ground
+      //  keeps its bands. Only asked from the air, where the impostors are the wood: flora.setImpGust)
+      // (crown mass, the look director's audit finding 1: the row asks the other way from how the run started)
+      crownMass: [cm0 ? 'far crowns stroke by stroke' : 'far crowns as masses', () => { const f = flora(); if (f && f.setCrownMass) f.setCrownMass(!cm0); }, () => { const f = flora(); if (f && f.setCrownMass) f.setCrownMass(cm0); }],
+      // (the far crowns' shadows on the ground from the air, ?farshadow=1: the shadow square grown to the impostors' reach and
+      //  every far impostor in view drawn into it; the row asks the other way from how the run started; flora.setFarShadow)
+      farShadow: [fsh0 ? 'far crowns: no shadows on the ground' : 'far crowns cast shadows on the ground', () => { const f = flora(); if (f && f.setFarShadow) f.setFarShadow(!fsh0); }, () => { const f = flora(); if (f && f.setFarShadow) f.setFarShadow(fsh0); }],
+      impGust: ['far crowns: no gust bands', () => { const f = flora(); if (f && f.setImpGust) f.setImpGust(false); }, () => { const f = flora(); if (f && f.setImpGust) f.setImpGust(true); }],
       shWhole: [shw0 ? 'split trees by part in shadow pass' : 'split trees whole in shadow pass',
         () => { const f = flora(); if (f && f.setShadowWhole) f.setShadowWhole(!shw0); }, () => { const f = flora(); if (f && f.setShadowWhole) f.setShadowWhole(shw0); }],
     };
@@ -423,10 +441,15 @@ export function attachBench(pc) {
       if (!S || !landing) return;
       if (!name) pin = landing;
       else {
-        const v = WV[name], R0 = 4000, l0 = Math.hypot(...v.dir), u = v.dir.map((a) => a / l0), F = frameAt(u);
+        const v = WV[name], R0 = 4000;
+        // (a view a water part places itself -- the falls: world/falls.js fallsView, in the sea before the widest fall --
+        //  from the world's surface as it is built: { dir, yaw (degrees), pitch (radians) })
+        const pl = v.place ? v.placed : null;
+        const vd = pl ? pl.dir : v.dir, l0 = Math.hypot(...vd), u = vd.map((a) => a / l0), F = frameAt(u);
         const sm = S.sampler(S.bodyId), at = (b, B, e, nn) => { const q = [0, 1, 2].map((i) => b[i] + (B.e[i] * e + B.n[i] * nn) / R0); const ql = Math.hypot(...q); return q.map((a) => a / ql); };
         const wetAt = (q) => { const s2 = sm({ x: q[0], y: q[1], z: q[2] }); return s2.liquidRadius > s2.radius; };
-        let d = at(u, F, v.e, v.n), yaw = v.yaw;
+        let d = pl ? u : at(u, F, v.e, v.n), yaw = pl ? pl.yaw : v.yaw;
+        const pitch = pl ? pl.pitch : v.pitch;
         // (the BANK is wherever the nearest water to that spot is: the rivers move with ?rivers=tree. Walk out from it to the
         //  nearest water, stand two metres back from its edge, and look the way the water runs longest, as the painter's
         //  gallery stands on a bank)
@@ -452,7 +475,7 @@ export function attachBench(pc) {
         const g = sm({ x: d[0], y: d[1], z: d[2] }), r = Math.max(g.radius, g.liquidRadius || 0);
         const G = frameAt(d), cy = Math.cos(yaw * Math.PI / 180), sy = Math.sin(yaw * Math.PI / 180);
         const f = { x: G.n[0] * cy + G.e[0] * sy, y: G.n[1] * cy + G.e[1] * sy, z: G.n[2] * cy + G.e[2] * sy };
-        pin = { t: landing.t, p: { x: d[0] * r, y: d[1] * r, z: d[2] * r }, v: { x: 0, y: 0, z: 0 }, fwd: { ...f }, view: { ...f }, pitch: v.pitch, boom: landing.boom, flying: false };
+        pin = { t: landing.t, p: { x: d[0] * r, y: d[1] * r, z: d[2] * r }, v: { x: 0, y: 0, z: 0 }, fwd: { ...f }, view: { ...f }, pitch, boom: landing.boom, flying: false };
       }
       putBack();
       await wait(600);
@@ -468,7 +491,17 @@ export function attachBench(pc) {
     if (pc.sim && pc.sim.bodyId === 'earth') {
       let extra = [];
       try { extra = (await import('../world/waterhooks.js')).WATER_BENCH || []; } catch { extra = []; }
-      for (const view of ['bank', 'shore']) {
+      // (a water part's own view, placed by the part: E-W2's falls view. Asked once here, of the world as it is built; a part
+      //  that is not loaded adds no row, and one that finds nothing to look at on this world (null) adds no view)
+      let surf = null;
+      try { surf = (await import('../world/surface.js')).getSurface('earth'); } catch { surf = null; }
+      for (const r of extra) {
+        if (!r || !r.place || WV[r.view]) continue;
+        let placed = null;
+        try { placed = surf ? r.place(surf) : null; } catch { placed = null; }
+        if (placed && placed.dir) WV[r.view] = { place: r.place, placed };
+      }
+      for (const view of ['bank', 'shore', ...Object.keys(WV).filter((k) => WV[k].place)]) {
         waterRows.push([AS + ', ' + view + ' view', () => goView(view), null, { alone: true }]);
         waterRows.push([view + ' view: no water drawn', () => show(/^pc-water/, false), () => show(/^pc-water/, true)]);
         for (const r of extra) if (r && r.view === view) waterRows.push([view + ' view: ' + r.name, r.on, r.off]);
@@ -511,6 +544,10 @@ export function attachBench(pc) {
       ['near grass one flat colour', () => B({ flat: 8 }), () => B({ flat: 0 })],
     ];
     const WX0 = { ...WX2 };      // (group D: its switches as the address set them, put back after each of its rows)
+    const WX_ALL = ['windmap', 'nearmap', 'farwind', 'cloudmap', 'stormland', 'rainlook', 'rainshaft', 'bolts', 'rainmap'];   // (group D, the flip: the new weather's switches, for the row 'the old weather')
+    // (lane W1 CLOUDS: whether the 3D clouds are on, and a switch that puts the sky's own flat cloud back in their place)
+    const CLOUDS3D = (() => { try { const a = new URLSearchParams(location.search); if (a.has('clouds3d')) return +a.get('clouds3d') > 0; return a.get('look') === 'oil' && a.get('weather') !== 'old'; } catch { return false; } })();
+    const clouds3d = (on) => { const c = pc.world && pc.world.clouds; if (c) c.enabled = on; };
     const holdStorm = (on) => { const P = pc.sim && pc.sim.physics; if (P && P.forceWeather) P.forceWeather(on ? { kind: 'storm' } : null); };
     const steps = [
       [AS, null, null],
@@ -605,11 +642,41 @@ export function attachBench(pc) {
       ...((WX2.rainshaft || WX2.bolts) ? [
         ['storm: no rain shafts or bolts', () => show(/^pc-storm-/, false), () => show(/^pc-storm-/, true)],
       ] : []),
+      // (group D, ?gustbands=1: the gust bands seen from the air. Off, the physics hands the shaders a zero strength and
+      //  pcGustBand returns before its noise read: the gap is its cost, one texture read a pixel of growth ground.)
+      ...(WX2.gustbands ? [
+        ['weather: no gust bands seen from the air', () => { WX2.gustbands = false; }, () => { WX2.gustbands = WX0.gustbands; }],
+      ] : []),
+      // (group D, the flip: THE NEW WEATHER AS A WHOLE against the old one (?weather=old), switched live -- the physics
+      //  reads its switches every frame; the 3D clouds go too, the sky taking its own flat cloud back (W1's switch). What
+      //  is fixed when the page is made stays: the rain streak's pale (kitmat.js) and the thunder's shape (audio.js),
+      //  neither of which costs anything measurable.)
+      ...(WX2.windmap ? [
+        ['weather: the old weather (?weather=old)', () => { for (const k of WX_ALL) WX2[k] = false; show(/^pc-storm-/, false); clouds3d(false); }, () => { for (const k of WX_ALL) WX2[k] = WX0[k]; show(/^pc-storm-/, true); clouds3d(CLOUDS3D); }],
+      ] : []),
       // (TENTH FORM) THE AIR: no row had ever timed it. The same spot, from 150 m and 400 m up.
       ...airAt(150, 30, [T0.noFar, T0.blob, T0.imp]),
       ...airAt(400, 45, [T0.noFar, T0.imp]),
       onFoot,
       // (the water's rows come LAST, after the final as-set row: see THE WATER'S ROWS LAST below)
+      // (GROUP D, LANE W1 CLOUDS: docs/lead/WEATHER-DESIGN.md 4.5 and 7. Asked only while the 3D clouds are on
+      //  (?clouds3d=1, world/clouds.js). "no clouds drawn" hides every cloud mesh (the lobes, the deck, the valley
+      //  cloud) in the weather of the moment; "clouds as before" puts back the sky's own flat cloud alone, so its gap to
+      //  the row before is what the 3D clouds cost against today's sky. The storm rows hold a storm overhead as the
+      //  weather group's row does, and take the clouds, then their shadows, out of it.)
+      ...(CLOUDS3D ? [
+        [AS, null, null],
+        ['weather: no clouds drawn (fair)', () => show(/^pc-cloud/, false), () => show(/^pc-cloud/, true)],
+        ['weather: clouds as before', () => clouds3d(false), () => clouds3d(true)],
+        // (the unseen 3D field laid into the cloud shadow map from the ground in the hybrid: its cost is this row's gap)
+        ['weather: no unseen cloud shadow field (fair)', () => { const c = pc.world && pc.world.clouds; if (c) c.shadowField = false; },
+          () => { const c = pc.world && pc.world.clouds; if (c) c.shadowField = true; }],
+        ...(WX2.cloudmap ? [
+          ['storm: no clouds drawn', () => { holdStorm(true); show(/^pc-cloud/, false); }, () => { show(/^pc-cloud/, true); holdStorm(false); }],
+          ['storm: no cloud shadows', () => { holdStorm(true); const c = pc.world && pc.world.clouds; if (c) c.shadowK = 0; },
+            () => { const c = pc.world && pc.world.clouds; if (c) c.shadowK = 1; holdStorm(false); }],
+        ] : []),
+      ] : []),
       // (back to the size the device really draws, so the four rows below are measured from IT and not from
       //  whatever sharper size the questions above had to be asked at: see MK at the top of this file)
       [AS, () => sharpen(1), null],
@@ -641,8 +708,8 @@ export function attachBench(pc) {
       T0.blob, T0.imp, T0.noFar, T0.farFlat, T0.farStill,
       [AS, null, null],
       T0.mid45, T0.hand, T0.pack,
-      ...airAt(150, 30, [T0.noFar, T0.blob, T0.imp, T0.farFlat, T0.a2c, T0.farStill]),
-      ...airAt(400, 45, [T0.noFar, T0.blob, T0.imp, T0.noSh]),
+      ...airAt(150, 30, [T0.noFar, T0.blob, T0.imp, T0.farFlat, T0.a2c, T0.farStill, T0.farShadow, ...(gust0 ? [T0.impGust] : [])]),
+      ...airAt(400, 45, [T0.noFar, T0.blob, T0.imp, T0.noSh, T0.crownMass, T0.farShadow]),
       onFoot,
       [AS + ', last', null, null],
     ];
@@ -660,6 +727,10 @@ export function attachBench(pc) {
         // (the far view's canopy painted into the ground, FV2: render/farground.js; the same picture as ?canopy=0)
         ['canopy painted off (FV2)', async () => { try { (await import('../render/farground.js')).CANOPY_BENCH.off = true; } catch { /* none */ } },
           async () => { try { (await import('../render/farground.js')).CANOPY_BENCH.off = false; } catch { /* none */ } }],
+        // (the ground's short uniform list, world/terrain.js UPLIST, the far-view lane: off = three re-sends the ground
+        //  material's whole uniform list every patch, as before 24 Nov; derived 1 to 2 ms of main-thread time on the phone)
+        ['ground uniforms re-sent whole every patch', async () => { try { (await import('../world/terrain.js')).UPLIST.on = false; } catch { /* none */ } },
+          async () => { try { (await import('../world/terrain.js')).UPLIST.on = true; } catch { /* none */ } }],
         T0.a2c,
         ['no shadows at all', () => B({ shadow: false }), () => B({ shadow: true })],
       ]),
@@ -690,6 +761,7 @@ export function attachBench(pc) {
       ...waterRows,
     ];
     if (MODE_B === 'trees') steps.splice(0, steps.length, ...treeSteps);
+    else if (MODE_B === 'water') steps.splice(0, steps.length, [AS, null, null], ...waterRows);      // (the water's views only)
     else if (MODE_B === 'foot') steps.splice(0, steps.length, ...footSteps);
     else if (MODE_B === 'air' || MODE_B.startsWith('air,')) steps.splice(0, steps.length, ...airSteps);
     const rows = [];

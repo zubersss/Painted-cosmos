@@ -98,7 +98,9 @@ export function createWorld(scene) {
   //  for, and the game without the switches loads nothing new. D's patch imported wx2.js at the top, which would have
   //  stopped the world loading wherever wx2.js is not yet merged: the look director's one change to it.)
   let storms = null;
-  if (LOOK.oil && typeof location !== 'undefined' && /[?&](wx2|rainshaft|bolts)=/.test(location.search || '')) {
+  // (the new weather is the default: fetched in the oil look unless the address says ?weather=old; physics/wx2.js says
+  //  whether the shafts and the bolts are on, and a program that does not compile switches itself off: wxguard.js)
+  if (LOOK.oil && typeof location !== 'undefined' && !/[?&]weather=old(&|$)/.test(location.search || '')) {
     import('../physics/wx2.js').then(({ WX2 }) => (WX2.rainshaft || WX2.bolts ? import('./storms.js').then((m) => {
       storms = m.makeStorms(null, { shafts: WX2.rainshaft, bolts: WX2.bolts }); scene.add(storms.shafts); scene.add(storms.bolts);
     }) : null)).catch((e) => console.warn('storms.js: ' + e.message));
@@ -315,7 +317,9 @@ export function createWorld(scene) {
   // (`src/world/wxfield.js`, update(fields)). Neither file exists yet: they are group D's (W1) to write. So both are
   // fetched on first use, and only where `?clouds3d=` asks (default 0 until W1's first commit flips the default below,
   // one line, with the look director's leave): a module that is not there is never asked for, so no request fails.
-  const CLOUDS3D = (() => { if (!LOOK.oil) return 0; try { const q = new URLSearchParams(location.search).get('clouds3d'); if (q != null && isFinite(+q)) return Math.max(0, +q); } catch { /* no address */ } return 0; })();
+  // (THE CLOUDS' FLIP, with the weather group's: the 3D clouds are the oil look's default; ?clouds3d=0 the opt-out, and
+  //  ?weather=old, the old weather, takes them out with the rest)
+  const CLOUDS3D = (() => { if (!LOOK.oil) return 0; try { const a = new URLSearchParams(location.search), q = a.get('clouds3d'); if (q != null && isFinite(+q)) return Math.max(0, +q); if (a.get('weather') === 'old') return 0; } catch { /* no address */ return 0; } return 1; })();
   const WXHOOK = { asked: false, clouds: null, wxfield: null };
   function askWeatherModules() {
     if (WXHOOK.asked || !CLOUDS3D) return; WXHOOK.asked = true;
@@ -734,6 +738,9 @@ export function createWorld(scene) {
         skyU.uSkyAir.value.z = AIRTOP ? -Math.sin(dip / DEG) * hk : 0;
         skyU.uSkyAir.value.w = LOOK.oil ? hk : 0;      // (the golden hour's painted rings come in with the same height: sky.js)
       }
+      // (high up a dark stroke takes less of the air, chunks.js pcAtmosV: from a dip of 27 to 35 degrees, Earth about 500 m
+      //  to 900 m, only where the air's top is on; ?airdark=0 off)
+      if (LOOK.oil) OIL.uLookG.value.w = AIRTOP && fv1 ? (LOOK.airDark || 0) * THREE.MathUtils.smoothstep(dip, 27, 35) : 0;
       const e = bu.uSunDirL.value.dot(_up);
       _east.crossVectors(Y, _up).normalize();
       const am = bu.uSunDirL.value.dot(_east) > 0;
@@ -780,6 +787,14 @@ export function createWorld(scene) {
       const sunless = Math.min(1, Math.max(oc, storm * 1.5));
       tmpKey.light.lerp(_pale.set(0.94, 0.955, 0.99), sunless * 0.85);
       bu.uStorm.value = Math.min(1, Math.max(storm * 1.3, (sk ? sk.snowfall * air : 0) * 0.8)) * 0.9 * dayness;      // (and a snowfield under falling snow is in shadow: blue-grey, the flakes white on it)
+      // (the oil look: a storm the 3D clouds hold over the eye counts as one, even where the physics key is lighter --
+      //  world.clouds.overhead01 x overheadStorm01, group D's read-only numbers, 0 with the deck off or failed; and
+      //  under a storm the land's light steps down, chunks.js pcLevel. ?stormsky=0 and ?stormlight=0 take them out.)
+      if (LOOK.oil) {
+        const wc = WXHOOK.clouds, ov = LOOK.stormSky && wc ? Math.min(1, (+wc.overhead01 || 0) * (+wc.overheadStorm01 || 0)) : 0;
+        if (ov > 0) bu.uStorm.value = Math.max(bu.uStorm.value, Math.min(1, ov * 1.3) * 0.9 * dayness);
+        OIL.uLookS.value.x = LOOK.stormLight || 0;
+      }
       tmpKey.glaze.multiply(_pale.set(1 - 0.10 * storm, 1 - 0.08 * storm, 1 - 0.02 * storm));
       // the far washes: lost into the pale band under the cloud, into grey water, into the ground's own dust
       tmpKey.zenith.lerp(_pale.copy(_storm).lerp(_white, 0.16), oc * 0.92);
@@ -971,6 +986,7 @@ export function createWorld(scene) {
       // deep space: no atmosphere anywhere
       skyU.uAtmo.value.set(1, 1, 0.03, 1);
       if (skyU.uSkyAir) { skyU.uSkyAir.value.z = 0; skyU.uSkyAir.value.w = 0; }      // (no world under the eye: no horizon to lay the bands from)
+      if (LOOK.oil) OIL.uLookG.value.w = 0;      // (and no dip: the air as it is)
       OIL.uLookN.value.w = 0;
       skyU.uCloud.value.y = 0; skyU.uWxSky.value.set(0, 0, 0, 0); WX.key = 0; WX.flash = 0;
       sun.getWorldPosition(_v2);

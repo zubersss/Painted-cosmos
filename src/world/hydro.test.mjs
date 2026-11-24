@@ -31,7 +31,9 @@ const unit = (v) => { const l = Math.hypot(v[0], v[1], v[2]); return [v[0] / l, 
 test('no switch, or no oil look: nothing is attached', () => {
   const W = MODE.water, keep = { ...W };
   try {
-    waterFromSearch('?look=oil&rivers=tree');
+    // (the oil look's parts are on by default since 24 Nov, the falls too: 'no part asked for' turns each one off -- E, at
+    //  the falls flip)
+    waterFromSearch('?look=oil&rivers=tree&lakes=0&ponds=0&puddles=0&fjord=0&falls=0');
     const S2 = { R: 4000, hydro: null, look: {}, biomes: [], lqGroup: [] };
     assert.equal(HY.attachHydro(S2, D, null), null, 'no part asked for');
     MODE.oil = false; waterFromSearch('?lakes=1');
@@ -56,13 +58,21 @@ test('the wood\'s hills asked straight of the noise are _forest\'s own (forestRe
   assert.ok(n > 100, 'the wood was asked'); assert.ok(worst < 1e-9, 'worst ' + worst);
 });
 
-test('lakes: the filled basins are open water, dead level, and the landing keeps its ground', () => {
+test('lakes: each basin drowns only its deepest core, at most lakeArea (about a kilometre across)', () => {
+  const maxA = HY.HYDRO_DEF.lakeArea * 1e6;
+  assert.ok(hy.lakeCores && hy.lakeCores.length >= 10, 'the basins measured');
+  for (const L of hy.lakeCores) assert.ok(L.core <= maxA + 120 * 120, 'a core of ' + (L.core / 1e6).toFixed(2) + ' km2');
+  assert.ok(hy.lakeCores.some((L) => L.area > 2 * maxA && L.f0 > D.lakeMin), 'a big basin keeps most of its wood');
+  assert.ok(hy.lakeCores.some((L) => L.area < maxA && L.f0 === D.lakeMin), 'a small basin drowns whole');
+});
+
+test('lakes: the cores are open water, dead level, and the landing keeps its ground', () => {
   const g = D.g, n = g.n, d3 = [0, 0, 0], bw = new Float32Array(S.nB);
   let tot = 0, wetA = 0, wetB = 0;
   const levels = new Map();
   for (let f = 0; f < 6; f++) for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
     const p = g.pid(f, i, j);
-    if (D.lvl[p] - D.ter[p] < 2.5 || D.lvl[p] > 40) continue;          // the deep part of the wood's basins ...
+    if (D.lvl[p] - D.ter[p] < hy.lakeF0[p] + 1.0 || D.lvl[p] > 40) continue;    // the deep part of each lake's core ...
     g.dirOf(f, i, j, d3);
     S.biomeWeights(d3[0], d3[1], d3[2], bw);                           // ... inside the wood (not on a seam with the coast)
     let wood = 0; for (let k = 0; k < S.nB; k++) if (S.biomes[k].terrain === 'forest') wood += bw[k];
@@ -71,7 +81,7 @@ test('lakes: the filled basins are open water, dead level, and the landing keeps
     tot++; if (a.lq > a.h + 0.05) wetA++; if (b.lq > b.h + 0.05) wetB++;
     if (b.lq > b.h + 0.05) { const k = Math.round(D.lvl[p] * 100); if (!levels.has(k)) levels.set(k, []); levels.get(k).push(b.lq); }
   }
-  assert.ok(tot > 200, 'basin points ' + tot);
+  assert.ok(tot > 60, 'core points ' + tot);
   assert.ok(wetB / tot > 0.7, 'open water: ' + (100 * wetB / tot).toFixed(0) + '% (was ' + (100 * wetA / tot).toFixed(0) + '%)');
   assert.ok(wetB > wetA * 1.5);
   for (const [kk, L] of levels) if (L.length > 3) assert.ok(Math.max(...L) - Math.min(...L) < 0.02, 'a lake is dead level: ' + kk + ' ' + Math.min(...L) + '..' + Math.max(...L) + ' n ' + L.length);
@@ -124,7 +134,8 @@ test('ponds: each is held in by its rim, level, small, and none near a landing',
     const mid = withH(c[0], c[1], c[2]);
     assert.ok(Math.abs(mid.lq - level) < 1e-6 && mid.lq > mid.h + 0.3, 'water in the middle at the pond\'s level');
     for (let r = 0; r < 16; r++) {
-      const ang = r / 16 * Math.PI * 2, u = 1.3 * a * Math.cos(ang), v = 1.3 * b * Math.sin(ang);
+      // (just outside the water, on the raised rim: 1.12 radii, which the outline's 13 % bend keeps inside 1.27)
+      const ang = r / 16 * Math.PI * 2, u = 1.12 * a * Math.cos(ang), v = 1.12 * b * Math.sin(ang);
       const q = unit([c[0] + (e1[0] * u + e2[0] * v) / R, c[1] + (e1[1] * u + e2[1] * v) / R, c[2] + (e1[2] * u + e2[2] * v) / R]);
       const s = withH(q[0], q[1], q[2]);
       assert.ok(s.h >= level - 1e-6, 'the rim holds the water in');
@@ -133,6 +144,27 @@ test('ponds: each is held in by its rim, level, small, and none near a landing',
     checked++;
   }
   assert.ok(checked > 5);
+});
+
+test('lakes: how wide each lake is, for the paint (the narrow axis of its core), read at load by a point', () => {
+  assert.ok(hy.lakeWidth && hy.lakeWidth.length === hy.lakeCores.length, 'a width for every lake');
+  const g = D.g, d = [0, 0, 0];
+  let checked = 0;
+  hy.lakeCores.forEach((L, id) => {
+    if (!(L.core > 0)) return;
+    const eq = 2 * Math.sqrt(L.core / Math.PI);
+    assert.ok(L.width > 0 && L.width <= eq + 1e-6, 'lake ' + id + ': width ' + L.width.toFixed(0) + ' m within its equivalent diameter ' + eq.toFixed(0));
+    // a node of this lake, asked by its place, answers this lake's width
+    for (let p = 0; p < hy.lakeComp.length; p++) {
+      if (hy.lakeComp[p] !== id) continue;
+      hy._pdir(p, d);
+      if (g.idOf(d[0], d[1], d[2]) !== p) continue;
+      assert.equal(hy.lakeWidthAt(d[0], d[1], d[2]), hy.lakeWidth[id]); checked++;
+      break;
+    }
+  });
+  assert.ok(checked > 0, 'lakes asked by a point: ' + checked);
+  assert.equal(hy.lakeWidthAt(spawn.x, spawn.y, spawn.z), 0, 'no lake at the landing');
 });
 
 test('puddles: shallow, few, only in hollows on near-level ground', () => {
@@ -150,6 +182,24 @@ test('puddles: shallow, few, only in hollows on near-level ground', () => {
     dry++; if (o.cap > 0) { cap++; assert.ok(o.cap <= k.capMax + 1e-9); }
   }
   assert.ok(cap > 0 && cap / dry < 0.04, 'puddles on ' + (100 * cap / dry).toFixed(2) + '% of the dry ground (at most 4 %)');
+  // a hollow on a river's flat floor must be deeper (puddleCap's `deep`) ...
+  assert.ok(HY.puddleCap(-0.4, 0, 0.005, k, 1, 0.12) < HY.puddleCap(-0.4, 0, 0.005, k, 1), 'shallower on a river floor');
+  assert.equal(HY.puddleCap(-0.2, 0, 0.005, k, 1, 0.12), 0, 'none in a shallow hollow on a river floor');
+  // ... so beside the widest rivers, whose floors are near level all the way across, they stay few too (measured 24 Nov:
+  // 5 to 9 % there before the floor rule)
+  let wide = -1, ww = 0;
+  for (let s = 0; s < net.nSeg; s++) { const w = Math.min(net.sW[2 * s], net.sW[2 * s + 1]); if (w > ww) { ww = w; wide = s; } }
+  assert.ok(wide >= 0 && ww >= 6, 'a wide river on Earth: half width ' + ww);
+  const a = wide * 3, m = unit([(net.sA[a] + net.sB[a]) / 2, (net.sA[a + 1] + net.sB[a + 1]) / 2, (net.sA[a + 2] + net.sB[a + 2]) / 2]);
+  dry = 0; cap = 0;
+  for (let j = 0; j < 120; j++) for (let i = 0; i < 120; i++) {
+    const p = unit([m[0] + (i - 60) * 0.0006, m[1] + (j - 60) * 0.0006, m[2]]);
+    S.sample(p[0], p[1], p[2], o, true);   // (full: o.s, the metres from the water's edge, is written only then)
+    if (o.lq > o.h - 0.3) continue;
+    dry++; if (o.cap > 0) cap++;
+    if (o.cap > 0 && o.s < k.capBank[0]) assert.fail('a puddle at the water\'s edge');
+  }
+  assert.ok(cap / dry < 0.04, 'beside the widest river puddles on ' + (100 * cap / dry).toFixed(2) + '% of the dry ground (at most 4 %)');
 });
 
 test('the cross sections are continuous where they meet the land', () => {
@@ -182,4 +232,13 @@ test('outside every lake, pond, puddle and cut the ground is exactly as it was',
   }
   assert.equal(other, 0, 'changed outside every part: ' + other + ' (same ' + same + ', inside ' + inside + ')');
   assert.ok(same > 4000);
+});
+
+test('only a world whose look asks for them gets them: with every switch on, Venus and Neptune are as they were', () => {
+  for (const id of ['venus', 'neptune']) {
+    const S2 = getSurface(id), D2 = ensureDrainage(id);
+    if (!D2) continue;
+    assert.equal(HY.attachHydro(S2, D2, S2.rivers), null, id + ' gets no water parts');
+    assert.equal(S2.hydro, null);
+  }
 });

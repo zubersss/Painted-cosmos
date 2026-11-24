@@ -38,6 +38,8 @@ A separate session builds W1 CLOUDS once the look director's sky ceiling (touch 
 | `?rainlook=1` | a downpour reads as one: more of the box's drops drawn, from nearer the eye, each a third longer |
 | `?rainshaft=1` | rain shafts under every raining storm 1 to 7 km off (`world/storms.js`; turns on `cloudmap`; oil look only) |
 | `?bolts=1` | lightning bolts, cloud to ground (`world/storms.js`; turns on `cloudmap`; oil look only) |
+| `?rainmap=1` | the rain box's drops placed by the rain map at its four corners (turns on `cloudmap`) |
+| `?gustbands=1` | the gust bands seen from the air (the physics side; a material shows them only with its `PC_GUST` hook and the `uPhysGust` binding) |
 | `?stormswing=0` | with `?stormland`: the land storms as W3.2 laid them (1 to 3 a day, the usual wind aloft); on by default |
 | `?clouds3d=1` | (the look director's switch for W1's clouds) also turns on `cloudmap` and `windmap` |
 
@@ -305,11 +307,391 @@ A separate session builds W1 CLOUDS once the look director's sky ceiling (touch 
   none over the wood without the swing). The sight distance is now 3.7 km in both.
 - **Suites:** physics 439, world and looks 73, unit 325, 0 failing.
 
+### W3.6: THE LOOK DIRECTOR'S REVIEW OF W3.3 / W3.4, ANSWERED (`world/storms.js`, `render/kitmat.js`)
+
+- **The review (24 Nov):** rainlook PASS (but streaks to the sky's pale value, V at most about 0.85). Bolts PASS (the
+  fault is the fair sky behind them, which is W1's). Shafts NOT YET: a comb of thin lines, and scratches over the slopes.
+  Use veils. Regions: shafts 7, bolts 8. The T2 hook is committed on look-director as 1de2bf6, with wx2.js and
+  storms.js both fetched lazily, only when the address names `?rainshaft=`, `?bolts=` or `?wx2=`. **Keep that
+  contract:** nothing shared may import `physics/wx2.js` at the top.
+- **The shafts are now veils**, per the review: two or three per storm (three from 12 mm/h), each at a place fixed in
+  the storm.
+  - Each veil is a flat sheet from the cloud's base to the ground, turned about the vertical to face the eye, its top
+    upwind by 10 to 25 degrees with the wind.
+  - Width 0.16 to 0.30 of the storm's core radius. The look director asked for 20 to 80 px at 1 km; this is about 40 to
+    80 px for an average storm, and narrower for lesser ones.
+  - Each is a VALUE STEP: a multiply of 0.06 to 0.10 (by the rain rate), half of it in the hue of the cool key
+    (`pcOilShadeC`).
+  - Strokes inside run along the slant, at the brush's width (4.6 px at 720 lines, never under 2 px), each within 0.03
+    of the step. Under three strokes wide the veil is one flat step.
+  - It thins in flat steps toward its sides (1, 2/3, 1/3, with edges that wander stroke by stroke), its top, and its
+    foot. The air in front takes back 60 % of its step at full fog.
+  - **Drawn in the scene pass, after everything solid, as a multiply** (CustomBlending: colour times the step, alpha
+    kept). The second target, region and depth (`pcAux`), is written as 1, times 1, so the land and sky under the veil
+    keep their own region and depth.
+  - So it writes NO region of its own. That is my answer to the region-7 ask: a glaze over the land, the land keeping
+    its region. Depth-tested, so the land in front cuts it.
+  - Why not the GLAZES path after the scene: it needs the full-screen copy into rtAbs that the plain frame skips (the
+    2026-11-18 note in post.js), which on a dry day with only distant storms would cost more than the veils.
+- **Bolts:** region 8.
+- **rainlook:** with the switch, the rain streak's pale is the sky's own (`uHaze`) capped at V 0.85, not near-white.
+  The switch is read from the address in kitmat.js, not imported (the contract above).
+  - MEASURED at the spawn's storm: the median streak V went from 0.72 to 0.67.
+  - The brightest 5 % of changed pixels stay at 0.90. Those may be leaves and flakes that also differ between frames;
+    the shader caps the pale itself.
+- **The flash's light, for the look director:** `storms.flash` (a THREE.Vector4).
+  - xyz: the direction from the eye to the brightest flash on now, in the body's axes, as `uSunDirL`.
+  - w: its strength 0..1 (its brightness, 1 within 500 m, a quarter at 2.5 km); 0 between flashes.
+  - Every flash counts, cloud to ground or in the cloud.
+- **Seen:**
+  - `W3.6_A_wood150_storm1700m_veils_off.jpg` and `W3.6_B_..._on.jpg`, plus a 3x crop: from 150 m over the wood,
+    facing a 14 mm/h storm 1.7 km off (t 25,520, re-anchored at 1999).
+    - B: four slanted veils of violet-grey glaze over the horizon, made of low-contrast strokes, with stepped sides and
+      ragged tops. Nothing else changes.
+    - **What is still wrong:** with no storm cloud drawn above them (W1), they hang from nothing. At this distance they
+      are tall and narrow, a little like towers. Their feet are under the curve of this small world past about 1 km.
+  - At the mountain station from 450 m (W3.4's view) the veils are behind the near ridge: 353 pixels change.
+  - `W3.6_B_rain_spawnstorm_rainlook_pale.jpg`: the downpour still reads as rain, the streaks greyer than in
+    `W3.3_B_...`.
+  - `W3.6_B_valley_bolt_region8.jpg`: the bolt is unchanged to the eye in region 8.
+- **Phone cost, derived:** the veils' shader is under a third of the ground's paint per pixel (about 8 ns).
+  - A storm 1.5 km off: about 2 % of the picture, about 0.05 ms.
+  - A storm at 1 km: about 0.1 ms.
+  - A few storms in view: about 0.2 ms.
+  - The speed-test row 'storm: no rain shafts or bolts' stands.
+- **Suites:** physics 439, world and looks 73, unit 325, 0 failing.
+
+### W3.7: THE RAIN BOX FOLLOWS THE MAP (W3.3's last part; `particles.js`, `index.js`; behind `?rainmap=1`)
+
+- **Built:** while it rains at the focus, `physics/index.js` reads `rainAt` at the rain box's four corners and its
+  middle (5 calls a frame).
+  - Each new drop is kept where it lands by the rate there (the bilinear of the corners) over the wettest corner's,
+    with up to 6 tries. The respawn path places a drop where it will be at mid-fall, so this is where it rains.
+  - The number of drops is scaled by the box's mean rate over its middle's, so the middle keeps its density.
+  - Off: `rainCorners` is null, one comparison, and no extra random draws, so the rain is what it was.
+- **MEASURED, and said plainly: the effect is very small.**
+  - The box is 48 m across, and a rain cell's edge softens over 250 to 450 m. So even at a storm's edge the corners
+    differ by up to about a quarter to a half. The edge found in the test had 3.1 against 1.7 mm/h.
+  - There the wind carries each drop across the box in the under 3 s it falls, which smears where it was placed. 53 %
+    of the drops lay on the wet half with the switch, against 52 % without.
+  - The placement rule itself is exact (tested: 62.5 % on the wet half for corners 3, 1, 3, 1). **No still**: the
+    difference cannot be seen in a picture.
+  - A sharp shower edge would need sharper cells. That is a choice for the weather's look, not this switch.
+- **Cost:** 5 x `rainAt` at 4 microseconds = 0.02 ms a frame here while it rains, about 0.06 ms on the phone with the
+  assumed x3. Script only; the GPU draws the same number of drops (within a few per cent).
+- **Tests:** one new in `cloudfield.test.mjs`: corners read, count kept within 8 %, and the placement law.
+- **Suites:** physics 440, world and looks 73, unit 325, 0 failing.
+
+### W3.8: THE LOOK DIRECTOR'S SECOND LOOK, AND THE MISSING BINDING (24 Nov)
+
+- **The coordinator found at the gate:** the plant shader's far-field sampler `uPhysFar` (096b6d0) was never bound
+  without the look director's binding in `render/shared.js` (ccf9609). It fell on texture unit 0, and the near trees,
+  grass and flowers VANISHED in the default view, with a WebGL warning and no console error.
+  - It is fixed on the live game (v38.3, main e005830). design-weather now has the binding: merge b44b05d of
+    look-proto 0d5533b.
+  - SEEN after the merge: the autumn wood from the stream, with no switches and with `?wx2=1`, both with the near
+    trees, grass and flowers.
+  - **My own miss:** the check still I took after the first merge (d4b166c, `?wx2=1`) already lacked the near trees on
+    the right, and I did not see it.
+  - **The rule from now on (the coordinator): never land a shader uniform without its binding in the same merge.**
+- **The look director's second look at the veils:** PASS as a step.
+  - The multiply glaze writing no region is the right call: keep it, and keep it out of GLAZES.
+  - Bolts region 8: confirmed. rainlook: pass.
+  - The look director will lay `storms.flash` in the shared light after tonight's release, as a cool white lift,
+    level-stepped, with no glow.
+  - Two notes, now done:
+    - TWO veils per storm, each 0.30 to 0.50 of the core radius: "two wide beat four thin".
+    - Until the clouds lane draws the cloud base, the top comes in by the same two flat steps as the sides, never a
+      ragged top in open air.
+- **Seen:** `W3.8_B_wood150_storm1700m_two_wide_veils.jpg`, plus a 3x crop, the same view as W3.6. Two wider slanted
+  veils whose tops come in by flat steps; they read less like towers than W3.6's four thin ones.
+- **Cost:** the same or less (two veils instead of up to three; wider, about the same area).
+
+### W3.9: A STORM PASSING OVER THE PLAYER, CHECKED IN THE GAME (the coordinator's ask, 24 Nov)
+
+- **How:** the real game (`index.html`, not the gallery): `?look=oil&card=0&audio=0&save=0&fresh=1&dynres=0&quality=1&stormland=1&nearmap=1&farwind=1&rainlook=1&rainshaft=1&bolts=1`,
+  with the look director's T2 hook applied locally (look-director 1de2bf6), loaded in the lab (3.5 minutes).
+  - A new game's land storm passes over the spawn at game time 3,750 s. It is the only one in 12 game days whose core
+    passes within half its radius, 192 m from the explorer, at 16 m/s.
+  - `__pc.hold()` and `__pc.step(1/15)` with the painter's render switched off step the game's own frame (sim, physics,
+    world) with no picture, about 30 frames in 0.1 s here. A log of every game second from 3,600 to 3,850 s is in
+    `docs/shots/physics/weather-build/W3.9_game_storm_pass_log.json`.
+  - Stills from the explorer's camera, aimed at the storm, at three moments.
+- **What comes together (MEASURED):**
+  - Overcast from 850 m out (3,698 s). The gust front at 620 m (3,713 s): wind from 1.3 to 3.8 m/s, gust index 0.97,
+    **5 s before the first drizzle**.
+  - Rain from 550 m out, a thunderstorm at 400 m, 13.7 mm/h at its peak (3,743 to 3,758 s), clear by 3,803 s: 70 s of
+    rain, about 105 s from overcast to clear.
+  - Wind 5 to 9 m/s through the storm.
+  - **The near plants answer:** grass 6 m off bends from 0.06 to 0.14 rad to about 1 rad, and trees from 0.03 to 0.33 to
+    0.39 rad. They are back by 3,803 s.
+  - The rain box goes 0 to 1,250 drops.
+  - The world's darkening: `uStorm` goes 0 to 0.81, the key light turns a pale grey, the glaze deepens, the haze
+    darkens.
+- **What was broken and is FIXED here (weather.js, behind the cloud map; switches off bit-identical, 162,000 numbers):**
+  the flash of light at the player and the bolts in the sky were TWO DIFFERENT SERIES.
+  - The player's lightning followed the cell that covered the place most, often a storm's wider cloud shield (another
+    cell), at the rate gathered there. The bolts follow each storm cell's own schedule at its full rate.
+  - In the game, before: flashes at 3,731, 3,736 and 3,773 s; bolts at 3,763, 3,778, 3,783 and 3,803 s; never together.
+  - Now the lightning at a place is that of the up to three storms that flash most there, each on its own schedule
+    (the brightest flash, the latest `last`, the soonest next).
+  - In the game, after: **18 frames with a bolt and its flash of light together**. 9 frames have a bolt and no light:
+    bolts of storms 0.9 to 1.3 km off, whose light is the look director's `storms.flash`, to come. 27 frames have light
+    and no bolt: in-cloud flashes, as they should.
+  - A test: under storms, every listed flash of a storm over the place lights it.
+- **Seen (game stills):**
+  - `W3.9_game_A_3690s_storm950m_approaching.jpg`: the storm 950 m off. **The sky is fair blue with small cumulus**;
+    only a faint veil shows behind the trees.
+  - `W3.9_game_B_3745s_storm_overhead.jpg`: a dark storm sky, slanting rain, a darker light, the explorer's hood up,
+    the grass blown, leaves flying. It reads as a thunderstorm overhead.
+  - `W3.9_game_C_3778s_storm_departing.jpg`: the departing storm, a grey sky with light in the air and blown leaves.
+    The bolt I stepped to had ended within the grab's first step (the lab's step moves the clock 0.25 s), so no bolt is
+    in it.
+- **What is still MISSING (the report to the coordinator):**
+  1. **The storm cannot be seen coming** (lane W1, the clouds). The sky draws only the weather at the eye, so a storm
+     950 m off leaves a fair blue sky, and then the whole sky turns to a storm deck in about 30 s as it arrives. From
+     W1 I need the land storms of `fields.cloud` drawn as clouds: towers from about 3.7 km out, a dark base at the
+     map's `base`, an anvil downwind, and the deck overhead being THAT cloud. My veils will then hang from that base.
+  2. **The gust front is weak** for a thunderstorm: at most 9 m/s here, against 15 to 25 m/s in a real one, though the
+     storm kind carries an outflow of 14. Mine (physics): a stronger outflow ahead of the core, behind a switch.
+  3. **The pace:** this storm drifts at 16 m/s (the day's swing at its fastest), so the whole event is about 105 s.
+     A cap near 10 m/s would make it about 170 s. Mine; the owner can judge.
+  4. **The flash's light on the land** for distant bolts: the look director's, from `storms.flash`, after tonight's
+     release.
+  5. **Thunder in the audio:** not checked (`audio=0` in a headless browser). The physics gives `thunderIn` and
+     `thunder01`; PILOT's audio would need to play them.
+- **Suites:** physics 441, world and looks 103, unit 325, 0 failing.
+
+### W3.10: THE GUST FRONT, THE PACE, AND THUNDER (the coordinator's rulings after W3.9; `weather.js`, `audio.js`)
+
+- **A correction of my own W3.9 report.** I wrote "the gust front is weak, 9 m/s at most". That was the wind at the
+  explorer's 2 m, not the standard 10 m.
+  - Measured properly, the 10 m wind (as the near grid composes it) under the OLD storms was already 8 to 25 m/s at
+    the leading edge.
+  - What was wrong was WHERE it blew: strongest inside the rain and on the REAR side (13 to 39 m/s behind), and only 1
+    to 4 m/s at 1.2 radii ahead.
+  - My first attempt (a stronger outflow) pushed the edge to 20 to 37 m/s and was too much. It was replaced before any
+    commit.
+- **The gust front at the leading edge** (`weather.js`, behind `?stormland`):
+  - A storm's outflow now peaks at its edge (0.95 to 1.1 radii), on the side it moves toward.
+  - It carries 0.8 of the storm's own speed there and 0.12 of its outflow behind, capped at 16.5 m/s (`STORMGUST`).
+  - MEASURED, six mature land storms, at 10 m:
+
+    | where | before | now |
+    | --- | --- | --- |
+    | 1.2 radii ahead | 1 to 4 m/s | 3 to 10 m/s |
+    | the leading edge (0.8 to 1 radius) | 8 to 25 m/s | 12 to 26 m/s |
+    | behind | 13 to 39 m/s | 12 to 22 m/s (the storm's own wind; its outflow there under a third of ahead's) |
+
+  - **In the game** (`W3.10_game_storm_pass_log.json`): the explorer's 2 m wind rises from 1.3 to 9 m/s about 18 s
+    BEFORE the first drizzle (5 s before), peaks at 11.5 m/s in the first heavy rain (about 15 to 16 m/s at 10 m over
+    open grass), and falls to 3 to 4 m/s behind.
+- **The pace:** no land storm drifts faster than 10 m/s times the dial (`STORMLAND.driftMax`).
+  - In the game the same storm now passes over the spawn in 157 s of cloud and 106 s of rain (was 105 and 70).
+  - The dial's table, measured again over 200 days, in `src/data/looks/earth.js`: dial 1 over the wood 22 % and in sight
+    62 %; 0.5 gives 11 / 42; 1.5 gives 27 / 68.
+  - `?stormswing=0` is still W3.2's exactly (hashed).
+- **Thunder** (`src/audio/audio.js`, PILOT's file, given to group D for this one piece; behind `?stormland` or `?wx2`,
+  read from the address; without them exactly as before):
+  - `thunderPlan(dist, cover, roof, seed)`: a near bolt (under 450 m) CRACKS, a rip of high noise then a slap, then the
+    boom and a roll. Up to 1.6 km it is a softened clap and rolls. Beyond, only two to four low rolls, slow to swell,
+    over up to about 10 s.
+  - Under leaves a quarter quieter; in the ship or under its hull no crack, muffled, and at most 0.55 of the loudness.
+  - The distance is read back from the loudness the thunder arrives with (`thunderDistance`), so `core/game.js` is
+    untouched.
+  - The bang plays when the count-down crosses zero, as before. With the switch, a crossing found more than 0.5 s late
+    is not played (`thunderDue(prev, now, 0.5)`).
+  - The physics now hands the count-down of the NEXT thunder among the storms here, so a switch between storms never
+    makes a late or double bang. In the first game run one late quiet roll had been read as 32 km off.
+  - **In the game:** 6 thunderclaps, each 0.9 to 1.8 s after its flash, within one frame of the distance over 340 m/s.
+    Near ones crack, ones 465 to 590 m off clap and roll.
+  - `tests/audiocheck.mjs`, which renders the graph in an OfflineAudioContext and fails on clipping, clicks or DC,
+    PASSES with and without the switch. Its click measure in the thunderstorm case goes from 1.2 to 2.3 with the
+    switch (the crack's 4 ms attack), within its limits.
+  - **Nobody has heard it**: there is no sound in a cloud session. The owner's ears decide.
+- **Tests:** `tests/thunder.test.mjs` (3: the bang due once at any frame rate and never late with the switch; the delay
+  as distance over the speed of sound with the distance read back; crack near, roll far, quieter under cover).
+  `stormland.test.mjs` gained the gust front and the drift cap.
+- **Suites:** physics 442, world and looks 103, unit 328, 0 failing. Switches off: bit-identical, 162,000 numbers.
+
+### W3.11: THE FLIP, READY BUT NOT APPLIED, AND THE GUARD (the coordinator, 24 Nov)
+
+- **The guard (committed, ade2f6f):** `src/world/wxguard.js`, `watchPrograms(mesh, name)`.
+  - On the frames after a mesh's first draw it looks once at the program three compiled for it. A failed one
+    (`diagnostics.runnable === false`) is hidden for good, with a console warning, and the game goes on without it.
+  - `world/storms.js` uses it for the veils and the bolts; the clouds lane may use it for its clouds.
+  - SEEN: a deliberately broken material was hidden and reported, a good one beside it untouched.
+- **THE FLIP, as one commit, NOT applied:** `docs/lead/WEATHER-FLIP.patch` (`git am docs/lead/WEATHER-FLIP.patch`).
+  It applies on top of the look director's storms hook (look-director 1de2bf6), which it changes; checked to apply
+  cleanly on design-weather plus that hook. What it does:
+  - `physics/wx2.js`: in a page every switch of the new weather is on unless the address turns it off. **?weather=old**
+    turns them all off (the weather of v37 to the last digit). `rainmap` stays off. In Node (no page) every switch stays
+    off, so no test changes meaning.
+  - `render/kitmat.js` and `audio/audio.js` read the same: on unless `?weather=old`.
+  - `world/index.js`: the hook fetches wx2.js and storms.js in the oil look unless `?weather=old`.
+  - `core/bench.js`: the row 'weather: the old weather (?weather=old)': the whole new weather against the old, live.
+  - CHECKED in the game: with no switches every switch is on but `rainmap`, the storms are loaded, the maps run, there
+    are no errors and the picture draws. With `?weather=old` every switch is off and storms.js is never fetched.
+  - NOT in it: the clouds lane's own switch (`?clouds3d`, the look director's and W1's) flips with their review.
+
+### W3.12: THE WIND SEEN FROM THE AIR (the coordinator, 24 Nov; `flora.js`, `flora.glsl.js`, `wx2.js`, `core/bench.js`)
+
+- **What the far land already took from the wind** (`?farwind`):
+  - The far trees' painted stand-ins (A1, trees-far `render/impostor.js`) lean at their foot with the far field
+    (pcPhysBendLite). From 150 m to 1 km a lean moves a crown's top about a pixel: no gusts can be seen in it.
+  - The ground reads only the push field (the trodden track, within 70 m). The near grass strokes read only its
+    flattening.
+  - The near plants carry travelling gust waves (`uPhysWave`), but these are 11 to 19 m long and their phases are kept
+    modulo one wave, so they cannot drive bands seen from far off.
+- **What a gust looks like from above:** not a bend but a SHEEN. Where it lays the grass and turns the leaves, their
+  paler side shows, and the pale patch runs downwind.
+- **Built (physics side, committed):** behind `?gustbands=1` (`WX2.gustbands`).
+  - `flora.js` hands the shaders `uPhysGust`: xyz the bands' direction (the near waves' own slowly turning direction,
+    in body axes) times their strength, which is 0 in a calm and full in a fresh breeze (`GUSTBAND.windLo` 0.4 and
+    `windHi` 2.2 m/s at the blades). w is how far they have run (1.5 times the blade wind), wrapped at the noise's
+    period so that they never jump.
+  - `flora.glsl.js pcGustBand(p)`: 0..1 at a body-local point (a stroke's centre). It is one read of the shared 3D noise,
+    stretched to bands about 40 m along the wind and 120 m across, lying on the world (no jump when the frame
+    re-anchors), with more and bolder bands the stronger the wind.
+  - **Compiled only where a material defines `PC_GUST`**, and that material must bind `uPhysGust` (the coordinator's
+    rule: no unbound uniform anywhere).
+  - Test: `gustband.test.mjs` (off by default; on in a breeze along the ground, running, wrapped, never jumping; the
+    function behind its define).
+- **The hooks, as patches for their owners (applied locally for the stills only, NOT committed):**
+  - `docs/shots/physics/weather-build/T_gust_render_shared_js.patch.txt`, for the look director: `uPhysGust` in
+    shared.js `PHYS`, one line. syncPhysFlora's loop then copies it.
+  - `docs/shots/physics/weather-build/T_gust_ground_materials_js.patch.txt`, for C, the far ground: in
+    `makeTerrainMaterial` `PC_GUST` with `?gustbands=1` in the oil look (its own switch only: W3.12b). In `pcGroundPaint` a growth stroke
+    (green to lemon and straw: `k.g - k.b`; not rock, not snow) under a band is laid a pale, cooler step, by whole
+    strokes.
+  - For A1, the far crowns: the same, one `pcGustBand(tree foot)` a tree in the impostor's fragment stage, a pale
+    lift of the crown's leaves (they turn their paler side); `PC_GUST` and the same binding.
+- **Seen** (`W3.12_*`): the green wood from 150 m in a 5 m/s breeze, A off, B on at t and one second later, a 3x crop
+  stack and a x12 difference.
+  - B has patches of paler, cooler ground strokes between the trees, and one second later they have moved downwind.
+    2.3 % of the pixels differ from A; 1.3 % differ between B's two frames.
+  - **Said plainly: it is subtle over a wood.** The crowns cover most of the ground from the air, so over woods the
+    visible answer needs the crowns too (A1's impostors, and the middle trees). Over open grass it reads more.
+  - In a calm, which this game's near winds mostly are (0.3 to 2.5 m/s at 2 m), it is off.
+- **Phone cost, first estimate (superseded below):** one read per ground stroke layer, put at 0.3 to 0.5 ms from the
+  air over grass. That estimate was too low. It took a tenth of the ground row's 4.8 ms, but that row is the spawn's
+  view, where the ground is under half the picture; from the air it is nearly all of it.
+- **Suites:** physics 443, world and looks 103, unit 328.
+- **Agreed after (24 Nov, messages):**
+  - **A1 (far crowns):** one `pcGustBand(foot)` per tree in the impostor's vertex stage, flat over the crown; each
+    tree turns at its own threshold (`step(0.15 + 0.7 * seed, band)`), its cap light one level up with a slightly
+    silvery hue, the same target as the ground. Under `PC_GUST` A1 declares `uniform sampler3D uNoise3D;` above
+    FLORA_GLSL in that vertex shader (the noise is declared in the fragment stage only), takes PHYS when gusts are on,
+    and follows my switch.
+  - **C (far ground):** sent the ground patch. It takes no ground-sample slot and no attribute (a fragment-stage read
+    at the stroke's centre). Asked C whether C's far ground past the mesh needs the same step.
+  - Both land with or after F's `uPhysGust` binding, never before.
+  - **W1 asked:** the 16 m/s anvil in its game test was the drift before the cap (881c97d came after the c359e12 it
+    merged); for a land cell the anvil is the capped drift.
+
+#### W3.12b: the open grass, the cheap read, and out of the flip (the coordinator, 24 Nov)
+
+- **Out of the flip's defaults:** `?gustbands=1` is now the ONLY way to turn the bands on (`wx2.js`, and the material
+  patches read the same). `?wx2=1` and the flip leave them off until the look director passes them over grass and
+  woods.
+- **The cheap read from the start:** the ground patch now reads the band ONCE A PIXEL, at the centre of the first
+  growth stroke the pixel lays (its top stroke; where the flowing strokes lay the coarse layer first, the coarse one),
+  and the strokes under it take the same number.
+  - A stroke still changes colour as a whole: in the crops no stroke is split.
+  - A band is 40 m by 120 m; a stroke is a metre or two from the air. So a stroke laid under another one hardly ever
+    straddles a band's edge.
+- **Seen, the open grass** (the alpine meadow, `wtime=5300`, a fresh breeze: the bands' strength 1; the camera looking
+  down 35 degrees from 150 m and 30 from 400 m; `W3.12_meadow*`: off, on, on one second later, 2x crops, x12
+  difference):
+  - 150 m: 14.9 % of the picture changes, and 5.0 % between the two frames a second apart.
+  - 400 m: 9.6 %, and 3.1 % a second apart.
+  - What it looks like: patches of the green strokes turn paler and silvery (sage), and a second later other strokes
+    have turned while the first have gone back. The difference picture shows the patches lying across the slope in
+    long swaths.
+  - Said plainly: on this meadow's mixed paint (violet rock, brown earth, grey-green turf) it is a moderate silvering
+    of patches. It is clear set side by side; one still on its own would not tell you it was the wind. It should read
+    best in motion, which only the owner's device can judge. On a greener meadow it would read more.
+  - Over the wood (above) it stays subtle: 2.3 %.
+- **Cost, MEASURED here (relative):** the same frame drawn with the bands working and with them idle (the uniform at 0,
+  the same compiled program), eight rounds interleaved, timed to the last pixel. This software renderer took about 3.8
+  to 4.1 s a frame, the ground about 3.0 to 3.3 s of it.
+  - 400 m: on 3,782 ms, idle 3,833 ms (means).
+  - 150 m: on 4,007 ms, idle 4,093 ms.
+  - So no cost shows above the noise, which bounds it at about 2 to 3.5 % of the ground's own cost (two standard
+    errors).
+- **Phone cost, derived from that:** the phone's ground from the air is about 8 to 11 ms (the v37 row's 4.8 ms for
+  40 to 50 % of the picture, scaled to 85 to 95 %).
+  - So the bands cost under about 0.2 to 0.4 ms. The count of work (one cached read against the ground's twenty-odd)
+    puts the true number under that bound.
+  - Unsettled: a software renderer weighs a read differently from the phone's chip. The phone's speed test, with the
+    row 'weather: no gust bands seen from the air', settles it.
+  - Reading the band per vertex would barely save anything: the far ground's mesh has about 216,000 vertices in this
+    view against 518,000 pixels.
+
+- **W3.12c, the look director's review (ACCEPTED with one change, made):**
+  - The sheen is a GREYING AND COOLING, not a lightening. Half the saturation, a touch toward the sky's blue-grey, and a
+    lift of at most 0.06 that never reaches a stroke already over V 0.80. On the lemon floor the first step had pushed
+    light strokes past white (cream fog).
+  - The patch is re-based on v39.2's materials.js (aa699c1). Rendered on the release with the hooks applied locally: it
+    compiles, with no errors. Alpine meadow from 150 m (`W3.12c_*`):
+    - 9.0 % of the picture changes;
+    - on the changed pixels, V 0.421 to 0.425, S 0.306 to 0.193, V over 0.90 from 0.4 % to 0.1 %;
+    - the green strokes go sage-grey in patches.
+  - Crowns: one band value per WHOLE tree (A1's impostors and C's canopy), never per dab. Not for the near and middle
+    trees, whose leaves already move.
+
+### W3.13: THE WEATHER RELEASE FOR v39.3 (the coordinator, 24 Nov; built on design-weather, aa699c1)
+
+- **Why on design-weather:** the coordinator asked for a branch named weather-release. This session's brief allows
+  pushing only design-weather, so the release is design-weather at aa699c1. The coordinator gates and merges that commit.
+- **What it is:**
+  - look-proto c7d8d9e (v39.2), merged clean.
+  - weather-clouds 1aad10e: the clouds lane, with the guard on every cloud program. Only the notes file clashed; both
+    lanes' hand-overs are kept.
+  - The look director's storms hook (1de2bf6), already in v39.2.
+  - **91cf7a8 THE FLIP** and **ed198bd THE CLOUDS' FLIP** (W1's two lines, with the look director's leave).
+  - weather-clouds c4b612e (the anvil wedge and the mountain cloud, accepted by the look director) is for v39.4.
+- **The flip is the OIL LOOK's default only.** As first written it switched the new weather on in every page, which
+  would have changed the watercolour game. Now wx2.js, kitmat.js and audio.js all read `?look=oil` exactly as shared.js
+  LOOK.oil does. The storm hook and the 3D clouds were oil-only already.
+  - In the oil look: `?weather=old` turns all of the new weather off; `?clouds3d=0` turns off only the 3D clouds.
+  - Rainmap and gustbands stay off.
+  - The bench row 'weather: the old weather (?weather=old)' turns the 3D clouds off and back on with the rest.
+- **Suites:** physics 443 (one run of three had one failure: powers.test.mjs 'the cost', a timing budget; alternating
+  with a v39.2 copy it failed 1 time in 6 on the release and 6 in 6 on v39.2: it flakes on this machine, not caused by
+  the release); world and looks 129 (183 with the plant kits); unit 328.
+- **Proofs (gallery, temperate wood streamside, noon, t=30, `?impfail=bake` on both sides):**
+  - With physics off: **watercolour identical to v39.2 (0 pixels)**. **Oil with `?weather=old&clouds3d=0`: 828 pixels
+    differ, by at most 2 levels**, against 823 between two loads of the release itself, so that is the method's own
+    floor (`release/v39.3_gallery_*_A_B_diff.jpg`).
+  - With physics on, the plants and the water move with the real time between frames, so no two loads match. I opened
+    the differences: they are in the grass, the falling leaves and the ripples only.
+  - Why `?impfail=bake`: in v39.2's gallery the far trees' stand-ins never finish baking in this software browser
+    (`world.busy` stays 1 for thousands of frames), so the page never says ready.
+  - The coordinator's own t=0 gate found 63,300 pixels; the cause was on their side (`?leafshade=0` also turns off v39's
+    leaf-shade quieting). Before their note came, I had read through all 22 source files the release changes and found
+    nothing that reaches the near plants under `?weather=old&clouds3d=0`.
+- **Seen, the default in the game** (`release/v39.3_game_default_*.jpg`, `index.html?look=oil...&time=12`, no weather
+  switch):
+  - Read in the loaded game: every new-weather switch on but rainmap and gustbands; the clouds and storms modules
+    loaded; no errors. A game day is 1,692 s.
+  - Noon draws correctly. Golden hour (18:00) is an orange evening with long shadows and a peach-lit cloud mass.
+  - A land storm passes 70 m from the landing at game time 3,653 s:
+    - at 990 m, a slate-violet ceiling with lighter seams comes over the wood;
+    - overhead, a thunderstorm of 10.8 mm/h: slanting rain, a darker sky, the explorer's hood up, leaves blowing.
+  - The look director's pair, noon at the landing, `?clouds3d=0` over the default
+    (`release/v39.3_game_noon_pair_*.jpg`):
+    - Nearly the same picture: the canopy hides most of the sky. With `?clouds3d=0` the sky is the old painted flat
+      cloud and the clouds module is never loaded.
+    - The default shows a patch of blue at the top right between its clouds.
+    - A game load is not repeatable to the pixel, so this pair is for the eye. The pixel proof is the gallery's.
+
 ## NEXT
 
-1. **The look director's review** of the W3.3 and W3.4 stills, and their decision on the T2 hook (6 lines in
-   `world/index.js`). Change the shafts as they say.
-2. **W3.3's remainder**, if wanted: the box's rain from the map's four corners.
+1. **The look director's second review** of the veils (W3.6), and their decision on region (a glaze keeping the region
+   under it, or region 7).
+2. (W3.3's remainder, the rain box from the map's corners: built as W3.7, with a very small effect.)
 3. **Then the water group's turn on `physics/index.js`** (touch T6): the rain field is in place for them
    (`fields.rain`: `cells`, `cellsX`, `now`, `GLSL`, `rainAt`, `rainBetween`, `throughfall`).
-4. W1 CLOUDS is another session's; the storm cannot be seen as a cloud until it lands.
+4. W1 CLOUDS is another session's; the storm cannot be seen as a cloud until it lands, and the veils hang from nothing
+   until then.

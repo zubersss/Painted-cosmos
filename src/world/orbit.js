@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import { G, ensureGlobals } from '../render/shared.js';
 import { VERT_PARS, VERT_END, FRAG_PARS } from '../render/chunks.js';
+import { WX as WXF, WXFIELD_GLSL } from './wxfield.js';
 
 const RING_VERT = /* glsl */`
 ${VERT_PARS}
@@ -97,6 +98,10 @@ uniform vec3 uBandB;
 uniform vec4 uSpot;      // a great storm: unit direction, and its angular radius (0 = none)
 uniform vec3 uSpotCol;
 uniform float uLimbCos;   // the cosine, on the shell, at which the line of sight just clears the world's own limb
+#ifdef PC_OIL
+${WXFIELD_GLSL}
+uniform vec4 uWx3D;       // (world/clouds.js) x 1 with the 3D clouds on, y how far they have handed over to this shell (0..1)
+#endif
 varying vec3 vPos;
 varying vec3 vNV;
 varying vec3 vView;
@@ -127,6 +132,15 @@ void main() {
     storm = (1.0 - smoothstep(0.72, 1.0, r + (c2 - 0.5) * 0.22)) * step(0.0, dot(nrm, sd));
   }
   float th = 1.0 - uCloud.x;
+  #ifdef PC_OIL
+  // (WEATHER-DESIGN A8: with the 3D clouds on, the deck seen from outside is the cloud map's own -- the storms seen from
+  // orbit are the storms on the ground -- and it comes in only as the 3D clouds go, from 2.8 km over the land)
+  if (uWx3D.x > 0.5) {
+    float lowM = pcWxField(nrm).r * uWxOn.x;
+    th = 1.0 - mix(uCloud.x, clamp(0.55 * uCloud.x + 0.85 * lowM, 0.0, 1.0), uWxOn.x);
+    th = mix(1.2, th, uWx3D.y);
+  }
+  #endif
   vec3 nV = normalize(vNV);
   // scattered cloud thins away toward the limb and is not drawn beyond the world's own edge: the globe keeps
   // one soft outline (cloud standing out past the limb was a ragged hard fringe against space)
@@ -165,6 +179,10 @@ export function makeCloudShell(bodyU, radius, look, stormDir) {
       uBandA: { value: new THREE.Vector3().fromArray(D.a || sky.horizon) }, uBandB: { value: new THREE.Vector3().fromArray(D.b || sky.cloudShade) },
       uSpot: { value: stormDir ? new THREE.Vector4(stormDir.x, stormDir.y, stormDir.z, D.storm ? D.storm.size : 0.22) : new THREE.Vector4(0, 1, 0, 0) },
       uSpotCol: { value: new THREE.Vector3().fromArray((D.storm && D.storm.color) || [0.80, 0.36, 0.30]) },
+      // (A8, the oil look with the 3D clouds: world/clouds.js sets uWx3D; the field's textures for the map's cover)
+      uWx3D: { value: new THREE.Vector4(0, 1, 0, 0) },
+      uWxField: WXF.uWxField, uWxField2: WXF.uWxField2, uWxN: WXF.uWxN, uWxOn: WXF.uWxOn,
+      uCloudShadow: WXF.uCloudShadow, uCloudShadowM: WXF.uCloudShadowM, uCloudShadowK: WXF.uCloudShadowK,
     }, bodyU),
     vertexShader: CLOUD_VERT, fragmentShader: CLOUD_FRAG,
   });

@@ -24,6 +24,7 @@
 import { smoothstep, clamp } from './noise.js';
 import { NOLQ } from './surface.js';
 import { MODE } from '../data/mode.js';
+import * as BL from './bloom.js';
 
 // ?canopy=0 takes the painted canopy out (patchgen packs nothing new, the ground's program is compiled without it).
 // ?canopy=1, the default, lays it. Read once.
@@ -36,9 +37,25 @@ export const GROUND_SEASON = (() => { const v = _q && _q.has('groundseason') ? +
 export function groundSeasonOn(bodyId) { return !!(MODE.oil && GROUND_SEASON && CANOPY_WORLDS[bodyId]); }
 
 // ?rockfield=0|1: ROCK FACES, STRATA AND SNOW THAT READ FROM AFAR (the far view's FV4: render/farground.js ROCK_FRAG, and
-// the snow shed off steep faces by patchgen.js). Read once.
-export const ROCKFIELD = (() => { const v = _q && _q.has('rockfield') ? +_q.get('rockfield') : 0; return isFinite(v) && v > 0; })();
+// the snow shed off the sheerest faces by patchgen.js). ON BY DEFAULT since v39.4 (the look director passed the coast cliff
+// and the mountains, 24 Nov); ?rockfield=0 is the picture before it. The oil look on Earth only: the watercolour game is
+// untouched (MODE.oil, LOOK.oil). Read once.
+export const ROCKFIELD = (() => { const v = _q && _q.has('rockfield') ? +_q.get('rockfield') : 1; return isFinite(v) && v > 0; })();
 export function rockfieldOn(bodyId) { return !!(MODE.oil && ROCKFIELD && CANOPY_WORLDS[bodyId]); }
+
+// ?bloomfar=1: THE FLOWER DRIFTS FROM THE AIR (FV6(b), with flora B: world/bloom.js writes each full sample's drift
+// cover o.fd and its colour as an index into the world's 16-colour palette o.fi; the mesher packs them, the ground lays
+// that share of its dabs in the flower's own colour, whole). The same switch as bloom.js's own (bloomSwitches().far),
+// read here too because the ground's program is compiled before any world. Read once; off by default.
+export const BLOOM_FAR = (() => { try { return new URLSearchParams(location.search).get('bloomfar') === '1'; } catch (e) { return false; } })();
+// on for a world whose flowers bloom.js can hand over: the oil look, the switch, a palette with colours in it. (The
+// namespace import: on a branch whose bloom.js has no palette yet this is simply off.)
+export function bloomFarOn(S) {
+  if (!MODE.oil || !BLOOM_FAR || typeof BL.bloomPalette !== 'function') return false;
+  const p = BL.bloomPalette(S);
+  return !!(p && p.count > 0);
+}
+export function bloomPaletteOf(S) { return typeof BL.bloomPalette === 'function' ? BL.bloomPalette(S) : null; }
 
 // The worlds whose woods are roofs of round crowns seen from above. Earth only: the other worlds' tall things are
 // crystals, spires, kelp, fungus and snow firs, which from the air are not crowns, and each would want its own look.

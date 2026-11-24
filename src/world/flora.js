@@ -22,7 +22,7 @@ import { makePropMaterial, TREE_DEPTH, TREE_GUARD } from '../render/materials.js
 import { ImpostorAtlas, makeImpostorMaterial, impostorQuadGeometry, IMP, IMP_SHADOW, makeImpostorShadowMaterial, bakeTick } from '../render/impostor.js';
 import { treeCell, underCell, hasCell, TREE_LEVEL, UNDER_LEVEL } from './obstacles.js';
 import { QUALITY, G, LOOK, SCREEN, SHADOW, SHADOW_CROWD } from '../render/shared.js';
-import { SHADOW_LAYER, SHADOW_TIERS, SHADOW_WHOLE, SHADOW_OPTS } from '../render/shadow.js';
+import { SHADOW_LAYER, SHADOW_TIERS, SHADOW_WHOLE, SHADOW_OPTS, FAR_SHADOW } from '../render/shadow.js';
 import { FELLED, FELL, felledAt, fallingOn, felledOn, fallTurn } from '../data/felled.js';
 
 // tier ranges in metres at quality 2; scaled by RANGE_SCALE at lower tiers
@@ -76,6 +76,31 @@ const TREES2 = (() => {
 // physics/flora.glsl.js pcPhysCrown). With the two short programs only; the speed test prices it (setTreeSway). How it
 // looks IN MOTION is not known here: only the owner's phone can show that.
 const TREESWAY = typeof location !== 'undefined' && /[?&]treesway=whole\b/.test(location.search || '');
+// ?pines=1 (24 Nov, the coordinator: the tall pines 20 to 60 m off read as bare poles): the kinds whose foliage is thin
+// needles -- the tall pine and the spruce, needles 7.5 to 8 cm across -- keep each needle at least NEEDLE_PX pixels
+// across on the screen (materials.js PROP_VERT, uNeedle), so a pine at range is a dark needle mass on its bare lower
+// stem and not specks round a pole. THE DEFAULT since the look director passed it (24 Nov, 'pines2', for v39.3);
+// ?pines=0 is the old way, exactly as before. The speed test swaps it (setNeedles).
+const PINES = !(typeof location !== 'undefined' && /[?&]pines=0\b/.test(location.search || ''));
+const NEEDLE_KITS = new Set(['tallpine', 'spruce']), NEEDLE_PX = 3.0;
+// ?nearleaf=1 (24 Nov, the look director's audit 2: near leaves read as big flat shards): a tree's leaves within 5 m of
+// the eye shrink about their centres, to 0.55 at 1.0 m on a smoothstep from 5 m (materials.js PROP_VERT, uNearLeaf);
+// from 5 m out nothing changes. In motion a leaf shrinks as the eye comes near: the thing to watch on the device.
+// OFF until the look director passes it and the owner has seen it.
+const NEARLEAF = typeof location !== 'undefined' && /[?&]nearleaf=1\b/.test(location.search || '');
+// ?leafgrow=1 (24 Nov, AN OPTION FOR THE OWNER, the look director's (C)): a thinned broadleaf's kept leaf grows at most
+// 1.15 times within 15 m of the eye (today up to 1.65 at 15 m on the phone's picture), back to today's by 25 m
+// (materials.js PROP_VERT, uLeafGrow); ?leafgrow=<1 to 2.4> another most. The same leaves, smaller, with the sky between
+// them; the needle kinds untouched. It changes the near trees the owner approved: OFF, never default without the owner.
+// THE CROWNS UNDER A STORM (24 Nov, the coordinator after the look director's storm light; THE DEFAULT in the oil look
+// from v39.5, the owner's ruling that passed work ships as the default with one opt-out): under a storm a tree's crown
+// is painted as the land is, the land's own glaze and deep wash in place of the fair-weather foliage shade (materials.js
+// PROP_VERT, uStormLeaf), HALF of it at a full storm, as the look director passed it (half keeps the reds and the rust
+// and amber told apart; all of it made every crown one plum-maroon). It follows the look director's one storm-light
+// switch: ?stormlight=0 turns it off with the land's (uLookS.x), and ?stormleaf=0 turns off the crowns' part alone;
+// ?stormleaf=<0.3 to 1> another share. With no storm nothing changes (uStorm 0), and the watercolour game never draws it.
+const STORMLEAF = (() => { try { const v = new URLSearchParams(location.search).get('stormleaf'); if (v == null) return 0.5; const n = +v; return n === 1 ? 0.5 : n >= 0.3 && n < 1 ? n : 0; } catch { return 0.5; } })();
+const LEAFGROW = (() => { try { const v = new URLSearchParams(location.search).get('leafgrow'); if (v == null) return 0; const n = +v; return n === 1 ? 1.15 : n > 1 && n <= 2.4 ? n : 0; } catch { return 0; } })();
 // (only a kind whose crown is leaves one by one, and nothing else, can be split: parts 0 bark, 5 leaf, 6 snow on a
 //  bough. A kind with crowns of washes (part 1: the green wood's conifer) keeps the one program.)
 function splittable(geos) {
@@ -116,6 +141,23 @@ const PHONE_TS = 0.30;
 // on foot. From the air every kind is an impostor.
 const IMP_FOOT = (() => { try { const v = new URLSearchParams(location.search).get('impfoot'); return v === 'all' || v === 'none' ? v : 'conifers'; } catch { return 'conifers'; } })();
 const IMP_AIR = 40;
+// THE FAR SPRUCE (the look director's order 3 after crown mass, 24 Nov; A2's ?pines). 'near' IS THE DEFAULT: the look
+// director chose it from the sheets A1_farspruce_*_ABCD (24 Nov: "D keeps A's clean dense cones and lifts them from
+// near-black to deep green ... B is shards, C loses the darks"). Both ways act only where the spruce's spec carries
+// needleTop (?pines, kits/spruce.js), so ?pines=0 is the old far spruce whatever is asked here; ?farspruce=0 the old
+// far spruce with ?pines.
+//   near (default)    the atlas bakes the spruce from its near tree, as today, and its crown is never painted under
+//                     V 0.24, as the middle spruce's needles are from 20 m out (materials.js PROP_VERT): today's dense
+//                     cone in the references' deep green, not near-black. (SEEN, 24 Nov: the clean dense cones kept.)
+//   ?farspruce=bough  its two layers are baked from its BY-BOUGH MIDDLE tree (seeds 13 and 12 at lod 1, 650 triangles),
+//                     with the same floor, and its needles drawn FAR_SPRUCE_K times larger about their centres as the
+//                     middle spruce's are from 30 m out (NEEDLE_FILL), not by the atlas's density rule. (SEEN, 24 Nov:
+//                     at 2.2 a pole with green sprays that all but vanishes from the air; at 4, ?farsprucek=4, the
+//                     density rule's growth, its fewer larger needle cards are big flat green shards.)
+// (From the air only: on foot the spruce keeps today's far spike.)
+const FAR_SPRUCE = (() => { try { const v = new URLSearchParams(location.search).get('farspruce'); return v === '0' || v === 'off' ? '' : v === 'bough' ? 'bough' : 'near'; } catch { return 'near'; } })();
+const FAR_SPRUCE_V = 0.24;
+const FAR_SPRUCE_K = (() => { try { const v = +new URLSearchParams(location.search).get('farsprucek'); return v > 0 ? Math.min(4, v) : 2.2; } catch { return 2.2; } })();
 const HAND = (() => {
   try {
     const q = new URLSearchParams(location.search), num = (k) => { const v = q.get(k); const n = v == null ? NaN : +v; return isFinite(n) && n > 1 && n < 400 ? n : null; };
@@ -268,10 +310,10 @@ export class Flora {
     //  for. The broadleaf and the conifer are the live game's own trees, so anything their shape gains for the oil
     //  look -- boughs sampled off a curve rather than drawn as two straight bars -- must be behind it, or the
     //  watercolour game changes and the pixel gate says so.)
-    const TALL = L.tall.map((sp) => (LOOK.oil ? Object.assign({}, sp, { oilLook: 1 }, sp.kit === 'broadleaf' || sp.kit === 'maple' || sp.kit === 'aspen' ? { leafy: 1, double: 1 } : null, sp.kit === 'roundmaple' || sp.kit === 'poplar' || sp.kit === 'oak' || sp.kit === 'birch' || sp.kit === 'willow' || sp.kit === 'sapling' ? { double: 1 } : null, sp.oil) : sp));
+    const TALL = L.tall.map((sp) => (LOOK.oil ? Object.assign({}, sp, { oilLook: 1 }, sp.kit === 'broadleaf' || sp.kit === 'maple' || sp.kit === 'aspen' ? { leafy: 1, double: 1 } : null, sp.kit === 'roundmaple' || sp.kit === 'poplar' || sp.kit === 'oak' || sp.kit === 'birch' || sp.kit === 'willow' || sp.kit === 'sapling' ? { double: 1 } : null, sp.oil, PINES && sp.kit === 'spruce' ? { needleTop: 1 } : null) : sp));      // (?pines: the spruce's needles budgeted by bough, kits/spruce.js)
     this.tall = TALL;
     this.species = TALL.map((sp, i) => {
-      const mo = { name: 'tall-' + sp.kit + i, barkA: sp.bark[0], barkB: sp.bark[1], leafA: sp.leaf[0], leafB: sp.leaf[1], leafC: sp.leaf[2], barkP: sp.barkP, leafP: sp.leafP, accent: sp.accent, oilDark: sp.dark || null, oilFam: sp.fam || null, oilKind: sp.snowy ? 1 : sp.bare ? 2 : 0, wind: sp.wind == null ? 0.03 : sp.wind, doubleSide: !!sp.double, phys: sp.kit === 'vine' ? null : 'lite', branch: BRANCHY.has(sp.kit), stiff: sp.kit === 'kelp' ? 0.1 : 1, plantHeight: (FAR_DIMS[sp.kit] || [0, 10])[1], gem: sp.kit === 'crystal',
+      const mo = { needle: PINES && NEEDLE_KITS.has(sp.kit) ? NEEDLE_PX : 0, nearLeaf: NEARLEAF ? 1 : 0, leafGrow: LEAFGROW, stormLeaf: STORMLEAF, name: 'tall-' + sp.kit + i, barkA: sp.bark[0], barkB: sp.bark[1], leafA: sp.leaf[0], leafB: sp.leaf[1], leafC: sp.leaf[2], barkP: sp.barkP, leafP: sp.leafP, accent: sp.accent, oilDark: sp.dark || null, oilFam: sp.fam || null, oilKind: sp.snowy ? 1 : sp.bare ? 2 : 0, wind: sp.wind == null ? 0.03 : sp.wind, doubleSide: !!sp.double, phys: sp.kit === 'vine' ? null : 'lite', branch: BRANCHY.has(sp.kit), stiff: sp.kit === 'kelp' ? 0.1 : 1, plantHeight: (FAR_DIMS[sp.kit] || [0, 10])[1], gem: sp.kit === 'crystal',
         // (the last fixes: a spire parts round an eye inside it; its girth at the foot, height and lean, florakit.js spireGeometry)
         hollow: sp.kit === 'spire' ? (sp.slim ? [1.3, 10.5, 0.3] : [2.0, 12, 0]) : null };
       const mat = makePropMaterial(bodyUniforms, mo);
@@ -316,7 +358,7 @@ export class Flora {
       this._turn.push({ mat: this.species[i].mat, far: i, sum: sp.leafSum ? summerCanopy(sp.leafSum) : sp.leaf, aut: sp.leafAut || sp.leaf,
         famW: sp.fam ? (sp.fam[3] == null ? 1 : sp.fam[3]) : 0 });
     }
-    this.treeDepth = TREEDEPTH; TREE_DEPTH.on = TREEDEPTH; this.swayWhole = TREESWAY;
+    this.treeDepth = TREEDEPTH; TREE_DEPTH.on = TREEDEPTH; this.swayWhole = TREESWAY; this.needles = PINES;
     if (TREES2 && !TREE_GUARD.failed) this._useTrees2(TREES2);
     const U = L.under || { leaf: [[0.8, 0.85, 0.4], [0.55, 0.7, 0.3], [0.35, 0.5, 0.3]], accent: [0.86, 0.29, 0.17], bush: [[0.64, 0.77, 0.37], [0.45, 0.63, 0.36], [0.24, 0.41, 0.36]], rock: [[0.8, 0.79, 0.83], [0.47, 0.45, 0.55]] };
     this.U = U;
@@ -370,19 +412,23 @@ export class Flora {
   // frame the bake is done they hand over (_impReady).
   _impostors(on) {
     if (on && !this.imp) {
-      const geos = [];
-      for (const sp of this.species) {
-        if (!sp.canCard) { sp.impLayer = -1; continue; }
+      const geos = [], floors = [], leafK = [];
+      this.species.forEach((sp, i) => {
+        if (!sp.canCard) { sp.impLayer = -1; return; }
         sp.impLayer = geos.length;
         // (on foot this kind keeps today's far form: the conifers' dark spikes, which the look director judged
         //  better on the skyline than their impostors, 24 Nov; ?impfoot=all makes every kind an impostor on foot,
         //  ?impfoot=none none)
         sp.footCards = IMP_FOOT === 'none' || (IMP_FOOT !== 'all' && sp.far[2] >= 0.5);
-        geos.push(sp.geo0[0]);
-        if (IMP.variants > 1) geos.push(sp.geo0[1]);
-      }
+        // (the spruce with ?pines: FAR_SPRUCE above, its near tree floored at V 0.24 by default; ?farspruce=0 as before)
+        const spec = this.tall[i], pine = !!FAR_SPRUCE && !!(spec && spec.needleTop) && !!TALL_KITS[spec.kit], byBough = pine && FAR_SPRUCE === 'bough';
+        sp.impByBough = byBough;
+        geos.push(byBough ? sp.base.geo1 : sp.geo0[0]);
+        if (IMP.variants > 1) geos.push(byBough ? TALL_KITS[spec.kit](12 + i * 10, 1, spec) : sp.geo0[1]);
+        for (let v = 0; v < Math.max(1, IMP.variants); v++) { floors.push(pine ? FAR_SPRUCE_V : 0); leafK.push(byBough ? FAR_SPRUCE_K : 0); }
+      });
       if (!geos.length) return false;
-      this.imp = new ImpostorAtlas(geos);
+      this.imp = new ImpostorAtlas(geos, { floors, leafK });
       this.mats.imp = makeImpostorMaterial(this.bodyUniforms, this.imp, this.mats.far);
       // (the guard: if this device cannot draw them, today's far tree, and the hand-over as it was)
       this.imp.onFail = (why) => { this.impFailed = why; this.setFarForm(FAR_BLOB ? 'blob' : 'cards'); this.setHandover(HAND.near, HAND.mid); };
@@ -528,7 +574,7 @@ export class Flora {
     // (an impostor mesh's own shadow, from the air: render/impostor.js IMP_SHADOW; on the shadow pass's list while the eye
     //  is up there, see update)
     if (far && this.mats && mat === this.mats.imp) {
-      mesh.userData.crowdEntry = { mesh, material: mat, makeShadow: makeImpostorShadowMaterial };
+      mesh.userData.crowdEntry = { mesh, material: mat, makeShadow: makeImpostorShadowMaterial, viewCull: true };
       if (this._impSh) SHADOW_CROWD.add(mesh.userData.crowdEntry);
     }
     // (the oil look's cast shadows, render/shadow.js: trees, bushes and stones cast; blades and flowers do not)
@@ -699,7 +745,7 @@ export class Flora {
     // groups: which trees can appear in which mesh
     const groups = {};
     const add = (key, i, geo, mat, far) => {
-      const g = groups[key] || (groups[key] = { list: [], geo, mat, far: !!far, imp: key === '4i', mesh: null, tierKey: key[0] });
+      const g = groups[key] || (groups[key] = { list: [], geo, mat, far: !!far, imp: key === '4i', mesh: null, tierKey: key[0], kind: far ? -1 : +key.split(':')[1] });
       g.list.push(i);
     };
     for (let i = 0; i < n; i++) {
@@ -802,7 +848,7 @@ export class Flora {
         // (the oil look's leaves by distance: a full tree keeps every leaf within about a quarter of its range and a fifth
         // of them at its end, where the middle tree, of fewer and larger leaves, takes over; the middle tree thins on from there)
         // (in units of the full tree's reach, flora.t0, read as it is drawn: the hand-over may move while the game runs)
-        if (LOOK.oil && !g.far && !TREES_FULL) g.mesh.userData.leafLod = g.tierKey === '0' ? [0.24, 0.2] : [1, 0.35];
+        if (LOOK.oil && !g.far && !TREES_FULL) g.mesh.userData.leafLod = this._leafLod(g);
         // (2026-11-18) THE FAR TREES ARE NOT THINNED BY DISTANCE, AND HERE IS THE MEASUREMENT THAT SAYS SO, because
         // on paper it is the biggest saving left in the game and the next session will want to try it again.
         // A study counted the far tier at 7,326,558 triangles of an 8,191,481-triangle frame from the air and
@@ -1010,6 +1056,33 @@ export class Flora {
     this._rebuildTrees();
     return whole;
   }
+  // THE LEAVES BY DISTANCE OF ONE MESH OF TREES: a full tree keeps every leaf within about a quarter of its range and a
+  // fifth of them at its end, where the middle tree, of fewer and larger leaves, takes over; the middle tree thins on from
+  // there. (?pines: the needle kinds keep at least 45 and 60 per cent: their foliage is sparse to begin with, and thinned
+  // as a broadleaf is the tree at range was a pole; materials.js PROP_VERT grows their needles from 12 m as well.)
+  _leafLod(g) {
+    const needle = this.needles && g.kind >= 0 && this.tall[g.kind] && NEEDLE_KITS.has(this.tall[g.kind].kit);
+    return g.tierKey === '0' ? [0.24, needle ? 0.45 : 0.2] : [1, needle ? 0.6 : 0.35];      // (in units of flora.t0)
+  }
+  // (PILOT's speed test, core/bench.js) ?pines swapped while the game runs: the needle kinds' every tree program told
+  // to keep its needles a mass at range (on) or as they are (off), and their leaves by distance with it. Uniforms and
+  // numbers on the meshes, so nothing is rebuilt.
+  // Returns whether it is now on, or null where there is no needle kind.
+  setNeedles(on) {
+    const v = on ? NEEDLE_PX : 0;
+    let n = 0;
+    for (let i = 0; i < this.species.length; i++) {
+      const s = this.species[i];
+      if (!this.tall[i] || !NEEDLE_KITS.has(this.tall[i].kit)) continue;
+      const ms = [s.base && s.base.mat].concat(s.mats ? Object.values(s.mats) : []);
+      for (const m of ms) if (m && m.uniforms && m.uniforms.uNeedle) { m.uniforms.uNeedle.value = v; n++; }
+      if (s.mo) s.mo.needle = v;
+    }
+    this.needles = !!on;
+    // (and the needle kinds' leaves by distance, mesh by mesh, as _leafLod now says)
+    if (LOOK.oil && !TREES_FULL) for (const ch of this.treeChunks.values()) for (const g of (ch.groups || [])) if (g.mesh && !g.far && g.mesh.userData.leafLod) g.mesh.userData.leafLod = this._leafLod(g);
+    return n ? !!on : null;
+  }
   // (every near and middle patch dropped, to be built again in its turn with the kinds' programs as they now are)
   _rebuildTrees() {
     for (const [key, ch] of this.treeChunks) {
@@ -1033,6 +1106,17 @@ export class Flora {
   // for the speed test's row: returns the setting before.
   setShadowWhole(on) { const was = SHADOW_OPTS.whole; SHADOW_OPTS.whole = !!on; return was; }
   get shadowWhole() { return SHADOW_OPTS.whole; }
+  // The far impostors' crown mass (render/impostor.js PC_MASS; the default, ?crownmass=0 the old way), switched while the
+  // game runs for the speed test's row: only the impostor program is compiled again. Returns the setting before, or null.
+  setCrownMass(on) { const m = this.mats && this.mats.imp; if (!m) return null; const was = !!m.defines.PC_MASS; if (on) m.defines.PC_MASS = 1; else delete m.defines.PC_MASS; m.needsUpdate = true; return was; }
+  get crownMass() { const m = this.mats && this.mats.imp; return !!(m && m.defines.PC_MASS); }
+  // The far crowns' shadows on the ground from the air (render/shadow.js FAR_SHADOW, ?farshadow=1), for the speed test's
+  // row: on or off while the game runs (the shadow square, the casters' list at the next update, the twin's whole crown).
+  setFarShadow(on) { const was = FAR_SHADOW.on; FAR_SHADOW.on = !!on; return was; }
+  get farShadow() { return FAR_SHADOW.on; }
+  // The far impostors in the weather group's gust bands (render/impostor.js GUST, ?gustbands=1), for the speed test's row:
+  // false keeps the bands off the crowns (the ground keeps them). Returns null where the impostors do not take them.
+  setImpGust(on) { const u = this.mats && this.mats.imp && this.mats.imp.uniforms.uImpGust; if (!u) return null; const was = u.value > 0.5; u.value = on ? 1 : 0; return was; }
   // THE FAR TREES' FORM, swapped while the game runs (the speed test, core/bench.js; 2026-11-24, trees lane T0):
   // 'cards' the tree of flat pieces that ships (138 triangles), 'blob' two crossed six-cornered cards (?fartree=blob:
   // 10 triangles, which prices on the phone what a quad's fragments cost against a mesh's triangles), 'lump' the old
@@ -1260,7 +1344,8 @@ export class Flora {
     this.treeScale = ts; this.farScale = fs;
     // THE IMPOSTORS' SHADOWS, FROM THE AIR ONLY (?impshadow=1; T6's option): above 60 m no near or middle tree stands in the
     // shadow square, and the far crowns throw their own; on the ground the pass is left as it was.
-    const impSh = !!(IMP_SHADOW && this.impOn && (SHADOW.alt || 0) > 60);
+    // (and the far crowns' shadows beside them, ?farshadow=1: render/shadow.js FAR_SHADOW, the same list and the same 60 m)
+    const impSh = !!((IMP_SHADOW || FAR_SHADOW.on) && this.impOn && (SHADOW.alt || 0) > 60);
     if (impSh !== !!this._impSh) {
       this._impSh = impSh;
       for (const ch of this.farChunks.values()) for (const m of ch.meshes) if (m.userData.crowdEntry) { if (impSh) SHADOW_CROWD.add(m.userData.crowdEntry); else SHADOW_CROWD.delete(m.userData.crowdEntry); }
