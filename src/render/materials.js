@@ -3873,6 +3873,7 @@ void main() {
         float pk = smoothstep(11.0, 16.0, di) * yrS;
         if (pk < 0.02) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); return; }
         dl *= pk; dw *= pk;
+        vTeeth = max(dw, wPx * 1.3) / max(wPx, 1e-5);      // (its half-width in pixels: the poppy's centre below)
       }
       #endif
       rel = ax * (iCol.a * (len / max(iAxis.w, 1e-4)) + max(dl, wPx * 1.3 * grow) * t) + sd * (side * max(dw, wPx * 1.3) * grow);
@@ -4017,6 +4018,10 @@ void main() {
       } else if (vKind > 4.5) {
         vec2 q = vec2(vS.y, vS.x * 2.0 - 1.0);
         if (vKind > 5.5 ? abs(q.x) > (1.0 - q.y * q.y) * 0.92 : dot(q, q) > 0.94) discard;
+        // (a drift's patch, nearground.js PATCH: on a touch over about 6 px across, one dot of the flower's second colour at
+        // its heart, about 1.3 px, so a far red touch reads as a poppy and a violet one as an aster -- the look director,
+        // 24 Nov; smaller, the touch is its one colour, nothing under a pixel and a half is drawn, R4.5)
+        if (vKind > 5.35 && vKind < 5.45 && vTeeth > 3.0) second = length(vec2(q.x, q.y * 0.85) * vTeeth) < 1.3;
       } else if (vKind > 3.5) {
         float u = vS.y * 0.5 + 0.5, hz = vS.z;
         float nb = 5.0 + floor(fract(hz * 5.37) * 5.0);
@@ -4102,9 +4107,7 @@ void main() {
   }
   // (a flick carries little more pigment than the ground it stands on: a loaded, crisp, wet
   // mark pooled by the sheet as well was a black comma)
-  // (a drift's patch, kind 5.4, nearground.js PATCH, is one flat colour, LOOK-RULES R3.1: SEEN 24 Nov, the dab's loaded-brush
-  // step darkened a white drift's touches to a grey-beige that read as pebbles)
-  float d = 1.0 + (0.55 - vS.x) * (vKind > 5.35 && vKind < 5.45 ? 0.0 : (vKind > 4.5 && vKind < 5.5 ? 1.5 : 0.7)) * vLoad + (vS.z - 0.5) * 0.5 * vLoad + (n1.r - 0.5) * 0.5;
+  float d = 1.0 + (0.55 - vS.x) * (vKind > 4.5 && vKind < 5.5 ? 1.5 : 0.7) * vLoad + (vS.z - 0.5) * 0.5 * vLoad + (n1.r - 0.5) * 0.5;
   vec3 c = pcWetWash(pcDensity(vCol, d), mix(1.0, 0.4, 1.0 - vLoad));
   c = mix(c, vec3(1.0), max(uWx.z * smoothstep(0.35, 0.9, vS.x) * 0.8, vFlat * 0.16));     // snow on the tips; trodden grass shows its pale side
   vec3 nV = normalize(vNV);

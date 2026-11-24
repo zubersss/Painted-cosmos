@@ -334,17 +334,18 @@ touches lean 0.16-0.28 with the meadow's comb (`combUV`, the same slow west wind
 THE DRIFT AS ONE PATCH: where a COLOURED drift is thick (cover > 0.22) a middle-ring cell lays 1-3 round flat touches of
 its colour (half-width 0.09-0.14 m, height 1.5-1.9 of it) gathered round one centre (far ring 1-2, 0.20-0.38 m, a
 little squat), with 2 heads (far 1) over them; a WHITE drift keeps its heads (a plain disc loses the daisy's eye: it read
-as pebbles); its own mark code `PATCH` = dab + 0.4, which `NEAR_VERT` brings in only past 11-16 m and `NEAR_FRAG` paints
-as one flat colour (R3.1; the loaded-brush step greyed it); PIXEL-NEUTRAL by the look director's condition: the cell's
+as pebbles); its own mark code `PATCH` = dab + 0.4, which `NEAR_VERT` brings in only past 11-16 m (the oil branch of `NEAR_FRAG`
+paints every near mark as one flat colour already; a26dd20's "flat colour" edit sat in the watercolour path, never acted,
+and was taken back out; on touches over ~6 px a 1.3 px dot of the flower's second colour, the poppy's centre); PIXEL-NEUTRAL by the look director's condition: the cell's
 freed room is NOT given to grass (COUNTED in Node, scratch overdraw counter taught the patch's fade, 1024x480: the meadow
 on foot 265,452 -> 267,321 near-ground pixels, +0.7 per cent; the landing -0.4). `?patchfloor=1` lowers the heads'
 floor in the middle and far rings (0.85 -> 0.55, 0.6 -> 0.4): never judged. History, SEEN: the first patch was thin
 horizontal lines (height set against half-width); round ones made white pebbles; a stronger ground tint in a drift's
 heart made pools from 10 m but the bare ground between strokes read it per pixel, a milky veil, the blur (taken out,
-a494aee). The look director's rulings: NO change to the ground's own strokes (the clip's floor is just that; the 6-10 px
+a494aee; the whites' grey was not the loaded brush, as first written: the oil branch has none). The look director's rulings: NO change to the ground's own strokes (the clip's floor is just that; the 6-10 px
 pattern aim withdrawn for the near ground); the POOL is to come from whole strokes: C's FV6 dab channel, with the bare
-ground taking none of the drift under 150 m (C did it, farview 1ed9553). For later (not blocking): a poppy's dark centre
-on the larger red patch touches (over ~6 px). Numbers barely move with all three (meadow 10 m colour pattern 4.6 -> 4.9
+ground taking none of the drift under 150 m (C did it, farview 1ed9553). The poppy's dark centre (the look director's
+"for later"): built, see above, not yet seen. Numbers barely move with all three (meadow 10 m colour pattern 4.6 -> 4.9
 px, edge 23.7 -> 23.6 per cent); the look director judged by eye.
 **THE SNOW LINE (passed for v39.5, landed in v39.4's commit):** `bloomAt` fades a drift by the sample's `snowK` (C's line,
 dd86fb3): no flower stands in snow; with C's clamp (farview 6cf9c7a) it clears the dark red smudges on the alpine ridges.
