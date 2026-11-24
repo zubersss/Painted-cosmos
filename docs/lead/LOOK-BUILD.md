@@ -256,3 +256,20 @@ sun side at noon where today's are an even lilac) and put the old facing back (P
 same picture. Flipping it is one line in PROP_FRAG and dropping that define, in one commit, but it changes every
 trunk in the approved picture: it wants A/B stills (S1, S2 at noon, the 275 m view) in front of the coordinator and
 the owner first. Not started.
+
+## L5, the air from the air: built and seen (OFF by default until the coordinator's eye: `?airfar=1`)
+
+- `chunks.js` pcFogAmount: from the air (OIL.uLookN.w, set by world/index.js from the air's reach: 0 on foot, 1 by
+  the air's) the distance is taken 1.4 times instead of 2.4, and a share of 0.16 of the far land's own paint is kept
+  at the horizon by the same knee the ground uses; SHADOW.air (the lit air's twin in world/index.js) changed with it.
+  pcAtmosV and sky.js pcSkyAir: from the air the far air's gold lies toward the sun and its blue-violet away from it
+  and deeper with distance, where one fixed mix of the two made khaki (F6). In the sky only the air band at the
+  horizon takes the split: laid through the sky's own bands it flattened the painted sky to one periwinkle (seen,
+  fixed in 9a9bc1e).
+- SEEN (opened; A `airfar` 0, B 1, same page; build/L5/L5_sheet_off_left_on_right.jpg): 150 m the land deeper and
+  less washed (S 0.35 -> 0.46), the sky as it was; 420 m noon the far wood and the hills keep more of their own paint
+  (S 0.32 -> 0.36, satD 0.16 -> 0.30); 420 m at 16.8 the far land warmer toward the sun and the band at the limb
+  blue-violet away from it (khaki less, not gone); the mile the peaks and the meadow a step deeper and more modelled
+  under the same painted sky. On foot S1 is identical to the pixel with it on (0 pixels differ). V over 0.90 moves at
+  most 0.8 of a point. NOT fixed by it: the mile at noon is still pale (FV1's thick air lasts to 1.76 km), and the
+  golden-hour sky itself is still one warm ochre wash -- that is the sky's own gold key, a separate step.
