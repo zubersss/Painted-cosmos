@@ -12,7 +12,7 @@
 // Only paper effects live in screen space (grain, wobble, border). Everything that belongs to
 // the painting (wash variation, strokes, light) is anchored in the world by the materials.
 import * as THREE from 'three';
-import { getTextures, G, PREV, LOOK, OIL } from './shared.js';
+import { getTextures, G, PREV, LOOK, OIL, CLOUDSHADOW } from './shared.js';
 
 // (2026-11-22, the owner's ten-step upgrade: the last pass's own switches, read once, so that the owner can be shown
 // A and B of the same still and can turn any one of them off. Each is described where it is used, in OIL_FRAG.)
@@ -650,6 +650,10 @@ uniform vec2 uInTexel;   // 1 / the size the scene is drawn at
 uniform float uUpK;      // (the sharp read where the picture is enlarged: 0 off, else the bilinear ramp's gain; setSize)
 uniform vec2 uShaftN;    // (the light in the air: x the most taps a line of sight gets, y metres of air to a tap; x 0 off)
 uniform vec4 uFarC;      // (the far land: x its local contrast, y the reference's reach in scene pixels, z its colour push, w free)
+uniform sampler2D uCloudShadow;   // (group D, T3: the cloud shadow map, world/clouds.js A6; 1 under a cloud, smooth)
+uniform mat4 uCloudShadowV;       // (view space -> its uv)
+uniform float uCloudShadowK;      // (0: none -- the default without ?clouds3d, and the speed test's row)
+uniform vec3 uCloudShadowC;       // (the shade's own hue, luminance 1: shared.js CLOUDSHADOW, set by world/index.js)
 uniform vec4 uLookF;     // (the look director's switches, shared.js: x the night key)
 uniform vec4 uLampV;     // (the lantern in the eye's space, w how strong: render/index.js)
 varying vec2 vUv;
@@ -678,6 +682,25 @@ void main() {
   // contrast and the night's lamp test each used to fetch it for itself)
   vec4 aux = pcAuxDec(texture(tAux, vUv));
   float vz = exp2(aux.z) - 1.0;
+  // THE CLOUDS' SHADOWS ON THE LAND (group D, WEATHER-DESIGN A6 and T3; weather-clouds 6991bf6, laid here by the look
+  // director): the shapes of the clouds overhead lying on the ground and on everything standing on it, from the map
+  // world/clouds.js draws along the sun. A GLAZE that draws the lit values toward the shaded ones -- the light parts down
+  // by up to a quarter and a third of the way to the SHADE'S OWN HUE (the cool key, as pcOilShadeC lays it: so a cloud's
+  // shadow on the orange floor reads plum like a tree's, on grass a cooler green), the darks barely moved -- never a
+  // plain dimming; crisp at the map's half-way line; weaker as the air thickens past two kilometres; never on the sky
+  // or the clouds themselves (region 0). uCloudShadowK 0 (no ?clouds3d) skips it whole: the picture as it was.
+  if (uCloudShadowK > 0.0 && aux.w > 0.5) {
+    vec3 cvp = vec3((vUv * 2.0 - 1.0) * uTanHalf, -1.0) * vz;
+    vec2 cuv = (uCloudShadowV * vec4(cvp, 1.0)).xy;
+    if (cuv.x > 0.0 && cuv.y > 0.0 && cuv.x < 1.0 && cuv.y < 1.0) {
+      float cs = texture(uCloudShadow, cuv).r;
+      float cw = clamp(fwidth(cs), 0.02, 0.2);
+      cs = smoothstep(0.5 - cw, 0.5 + cw, cs) * uCloudShadowK * (1.0 - smoothstep(1800.0, 4200.0, vz));
+      float cL = dot(col, vec3(0.3, 0.5, 0.2));
+      vec3 csh = mix(col, vec3(cL) * uCloudShadowC, 0.32) * mix(1.0, 0.74, smoothstep(0.22, 0.72, cL));
+      col = mix(col, csh, cs * 0.85);
+    }
+  }
   // THE FAR LAND KEEPS ITS LOCAL CONTRAST (the owner, 22 Nov: "fully rendered even from 300 yards away"). Past about
   // 60 m the air's veil flattens the land's own value steps toward one tone, so a wood at 275 m reads as a smudge that
   // sharpens as the player walks in. The pixel is set against a few-pixel reference of its neighbourhood and nudged
@@ -986,7 +1009,8 @@ export class Post {
       // (2026-11-22, the ten-step upgrade; the switches are at the top of this file and the reasons in OIL_FRAG)
       uInTexel: this.sheetUniforms.uInTexel, uUpK: { value: 0 },
       uShaftN: { value: new THREE.Vector2(16, 7) },
-      uFarC: { value: new THREE.Vector4(FARCON, FARPX, FARSAT, 0) }, uLookF: OIL.uLookF, uLampV: OIL.uLampV });
+      uFarC: { value: new THREE.Vector4(FARCON, FARPX, FARSAT, 0) }, uLookF: OIL.uLookF, uLampV: OIL.uLampV,
+      ...CLOUDSHADOW });      // (group D's cloud shadows, T3: shared.js)
     this.mOil.name = 'oil-finish';
     this.debugView = 0;
     this.mCopy = fsMaterial(/* glsl */`

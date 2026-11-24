@@ -84,8 +84,14 @@ float pcWHash(vec2 c) { return fract(sin(dot(c, vec2(12.9898, 78.233))) * 43758.
 // (the cells' edges waver a little, so no ruled grid shows even where two cells' strokes meet)
 vec2 pcWWob(vec2 ch, float C) { return 0.10 * vec2(sin(ch.y * (6.0 / C)), sin(ch.x * (4.9 / C))); }
 vec2 pcWCellOf(vec2 ch, float C) { return floor(ch / C + pcWWob(ch, C) + 0.5); }
-// a cell for strokes wL wide (m): 26 m near the eye, as v37's, and never under sixty-six strokes' widths
-float pcWCellC(float wL) { return max(26.0, 66.0 * wL); }
+// POINTED ENDS (the look director, 24 Nov, on the sea's near chop: "the new dashes have square ends, so the near chop reads
+// as bricks or tiles; give the dash pointed or rounded ends -- the clip's dabs are pointed at both ends"). 0 square ends,
+// as before; 1 each stroke drawn in to a point over its last 1.3 widths at both ends, the water's body showing past the
+// point. Set by the caller before pcWStrokes (a global, so the function's arguments stay as they are).
+float gWLens = 0.0;
+// a cell for strokes wL wide (m) and asp long: 26 m near the eye, as v37's, never under sixty-six strokes' widths, and
+// at least two and a half strokes long (a stroke laid long to make up for foreshortening must still lie in its cell)
+float pcWCellC(float wL, float asp) { return max(26.0, wL * max(66.0, 2.5 * asp)); }
 // One cell's stroke over the pixel. ch: the pixel's chart (m); cell, C: the cell and its size; mC: how far past its edge
 // (in cells, along each axis) a stroke's centre may lie and the stroke still be the cell's; d, n: the way its strokes
 // run and across it (chart, unit); tdx, tdy: the turned chart's screen derivatives and wdx, wdy the chart's own (m a
@@ -111,6 +117,12 @@ float pcWCand(vec2 ch, vec2 cell, float C, vec2 mC, vec2 d, vec2 n, vec2 tdx, ve
   vec2 spx = vec2(length(vec2(dpx.x, dpy.x)), length(vec2(dpx.y, dpy.y)));
   vec2 ctr, uv;
   pcThinR(p, asp, spx, 0.0, rnd, ctr, own, rndN, uv);
+  if (gWLens > 0.0) {
+    // (the stroke's half-thickness, 1 along its body, to 0 at each end over 1.3 widths; the edge in pixels across the row)
+    float hl = mix(1.0, clamp(min(uv.x, 1.0 - uv.x) * asp / 1.3, 0.0, 1.0), gWLens);
+    float oL = clamp(0.5 + (hl - abs(2.0 * uv.y - 1.0)) * 0.5 / max(spx.y, 1e-6), 0.0, 1.0);
+    if (oL < own) { own = oL; rndN = vec3(0.5, 0.99, 0.99); }
+  }
   pri = fract(rnd.x * 7.13 + rnd.z * 3.71);
   // where its centre lies on the water: pcThinR's own sway of the rows undone, then the bend above
   float yc = ctr.y;
@@ -149,7 +161,7 @@ float pcWStrokes(vec2 ch, vec2 wdx, vec2 wdy, vec2 d, float spd, float w0, float
   for (int L = 0; L < 2; L++) {
     bool fine = L == 0;
     if (fine && oc.x > 0.93) continue;      // (every stroke of the finer octave has gone)
-    float wL = fine ? w0 : 2.0 * w0, C = pcWCellC(wL);
+    float wL = fine ? w0 : 2.0 * w0, C = pcWCellC(wL, asp);
     vec2 f = ch / C + pcWWob(ch, C) + 0.5, cA = floor(f), fr = f - cA;
     // (half a stroke's reach along each axis of the chart, in cells: half its length along d, a row and its sway
     // across. A cell's strokes are the strokes whose centres lie in it OR WITHIN THAT OF ITS EDGE: so every stroke over

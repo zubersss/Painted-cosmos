@@ -2,10 +2,10 @@
 // Builds the vertex data of one quadtree node of the cube-sphere. Kept free of three so it can
 // be unit-tested in Node and moved into a worker later without changes.
 import { faceToDir } from './cubesphere.js';
-import { makeSample, NOLQ } from './surface.js';
+import { makeSample, NOLQ, SNOW } from './surface.js';
 import { MODE } from '../data/mode.js';
 import { BODIES } from '../data/bodies.js';
-import { canopyOn, standAt } from './farstand.js';
+import { canopyOn, groundSeasonOn, rockfieldOn, standAt } from './farstand.js';
 import { shoreField, SHORE_DEF } from './shore.js';
 
 export const PATCH_N = 32;                 // cells per patch edge (even, for geomorphing)
@@ -42,8 +42,9 @@ const _d = [0, 0, 0];
 const _px = new Float64Array(E * E), _py = new Float64Array(E * E), _pz = new Float64Array(E * E);
 const _hh = new Float32Array(E * E), _lq = new Float32Array(E * E);
 const _shoreOut = { lx: 0, ly: 0, w: 0 };   // (the shore's direction at a vertex: world/shore.js)
-const CS = 26;   // floats kept per sample: wash, far wash, parameters, liquid look, strata, the current, the fall, the stand
-                 // (21, 22: the far view's), how still (23: the water's), runoff's cap and swell (24, 25: the water's)
+const CS = 27;   // floats kept per sample: wash, far wash, parameters, liquid look, strata, the current, the fall, the stand
+                 // (21, 22: the far view's), how still (23: the water's), the snow (24: the far view's), runoff's cap and
+                 // swell (25, 26: the water's). (The layout is the water group lead's, agreed with the far view: E.)
 const _col = new Float32Array(E * E * CS);
 const _fs = [0, 0];     // (the stand and its needle share at a sample: world/farstand.js)
 let _s = null;
@@ -103,6 +104,13 @@ export function stepPatch(job, deadline) {
   // told how many trees the placer keeps there and how many are needle trees -- world/farstand.js, render/farground.js.
   // Off, or on any other world, nothing is computed and the bytes are the ones they always were.)
   const can = canopyOn(S.id);
+  // (and the floor that follows the year, FV3: the trees here in woods painted in an autumn palette and in a summer one
+  // (surface.js canA, canS), in the parameters' first and second bytes -- the dry and wet washes', which the oil look's
+  // ground never reads)
+  const gse = groundSeasonOn(S.id);
+  // (and the rock, FV4: how much snow the surface laid over each wash, so that it can be shed off the steep faces once
+  // the patch's normals are known, below)
+  const rkf = rockfieldOn(S.id);
   // 1. sample the surface on the apron grid, a row at a time
   // (S.foot: how far apart this patch's samples lie, in metres, while they are taken: the oil look's surface draws a
   // river into the far colour as wide as that, so that a river is still a line on the land from high up, where the
@@ -130,7 +138,9 @@ export function stepPatch(job, deadline) {
         _col[c + 19] = s.fspd || 0; _col[c + 20] = s.turb || 0;  // (the drainage field's own speed and churn, where a surface gives them; 0 otherwise)
         if (can) { standAt(S, _d[0], _d[1], _d[2], s, _fs); _col[c + 21] = _fs[0]; _col[c + 22] = _fs[1]; }
         _col[c + 23] = s.still || 0;                              // (the water's: how still, where a water part says; 0 otherwise)
-        _col[c + 24] = s.cap || 0; _col[c + 25] = s.swell || 0;  // (the water's runoff, ?runoff=1: water only in the wet, and how much it rises)
+        if (gse) { _col[c + 6] = s.canA || 0; _col[c + 7] = s.canS || 0; }
+        _col[c + 24] = rkf ? s.snowK || 0 : 0;                    // (the far view's snow, slot 24: the water lead's layout)
+        _col[c + 25] = s.cap || 0; _col[c + 26] = s.swell || 0;  // (the water's runoff, ?runoff=1: water only in the wet, and how much it rises)
       }
     }
   }
@@ -158,6 +168,29 @@ export function stepPatch(job, deadline) {
       let nx = ay * bz - az * by, ny = az * bx - ax * bz, nz = ax * by - ay * bx;
       const il = 1 / Math.sqrt(nx * nx + ny * ny + nz * nz);
       nor[o] = nx * il; nor[o + 1] = ny * il; nor[o + 2] = nz * il;
+      // SNOW DOES NOT LIE ON A CLIFF (the far view, FV4; the references: the snow mountains the lightest thing in the
+      // picture, on ledges and in gullies, with dark rock ribs between). The surface lays snow by height and noise alone,
+      // so a face of 60 degrees above the snowline was as white as a ledge, and a range from the air was a white cone.
+      // Where the face is steeper than about 50 degrees most of the snow is taken off it again -- the wash under the snow is found
+      // by undoing the surface's own mix (it laid SNOW over it by snowK), and laid again with less of it -- in both washes.
+      if (rkf) {
+        const sk = _col[(k) * CS + 24];
+        if (sk > 0.01) {
+          const pr = 1 / Math.sqrt(_px[k] * _px[k] + _py[k] * _py[k] + _pz[k] * _pz[k]);
+          const upn = (nor[o] * _px[k] + nor[o + 1] * _py[k] + nor[o + 2] * _pz[k]) * pr;
+          // (from about 49 degrees, all but a fifth of it by 61: MEASURED from 400 m, shedding from 38 degrees took the snow
+          // off nearly every summit -- at a far patch's spacing a summit's faces all read steep -- and the range went grey)
+          const st = sstep(0.66, 0.48, upn);
+          if (st > 0) {
+            const k2 = sk * (1 - 0.8 * st), cc = k * CS, iv = 1 / (1 - sk);
+            for (let t = 0; t < 3; t++) {
+              const base = (_col[cc + t] - SNOW[t] * sk) * iv, base2 = (_col[cc + 3 + t] - SNOW[t] * sk) * iv;
+              _col[cc + t] = base + (SNOW[t] - base) * k2;
+              _col[cc + 3 + t] = base2 + (SNOW[t] - base2) * k2;
+            }
+          }
+        }
+      }
       // morph target: where this vertex sits on the parent's (half resolution) mesh
       const io = i & 1, jo = j & 1;
       if (io || jo) {
@@ -375,7 +408,7 @@ export function stepPatch(job, deadline) {
       w2 = new Uint8Array(V * V * 4);
       for (let j = 0; j < V; j++) for (let i = 0; i < V; i++) {
         const c = ((j + 1) * E + (i + 1)) * CS, q = (j * V + i) * 4;
-        w2[q] = b8(_col[c + 24] / 0.6); w2[q + 1] = b8(_col[c + 25]);
+        w2[q] = b8(_col[c + 25] / 0.6); w2[q + 1] = b8(_col[c + 26]);
       }
     }
     // THE SHORE'S DIRECTION for the sea's strokes (lane W2, the bodies of water; world/shore.js): one more attribute, aShore,

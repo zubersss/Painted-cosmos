@@ -4,4 +4,4 @@
 // that a screenshot or a recording says which version drew it: twice the owner tried a new version minutes after
 // merging it, the site had not yet been renewed, and the old version was judged in the new one's place (2026-11-16).
 // (The game makes no request at run time: a page that shows an older name than the one expected is loaded again by hand.)
-export const BUILD = 'v39 (24 Nov)';
+export const BUILD = 'v39.2 (24 Nov)';
