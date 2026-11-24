@@ -337,7 +337,23 @@ Branch `water-bodies` = lane 0 + look-proto v37.1 + `origin/design-water` (W1's 
   slope. Not good yet, said plainly: at 150 m the surface reads as long grey-blue bands (the shared still-water strokes, as
   on the lakes), more like ribbed metal than a still tarn; for F to judge. Not yet looked at in the game itself (only the
   gallery, which uses the same surface code).
-- NEXT: W3's curtain fix (then F looks at the falls, then the word to E for the falls flip); whatever F says of the tarns.
+- **F on the tarns: PASS** to keep behind the switch (shores crisp at all three distances; no change to the tarn code). The ribbed
+  bands are the shared still-water strokes: F and the coordinator have given them to water-paint (step 3), the tarns as a test
+  case.
+- **IN THE GAME (not only the gallery):** `/?body=earth&look=oil&mount=1&card=0&time=15.4&quality=1` booted in the lab in about
+  4 minutes; the page reports 24 tarns, lakes on, no errors. The explorer placed 7 m from the south shore of the tarn at
+  [-0.014061, 0.899892, 0.435885] (shore found 42 to 45 m south of its middle), facing north: `tarn-in-game-shore.jpg`. SEEN:
+  the water lies at the back of the meadow where it should, the shore crisp against the grass; the strokes on it are choppy,
+  the same shared still-water strokes as above. (c.swell, which the tarn sets to 0.4, is how far water rises after rain,
+  not waves.)
+- **PUDDLES BESIDE A WIDE RIVER (110b43e, for E's landing river 784184b, which made the puddle test read 7.73 %):** on a
+  river's flat floor a hollow must be deeper (capFloor 0.12 m times (1 - rise) squared) and none lies within capBank 4 to 10 m
+  of the water's edge. Measured in 288 m squares beside Earth's six widest rivers (half width 13 m): 5 to 9 % of the dry
+  ground before, 1.0 to 2.7 % now; round the landing 3.3 to 1.2 %; the wood's uplands unchanged. The test holds the widest
+  river's square under 4 % too. NOT run on top of E's commit by me (E runs it after the merge). E's own suggestion, no puddle
+  within 30 m of any stream, was measured by E and works, but would take most of the wood's puddles (the streams are dense).
+- NEXT: E's landing river merged (then re-run the three water tests, and re-check the main fall, the fjord's choice and the
+  ponds near the landing); W3's curtain fix (then F looks at the falls, then the word to E for the falls flip).
 
 ## Stations and tools
 
