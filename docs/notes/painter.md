@@ -532,7 +532,14 @@ FV7 of `docs/lead/FARVIEW-DESIGN.md`. A second session (A2, branch `trees-near`)
 the same time: this lane touches only the far parts of `flora.js`, `florakit.js`, the plant material's far branch,
 `render/impostor.js`, `render/shadow.js` and new rows in `core/bench.js`.
 
-**State (update this line every step):** (24 Nov, about 23:00) THE IMPOSTORS' PAINT CHEAPER (the coordinator's top priority
+**State (update this line every step):** (24 Nov, about 23:50) R3.9 REBUILT ON THE AMENDED ANCHOR (70a2b74; the 480-line
+f898935 was reverted in v39.6): the crown's width times uImpTop / uOilPx.y, uImpTop = shared.js SCREEN.outH (the scene
+pass's lines at dynres 1; the oil look draws every tier at full size). PROVED in one page each against the factor pinned
+to 1 (v39.5's real-pixel thresholds): 1024x480 at 150 m 0 pixels, 420 m 0, 1 km 241 pixels at most 3 of 255 (the trees
+settling between grabs); 1920x1080 at 150 m 0 pixels. ONE DYNRES STEP DOWN (setRenderScale 0.85, 408 lines) at 150 m:
+139,248 pixels differ between the device anchor and v39.5's thresholds, which are the crowns v39.5 flips (crop sheet
+A1_r39_dynres_step_crop_ABC). F PASSED THE PAINT CUT on the look (its keep waits for massV, massT on the phone).
+Before: THE IMPOSTORS' PAINT CHEAPER (the coordinator's top priority
 after the owner's phone table: 'far trees one flat colour' saved as much as no far trees, so the cost is the paint per
 pixel; F: R3.9 first). DONE, ALL THE SAME PICTURE, ALL ON: f898935 R3.9 (thresholds in px of 480 lines; 0 pixels at
 1024x480); aedfc01 step 1, crown mass's colour and cap level once a crown in the vertex shader (MASSV, ?imppaint=0 off;
