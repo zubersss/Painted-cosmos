@@ -889,6 +889,9 @@ export function createClouds(scene) {
   const _cc = new THREE.Color(), _sp = new THREE.Vector3(), _st = new THREE.Vector3(), _su = new THREE.Vector3(), _sx = new THREE.Vector3();
   const self = {
     eyeInCloud01: 0, enabled: true, shadowK: 1,
+    // (for the shared light, the look director's ask: how closed the cloud deck is straight over the eye, 0..1, and how
+    // stormy it is there, both from the cloud map as the deck draws them; 0 with the deck off or no map. Read-only.)
+    overhead01: 0, overheadStorm01: 0,
     group, meshes, deck, valley, stats: { clouds: 0, lobes: 0, tris: 0, ms: 0 },
     shadowTarget: shadowRT,
   };
@@ -1243,6 +1246,7 @@ export function createClouds(scene) {
       // the deck at the eye (the eye inside it whites out, below)
       deckFn(upx, upy, upz, _cOut3);
       eyeDeck.base = _cOut3.base; eyeDeck.top = _cOut3.base + _cOut3.thick; eyeDeck.cover = CLOUDS.deck ? _cOut3.cover : 0;
+      self.overhead01 = eyeDeck.cover; self.overheadStorm01 = CLOUDS.deck ? _cOut3.storm || 0 : 0;
     }
     deck.u.uShellK.value.y = R; valley.u.uShellK.value.y = R;
     own.uAnchorD.value.copy(anchor);
@@ -1355,7 +1359,7 @@ export function createClouds(scene) {
   self.update = function update(dt, camL, root, sunL, fields, skyU) {
     if (!LOOK.oil || !CLOUDS.mode) return;
     // (the speed test's row 'weather: clouds as before': the sky's own flat cloud back in their place)
-    if (self.enabled === false || self.failed) { group.visible = false; if (skyU && skyU.uCloud3D) { skyU.uCloud3D.value.x = 0; skyU.uCloud3D.value.w = 0; } if (skyU && skyU.uRainbow) skyU.uRainbow.value.x = 0; if (skyU && skyU.uSkyFix) skyU.uSkyFix.value.set(0, 0, 0, 0); return; }
+    if (self.enabled === false || self.failed) { group.visible = false; self.overhead01 = 0; self.overheadStorm01 = 0; if (skyU && skyU.uCloud3D) { skyU.uCloud3D.value.x = 0; skyU.uCloud3D.value.w = 0; } if (skyU && skyU.uRainbow) skyU.uRainbow.value.x = 0; if (skyU && skyU.uSkyFix) skyU.uSkyFix.value.set(0, 0, 0, 0); return; }
     const id = root && root.name && root.name.startsWith('body-') ? root.name.slice(5) : null;
     if (!id || !BODIES[id]) return;
     const look = getLook(id);
