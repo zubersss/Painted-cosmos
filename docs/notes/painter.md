@@ -144,16 +144,48 @@ commit (the alpine meadow's easel, every change of this lane in).
    marks 149,344 -> 143,649 fragments (the new flowers replace the old ones); THE LANDING 279,137 -> 352,549 (+73k: +1.5 ms
    at K2's 20 ns, 0.9-2.6, and about 1.4 times that at the phone's picture), of which the heads' least size is 13.7k. OVER
    the design's F budget (+1, at most +1.8 ms). The dials: the least size (2.6 px), the landing's patch, a kind's `peak`.
+   RULED by the coordinator: hold the look (the owner's own ask), trim only what does not show: the middle and far rings'
+   least size is 1.9k of the 73k (COUNTED, near ring only against all) and makes the drifts read from 10 m: kept.
+8. THE LOOK DIRECTOR'S NOTES on 7 (a PASS with two notes): the near buttercup drift "one orange carpet": `bloomAt` gives a
+   runner-up kind where its drift is nearly as strong (`out.bloom2`, `out.mix`), a cell is a clump of one or the other,
+   and one cell in three in a drift is grass; buttercups and hawkbits butter-yellow (a glaze of lemon on lemon, hue 51);
+   asters violet (hue 269) and harebells cobalt violet (257). THE CLOAK'S BLUE (CLOAK_BLUES, hue ~226): no head at hue
+   210-240 over S 0.45: the bluebell to hue 249, the gentian (which sat AT 226) to 248; `flora.test.mjs` guards it.
+   Lit heads S <= 0.90 and V <= 0.88, two flat colours, no head bigger than the cloak at 2 m: F's four limits, agreed.
+9. THE YEAR (the coordinator's ruling: build it behind its own switch; no place ever flowerless near the eye; season-true
+   kinds). `?bloomyear=0` off. Each kind `season: [from, to]` on SEASON.t in sevenths and `bold: 1` on the bold kinds;
+   autumn kinds added where a place had none: the ivy-leaved cyclamen and an autumn hawkbit (green wood), the autumn
+   crocus and the hawkbit (high meadow), heather (cliff tops), knapweed for the autumn wood's summer (its hawkbit alone was
+   one yellow carpet). `bloomAt(..., tEval)` chooses for a point of the year and spreads the kinds in flower over the
+   ground the others left (their drift edge lowered by 0.45 of the share out of flower). HELD (`?season=`): one clump as
+   the map says now, and the ground's colour and far marks follow it. TURNING (the game): a cell holds a summer clump and
+   an autumn clump, each packed with its half of the year in iTone's top six bits (`packWin`), a third of the cells one, a
+   third the other, a third both with the room shared; NEAR_VERT thins out-of-window marks one by one (stalks too) and
+   shrinks heads before they go; nothing is laid again. The fine ring's pool +25 % while the year turns. The ground's
+   colour and the far marks do NOT follow a turning year (a colour baked at two moments would seam).
+   SEEN (`y-*`): the year moved from 0.15 to 0.85 in one page (not held): the landing's knapweed and hawkbits give way to
+   asters and goldenrod with asters at the feet; the green wood's bluebells to pink cyclamen up to the feet; the meadow's
+   buttercups and ox-eyes to late poppies and hawkbits with crocus beyond. At ?season=0.85 against ?bloomyear=0 likewise.
+   FIRST TRIES that failed and why: laid one after the other, the summer clump took the whole room (the turning autumn all
+   but bare); held without the spreading, the green wood's feet were bare in autumn. COUNTED in Node, ground in a drift
+   at year 0.15 / 0.5 / 0.85: meadow 56 / 55 / 59 %, coast 50 / 42 / 41, green wood 34 / 23 / 40, autumn wood 16 / 16 / 16.
+   lookstats: V > 0.90 under 4 % in every year still (3.0-3.7 %); S(V<.3) moves 0.02-0.03 at most.
+10. THE LIME (F10, agreed with the look director: the blades' own data, the ground C's, the light F's): `oil.flora.sward.leaf`
+   per biome (the green wood: olive with yellow ochre / olive / olive with hooker's; the autumn wood a step more golden)
+   and `sward.gm` 0.12, behind `?bladegreen=0`. MEASURED, the lit grass of the 1.8 m stills (`l-*`, off -> on): the landing
+   hue 72 -> 61, V 0.72 -> 0.66; the green wood 70 -> 63, 0.71 -> 0.69: inside R2.4's hue and value; BUT S 0.84 -> 0.82 and
+   0.79 -> 0.78, over R2.4's 0.75: it is the ground under the blades (C's palette) and the paint's own richness (F's chain),
+   which the blades' data cannot move. The meadow (no sward.leaf) measures hue 70, S 0.81, V 0.65.
 
 **Tests:** `tests/` 325 of 325, `src/world/` + `src/data/looks/` 65 of 65. `src/physics/` 415 of 416: the one failure is
 `loose.test.mjs` P25 ("under the closed wood the litter still puffs: 2"), which is FLAKY ON THE CLEAN COMMIT TOO (it
 failed 1 run in 5 there with none of this lane's changes): reported to the coordinator, not this lane's.
 
-**Next:** the lime (F10, with the look director: the blades' own lit greens as data, after merging look-director's L2);
-the look director's standard set (S1-S6 at 1024 x 480) with `lookstats.py`; THE YEAR for the flowers (the coordinator's
-ruling: build it, behind its own switch, every place keeping a bold season-true kind in flower near the eye in every
-season; a first build is parked in a scratch worktree: windows in iTone's top bits, heads thinned in NEAR_VERT); then FV6
-(meadows from the air) with C. O and F4 wait for the trees lanes. ASKED OF THE FAR-VIEW LANE through the coordinator: a ground dab that takes a drift's colour WHOLE
+**Next:** the look director's standard set (S1-S6 at 1024 x 480) with `lookstats.py`; then FV6 (meadows from the air)
+with C (C owns patchgen.js and TERRAIN_FRAG; the bloom channel from `bloomAt` is to be agreed with it). The coordinator
+will put the new flora in front of the owner behind one switch once told. O and F4 wait for the trees lanes.
+**Branch state:** design-flora has look-proto v38.1 and look-director (to 4e48468) merged in; the watercolour game checked
+pixel for pixel against a tree of exactly those without this lane (see the commit that records it). ASKED OF THE FAR-VIEW LANE through the coordinator: a ground dab that takes a drift's colour WHOLE
 (pointillist) from `bloomAt`, the one thing that would make drifts read from 150 m and a mile.
 
 ## Hand-over of THE FAR TREES (trees lane A1, branch `trees-far`; kept current by that session)
