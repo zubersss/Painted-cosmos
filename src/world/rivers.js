@@ -854,6 +854,10 @@ class RiverNet {
       }
     }
     c.pool = deep; c.bar = bar; c.barZone = zone; c.bankD = bankD;
+    // (the far view's water line, ?farwater=1: the signed distance to the nearest river's centre line -- its sign the side of
+    //  the segment, so it passes through zero across the river and interpolates truly between vertices far apart -- and
+    //  that river's half width; 1e9 and 0 where no river is near)
+    c.rsd = si >= 0 ? sd : 1e9; c.rhw = si >= 0 ? hw : 0;
     // 4. the current, along the channel that won, downstream
     c.fu = 0; c.fv = 0;
     if (best < W + 3) {

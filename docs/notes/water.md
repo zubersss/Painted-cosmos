@@ -255,6 +255,27 @@ showed NO water with the water branch (`docs/shots/painter/water-air/gate-high-a
   built): pack the signed distance to the water's edge at each vertex (patchgen, the layout is this session's) and let the
   far ground's paint (C's farground.js) draw a river-coloured line where the interpolated distance crosses zero: a line that
   survives any vertex spacing. W3's notes already name "the far water byte for C".
+- WHY 1 KM LOST IT, exactly: patchgen drops a patch's water when it covers under 8 % of the patch below level 5 ("thin water is
+  left to the terrain's far colour"), and the far colour's own widening (surface.js, S.foot) makes a river as wide as the
+  samples lie apart, at part strength: a faint broken band 50 to 100 m wide.
+- BUILT, ?farwater=1 (the coordinator, 16:14: after v39.3 took 792d1f1; C agreed, 16:22), off by default, the oil look only:
+  rivers.js writes c.rsd (the signed distance to the nearest river's centre line, its sign the segment's side) and c.rhw (that
+  river's half width), every call; surface.js hands them out as o.rsd, o.rhw while the rivers are attached (the context reset
+  each sample). patchgen.js: THE LAYOUT, CS 30: 23 still, 24 snow, 25 and 26 W3's runoff (reserved), 27 the signed distance,
+  28 its size, 29 the half width; packed only with the switch into aFarW (+ aFarWP for the morph: x 0.5 + sd / 96 m, y size
+  over 48 m, z half width over 24 m); terrain.js binds them. render/farground.js (at C's place: FARWATER_VERT_DECL / _MAIN /
+  _FRAG, inside #ifdef PC_FARWATER): pcFarWaterLay lays the river over the ground's finished paint at each pixel, as wide as
+  the interpolated distance says, in water's tone from above (the haze with 0.3 white, as the water's own paint takes the
+  sky), only past 250 m (fading in to 500 m), and only where the size says a river is near both vertices (two rivers'
+  distances of opposite sign would cross zero between them). materials.js: the includes and one line before the haze.
+  TRIED AND NOT KEPT (C's first wish): the water's wash in the dabs at their centres and between them, with crowns and fallen
+  leaves gated off a river dab: from 1 km the river is about 7 px, narrower than a dab, and lost again
+  (`farwater-in-dabs-tried-1km.jpg`). SEEN (`farwater-ab-400-1km-1600.jpg`, same frames A | B): 400 m unchanged (the water's
+  own mesh holds the river there); 1 km the landing's river a continuous line from near the eye into the lake, and two other
+  rivers; 1.6 km the rivers winding lines. HONEST: the line is a plain pale stroke, lighter than the lake's painted water and
+  without its strokes: the look director's call. Test: src/world/farwater.test.mjs (nothing packed without the switch; with
+  it, coarse patches over the landing carry vertices inside the river, and they are wet). Switches off: 0 of 1,688,000 values
+  differ, both looks; the ground's program is compiled without any of it.
 
 ### THE SPEED TEST'S FALLS VIEW AND ?bench=water (24 Nov, this session; lane 0, the coordinator's order)
 

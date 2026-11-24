@@ -531,3 +531,42 @@ export function syncCanopy(material, S) {
     for (let i = 0; i < 3; i++) { u.uCanSum.value[i] = spec.means[0][i]; u.uCanAut.value[i] = spec.means[1][i]; }
   }
 }
+
+// THE FAR VIEW'S WATER LINE (?farwater=1; the water group's lead, written here with C's agreement, 24 Nov; docs/notes/water.md
+// "THE WATER FROM THE AIR" on design-water). From high up the ground's patches are coarse: they drop a river's water mesh
+// (world/patchgen.js: thin water is left to the far colour) and a river of 19 m falls between vertices 40 to 60 m apart, so
+// from 1 km a river of the tree was lost. The mesher packs at each vertex the SIGNED distance to the nearest river's centre
+// line (its sign the side of the river), which passes through zero across the river and interpolates truly between
+// vertices however far apart they lie, the river's half width, and its size (no river near: two rivers' distances of
+// opposite sign would cross zero between them). The river is then laid as wide as it is, at each pixel, over the ground's
+// paint, in the tone of water seen from above (the sky's, as the water's own paint takes it). WHY AT EACH PIXEL AND NOT IN
+// THE DABS (C asked for the dabs; tried, 24 Nov 17:00, and SEEN to lose the river again): from 1 km the river is about 7
+// pixels wide, narrower than a dab, and a dab is painted whole from its centre, so few dabs ever took the water and the
+// line broke up. Only past 250 m (nearer, the water's own mesh holds the river). Compiled in only with the oil look and
+// ?farwater=1 (render/materials.js); the mesher packs nothing without it.
+export const FARWATER_VERT_DECL = /* glsl */`
+#ifdef PC_FARWATER
+attribute vec4 aFarW;     // the signed distance to a river's centre (0.5 on it), its size, the river's half width
+attribute vec4 aFarWP;    // the same as the parent patch paints it
+varying vec3 vFarW;
+#endif`;
+export const FARWATER_VERT_MAIN = /* glsl */`
+  #ifdef PC_FARWATER
+    vFarW = mix(aFarW.xyz, aFarWP.xyz, m);
+  #endif`;
+export const FARWATER_FRAG = /* glsl */`
+#ifdef PC_FARWATER
+varying vec3 vFarW;
+// how much of this pixel is river: 1 inside, 0 out, over the pixel's own share of the distance; 0 near the eye
+float pcFarWater(vec3 fw, float aa, float dist) {
+  float sd = (fw.x - 0.5) * 96.0, dc = fw.y * 48.0, hw = fw.z * 24.0;
+  aa = max(aa, 0.05);
+  return (1.0 - smoothstep(hw - aa, hw + aa, abs(sd))) * step(0.75, hw) * (1.0 - smoothstep(41.0, 46.0, dc))
+       * smoothstep(250.0, 500.0, dist);
+}
+// the ground's paint c with the river laid over it, in water's tone from above
+vec3 pcFarWaterLay(vec3 c, float dist) {
+  float k = pcFarWater(vFarW, fwidth(vFarW.x) * 72.0, dist);
+  return mix(c, pcDensity(mix(uHaze, vec3(1.0), 0.30) * vec3(0.86, 0.95, 1.04), 1.12), k);
+}
+#endif`;

@@ -40,10 +40,14 @@ export const PATCH_VERTS = V * V + 4 * V;
 const _d = [0, 0, 0];
 const _px = new Float64Array(E * E), _py = new Float64Array(E * E), _pz = new Float64Array(E * E);
 const _hh = new Float32Array(E * E), _lq = new Float32Array(E * E);
-const CS = 25;   // floats kept per sample: wash, far wash, parameters, liquid look, strata, the current, the fall, the stand
+const CS = 30;   // floats kept per sample: wash, far wash, parameters, liquid look, strata, the current, the fall, the stand
                  // (21, 22: the far view's), how still (23: the water's), the snow (24: the far view's). (v39.2's merge into the
                  // water branch, 24 Nov, as the coordinator's trial: the water keeps 23, the snow moved to 24, written and read
-                 // there. The water lead owns this layout for the water lanes: the runoff's cap and swell take 25 and 26.)
+                 // there. The water lead owns this layout for the water lanes: the runoff's cap and swell take 25 and 26 (lane
+                 // W3), the far view's water line 27, 28, 29: the signed distance to a river's centre, its size, its half width.)
+// (?farwater=1, the far view's water line: the signed distance to a river's centre line is packed to this many metres either
+//  side, and a half width to this many)
+const FW_R = 48, FW_HW = 24;
 const _col = new Float32Array(E * E * CS);
 const _fs = [0, 0];     // (the stand and its needle share at a sample: world/farstand.js)
 let _s = null;
@@ -110,6 +114,8 @@ export function stepPatch(job, deadline) {
   // (and the rock, FV4: how much snow the surface laid over each wash, so that it can be shed off the steep faces once
   // the patch's normals are known, below)
   const rkf = rockfieldOn(S.id);
+  // (?farwater=1: the rivers of the tree's signed distance at each vertex, for the far ground's water line; only with them)
+  const fwo = !!(MODE.oil && MODE.water && MODE.water.farwater && S.rivers);
   // 1. sample the surface on the apron grid, a row at a time
   // (S.foot: how far apart this patch's samples lie, in metres, while they are taken: the oil look's surface draws a
   // river into the far colour as wide as that, so that a river is still a line on the land from high up, where the
@@ -139,6 +145,7 @@ export function stepPatch(job, deadline) {
         _col[c + 23] = s.still || 0;                              // (the water's: how still, where a water part says; 0 otherwise)
         if (gse) { _col[c + 6] = s.canA || 0; _col[c + 7] = s.canS || 0; }
         _col[c + 24] = rkf ? s.snowK || 0 : 0;                    // (the far view's snow: 24 since the water took 23)
+        if (fwo) { const sd = s.rsd === undefined ? 1e9 : s.rsd; _col[c + 27] = sd; _col[c + 28] = Math.abs(sd); _col[c + 29] = s.rhw || 0; }
       }
     }
   }
@@ -153,6 +160,9 @@ export function stepPatch(job, deadline) {
   // the same vertex as the parent's (half resolution) mesh paints it: its washes, its parameters and its
   // normal there, so a patch can show exactly what its parent showed and slide to its own look
   const colP = new Uint8Array(nv * 4), col2P = new Uint8Array(nv * 4), parP = new Uint8Array(nv * 4), norP = new Float32Array(nv * 3);
+  // (?farwater=1: the far view's water line, x the signed distance to a river's centre (0.5 on it, FW_R metres to 0 or 1),
+  //  y its size (FW_R and more: none near), z the river's half width over FW_HW; with the parent's look beside it)
+  const fw = fwo ? new Uint8Array(nv * 4) : null, fwP = fwo ? new Uint8Array(nv * 4) : null;
   let boundR2 = 0;
   for (let j = 0; j < V; j++) {
     for (let i = 0; i < V; i++) {
@@ -206,6 +216,7 @@ export function stepPatch(job, deadline) {
       // crack's depth, which the oil look's ground never paints -- the needle share; world/farstand.js)
       col2[q] = b8(_col[c + 3]); col2[q + 1] = b8(_col[c + 4]); col2[q + 2] = b8(_col[c + 5]); col2[q + 3] = can ? b8(_col[c + 21]) : 255;
       par[q] = b8(_col[c + 6]); par[q + 1] = b8(_col[c + 7]); par[q + 2] = b8(_col[c + 8]); par[q + 3] = b8(_col[c + (can ? 22 : 9)]);
+      if (fw) { const sd = Math.max(-FW_R, Math.min(FW_R, _col[c + 27])); fw[q] = b8(0.5 + 0.5 * sd / FW_R); fw[q + 1] = b8(Math.min(FW_R, _col[c + 28]) / FW_R); fw[q + 2] = b8(_col[c + 29] / FW_HW); fw[q + 3] = 255; }
       if (!io && !jo) {
         // the parent's own normal here: its grid is twice as wide (at the border the apron is one cell deep)
         const il2 = i > 0 ? k - 2 : k - 1, ir2 = i < N ? k + 2 : k + 1, jl2 = j > 0 ? k - 2 * E : k - E, jr2 = j < N ? k + 2 * E : k + E;
@@ -226,6 +237,7 @@ export function stepPatch(job, deadline) {
         colP[v * 4 + t] = (col[v1 * 4 + t] + col[v2 * 4 + t] + 1) >> 1;
         col2P[v * 4 + t] = (col2[v1 * 4 + t] + col2[v2 * 4 + t] + 1) >> 1;
         parP[v * 4 + t] = (par[v1 * 4 + t] + par[v2 * 4 + t] + 1) >> 1;
+        if (fw) fwP[v * 4 + t] = (fw[v1 * 4 + t] + fw[v2 * 4 + t] + 1) >> 1;
       }
       if (io || jo) for (let t = 0; t < 3; t++) norP[v * 3 + t] = (norP[v1 * 3 + t] + norP[v2 * 3 + t]) * 0.5;
     }
@@ -246,6 +258,7 @@ export function stepPatch(job, deadline) {
     const a = dst * 4, b = src * 4;
     norP[o] = norP[p]; norP[o + 1] = norP[p + 1]; norP[o + 2] = norP[p + 2];
     for (let t = 0; t < 4; t++) { col[a + t] = col[b + t]; col2[a + t] = col2[b + t]; par[a + t] = par[b + t]; colP[a + t] = colP[b + t]; col2P[a + t] = col2P[b + t]; parP[a + t] = parP[b + t]; }
+    if (fw) for (let t = 0; t < 4; t++) { fw[a + t] = fw[b + t]; fwP[a + t] = fwP[b + t]; }
   };
   for (let k = 0; k < V; k++) {
     skirt(S0 + k, k); skirt(S0 + V + k, N * V + k); skirt(S0 + 2 * V + k, k * V); skirt(S0 + 3 * V + k, k * V + N);
@@ -413,7 +426,7 @@ export function stepPatch(job, deadline) {
   }
   return {
     origin: [ox, oy, oz], positions: pos, normals: nor, morph: mor, colors: col, colors2: col2, params: par,
-    colorsP: colP, colors2P: col2P, paramsP: parP, normalsP: norP,
+    colorsP: colP, colors2P: col2P, paramsP: parP, normalsP: norP, farw: fw, farwP: fwP,
     water, boundR: Math.sqrt(boundR2) + drop, minH, maxH, size,
   };
 }

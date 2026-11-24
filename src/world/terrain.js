@@ -142,6 +142,7 @@ export class PlanetTerrain {
     g.setAttribute('aColor2P', new THREE.BufferAttribute(d.colors2P, 4, true));
     g.setAttribute('aParamsP', new THREE.BufferAttribute(d.paramsP, 4, true));
     g.setAttribute('aNormalP', new THREE.BufferAttribute(d.normalsP, 3));
+    if (d.farw) { g.setAttribute('aFarW', new THREE.BufferAttribute(d.farw, 4, true)); g.setAttribute('aFarWP', new THREE.BufferAttribute(d.farwP, 4, true)); }   // (?farwater=1: patchgen.js)
     g.setIndex(sharedIndex());
     g.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 0, 0), d.boundR);
     const mesh = new THREE.Mesh(g, this.material);
