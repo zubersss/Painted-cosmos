@@ -5,9 +5,9 @@
 // Additive: setTime(seconds), setDebugView(n), setLook({...}), info, dispose().
 import * as THREE from 'three';
 import { Post } from './post.js';
-import { G, SHEET, WX, QUALITY, FRAME_HOOKS, GLAZES, MOTION, PREV, LOOK, OIL, SHADOW, ensureGlobals, SCREEN, MATERIALS } from './shared.js';
+import { G, SHEET, WX, QUALITY, FRAME_HOOKS, GLAZES, MOTION, PREV, LOOK, OIL, SHADOW, ensureGlobals, SCREEN, MATERIALS, PREPASSES } from './shared.js';
 const _lv = new THREE.Vector3();
-import { makeWashMaterial, makePaintUniforms, standInFor, bindBodyUniforms, defaultBodyUniforms } from './materials.js';
+import { makeWashMaterial, makePaintUniforms, standInFor, bindBodyUniforms, defaultBodyUniforms, TREE_DEPTH, TREE_GUARD, treeGuardCheck } from './materials.js';
 import { VERT_PARS, VERT_END, FRAG_PARS } from './chunks.js';
 import { ShadowMap } from './shadow.js';
 
@@ -127,7 +127,15 @@ export function createPainter(renderer) {
     // none it cannot change the picture, because with one sample alpha-to-coverage has no effect by definition.
     {
       const want = post.samples > 0;
-      for (const m of MATERIALS) if (m.userData.pcMake && m.userData.pcMake.kind === 'prop' && !!m.alphaToCoverage !== want) m.alphaToCoverage = want;
+      // (?trees2: the trees' wood and leaf programs, and the cards' colour pass after a depth pass, are drawn with no
+      //  alpha to coverage whatever the samples: they cut nothing, or the depth pass already cut it, and it would only
+      //  cost them the early depth test -- materials.js makePropMaterial, opts.tree)
+      for (const m of MATERIALS) {
+        const mk = m.userData.pcMake;
+        if (!mk || mk.kind !== 'prop') continue;
+        const t = mk.opts && mk.opts.tree, w = t === 'wood' || t === 'leaf' || (t === 'card' && mk.opts.depth) ? false : want;
+        if (!!m.alphaToCoverage !== w) m.alphaToCoverage = w;
+      }
     }
     // (the oil look on a touch device has no smoothing filter at all: the light post filter softens every stroke's edge,
     // and the phone's screen then stretches the picture three times over: blur on blur, against the look's first rule)
@@ -197,6 +205,20 @@ export function createPainter(renderer) {
     swapped.length = 0;
   }
 
+  // (package T5) each card mesh that is shown, drawn into the scene's depth with its depth-only materials, its wood
+  // left out; then put back as it was. The scene's own pass draws the cards' colour where the depth is equal.
+  function treeDepthFirst(camera) {
+    for (const mesh of TREE_DEPTH.meshes) {
+      if (!mesh.count || !mesh.userData.pcDepthMats) continue;
+      let shown = true;
+      for (let o = mesh; o && shown; o = o.parent) if (!o.visible) shown = false;
+      if (!shown) continue;
+      const src = mesh.material;
+      mesh.material = mesh.userData.pcDepthMats;
+      try { renderer.render(mesh, camera); } finally { mesh.material = src; }
+    }
+  }
+
   function render(scene, camera, dt) {
     if (dt > 0) G.uTime.value += Math.min(dt, 0.1);
     for (const hook of FRAME_HOOKS) hook(camera, info);
@@ -235,6 +257,7 @@ export function createPainter(renderer) {
     // place them all again, though nothing has moved in between: when the shadow pass has drawn this frame, the scene
     // pass takes the places as they are. Counted at a phone's size: 872 objects were placed 2.8 times a frame, now once.)
     const sf0 = shadow ? shadow.frames : 0;
+    for (const p of PREPASSES) p(renderer, scene, camera);      // (group D, T5: the cloud shadow map, world/clouds.js; empty, nothing runs)
     if (shadow) shadow.render(renderer, scene, camera);
     const placed = !!shadow && shadow.frames !== sf0 && scene.matrixWorldAutoUpdate === true;
     if (LOOK.oil) {
@@ -249,12 +272,18 @@ export function createPainter(renderer) {
     glazed.length = 0;
     for (const o of GLAZES) if (o.visible && o.parent) { o.visible = false; glazed.push(o); }
     if (placed) scene.matrixWorldAutoUpdate = false;
+    // (?treedepth=1, the trees to 30 a second, package T5: the trees' cards of leaves are laid in DEPTH ONLY before
+    //  the scene, so that in the scene each pixel of a tree is painted once, by the leaf on top: materials.js CARD_FRAG)
+    if (TREE_DEPTH.on && TREE_DEPTH.meshes.size) treeDepthFirst(camera);
     try {
       renderer.render(scene, camera);
     } finally {
       if (placed) scene.matrixWorldAutoUpdate = true;
       restoreForeign();
     }
+    // (did any of the trees' two short programs fail to link? Then every tree goes back to the one program on the next
+    //  frame: materials.js TREE_GUARD. A look at a score of materials' programs, until one fails.)
+    if (TREE_GUARD.mats.size && !TREE_GUARD.failed) treeGuardCheck(renderer);
     post.finish(glazed, camera);
     renderer.setRenderTarget(prevTarget);
     renderer.autoClear = prevAuto;

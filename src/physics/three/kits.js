@@ -43,6 +43,7 @@
 // Depth (C7): the kits write no depth of their own; the material does (include three's
 // logdepthbuf chunks in a ShaderMaterial, as everywhere else).
 import * as THREE from 'three';
+import { WX2 } from '../wx2.js';
 import { PARTICLES } from '../particles.js';
 import { DRAW, makeEye, cellFor, expandStreaks, expandDabs, dabSize, expandShades, expandVeils, expandMats, expandMarks, expandRings, expandWater, quadIndices, quadUvs, gridIndices } from './expand.js';
 import { PARTICLE_GLSL } from './chunks.glsl.js';
@@ -234,6 +235,17 @@ export function createWeatherKit(physics, { makeMaterial, kinds = PARTICLES.kind
         eye.radius = b.far > PARTICLES.radius ? b.far : PARTICLES.radius;
         // (P10: what the wind itself raises is streamers too: the powder over blowing snow, the fines over blowing sand)
         eye.wall01 = P.kind === 'dust' ? Math.max(physics.here.weather.dustLoad01 || 0, 0.9 * (physics.here.blown ? Math.max(physics.here.blown.snow, physics.here.blown.sand) : 0)) : 0;
+        // (group D, ?rainlook=1: A DOWNPOUR READS AS ONE. SEEN at the spawn's own thunderstorm, 23.7 mm/h, before this: a
+        //  few dozen strokes in view, a light shower to the eye. The box already holds ~1,500 drops at tier 1; three of the
+        //  painter's own dials are let go -- all of them drawn from about three quarters of a downpour up (shareGain 1.4,
+        //  from 1), drops from 3.5 m out drawn (6), each stroke a third longer -- and the count stays what it was.)
+        if (P.kind === 'rain' && WX2.rainlook !== !!P._rainlook) {
+          if (!P._rain0) P._rain0 = { shareGain: P.D.shareGain, near: P.D.near, exposure: P.D.exposure, maxLen: P.D.maxLen };
+          const o = P._rain0, on = !!WX2.rainlook;
+          P.D.shareGain = on ? 1.4 : o.shareGain; P.D.near = on ? 3.5 : o.near;
+          P.D.exposure = on ? (o.exposure || 0.12) * 1.35 : o.exposure; P.D.maxLen = on ? (o.maxLen || 1.2) * 1.35 : o.maxLen;
+          P._rainlook = on;
+        }
         // (rain: more strokes the harder it rains; the share moves as slowly as the sky's number does)
         if (P.D.shareGain > 0) P.D.share = Math.min(1, P.share0 * (0.6 + P.D.shareGain * (physics.here.sky.rain || 0)));
         // how large a dab is now: its own size, or what the dust (snow) in the air needs to hide what it hides

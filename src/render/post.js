@@ -12,7 +12,7 @@
 // Only paper effects live in screen space (grain, wobble, border). Everything that belongs to
 // the painting (wash variation, strokes, light) is anchored in the world by the materials.
 import * as THREE from 'three';
-import { getTextures, G, PREV, LOOK, OIL } from './shared.js';
+import { getTextures, G, PREV, LOOK, OIL, CLOUDSHADOW } from './shared.js';
 
 // (2026-11-22, the owner's ten-step upgrade: the last pass's own switches, read once, so that the owner can be shown
 // A and B of the same still and can turn any one of them off. Each is described where it is used, in OIL_FRAG.)
@@ -650,6 +650,12 @@ uniform vec2 uInTexel;   // 1 / the size the scene is drawn at
 uniform float uUpK;      // (the sharp read where the picture is enlarged: 0 off, else the bilinear ramp's gain; setSize)
 uniform vec2 uShaftN;    // (the light in the air: x the most taps a line of sight gets, y metres of air to a tap; x 0 off)
 uniform vec4 uFarC;      // (the far land: x its local contrast, y the reference's reach in scene pixels, z its colour push, w free)
+uniform sampler2D uCloudShadow;   // (group D, T3: the cloud shadow map, world/clouds.js A6; 1 under a cloud, smooth)
+uniform mat4 uCloudShadowV;       // (view space -> its uv)
+uniform float uCloudShadowK;      // (0: none -- the default without ?clouds3d, and the speed test's row)
+uniform vec3 uCloudShadowC;       // (the shade's own hue, luminance 1: shared.js CLOUDSHADOW, set by world/index.js)
+uniform vec4 uLookF;     // (the look director's switches, shared.js: x the night key)
+uniform vec4 uLampV;     // (the lantern in the eye's space, w how strong: render/index.js)
 varying vec2 vUv;
 ${AUX_DEC}
 const vec3 W = vec3(0.3, 0.5, 0.2);
@@ -676,6 +682,25 @@ void main() {
   // contrast and the night's lamp test each used to fetch it for itself)
   vec4 aux = pcAuxDec(texture(tAux, vUv));
   float vz = exp2(aux.z) - 1.0;
+  // THE CLOUDS' SHADOWS ON THE LAND (group D, WEATHER-DESIGN A6 and T3; weather-clouds 6991bf6, laid here by the look
+  // director): the shapes of the clouds overhead lying on the ground and on everything standing on it, from the map
+  // world/clouds.js draws along the sun. A GLAZE that draws the lit values toward the shaded ones -- the light parts down
+  // by up to a quarter and a third of the way to the SHADE'S OWN HUE (the cool key, as pcOilShadeC lays it: so a cloud's
+  // shadow on the orange floor reads plum like a tree's, on grass a cooler green), the darks barely moved -- never a
+  // plain dimming; crisp at the map's half-way line; weaker as the air thickens past two kilometres; never on the sky
+  // or the clouds themselves (region 0). uCloudShadowK 0 (no ?clouds3d) skips it whole: the picture as it was.
+  if (uCloudShadowK > 0.0 && aux.w > 0.5) {
+    vec3 cvp = vec3((vUv * 2.0 - 1.0) * uTanHalf, -1.0) * vz;
+    vec2 cuv = (uCloudShadowV * vec4(cvp, 1.0)).xy;
+    if (cuv.x > 0.0 && cuv.y > 0.0 && cuv.x < 1.0 && cuv.y < 1.0) {
+      float cs = texture(uCloudShadow, cuv).r;
+      float cw = clamp(fwidth(cs), 0.02, 0.2);
+      cs = smoothstep(0.5 - cw, 0.5 + cw, cs) * uCloudShadowK * (1.0 - smoothstep(1800.0, 4200.0, vz));
+      float cL = dot(col, vec3(0.3, 0.5, 0.2));
+      vec3 csh = mix(col, vec3(cL) * uCloudShadowC, 0.32) * mix(1.0, 0.74, smoothstep(0.22, 0.72, cL));
+      col = mix(col, csh, cs * 0.85);
+    }
+  }
   // THE FAR LAND KEEPS ITS LOCAL CONTRAST (the owner, 22 Nov: "fully rendered even from 300 yards away"). Past about
   // 60 m the air's veil flattens the land's own value steps toward one tone, so a wood at 275 m reads as a smudge that
   // sharpens as the player walks in. The pixel is set against a few-pixel reference of its neighbourhood and nudged
@@ -770,7 +795,17 @@ void main() {
   if (uNight > 0.003 || uGrade != vec3(1.0)) lamp = step(7.95, aux.w);
   // (and by night what is warm is a light or is lit by one: the lantern's pool on the snow keeps its orange, as a
   // lamp's glass does; the night's cool key over it turned the pool to mustard)
-  lamp = max(lamp, smoothstep(0.10, 0.32, col.r - col.b) * uNight);
+  // (L1, 2026-11-24: the night key. The excuse was taken from the HUE -- every pixel redder than it is blue -- so every
+  // autumn leaf, every lemon blade and every sand bank kept its day colour at night, LOOK-AUDIT F1. It is now taken
+  // from the lantern's own reach: the place this pixel shows, from its depth, against the lantern's place in the
+  // eye's space, whole within 4.5 m and gone by 6 m, as pcLamp's pool is; and region 8 (a flame, a lamp) as above.
+  // uLookF.x 0 is the hue test as it was.)
+  if (uLookF.x > 0.5) {
+    if (uLampV.w > 0.01) {
+      vec3 vp = vec3((vUv * 2.0 - 1.0) * uTanHalf, -1.0) * vz;
+      lamp = max(lamp, (1.0 - smoothstep(4.5, 6.0, length(vp - uLampV.xyz))) * step(0.5, aux.w) * uNight);
+    }
+  } else lamp = max(lamp, smoothstep(0.10, 0.32, col.r - col.b) * uNight);
   col *= mix(uGrade, vec3(1.0), lamp);
   // lightning: for a frame or two everything light goes lighter
   col = mix(col, vec3(1.0), clamp(uWxSheet.y * smoothstep(0.25, 0.75, dot(col, W)) * 0.6, 0.0, 0.9));
@@ -782,8 +817,24 @@ void main() {
   // meant to mend; above 0.79 it does cut, but easing it there lifts the far picture, which is exactly what the
   // owner called "kinda light" and measured against (the shoulder's note below). The far land's modelling is put
   // back by the local-contrast gain above instead, which moves no mean value at all.)
-  vec3 s = col * col * (3.0 - 2.0 * col);
-  col = mix(col, s, 0.35);
+  // (L7, 2026-11-24, QUIET DARKS; LOOK-AUDIT F4: the S laid on each channel pushed a dark colour's small channels down
+  // faster than its large one, so every shadow came out purer than it was painted -- (0.20, 0.12, 0.18) went from
+  // saturation 0.40 to 0.53 here and the push below. With uLookF.w on, the S is laid on the VALUE only and the colour
+  // scaled to it, so a colour keeps its hue and its saturation and only its value moves along the same S.)
+  if (uLookF.w > 0.5) {
+    // (never above where the old S took the brightest channel: laid on the value alone, a bright saturated colour's
+    // top channel rose further than it did, and the share of the picture over 0.90 grew, 4.1 to 4.8 per cent on S2)
+    // (REWORKED after the coordinator's S1 review: laid on the value everywhere it also dimmed the saturated MIDDLE
+    // values -- the autumn crowns at golden hour, measured on S1: their warm pixels' value 0.54 to 0.49 and saturation
+    // 0.73 to 0.68 -- because the old per-channel S is what lifted a red's top channel and gave it its fire. Now it is
+    // the darks' step only: under a value of 0.30 the value S, over 0.50 the old S exactly, between the two a blend.)
+    float l0 = max(dot(col, W), 1e-4), vm0 = max(max(col.r, col.g), max(col.b, 1e-4));
+    vec3 sv = col * min(mix(l0, l0 * l0 * (3.0 - 2.0 * l0), 0.35) / l0, mix(vm0, vm0 * vm0 * (3.0 - 2.0 * vm0), 0.35) / vm0);
+    col = mix(sv, mix(col, col * col * (3.0 - 2.0 * col), 0.35), smoothstep(0.30, 0.50, vm0));
+  } else {
+    vec3 s = col * col * (3.0 - 2.0 * col);
+    col = mix(col, s, 0.35);
+  }
   // colours that pop (the owner, 2026-11-15): every colour pushed from its grey, the dull ones most and the pure ones
   // hardly, so nothing clips; a pixel's own colour only, no neighbour is read: no edge is touched
   // (2026-11-22: and the push eases from 0.28 to uFarC.z with distance. It is strongest where the colour is weakest,
@@ -792,7 +843,14 @@ void main() {
   // dot(col, W) for any g -- so easing it cannot lighten the far picture and the measured shares do not move.
   // ?farsat= sets it; 0.28 is the look as it was.)
   float lw = dot(col, W), sat = max(col.r, max(col.g, col.b)) - min(col.r, min(col.g, col.b));
-  col = clamp(mix(vec3(lw), col, 1.0 + mix(0.28, uFarC.z, far) * (1.0 - sat)), 0.0, 1.0);
+  // (L7: "dull" was measured as max - min, which is small for EVERY dark colour, so every shadow got the whole push.
+  // With uLookF.w on the push eases to four tenths of itself under a value of 0.20, fully back by 0.40: the darks are
+  // left nearer as painted, deep and quieter, and the lights and middle values pop exactly as before. (The first
+  // version also measured "dull" as the real saturation, which took most of the push off every saturated middle
+  // value too -- the crowns again -- and is dropped.))
+  float pushK = 1.0;
+  if (uLookF.w > 0.5) pushK = mix(0.4, 1.0, smoothstep(0.20, 0.40, max(col.r, max(col.g, col.b))));
+  col = clamp(mix(vec3(lw), col, 1.0 + mix(0.28, uFarC.z, far) * (1.0 - sat) * pushK), 0.0, 1.0);
   col = mix(vec3(0.07, 0.06, 0.09), col, smoothstep(0.0, 1.0, uLaid));
   // (2026-11-18, the owner: "It's kinda light".) THE SHOULDER: nothing clips to paper white any more.
   // Measured on rendered stills against the owner's twenty oil paintings: HALF the game's aerial picture was
@@ -951,7 +1009,8 @@ export class Post {
       // (2026-11-22, the ten-step upgrade; the switches are at the top of this file and the reasons in OIL_FRAG)
       uInTexel: this.sheetUniforms.uInTexel, uUpK: { value: 0 },
       uShaftN: { value: new THREE.Vector2(16, 7) },
-      uFarC: { value: new THREE.Vector4(FARCON, FARPX, FARSAT, 0) } });
+      uFarC: { value: new THREE.Vector4(FARCON, FARPX, FARSAT, 0) }, uLookF: OIL.uLookF, uLampV: OIL.uLampV,
+      ...CLOUDSHADOW });      // (group D's cloud shadows, T3: shared.js)
     this.mOil.name = 'oil-finish';
     this.debugView = 0;
     this.mCopy = fsMaterial(/* glsl */`

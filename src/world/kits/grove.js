@@ -30,7 +30,7 @@
 //
 // WHAT IS NOT CLAIMED: the shapes have been seen, flat-filled and in one colour, in Node. Nothing here has been seen
 // in the game's own paint, light or motion.
-import { Builder, tube, leafCards, V } from '../kitbuild.js';
+import { Builder, tube, leafCards, clusterCard, V } from '../kitbuild.js';
 import { mulberry32 } from '../noise.js';
 
 // The settings a tree is made of. height m; girth of height; lean; forkAt where the boughs leave (of height);
@@ -46,6 +46,9 @@ const BASE = {
   spread: 0.8, arch: 0.16, levels: 3, split: 0.62, taper: 0.22, triple: 0.3, twigs: 4, twigLen: 0.3,
   drop: -0.10, liftTo: 0.3, twigDrop: 0, stopEarly: 0.3, leader: 0, inner: 0.45, hem: 1.4, twigMax: 0.16,
   boughLen: 0.34, leafN: 900, leafR: 0.055, leafLen: 0.5, leafDroop: 0.3,
+  // (?trees2=cards: how many leaves a card stands for, how much wider than its clump it is, how far it faces out of the
+  //  crown rather than its own way)
+  cardLeaves: 4, cardK: 1.2, cardOut: 0.55,
 };
 
 export const GROVE = {
@@ -63,8 +66,22 @@ export const GROVE = {
 // higher with a narrower crown, so a wood seen from inside is its trunks against the air.)
 export function grow(P0, seed, lod, spec) {
   const rnd = mulberry32(seed), B = new Builder();
+  B.axis = !!(spec && spec.trees2);      // (?trees2=: kitbuild.js tube, the wood's pinch at the lens)
   const near = lod === 0;
   const sl = !!(spec && spec.slender);
+  // THE TREES TO 30 A SECOND (?trees2=, 2026-11-24; docs/lead/TREES-DESIGN.md on r2, package T2). spec.trees2:
+  //   'split': the same tree with its WOOD lighter -- no haze of hair twigs (460 to 4,350 triangles a tree, half of them
+  //            under a pixel on the phone) -- for the plant's two short programs (materials.js WOOD_FRAG and
+  //            LEAF_FRAG); the leaves are the leaves they were. (It also took a side off every tube at first. SEEN
+  //            24 Nov, the same trunk at 5 m: that, and not the programs or the twigs, is what made the bark's
+  //            streaks flatter and less broken than today's -- the split programs on today's tubes match today to
+  //            0.1 of 255 there -- so every tube keeps today's sides.)
+  //   'cards': that wood, and the leaves as CLUSTERS on cards (kitbuild.js clusterCard; materials.js CLUSTER_FRAG).
+  // THE TREE IS THE SAME TREE: every random number is drawn exactly as before, in the same order, whether or not
+  // what it was for is built, so the skeleton -- the owner's chosen form, the fork, the boughs -- and where every
+  // clump of leaves hangs are the very ones today's tree has. Only what is laid on them changes.
+  const t2 = spec && spec.trees2 ? String(spec.trees2) : '';
+  const lite = !!t2, cards = t2 === 'cards';
   const P = sl ? Object.assign({}, P0, { forkAt: Math.min(0.8, P0.forkAt * 1.35), boughLen: P0.boughLen * 0.84, spread: P0.spread * 0.82 }) : P0;
   // THE MIDDLE TIER IS A STEM AND ITS FIRST BOUGHS, AND NOTHING ELSE. (Measured 2026-11-19 against the kits this
   // wood used to plant: at this tier the old maple drew 84 triangles of WOOD and this grammar drew 652, the poplar
@@ -121,7 +138,8 @@ export function grow(P0, seed, lod, spec) {
         if (hy < -0.3) lh = Math.min(lh, Math.max(0.2, (tip.y - P.hem) / fall));   // the curtain's hem
         const q1 = V(tip.x + hx * lh * 0.5, tip.y + hy * lh * 0.5 + lh * sagK, tip.z + hz * lh * 0.5);
         const q2 = V(tip.x + hx * lh, tip.y + hy * lh + lh * sagK * 2.6, tip.z + hz * lh);
-        tube(B, [tip, q1, q2], [rh, rh * 0.5, rh * 0.16], 3, { part: 0, shade: 0.68, sway0: 0.9, hash: rnd(), branch: bid });
+        // (?trees2: the hair is not laid, but its number is still drawn, so every tree after it is the same tree)
+        if (lite) rnd(); else tube(B, [tip, q1, q2], [rh, rh * 0.5, rh * 0.16], 3, { part: 0, shade: 0.68, sway0: 0.9, hash: rnd(), branch: bid });
         const ns = lh > len * 0.7 ? 3 : 2;                 // a long hanging twig is leafy the whole way down
         for (let j = 1; j <= ns; j++) { const u = j / ns;
           stations.push({ p: V(tip.x + hx * lh * u, tip.y + hy * lh * u + lh * sagK * u * u * 2.6, tip.z + hz * lh * u), len: lh / ns, w: 0.8, bid }); }
@@ -169,13 +187,42 @@ export function grow(P0, seed, lod, spec) {
   // four-cornered rather than six, so a tenth of the count reads as the same mass.
   const want = near ? P.leafN : Math.round(P.leafN * 0.10);
   const floor = near ? 3 : 2;
-  const room = Math.max(8, Math.floor(want / floor));
+  // (?trees2=cards: a card carries a clump of about P.cardLeaves leaves, so a tree has want / cardLeaves of them)
+  // (the middle tree, package T3: its clumps on cards too, of the same larger leaves its kites were, one card a clump:
+  //  a few dozen cards where it had a hundred and more kites)
+  const asCards = cards;
+  const room = asCards ? Math.max(8, Math.round(want / (near ? P.cardLeaves : floor))) : Math.max(8, Math.floor(want / floor));
   if (stations.length > room) {
     const keep = [], step = stations.length / room;
     for (let i = 0; i < room; i++) keep.push(stations[Math.floor(i * step)]);   // spread through, not the first few
     stations.length = 0; for (const st of keep) stations.push(st);
   }
   let wsum = 0; for (const st of stations) wsum += st.w;
+  if (asCards) {
+    // ONE CARD A CLUMP. It hangs where the clump of leaves hung (the same places, thinned evenly through the tree),
+    // facing out of the crown more or less -- its own way by its own numbers, so that from any side some cards face the
+    // eye and some are turned -- and as wide as the clump was, with room at its edge for a whole leaf (the leaf
+    // program never cuts a leaf at the card's edge: it leaves out a leaf that would cross it).
+    const cy0 = H * P.forkAt, cyR = Math.max(1, H - cy0);
+    for (const st of stations) {
+      const r = Math.min(P.leafR * H, st.len * 1.1) * (0.7 + 0.6 * rnd()) * (near ? 1 : 2.3);
+      const leaf = near ? P.leafLen : P.leafLen * 2.6;
+      groundUp(st.p);
+      let ox = st.p.x - crownC.x, oy = st.p.y - crownC.y, oz = st.p.z - crownC.z;
+      const ol = Math.hypot(ox, oy, oz) || 1; ox /= ol; oy /= ol; oz /= ol;
+      const ax = rnd() * 2 - 1, ay = rnd() * 2 - 1, az = rnd() * 2 - 1;
+      const nrm = V(ox * P.cardOut + ax * (1 - P.cardOut), oy * P.cardOut + ay * (1 - P.cardOut) + 0.15, oz * P.cardOut + az * (1 - P.cardOut));
+      const nl = nrm.length() || 1; nrm.multiplyScalar(1 / nl);
+      const mk = 0.55, mass = V(nrm.x + (ox - nrm.x) * mk, nrm.y + (oy - nrm.y) * mk, nrm.z + (oz - nrm.z) * mk).normalize();
+      const tan = V(rnd() - 0.5, rnd() - 0.5, rnd() - 0.5);
+      const yRel = Math.max(0, Math.min(1, (st.p.y - cy0) / cyR));
+      clusterCard(B, st.p, nrm, tan, r * P.cardK + leaf * 0.55, {
+        branch: st.bid, mass, hash: rnd(), rot: rnd() * 1.05, shade: Math.max(0, Math.min(1, 0.05 + 0.25 * (1 - yRel))), cell: leaf / 1.8,
+        sway: 0.55 + 0.45 * Math.max(0, Math.min(1, st.p.y / H)),
+      });
+    }
+    return B.build();
+  }
   for (const st of stations) {
     const n = Math.max(floor, Math.round(want * st.w / Math.max(1e-6, wsum)));
     const r = Math.min(P.leafR * H, st.len * 1.1) * (0.7 + 0.6 * rnd()) * (near ? 1 : 2.3);

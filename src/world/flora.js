@@ -18,10 +18,11 @@ import { dirToFace, faceToDir, nodeSize } from './cubesphere.js';
 import { INST_STRIDE, U_GRASS, U_FERN, U_BUSH, U_ROCK, U_FLOWER, U_STONE, U_REED, U_SHARD } from './floraplace.js';
 import { SEASON, leafNow } from '../data/season.js';
 import { FLORA_PHYS, TALL_KITS, farCardGeometry, farBlobGeometry, sortLeafCards, leafDrawCount, farTreeGeometry, grassGeometry, grassPatchGeometry, reedGeometry, fernGeometry, bushGeometry, rockGeometry, flowerGeometry, shardGeometry } from './florakit.js';
-import { makePropMaterial } from '../render/materials.js';
+import { makePropMaterial, TREE_DEPTH, TREE_GUARD } from '../render/materials.js';
+import { ImpostorAtlas, makeImpostorMaterial, impostorQuadGeometry, IMP, IMP_SHADOW, makeImpostorShadowMaterial, bakeTick } from '../render/impostor.js';
 import { treeCell, underCell, hasCell, TREE_LEVEL, UNDER_LEVEL } from './obstacles.js';
-import { QUALITY, G, LOOK, SCREEN, SHADOW } from '../render/shared.js';
-import { SHADOW_LAYER } from '../render/shadow.js';
+import { QUALITY, G, LOOK, SCREEN, SHADOW, SHADOW_CROWD } from '../render/shared.js';
+import { SHADOW_LAYER, SHADOW_TIERS } from '../render/shadow.js';
 import { FELLED, FELL, felledAt, fallingOn, felledOn, fallTurn } from '../data/felled.js';
 
 // tier ranges in metres at quality 2; scaled by RANGE_SCALE at lower tiers
@@ -55,6 +56,73 @@ const FAR_LUMP = typeof location !== 'undefined' && /[?&]fartree=lump\b/.test(lo
 // It stays opt-in, for the speed test and for comparisons.
 const FAR_BLOB = typeof location !== 'undefined' && /[?&]fartree=blob\b/.test(location.search || '');
 const FAR_CARDS = !FAR_LUMP;
+// THE TREES TO 30 A SECOND (?trees2=, 2026-11-24; docs/lead/TREES-DESIGN.md on r2, package T2; the oil look only).
+//   THE DEFAULT (since 24 Nov: the owner's phone measured the frame at 40.3 ms with it, 36.6 with no near trees): the near
+//     and middle trees drawn by TWO SHORT PROGRAMS, one for the wood and one for the leaves (materials.js WOOD_FRAG,
+//     LEAF_FRAG), with the wood's haze of hair twigs not built (kits/grove.js): the same leaves, the same skeleton,
+//     the same paint.
+//   ?trees2=0: every tree exactly what it was, in the one program (for an A and a B).
+//   ?trees2=cards: the near tree's leaves as CLUSTERS on cards (kitbuild.js clusterCard). Dropped by the owner; kept
+//     for the speed test's rows.
+// THE GUARD: a device that cannot build either short program puts every tree back to the one program at once
+// (materials.js TREE_GUARD; update below), and says why in the console. The speed test swaps it while it runs (setTrees2).
+const TREES2 = (() => {
+  const q = typeof location !== 'undefined' && location.search ? new URLSearchParams(location.search).get('trees2') : null;
+  return q === '0' || q === 'off' || q === 'false' ? '' : q === 'cards' ? 'cards' : 'split';
+})();
+// ?treesway=whole (24 Nov, the coordinator's ask after the phone priced the trees' wind): the NEAR trees bend whole, as
+// the middle trees already do (package T3), without PHYSICS' crown -- each branch swinging on its own clock, the dearest
+// thing in a tree's vertex program (two field lookups, twenty-four sines, four powers and three arctangents a vertex,
+// physics/flora.glsl.js pcPhysCrown). With the two short programs only; the speed test prices it (setTreeSway). How it
+// looks IN MOTION is not known here: only the owner's phone can show that.
+const TREESWAY = typeof location !== 'undefined' && /[?&]treesway=whole\b/.test(location.search || '');
+// (only a kind whose crown is leaves one by one, and nothing else, can be split: parts 0 bark, 5 leaf, 6 snow on a
+//  bough. A kind with crowns of washes (part 1: the green wood's conifer) keeps the one program.)
+function splittable(geos) {
+  for (const g of geos) { const d = g.attributes.aData.array; for (let i = 1; i < d.length; i += 4) { const p = d[i]; if (!(p < 0.5 || (p > 4.5 && p < 6.5))) return false; } }
+  return true;
+}
+// Wood first, then the leaves (sortLeafCards already orders them so: everything that is not a leaf, then the leaves by
+// number), as two groups of one index, one for each program.
+// (?treedepth=1, package T5: the cards of leaves laid in depth first, render/index.js; only with ?trees2=cards)
+const TREEDEPTH = typeof location !== 'undefined' && /[?&]treedepth=1\b/.test(location.search || '');
+const HIDDEN = new THREE.MeshBasicMaterial({ visible: false });      // (the wood's place in the depth pass: not drawn)
+function hasPart(geo, part) { const d = geo.attributes.aData.array; for (let i = 1; i < d.length; i += 4) if (Math.abs(d[i] - part) < 0.5) return true; return false; }
+function splitGroups(geo) {
+  const base = geo.userData.leaf ? geo.userData.leaf.base : geo.index.count;
+  geo.clearGroups(); geo.addGroup(0, base, 0); geo.addGroup(base, geo.index.count - base, 1);
+  return geo;
+}
+// THE FAR TREES AS PAINTED IMPOSTORS (2026-11-24, the trees lane, T1 of docs/lead/TREES-DESIGN.md on r2): each kind's
+// own full tree, baked once per world from 64 directions into an atlas and drawn as two triangles a tree, painted
+// stroke by stroke in the tree's own colour run with the crown's lit and shaded sides (render/impostor.js). Kinds that
+// are not trees in leaf (CAN_CARD below) keep the form they had. ?fartree=impostor; the default stays the tree of
+// flat pieces until the owner's phone and the stills say otherwise.
+// (THE DEFAULT since 24 Nov, after the look director passed the grain fix and the owner's phone timed them: from 150 m
+//  up the frame went from 151 ms to the screen's 16.7. ?fartree=old -- or cards, lump, blob -- is today's far tree. A
+//  device that cannot draw them falls back to today's far tree by itself: render/impostor.js, THE GUARD.)
+const FAR_IMP = typeof location !== 'undefined' && !/[?&]fartree=(old|cards?|lump|blob)\b/.test(location.search || '');
+// THE HAND-OVER DISTANCES (T4 of docs/lead/TREES-DESIGN.md, 2026-11-24): with the impostors on, the middle tree hands
+// over to the impostor at 45 m (the design's full tree to middle tree at 18 m waits for the near lane's new middle
+// tree: see setHandover), at the phone's picture (372 lines, where a
+// tree's ranges are scaled by 0.30: 90 and 190 m before scaling become 60 and 150), and both scale with the picture as
+// before. The owner's own rows say moving the hand-over in pays even with today's far tree ('hand over at half'
+// -28.7 ms, 'at a third' -38.1). ?treenear= and ?treemid= set them in metres at the phone's scale (?treenear=27&
+// treemid=57 is the hand-over as it was); without the impostors nothing changes unless they are given.
+const PHONE_TS = 0.30;
+// WHICH KINDS ARE IMPOSTORS ON FOOT (the look director's review of 24 Nov: on foot the far conifers lost their clean dark
+// spikes as impostors): 'conifers' (the default) keeps today's far form for the tapering kinds below IMP_AIR metres of
+// height; ?impfoot=all makes every kind an impostor on foot too, ?impfoot=none keeps today's far form for every kind
+// on foot. From the air every kind is an impostor.
+const IMP_FOOT = (() => { try { const v = new URLSearchParams(location.search).get('impfoot'); return v === 'all' || v === 'none' ? v : 'conifers'; } catch { return 'conifers'; } })();
+const IMP_AIR = 40;
+const HAND = (() => {
+  try {
+    const q = new URLSearchParams(location.search), num = (k) => { const v = q.get(k); const n = v == null ? NaN : +v; return isFinite(n) && n > 1 && n < 400 ? n : null; };
+    return { near: num('treenear'), mid: num('treemid') };
+  } catch { return { near: null, mid: null }; }
+})();
+const FAR_REACH = (() => { try { const q = new URLSearchParams(location.search).get('farreach'); const n = q == null ? NaN : +q; return isFinite(n) && n >= 0 && n <= 4000 ? n : 1500; } catch { return 1500; } })();
 const RANGE_SCALE = [0.28, 0.6, 1.0];                    // (the lower tiers keep the ranges they had)
 const TRIM = [1, 1];          // (was [0.82, 0.88] to pay for a triangle budget; the owner withdrew the budget: trees hand over where they read best)
 const WASH_T = 0.55;                   // seconds a new thing takes to wash in, and a tree to change hands between two tiers
@@ -165,6 +233,11 @@ export class Flora {
     this.farFill = !!(LOOK.oil && FAR_FILL);
     this.farSize = this.treeSize * this.farSpan;       // far trees are batched in cells this many tree cells to a side
     this.rangeScale = 1; this.treeScale = 1; this.farScale = 1; this.lastScale = -1; this.benchTreeK = null;
+    // (the speed test's handle on the near trees' index, core/bench.js: 'leaves' draws a tall mesh from its first leaf
+    //  card on, 'wood' only what comes before it -- sortLeafCards puts every piece of wood first. null: the whole tree.)
+    this.benchNear = null;
+    // (the full tree's and the middle tree's reach before the picture's scale: T0 and T1, or the hand-over above)
+    this.t0 = T0; this.t1 = T1;
     this.lastLaid = -10; this.washNow = 1; this._washWall = 0;
     this.lastRelease = -10;
     this.held = [];                    // cells that are built and wait for their ground (see update)
@@ -196,17 +269,20 @@ export class Flora {
     //  look -- boughs sampled off a curve rather than drawn as two straight bars -- must be behind it, or the
     //  watercolour game changes and the pixel gate says so.)
     const TALL = L.tall.map((sp) => (LOOK.oil ? Object.assign({}, sp, { oilLook: 1 }, sp.kit === 'broadleaf' || sp.kit === 'maple' || sp.kit === 'aspen' ? { leafy: 1, double: 1 } : null, sp.kit === 'roundmaple' || sp.kit === 'poplar' || sp.kit === 'oak' || sp.kit === 'birch' || sp.kit === 'willow' || sp.kit === 'sapling' ? { double: 1 } : null, sp.oil) : sp));
+    this.tall = TALL;
     this.species = TALL.map((sp, i) => {
-      const mat = makePropMaterial(bodyUniforms, { name: 'tall-' + sp.kit + i, barkA: sp.bark[0], barkB: sp.bark[1], leafA: sp.leaf[0], leafB: sp.leaf[1], leafC: sp.leaf[2], barkP: sp.barkP, leafP: sp.leafP, accent: sp.accent, oilDark: sp.dark || null, oilFam: sp.fam || null, oilKind: sp.snowy ? 1 : sp.bare ? 2 : 0, wind: sp.wind == null ? 0.03 : sp.wind, doubleSide: !!sp.double, phys: sp.kit === 'vine' ? null : 'lite', branch: BRANCHY.has(sp.kit), stiff: sp.kit === 'kelp' ? 0.1 : 1, plantHeight: (FAR_DIMS[sp.kit] || [0, 10])[1], gem: sp.kit === 'crystal',
+      const mo = { name: 'tall-' + sp.kit + i, barkA: sp.bark[0], barkB: sp.bark[1], leafA: sp.leaf[0], leafB: sp.leaf[1], leafC: sp.leaf[2], barkP: sp.barkP, leafP: sp.leafP, accent: sp.accent, oilDark: sp.dark || null, oilFam: sp.fam || null, oilKind: sp.snowy ? 1 : sp.bare ? 2 : 0, wind: sp.wind == null ? 0.03 : sp.wind, doubleSide: !!sp.double, phys: sp.kit === 'vine' ? null : 'lite', branch: BRANCHY.has(sp.kit), stiff: sp.kit === 'kelp' ? 0.1 : 1, plantHeight: (FAR_DIMS[sp.kit] || [0, 10])[1], gem: sp.kit === 'crystal',
         // (the last fixes: a spire parts round an eye inside it; its girth at the foot, height and lean, florakit.js spireGeometry)
-        hollow: sp.kit === 'spire' ? (sp.slim ? [1.3, 10.5, 0.3] : [2.0, 12, 0]) : null });
+        hollow: sp.kit === 'spire' ? (sp.slim ? [1.3, 10.5, 0.3] : [2.0, 12, 0]) : null };
+      const mat = makePropMaterial(bodyUniforms, mo);
       mat.userData.pcCasts = true;
       const gen = TALL_KITS[sp.kit];
       const fd = sp.farD || (sp.kit === 'crystal' && sp.thin ? [1.8, 8, 0.9] : FAR_DIMS[sp.kit]);      // (farD: a kind's own far size [across, high, taper]: the oil look's trees of the snow)
       // (the oil look: a tree's leaves in the order of their numbers, so that far off only a share of them is drawn:
       // florakit.js sortLeafCards)
       const lf = LOOK.oil ? sortLeafCards : (g) => g;
-      return { mat, geo0: [lf(gen(11 + i * 10, 0, sp)), lf(gen(12 + i * 10, 0, sp))], geo1: lf(gen(13 + i * 10, 1, sp)), far: fd, pine: sp.kit === 'conifer',
+      const geo0 = [lf(gen(11 + i * 10, 0, sp)), lf(gen(12 + i * 10, 0, sp))], geo1 = lf(gen(13 + i * 10, 1, sp));
+      return { mat, mat1: mat, geo0, geo1, base: { mat, geo0, geo1 }, mo, t2: null, t2Mode: '', canSplit: LOOK.oil && !!gen && splittable([geo0[0], geo1]), far: fd, pine: sp.kit === 'conifer',
         // (far off it is drawn as leaf cards, not as a lump: the trees in leaf of the oil look; ?fartree=lump: as it was)
         // (2026-11-18, found by an independent reader and re-measured: this list was left at the two old kits when the
         //  four new ones went into the autumn wood, so 38,686 of 38,968 FAR TREES IN IT FELL BACK TO THE 26-TRIANGLE
@@ -223,14 +299,25 @@ export class Flora {
     // in the oil overlay (the forest floor's), so without this line the LIVE WATERCOLOUR GAME would start turning
     // its seasons too -- which is a change to the live game, and those only happen when the owner asks.
     this._turn = [];
+    // THE SUMMER CANOPY (the look director, 24 Nov; render/shared.js LOOK.canopyGreen, off with ?light=old). The trees'
+    // summer dress was a lime (0.80, 0.92, 0.36), hue 73 at value 0.92, so the lit step of every crown came out at 0.91
+    // and from the air, where the crowns are most of the picture, the summer wood was one carpet of lime. A painter's
+    // summer wood is deep and varied with gold in its lights: the lightest of the three greens goes to an olive-gold a
+    // step down (about hue 60, value 0.78), the middle one a step deeper, the darkest toward a blue-green. Each kind
+    // keeps its own differences (it is a scale per channel, not new colours), the autumn dress is untouched, and the
+    // conifers, which have one dress, are not turned at all.
+    const SUMMER_K = [[0.98, 0.84, 0.92], [0.92, 0.82, 0.95], [0.86, 0.80, 1.02]];
+    const summerCanopy = (sum) => (LOOK.oil && LOOK.canopyGreen ? sum.map((c, k) => c.map((v, j) => v * SUMMER_K[Math.min(k, 2)][j])) : sum);
     for (let i = 0; LOOK.oil && i < TALL.length; i++) {
       const sp = TALL[i];
       if (!sp.leafSum && !sp.leafAut) continue;
       // `fam`, the family accent a kind's crowns carry (the maple's reds), is an AUTUMN colour: seen in the first
       // summer still it left red crowns in a green wood. Its amount rides the season with everything else.
-      this._turn.push({ mat: this.species[i].mat, far: i, sum: sp.leafSum || sp.leaf, aut: sp.leafAut || sp.leaf,
+      this._turn.push({ mat: this.species[i].mat, far: i, sum: sp.leafSum ? summerCanopy(sp.leafSum) : sp.leaf, aut: sp.leafAut || sp.leaf,
         famW: sp.fam ? (sp.fam[3] == null ? 1 : sp.fam[3]) : 0 });
     }
+    this.treeDepth = TREEDEPTH; TREE_DEPTH.on = TREEDEPTH; this.swayWhole = TREESWAY;
+    if (TREES2 && !TREE_GUARD.failed) this._useTrees2(TREES2);
     const U = L.under || { leaf: [[0.8, 0.85, 0.4], [0.55, 0.7, 0.3], [0.35, 0.5, 0.3]], accent: [0.86, 0.29, 0.17], bush: [[0.64, 0.77, 0.37], [0.45, 0.63, 0.36], [0.24, 0.41, 0.36]], rock: [[0.8, 0.79, 0.83], [0.47, 0.45, 0.55]] };
     this.U = U;
     this.pal = new Map();
@@ -256,6 +343,68 @@ export class Flora {
       grass: grassGeometry(31, { oil: LOOK.oil }), patch: grassPatchGeometry(37, { oil: LOOK.oil }), fern: fernGeometry(41, { oil: LOOK.oil }), reed: reedGeometry(81), bush: bushGeometry(51, { oil: LOOK.oil }),
       rock: rockGeometry(61), flower: flowerGeometry(71, { oil: LOOK.oil }), shard: shardGeometry(91),
     };
+    this.impOn = false; this.impWant = false;
+    if (LOOK.oil && FAR_IMP && this.mats.far) this._impostors(true);
+    this.setHandover(HAND.near, HAND.mid);
+  }
+
+  // The hand-over distances in metres at the phone's scale (null: the default for whether the impostors are on). Taken
+  // in on the next update; the speed test sets them for a row (core/bench.js).
+  setHandover(near, mid) {
+    const on = LOOK.oil && !TREES_FULL;
+    // (the near hand-over stays where it was by default: SEEN at 18 m with today's middle tree, a tree 15 to 20 m off
+    //  became an umbrella of big kites -- that hand-over waits for the near lane's new middle tree. The middle tree
+    //  hands to the impostor at 45 m.)
+    const n = near != null ? near : null, m = mid != null ? mid : on && this.impOn ? 45 : null;
+    this.t0 = n != null && on ? n / PHONE_TS : T0;
+    this.t1 = m != null && on ? Math.max(this.t0 * 1.2, m / PHONE_TS) : T1;
+    SHADOW_TIERS.mid = this.t1 * 1.15;
+    this.lastScale = -1;
+    return [this.t0 * PHONE_TS, this.t1 * PHONE_TS];
+  }
+
+  // The far impostors made (once) and switched on or off. Every kind drawn far off as leaves gets two layers of the
+  // atlas, its two lod-0 trees; the atlas itself is baked the first time a far tree is drawn (render/impostor.js).
+  // impWant: the impostors are wanted (made, not failed); impOn: and their atlas is baked, so they are drawn. Between
+  // the two (THE BAKE, over frames: up to 8 s on the phone after a world loads) today's far trees are drawn, and the
+  // frame the bake is done they hand over (_impReady).
+  _impostors(on) {
+    if (on && !this.imp) {
+      const geos = [];
+      for (const sp of this.species) {
+        if (!sp.canCard) { sp.impLayer = -1; continue; }
+        sp.impLayer = geos.length;
+        // (on foot this kind keeps today's far form: the conifers' dark spikes, which the look director judged
+        //  better on the skyline than their impostors, 24 Nov; ?impfoot=all makes every kind an impostor on foot,
+        //  ?impfoot=none none)
+        sp.footCards = IMP_FOOT === 'none' || (IMP_FOOT !== 'all' && sp.far[2] >= 0.5);
+        geos.push(sp.geo0[0]);
+        if (IMP.variants > 1) geos.push(sp.geo0[1]);
+      }
+      if (!geos.length) return false;
+      this.imp = new ImpostorAtlas(geos);
+      this.mats.imp = makeImpostorMaterial(this.bodyUniforms, this.imp, this.mats.far);
+      // (the guard: if this device cannot draw them, today's far tree, and the hand-over as it was)
+      this.imp.onFail = (why) => { this.impFailed = why; this.setFarForm(FAR_BLOB ? 'blob' : 'cards'); this.setHandover(HAND.near, HAND.mid); };
+      this.imp.onReady = () => this._impReady();
+      this.kit.impQuad = impostorQuadGeometry();
+    }
+    this.impWant = !!on && !!this.imp && !this.impFailed;
+    this.impOn = this.impWant && this.imp.ready;
+    return this.impWant;
+  }
+  // THE BAKE IS DONE: today's far trees hand over to the impostors in this very frame (render/impostor.js step(), run
+  // by the frame hook before the frame's passes, or by update()). Every far cell built while the bake ran holds both
+  // forms (_buildTrees), so nothing is dropped or built again: each cell is sorted into its tiers again at once, and
+  // so is each near cell, for the hand-over moves from 57 m to 45 m with the impostors.
+  _impReady() {
+    if (!this.impWant || this.impFailed || this.impOn) return;
+    const t0 = performance.now();
+    this.impOn = true;
+    this.setHandover(HAND.near, HAND.mid);
+    for (const ch of this.farChunks.values()) if (ch.built && ch.n && !ch.held && !ch.dead) this._retier(ch, true);
+    for (const ch of this.treeChunks.values()) if (ch.built && ch.n && !ch.held && !ch.dead) this._retier(ch, true);
+    this.impSwapMs = performance.now() - t0;
   }
 
   // Every wash this world's flora can be drawn with, each with a kit geometry it is drawn on (kits and
@@ -265,8 +414,9 @@ export class Flora {
   // its programs and are not listed.
   warmSet() {
     if (!this.ready) this._init();
-    const K = this.kit, M = this.mats, out = this.species.map((s) => [s.mat, s.geo1]);
+    const K = this.kit, M = this.mats, out = this.species.flatMap((s) => (s.mat1 && s.mat1 !== s.mat ? [[s.mat, s.geo0[0]], [s.mat1, s.geo1]] : [[s.mat, s.geo1]]));      // (?trees2: each tier its own programs)
     if (M.far) out.push([M.far, K.far]);
+    if (this.impWant && M.imp) out.push([M.imp, K.impQuad]);
     out.push([M.under, K.grass], [M.patch, K.patch], [M.bush, K.bush], [M.rock, K.rock], [M.shard, K.shard]);
     return out;
   }
@@ -329,7 +479,11 @@ export class Flora {
   }
 
   // (still busy while a wash is being laid: a frame taken when this reaches 0 shows nothing half arrived)
-  get busy() { return this.queue.length + (this.group.visible ? this.held.length + (this.washNow - this.lastLaid < WASH_T + 0.1 ? 1 : 0) : 0); }
+  get busy() { return this.queue.length + (this.group.visible ? this.held.length + (this.washNow - this.lastLaid < WASH_T + 0.1 ? 1 : 0) + this._baking() : 0); }
+  // (the far impostors' bake counts as busy from the frame it is asked for until the swap, so a still taken when the
+  //  world says it is ready shows the impostors and not the trees standing in for them; before the first far tree is
+  //  drawn it is not asked for, and a world that draws none never waits for it)
+  _baking() { return this.impWant && !this.impOn && this.imp && this.imp.renderer && !this.imp.failed ? 1 : 0; }
 
   // HOW MUCH OF THE WOOD IS STANDING: cells built and not thrown away, and the meshes of them being drawn. For
   // measuring whether the plants keep up with a player who is moving (the owner, 2026-11-22: "I want things far
@@ -354,6 +508,7 @@ export class Flora {
     const g = new THREE.BufferGeometry();
     for (const k of SHARED) if (geo.attributes[k]) g.setAttribute(k, geo.attributes[k]);
     g.setIndex(geo.index);
+    for (const gr of geo.groups) g.addGroup(gr.start, gr.count, gr.materialIndex);      // (?trees2: wood, then leaves)
     if (geo.userData.leaf) g.userData.leaf = geo.userData.leaf;
     const inst = new THREE.InstancedBufferAttribute(new Float32Array(cap * 4), 4);
     g.setAttribute('aInst', inst);
@@ -370,8 +525,15 @@ export class Flora {
     // lets the depth test throw away most of their painting before it is done. The same table's row 7, drawn
     // FIRST, is +2.3 ms, which is the other half of the same fact.
     if (far) mesh.renderOrder = 9;
+    // (an impostor mesh's own shadow, from the air: render/impostor.js IMP_SHADOW; on the shadow pass's list while the eye
+    //  is up there, see update)
+    if (far && this.mats && mat === this.mats.imp) {
+      mesh.userData.crowdEntry = { mesh, material: mat, makeShadow: makeImpostorShadowMaterial };
+      if (this._impSh) SHADOW_CROWD.add(mesh.userData.crowdEntry);
+    }
     // (the oil look's cast shadows, render/shadow.js: trees, bushes and stones cast; blades and flowers do not)
-    if (mat.userData.pcCasts) mesh.layers.enable(SHADOW_LAYER);
+    if ((Array.isArray(mat) ? mat[0] : mat).userData.pcCasts) mesh.layers.enable(SHADOW_LAYER);
+    if (Array.isArray(mat) && mat.depthMats) { mesh.userData.pcDepthMats = mat.depthMats; TREE_DEPTH.meshes.add(mesh); }      // (?treedepth=1)
     mesh.count = 0;
     mesh.position.copy(chunk.origin);
     mesh.matrixAutoUpdate = false; mesh.updateMatrix();
@@ -380,6 +542,14 @@ export class Flora {
     //  to break its outline, so a crown must not be culled at the edge of the screen for those few extra metres.)
     mesh.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 0, 0), chunk.size * 0.75 + (LOOK.oil ? 30 : 24));
     const origin = chunk.origin, flora = this, camRel = new THREE.Vector3(), lodv = new THREE.Vector4().fromArray(lod);
+    // (the draw range of a tree's sorted index: n is what the leaves by distance ask for; the speed test may keep only
+    //  the wood or only the leaves of a NEAR tree, flora.benchNear, and never touches a far one)
+    const benchRange = (geometry, lf, n) => {
+      const bn = far ? null : flora.benchNear;
+      if (bn === 'wood') geometry.setDrawRange(0, lf.base);
+      else if (bn === 'leaves') geometry.setDrawRange(lf.base, Math.max(0, n - lf.base));
+      else geometry.setDrawRange(0, n);
+    };
     mesh.onBeforeRender = function (renderer, scene, camera, geometry, material) {
       // (a tree's ranges follow its size on the screen in the oil look, and the far trees the air they are seen through: update())
       const u = material.uniforms, k = far ? flora.farScale : chunk.isTree ? flora.treeScale : flora.rangeScale;
@@ -393,7 +563,7 @@ export class Flora {
         // eye has moved since).
         const L = mesh.userData.leafLod, lf = geometry.userData.leaf;
         if (L) {
-          const d0 = L[0] * flora.treeScale;
+          const d0 = L[0] * flora.t0 * flora.treeScale;
           u.uLeafLod.value.set(d0, L[1], 0, 0);
           if (lf) {
             const dn = Math.max(0.01, (mesh.userData.dNear || 0) - (chunk.tierPos ? chunk.tierPos.distanceTo(flora.camLocal) : 1e9));
@@ -401,14 +571,17 @@ export class Flora {
             let thr = (1 - keep) * 1.06 - 0.06;
             // (the shadow pass: of a crown's leaves only a share throws a shadow at all, shadow.js uThinLeaf)
             if (u.uThinLeaf) thr = 1 - Math.min(1 - u.uThinLeaf.value, keep * 0.5) - 0.02;
-            geometry.setDrawRange(0, leafDrawCount(lf, thr));
+            benchRange(geometry, lf, leafDrawCount(lf, thr));
           }
         } else {
           u.uLeafLod.value.set(0, 0, 0, 0);
-          if (lf) geometry.setDrawRange(0, Infinity);
+          if (lf) benchRange(geometry, lf, geometry.index ? geometry.index.count : Infinity);
         }
       }
       if (u.uWashIn) u.uWashIn.value.set(flora.washNow, mesh.userData.laid, WASH_T);
+      // (the far impostors' atlas: baked once, outside a render, from the first frame a far tree of any form is drawn
+      //  in -- today's far trees stand in till it is done: render/impostor.js)
+      if (far && flora.impWant && !flora.impOn) flora.imp.request(renderer);
       if (u.uFocus) u.uFocus.value.copy(flora._focus(renderer, camera));
       if (u.uPlantHeight && mesh.userData.plantH) u.uPlantHeight.value = mesh.userData.plantH;
       material.uniformsNeedUpdate = true;
@@ -523,17 +696,26 @@ export class Flora {
     // groups: which trees can appear in which mesh
     const groups = {};
     const add = (key, i, geo, mat, far) => {
-      const g = groups[key] || (groups[key] = { list: [], geo, mat, far: !!far, mesh: null, tierKey: key[0] });
+      const g = groups[key] || (groups[key] = { list: [], geo, mat, far: !!far, imp: key === '4i', mesh: null, tierKey: key[0] });
       g.list.push(i);
     };
     for (let i = 0; i < n; i++) {
       const o = i * INST_STRIDE;
       this._layTree(chunk, i);
-      if (chunk.kind === 'far') { const cf = this.species[d[o + 5]] && this.species[d[o + 5]].cardFar; add(cf ? '2c' : '2', i, cf ? this.kit.farCards : this.kit.far, this.mats.far, true); }
+      if (chunk.kind === 'far') {
+        const spf = this.species[d[o + 5]], cf = spf && spf.cardFar;
+        // (an impostor kind is in the impostor mesh; a kind that keeps today's far form on foot is in that mesh too,
+        //  and _retier says which of the two draws it: see IMP_FOOT)
+        // (and while the atlas is still being baked every kind is in today's far mesh as well, which _retier draws till
+        //  the bake is done: _impReady)
+        const im4 = this.impWant && spf && spf.impLayer >= 0;
+        if (im4) add('4i', i, this.kit.impQuad, this.mats.imp, true);
+        if (!im4 || spf.footCards || !this.impOn) add(cf ? '2c' : '2', i, cf ? this.kit.farCards : this.kit.far, this.mats.far, true);
+      }
       else {
         const kind = d[o + 5], v = d[o + 6] % 2, sp = this.species[kind];
         add('0:' + kind + ':' + v, i, sp.geo0[v], sp.mat);
-        add('1:' + kind, i, sp.geo1, sp.mat);
+        add('1:' + kind, i, sp.geo1, sp.mat1 || sp.mat);
       }
     }
     chunk.groups = Object.values(groups);
@@ -569,6 +751,7 @@ export class Flora {
     // (the filled far band: with it the plain far tier runs all the way to T_FAR and there is no thinned tier at all,
     //  so nothing in the owner's 300 yards is one tree in three. ?farfill=0, and the watercolour game, keep the ring.)
     const fill = this.farFill, thinR = fill ? T_FAR : T_THIN;
+    const impK = this.impOn && chunk.kind === 'far', onFoot = (SHADOW.alt || 0) < IMP_AIR;
     let changed = false;
     // a far cell: are the trees of its tree cells laid? Where they are not (not built yet, or waiting
     // for their ground), the far form stands in at any distance, and changes hands when they come
@@ -586,12 +769,14 @@ export class Flora {
       const j = (1 + (seed - 0.5) * JIT) * k;
       const jf = kf === k ? j : (1 + (seed - 0.5) * JIT) * kf;      // (the far trees' own scale in the oil look; the same number as j without it)
       let t;
-      if (dist < T0 * j * trim0) t = lowQ ? 1 : 0;      // the low tier draws no full trees
-      else if (dist < T1 * j * trim1) t = 1;
+      if (dist < this.t0 * j * trim0) t = lowQ ? 1 : 0;      // the low tier draws no full trees
+      else if (dist < this.t1 * j * trim1) t = 1;
       else if (dist < thinR * jf) t = 2;
       else if (!fill && dist < T_FAR * jf && (seed * 13.37) % 1 < 0.34) t = 3;   // thinned: one in three, drawn larger
       else t = -1;
       if (pe) { while (i >= pe[part]) part++; if (t >= 0 && t < 2 && !laid[part]) t = 2; }
+      // (far, as an impostor: tier 4; a kind that keeps today's far form on foot stays tier 2 below IMP_AIR metres)
+      if (t === 2 && impK) { const spi = this.species[d[i * INST_STRIDE + 5]]; if (spi && spi.impLayer >= 0 && !(spi.footCards && onFoot)) t = 4; }
       if (t !== tier[i]) { prev[i] = tier[i]; since[i] = now; tier[i] = t; changed = true; }
     }
     chunk.tierPos.copy(this.camLocal);
@@ -601,7 +786,7 @@ export class Flora {
     if (changed) this.lastLaid = now;
     const mat = chunk.mat;
     for (const g of chunk.groups) {
-      const want = g.tierKey === '0' ? 0 : g.tierKey === '1' ? 1 : 2;
+      const want = g.tierKey === '0' ? 0 : g.tierKey === '1' ? 1 : g.tierKey === '4' ? 4 : 2;
       let c = 0;
       const list = g.list;
       const inTier = (t) => t === want || (want === 2 && t === 3);
@@ -613,7 +798,8 @@ export class Flora {
         g.mesh = this._instanced(chunk, g.geo, g.mat, list.length, g.far ? [0, T_FAR, JIT, 0.88] : [0, 1e7, 0, 0.999], g.far);
         // (the oil look's leaves by distance: a full tree keeps every leaf within about a quarter of its range and a fifth
         // of them at its end, where the middle tree, of fewer and larger leaves, takes over; the middle tree thins on from there)
-        if (LOOK.oil && !g.far && !TREES_FULL) g.mesh.userData.leafLod = g.tierKey === '0' ? [0.24 * T0, 0.2] : [T0, 0.35];
+        // (in units of the full tree's reach, flora.t0, read as it is drawn: the hand-over may move while the game runs)
+        if (LOOK.oil && !g.far && !TREES_FULL) g.mesh.userData.leafLod = g.tierKey === '0' ? [0.24, 0.2] : [1, 0.35];
         // (2026-11-18) THE FAR TREES ARE NOT THINNED BY DISTANCE, AND HERE IS THE MEASUREMENT THAT SAYS SO, because
         // on paper it is the biggest saving left in the game and the next session will want to try it again.
         // A study counted the far tier at 7,326,558 triangles of an 8,191,481-triangle frame from the air and
@@ -640,7 +826,12 @@ export class Flora {
         // when it came (it washes in), or when it left (it is lifted out); one that only changed within the mesh keeps its place
         ab[w] = out ? -Math.max(since[i], 1e-3) : (inTier(prev[i]) ? 0 : since[i]);
         const o = i * INST_STRIDE, mo = i * 16, wo = w * 16;
-        if (g.far) {
+        if (g.imp) {
+          // an impostor stands exactly where its tree stands, at the tree's own size and lean: the quad is the kit's
+          // own picture, so it takes the near tree's matrix; its layer is its kind's pair and its own variant
+          for (let q = 0; q < 16; q++) im[wo + q] = mat[mo + q];
+          ib[w * 2] = d[o + 5]; ib[w * 2 + 1] = this.species[d[o + 5]].impLayer + (IMP.variants > 1 ? d[o + 6] % 2 : 0);
+        } else if (g.far) {
           // the unit far tree: size it to the species. A thinned tree (tier 3) stands in for three and is grown to
           // cover for them -- which is what made the far wood read as sized blobs rather than trees. Where the band is
           // filled there is no tier 3 at all (see above), so t is never 3 here and nothing is grown.
@@ -742,6 +933,89 @@ export class Flora {
     }
   }
 
+  // THE TREES' TWO SHORT PROGRAMS (?trees2=; see TREES2 at the head of this file). Each kind that can be split is
+  // given a wood program and a leaf program (one material each, in that order, over the two groups of one index) and
+  // its trees built again for them; a kind that cannot keeps what it had. mode '' puts every kind back. The kinds'
+  // first forms are kept, so the speed test can swap one for the other in the same minute (setTrees2).
+  _useTrees2(mode) {
+    // ('cards-near' / 'cards-mid': only that tier in cards, the other split -- so the speed test can price each alone)
+    const nearC = mode === 'cards' || mode === 'cards-near', midC = mode === 'cards' || mode === 'cards-mid';
+    for (let i = 0; i < this.species.length; i++) {
+      const s = this.species[i];
+      if (!mode || !s.canSplit) { s.mat = s.mat1 = s.base.mat; s.geo0 = s.base.geo0; s.geo1 = s.base.geo1; s.t2Mode = ''; continue; }
+      if (!s.t2 || s.t2.mode !== mode || s.t2.deep !== !!this.treeDepth || s.t2.whole !== !!this.swayWhole) {
+        const gen = TALL_KITS[this.tall[i].kit];
+        const spN = Object.assign({}, this.tall[i], { trees2: nearC ? 'cards' : 'split' }), spM = Object.assign({}, this.tall[i], { trees2: midC ? 'cards' : 'split' });
+        const g = (seed, lod, sp) => splitGroups(sortLeafCards(gen(seed, lod, sp)));
+        const geo0 = [g(11 + i * 10, 0, spN), g(12 + i * 10, 0, spN)], geo1 = g(13 + i * 10, 1, spM);
+        // (a tier whose tree came out in cards of leaves, part 7, has its leaves drawn by the card program; a kind with
+        //  no cards of its own, by the leaf program)
+        const cN = nearC && hasPart(geo0[0], 7), cM = midC && hasPart(geo1, 7), deep = !!this.treeDepth;
+        s.mats = s.mats || {};
+        // (t: wood, leaf, card, card-eq, card-first; '-mid' the middle tier's own, package T3: its trees bend whole, as
+        //  every other plant does, without the crown's branch-by-branch sway -- a few pixels at that distance, and the
+        //  dearest thing in a tree's vertex shader)
+        const mk = (t) => {
+          if (s.mats[t]) return s.mats[t];
+          const mid = t.endsWith('-mid'), base = mid ? t.slice(0, -4) : t;
+          const m = makePropMaterial(this.bodyUniforms, Object.assign({}, s.mo, { name: s.mo.name + '-' + t, tree: base.startsWith('card') ? 'card' : base,
+            depth: base === 'card-eq' ? 'equal' : base === 'card-first' ? 'first' : undefined }, mid ? { branch: false } : null));
+          m.userData.pcCasts = true;
+          // (the depth pass shares the colour pass's uniforms: whatever the mesh sets before it is drawn holds for both)
+          if (base === 'card-first') m.uniforms = mk('card-eq' + (mid ? '-mid' : '')).uniforms;
+          // (the leaf programs turn with the year as the kind's own material does)
+          const q = base !== 'wood' && base !== 'card-first' && this._turn && this._turn.find((x) => x.mat === s.base.mat);
+          if (q) { this._turn.push(Object.assign({}, q, { mat: m, far: null })); this._seasonAt = -1; this.setSeason(SEASON.t); }
+          return (s.mats[t] = m);
+        };
+        const leafOf = (cards, sfx) => mk(cards ? (deep ? 'card-eq' : 'card') + sfx : 'leaf' + sfx);
+        // (?treesway=whole: the near tier is given the middle tier's own programs, which bend the tree whole; the tiers'
+        //  ranges and leaf thinning are set on each mesh before it is drawn, so one program can serve both)
+        const whole = !!this.swayWhole, sN = whole ? '-mid' : '';
+        const mats0 = [mk('wood' + sN), leafOf(cN, sN)], mats1 = [mk('wood-mid'), leafOf(cM, '-mid')];
+        if (deep && cN) mats0.depthMats = [HIDDEN, mk('card-first' + sN)];
+        if (deep && cM) mats1.depthMats = [HIDDEN, mk('card-first-mid')];
+        s.t2 = { mode, deep, whole, mats0, mats1, geo0, geo1 };
+      }
+      s.mat = s.t2.mats0; s.mat1 = s.t2.mats1; s.geo0 = s.t2.geo0; s.geo1 = s.t2.geo1; s.t2Mode = mode;
+    }
+    this.trees2 = mode;
+  }
+  // (PILOT's speed test, core/bench.js) The trees' two programs swapped in while the game runs: every near and middle
+  // patch is dropped and built again in its turn; the caller waits for the world to settle. Returns the mode now
+  // drawn, or null where there is nothing to swap (not the oil look, or no kind that can be split).
+  setTrees2(mode, depth) {
+    if (!LOOK.oil || !this.ready || !this.species.some((s) => s.canSplit)) return null;
+    mode = mode === 'cards' || mode === 'cards-near' || mode === 'cards-mid' ? mode : mode ? 'split' : '';
+    if (TREE_GUARD.failed) mode = '';      // (a program of theirs failed on this device: only the one program)
+    depth = depth == null ? !!this.treeDepth : !!depth;
+    if ((this.trees2 || '') === mode && !!this.treeDepth === depth) return mode;
+    this.treeDepth = depth; TREE_DEPTH.on = depth;
+    this._useTrees2(mode);
+    this._rebuildTrees();
+    return mode;
+  }
+  // (PILOT's speed test, core/bench.js) ?treesway=whole swapped while the game runs: the near trees bend whole, as the
+  // middle ones do, or sway branch by branch as set. Only with the two short programs; returns whether the near trees
+  // now bend whole, or null where there is nothing to swap.
+  setTreeSway(whole) {
+    if (!LOOK.oil || !this.ready || !this.trees2) return null;
+    whole = !!whole;
+    if (!!this.swayWhole === whole) return whole;
+    this.swayWhole = whole;
+    this._useTrees2(this.trees2);
+    this._rebuildTrees();
+    return whole;
+  }
+  // (every near and middle patch dropped, to be built again in its turn with the kinds' programs as they now are)
+  _rebuildTrees() {
+    for (const [key, ch] of this.treeChunks) {
+      if (ch.queued) { const qi = this.queue.indexOf(ch); if (qi >= 0) this.queue.splice(qi, 1); ch.queued = false; }
+      this._disposeChunk(ch); this.treeChunks.delete(key);
+    }
+    this.lastTreeEval.set(1e9, 0, 0);
+  }
+
   // (PILOT's speed test, core/bench.js) The far trees' form swapped while the game runs: the lump, or the flat pieces of
   // ?fartree=cards. Every far patch is dropped and built again in its turn; the caller waits for the world to settle.
   // Returns which form is now drawn (true: flat pieces), or null where there is nothing to swap (not the oil look).
@@ -750,19 +1024,46 @@ export class Flora {
     on = !!on;
     const now = this.species.some((sp) => sp.cardFar);
     if (on === now) return now;
-    if (on && !this.kit.farCards) this.kit.farCards = sortLeafCards(FAR_BLOB ? farBlobGeometry(6) : farCardGeometry(6));   // (ordered for thinning here too, or the speed test's swap loses it)
-    for (const sp of this.species) sp.cardFar = on && sp.canCard;
+    return this.setFarForm(on ? (FAR_BLOB ? 'blob' : 'cards') : 'lump') !== 'lump';
+  }
+  // THE FAR TREES' FORM, swapped while the game runs (the speed test, core/bench.js; 2026-11-24, trees lane T0):
+  // 'cards' the tree of flat pieces that ships (138 triangles), 'blob' two crossed six-cornered cards (?fartree=blob:
+  // 10 triangles, which prices on the phone what a quad's fragments cost against a mesh's triangles), 'lump' the old
+  // lump. Every far patch is dropped and built again in its turn. Returns the form now drawn, or null where there is
+  // nothing to swap (not the oil look, or not yet made).
+  setFarForm(form) {
+    if (!LOOK.oil || !this.ready) return null;
+    const now = this.farForm || (this.impWant ? 'impostor' : this.species.some((sp) => sp.cardFar) ? (FAR_BLOB ? 'blob' : 'cards') : 'lump');
+    if (form === now) return now;
+    // (the impostors stand in front of whatever far form the cards would be: the cards stay the tree of flat pieces)
+    if (form === 'impostor') { if (this.impFailed || !this._impostors(true)) return now; this.farForm = form; this._dropFar(); return form; }
+    this._impostors(false);
+    // (the hand-over stays where it was for the speed test's swap: only the far form is the question there)
+    // (ordered for thinning here too, or the speed test's swap loses it)
+    // (each form made once and kept: its buffers stay on the graphics card while the meshes come and go)
+    const fg = this._farGeo || (this._farGeo = {});
+    if (this.kit.farCards && now !== 'lump' && !fg[now]) fg[now] = this.kit.farCards;
+    if (form === 'blob') this.kit.farCards = fg.blob || (fg.blob = sortLeafCards(farBlobGeometry(6)));
+    else if (form === 'cards') this.kit.farCards = fg.cards || (fg.cards = sortLeafCards(farCardGeometry(6)));
+    else form = 'lump';
+    for (const sp of this.species) sp.cardFar = form !== 'lump' && sp.canCard;
+    this.farForm = form;
+    this._dropFar();
+    return form;
+  }
+  _dropFar() {
     for (const [key, ch] of this.farChunks) {
       if (ch.queued) { const qi = this.queue.indexOf(ch); if (qi >= 0) this.queue.splice(qi, 1); ch.queued = false; }
       this._disposeChunk(ch); this.farChunks.delete(key);
     }
     this.lastTreeEval.set(1e9, 0, 0);
-    return on;
   }
 
   _disposeChunk(chunk) {
     for (const m of chunk.meshes) {
+      if (m.userData.crowdEntry) SHADOW_CROWD.delete(m.userData.crowdEntry);
       this.group.remove(m);
+      TREE_DEPTH.meshes.delete(m);
       for (const k of SHARED) m.geometry.deleteAttribute(k);
       m.geometry.setIndex(null);
       m.geometry.dispose();
@@ -886,6 +1187,9 @@ export class Flora {
 
   // budgetMs: time this call may spend building and re-tiering. now: the world's wash clock (s).
   update(camLocal, active, budgetMs, now, lead) {
+    // (the guard: one of the trees' two short programs failed to link on this device, materials.js TREE_GUARD -- every
+    //  tree back to the one program, its patches built again from the next)
+    if (TREE_GUARD.failed && this.trees2) this.setTrees2('');
     this.camLocal.copy(camLocal);
     this.leadOn = !!lead;
     if (lead) this.lead.copy(lead);
@@ -928,6 +1232,17 @@ export class Flora {
       // (on every tier: the far tree is the cheapest thing in the wood, and at the middle tier on a phone the two cuts
       // together ended the trees 170 m off, bare hills behind: "most of the things haven't rendered", the owner)
       ts *= sk; fs = Math.max(sk, 0.75) * air * (1 + Math.round(Math.min(1, (SHADOW.alt || 0) / 220) * 4) / 4);
+      // THE FAR TREES REACH WHAT THE EYE NEEDS FROM THE AIR (FV2-T of docs/lead/FARVIEW-DESIGN.md; the owner, 24 Nov:
+      // "when im flying high in the sky up to a mile I want trees from a distance to look good"). With the far tree a
+      // mesh of 138 triangles the reach topped out at 900 m in 3D on the phone, so 1 km up no tree was drawn at all.
+      // An impostor is two triangles: from the air its reach is hypot(height, FAR_REACH), held to the horizon of
+      // these small worlds (sqrt(2Rh + h^2): 126 m on foot, 1.1 km at 150 m up, 3 km at 1 km), in quarter steps so
+      // the tiers are not sorted again with every metre climbed. On foot it changes nothing (the horizon is nearer
+      // than the reach the ground already gives). ?farreach=<m> (0: off).
+      if (this.impOn && FAR_REACH > 0) {
+        const h = Math.max(0, SHADOW.alt || 0), hz = Math.sqrt(2 * this.R * h + h * h);
+        fs = Math.max(fs, Math.round(Math.min(hz, Math.hypot(h, FAR_REACH)) / T_FAR * 4) / 4);
+      }
     }
     // (THE SPEED TEST'S OWN HANDLE, core/bench.js. The owner's phone says the NEAR trees are 62.7 ms of a 101 ms
     //  frame and nothing in the table says how much of that is their leaves and how much their size on the screen.
@@ -935,6 +1250,13 @@ export class Flora {
     //  the change that would be made if it is worth it -- so the device measures the fix itself, not a guess.)
     if (this.benchTreeK != null) { ts *= this.benchTreeK; }
     this.treeScale = ts; this.farScale = fs;
+    // THE IMPOSTORS' SHADOWS, FROM THE AIR ONLY (?impshadow=1; T6's option): above 60 m no near or middle tree stands in the
+    // shadow square, and the far crowns throw their own; on the ground the pass is left as it was.
+    const impSh = !!(IMP_SHADOW && this.impOn && (SHADOW.alt || 0) > 60);
+    if (impSh !== !!this._impSh) {
+      this._impSh = impSh;
+      for (const ch of this.farChunks.values()) for (const m of ch.meshes) if (m.userData.crowdEntry) { if (impSh) SHADOW_CROWD.add(m.userData.crowdEntry); else SHADOW_CROWD.delete(m.userData.crowdEntry); }
+    }
     if (now != null) this.washNow = now;
     else { const w = performance.now(); this.washNow += this._washWall ? Math.min(0.1, Math.max(0.02, (w - this._washWall) / 1000)) : 0; this._washWall = w; }
     const alt = camLocal.length() - this.R;
@@ -948,6 +1270,9 @@ export class Flora {
       return;
     }
     if (!this.ready) this._init();
+    // (the impostors' bake, stepped from here only when no frame was drawn since the last update -- the gallery's
+    //  settling loop, which waits for nothing to be busy without drawing: render/impostor.js bakeTick)
+    if (this._baking()) { const tk = bakeTick(); if (tk === this._impTick) this.imp.step(); this._impTick = tk; }
     const k = this.rangeScale, kt = this.treeScale, kq = k + kt * 8 + this.farScale * 64;
     const t0 = performance.now();
     const prof = this.prof;
@@ -960,7 +1285,7 @@ export class Flora {
     if (this.lastTreeEval.distanceTo(camLocal) > 20) {
       this.lastTreeEval.copy(camLocal);
       if (this.species.length) {
-        this._wanted(TREE_LEVEL, this.treeSize, T1 * kt * (1 + JIT * 0.5) + this.treeSize * 0.75, this.treeChunks, 'near');
+        this._wanted(TREE_LEVEL, this.treeSize, this.t1 * kt * (1 + JIT * 0.5) + this.treeSize * 0.75, this.treeChunks, 'near');
         this._wanted(TREE_LEVEL - this.farShift, this.farSize, T_FAR * this.farScale * (1 + JIT * 0.5) + this.farSize * 0.75, this.farChunks, 'far');
       }
       this.treeList = Array.from(this.treeChunks.values()).concat(Array.from(this.farChunks.values()));
@@ -1041,7 +1366,7 @@ export class Flora {
     // re-tier: chunks near a tier boundary react to a few metres of travel, far ones to more
     if (!spent) {
       const list = this.treeList, n = list.length;
-      const nearR = T1 * kt * (1 + JIT * 0.5) + this.treeSize;
+      const nearR = this.t1 * kt * (1 + JIT * 0.5) + this.treeSize;
       for (let c = 0; c < n; c++) {
         const ch = list[(this.retierCursor + c) % n];
         if (!ch.built || !ch.n || ch.held) continue;

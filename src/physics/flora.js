@@ -26,7 +26,7 @@ import { scrollField } from './near.js';
 import { devilWind } from './features.js';
 import { powerWind, windsBend, WINDPOWER } from './powers.js';
 import { timeAt } from './times.js';
-import { wakeAt } from './wind.js';    // (P16: from wind.js, not air.js; air.js imports this module, and the cycle broke the browser in 6d5c02a)
+import { wakeAt, heightFactor, WIND } from './wind.js';    // (P16: from wind.js, not air.js; air.js imports this module, and the cycle broke the browser in 6d5c02a)
 
 export const FLORA = Object.freeze({
   N: 32, cell: 8,               // bend / wind field
@@ -176,6 +176,12 @@ export const FLORA = Object.freeze({
 // (whole numbers: the motion is continuous all the way round), each eddy train with its own count and its own
 // run of phase with height. (Trees differ by where they stand in the eddies; the number per tree of P6, taken
 // from the grid cell, jumped when the frame re-anchored and is gone: BRANCH_T is no longer used.)
+// (group D, ?farwind=1) the far field of the plants (FloraField.far): its size, its cells, how often it is refreshed
+export const FAR = Object.freeze({ N: 64, cell: 32, every: 1 });
+const _fd = [0, 0, 0], _fw = new Float64Array(4);
+let _hfFar = null;
+const hfFar = () => _hfFar || (_hfFar = [heightFactor(FLORA.softHeight, WIND.refRoughness), heightFactor(FLORA.stiffHeight, WIND.refRoughness)]);
+
 export const BRANCH_F = [1, 1.37, 0.71, 1.93];   // (the four clock oscillators of P6 to P13: no longer used by the model)
 export const BRANCH_M = [2, 3, 1, 4];
 export const BRANCH_S = [2.6, -1.9, 4.1, 0];
@@ -230,6 +236,16 @@ export class FloraField {
     this.bend = new Float32Array(N * N * 4);     // soft east, soft north, stiff east, stiff north (load units)
     this.wind = new Float32Array(N * N * 4);     // wind east, north at 2 m (m/s), gust01, turbulence (m/s)
     this.push = new Float32Array(M * M * 4);     // push east, north (load units), flatten01, shake01
+    // (group D, ?farwind=1) THE FAR FIELD: beyond the bend field's 256 m every plant read its edge (pcPhysTex clamps), so a
+    // forest seen from the air leaned and swayed as one block. This holds the steady load of the WIND MAP's wind
+    // (windmap.js: the land's own wind, channelled, sheltered, thermal) on FAR.N x FAR.N cells of FAR.cell m round the
+    // focus, refreshed every FAR.every s; FLORA_GLSL blends into it at the bend field's edge, and the travelling wave
+    // trains it already lays run on top. RGBA: soft east, soft north, stiff east, stiff north (load units, as `bend`).
+    // windMap: set by physics/index.js while the switch is on (null: the field is never touched, the shader never reads it).
+    this.far = new Float32Array(FAR.N * FAR.N * 4);
+    this.farN = FAR.N; this.farCell = FAR.cell; this.farVersion = 0;
+    this.windMap = null;
+    this._farT = 0; this._farFrame = -1; this._fci = 0; this._fcj = 0;
     // internal state
     this._vel = new Float32Array(N * N * 4);     // rates of the four bend components
     this._pv = new Float32Array(M * M * 2);      // push rates
@@ -265,6 +281,7 @@ export class FloraField {
       uPhysAnchor: [0, 0, 0], uPhysEast: [1, 0, 0], uPhysNorth: [0, 0, -1], uPhysUp: [0, 1, 0],
       uPhysWindMap: [0, 0, 1 / (N * FLORA.cell), N],
       uPhysNearMap: [0, 0, 1 / (M * FLORA.nearCell), M],
+      uPhysFarMap: [0, 0, 1 / (FAR.N * FAR.cell), 0],   // (group D) the far field: centre (m east, north), 1/size, texels a side (0: off)
       uPhysWave: [1, 0, 0, 0],                    // xy: wave direction; z, w: flutter phases 0 and 1 (P11)
       uPhysWavePhase: [0, 0, 0, 0],
       uPhysShape: [FLORA.softFlex, FLORA.softMax, FLORA.stiffFlex, FLORA.stiffMax],
@@ -510,6 +527,12 @@ export class FloraField {
     U.uPhysUp[0] = frame.ax; U.uPhysUp[1] = frame.ay; U.uPhysUp[2] = frame.az;
     U.uPhysWindMap[0] = this.ci * cell; U.uPhysWindMap[1] = this.cj * cell;
     U.uPhysNearMap[0] = this.mi * nc; U.uPhysNearMap[1] = this.mj * nc;
+    // (group D) the far field, once a second from the wind map; off (w = 0) whenever there is no map
+    if (this.windMap && this.windMap.ready) {
+      this._farT -= dt > 0 ? dt : 0;
+      if (this._farT <= 0 || this._farFrame !== frame.version) { this._farStep(frame, rho); this._farT = FAR.every; this._farFrame = frame.version; }
+      U.uPhysFarMap[0] = this._fci * FAR.cell; U.uPhysFarMap[1] = this._fcj * FAR.cell; U.uPhysFarMap[3] = FAR.N;
+    } else U.uPhysFarMap[3] = 0;
     U.uPhysWave[0] = this.waveDir[0]; U.uPhysWave[1] = this.waveDir[1];
     U.uPhysWavePhase[0] = this.wavePhase[0] % TAU; U.uPhysWavePhase[1] = this.wavePhase[1] % TAU; U.uPhysWavePhase[2] = this.wavePhase[2] % TAU;
     U.uPhysWave[2] = this.flutPhase[0] % TAU; U.uPhysWave[3] = this.flutPhase[1] % TAU; U.uPhysWavePhase[3] = this.flutPhase[2] % TAU;
@@ -626,6 +649,25 @@ export class FloraField {
   }
 
   // Bilinear sample of a 4-component field. Returns into _q[0..3].
+  // (group D) the far field from the wind map: the steady load of its 10 m wind at each cell, in the field's frame
+  // (the map's vector turned into the frame's plane by its east and north: within 1 km of the anchor the tilt is under
+  // 15 degrees). The load is the bend field's own law (kq x speed x the height factor squared, open ground: a far cell
+  // has no cover of its own), without the oscillator: what moves far off is the wave trains, not each cell's ringing.
+  _farStep(frame, rho) {
+    const N = FAR.N, c = FAR.cell, wm = this.windMap, hf = hfFar(), kq = 0.5 * rho / FLORA.qRef, F = this.far;
+    // centred on the bend field's centre, on the far field's own 32 m lattice
+    this._fci = Math.round(this.ci * this.cell / c); this._fcj = Math.round(this.cj * this.cell / c);
+    for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+      const x = (this._fci + i - N / 2 + 0.5) * c, z = (this._fcj + j - N / 2 + 0.5) * c;
+      frame.dir(x, z, _fd);
+      wm.vecAt(_fd[0], _fd[1], _fd[2], _fw);
+      const we = _fw[0] * frame.ex + _fw[1] * frame.ey + _fw[2] * frame.ez, wn = _fw[0] * frame.nx + _fw[1] * frame.ny + _fw[2] * frame.nz;
+      const sp = Math.sqrt(we * we + wn * wn), ls = kq * sp * hf[0] * hf[0], lt = kq * sp * hf[1] * hf[1], o = (j * N + i) * 4;
+      F[o] = we * ls; F[o + 1] = wn * ls; F[o + 2] = we * lt; F[o + 3] = wn * lt;
+    }
+    this.farVersion++;
+  }
+
   _tex(arr, N, u, v) {
     // u, v in texel units (texel centres at +0.5), clamped to the edge like a texture
     let x = u - 0.5, y = v - 0.5;
@@ -641,9 +683,23 @@ export class FloraField {
   // The bend of a plant rooted at grid position (x, z). The JS twin of pcPhysBend in FLORA_GLSL.
   //   stiff01: 0 grass .. 1 tree.   Fills o: e, n (bend direction x angle, radians, along the
   //   frame's east and north axes), angle, flatten01, shake01, load.
+  // (group D) the twin of FLORA_GLSL's pcPhysLoad: the bend field's load, blended into the far field's beyond its edge
+  _load(x, z) {
+    const N = this.N, u = (x - this.ci * this.cell) / this.cell + N / 2, v = (z - this.cj * this.cell) / this.cell + N / 2;
+    const b = this._tex(this.bend, N, u, v);
+    if (this.uniforms.uPhysFarMap[3] > 0.5) {
+      const q = Math.max(Math.abs(u / N - 0.5), Math.abs(v / N - 0.5)) * 2, t = clamp01((q - 0.875) / 0.125), e = t * t * (3 - 2 * t);
+      if (e > 0) {
+        const c0 = b[0], c1 = b[1], c2 = b[2], c3 = b[3], FN = FAR.N;
+        const f = this._tex(this.far, FN, (x - this._fci * FAR.cell) / FAR.cell + FN / 2, (z - this._fcj * FAR.cell) / FAR.cell + FN / 2);
+        b[0] = c0 + (f[0] - c0) * e; b[1] = c1 + (f[1] - c1) * e; b[2] = c2 + (f[2] - c2) * e; b[3] = c3 + (f[3] - c3) * e;
+      }
+    }
+    return b;
+  }
   plantBend(x, z, stiff01, o = {}) {
     const N = this.N, M = this.M;
-    const b = this._tex(this.bend, N, (x - this.ci * this.cell) / this.cell + N / 2, (z - this.cj * this.cell) / this.cell + N / 2);
+    const b = this._load(x, z);
     let le = b[0] + (b[2] - b[0]) * stiff01, ln = b[1] + (b[3] - b[1]) * stiff01;
     const wt = this._tex(this.wind, N, (x - this.ci * this.cell) / this.cell + N / 2, (z - this.cj * this.cell) / this.cell + N / 2);
     const g = wt[2], w2e = wt[0], w2n = wt[1], turb = wt[3];
@@ -695,8 +751,7 @@ export class FloraField {
   }
   // The cheap twin (pcPhysBendLite): wind response only. Fills o: e, n, angle, load.
   plantBendLite(x, z, stiff01, o = {}) {
-    const N = this.N;
-    const b = this._tex(this.bend, N, (x - this.ci * this.cell) / this.cell + N / 2, (z - this.cj * this.cell) / this.cell + N / 2);
+    const b = this._load(x, z);
     const le = b[0] + (b[2] - b[0]) * stiff01, ln = b[1] + (b[3] - b[1]) * stiff01;
     const load = Math.hypot(le, ln);
     const flex = FLORA.softFlex + (FLORA.stiffFlex - FLORA.softFlex) * stiff01;

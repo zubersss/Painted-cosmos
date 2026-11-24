@@ -13,11 +13,11 @@ export class Builder {
   // trunk; `aLeaf01` 1 on foliage. `branch` is the number the next tube or blob is laid with)
   // (`aCard`, the oil look's leaves: the centre of the leaf a vertex belongs to, so the shader can light a leaf whole;
   // on everything else the vertex's own place. `card` is the centre the next vertices are laid with.)
-  constructor() { this.p = []; this.n = []; this.m = []; this.uv = []; this.d = []; this.idx = []; this.br = []; this.lf = []; this.cd = []; this.branch = -1; this.card = null; }
+  constructor() { this.p = []; this.n = []; this.m = []; this.uv = []; this.d = []; this.idx = []; this.br = []; this.lf = []; this.cd = []; this.branch = -1; this.card = null; this.axis = false; }
   get count() { return this.p.length / 3; }
   vert(px, py, pz, nx, ny, nz, mx, my, mz, u, v, sway, part, shade, hash) {
     this.p.push(px, py, pz); this.n.push(nx, ny, nz); this.m.push(mx, my, mz); this.uv.push(u, v); this.d.push(sway, part, shade, hash);
-    this.br.push(this.branch); this.lf.push(part === 1 || part === 3 || part === 5 ? 1 : 0);
+    this.br.push(this.branch); this.lf.push(part === 1 || part === 3 || part === 5 || part === 7 ? 1 : 0);
     if (this.card) this.cd.push(this.card[0], this.card[1], this.card[2]); else this.cd.push(px, py, pz);
     return this.p.length / 3 - 1;
   }
@@ -61,6 +61,10 @@ export function tube(B, pts, radii, sides, opts) {
     if (i > 0) vv += p.distanceTo(pts[i - 1]) * o.vScale;
     const ring = [];
     const sway = o.sway0 + o.swayK * Math.pow(Math.max(0, p.y / o.swayH), 2);
+    // (Builder.axis, the trees' two short programs, ?trees2=: every vertex of a ring carries the ring's centre in aCard,
+    //  so the wood's vertex shader can pinch a branch in to its own line round the lens with no discard:
+    //  materials.js PROP_VERT, PC_TREE_WOOD. Off, aCard is the vertex's own place, as it always was.)
+    if (B.axis) B.card = [p.x, p.y, p.z];
     for (let s = 0; s <= sides; s++) {
       const ang = (s / sides) * Math.PI * 2, ca = Math.cos(ang), sa = Math.sin(ang);
       const nx = a.x * ca + b.x * sa, ny = a.y * ca + b.y * sa, nz = a.z * ca + b.z * sa;
@@ -68,6 +72,7 @@ export function tube(B, pts, radii, sides, opts) {
     }
     rings.push(ring);
   }
+  if (B.axis) B.card = null;
   for (let i = 0; i < rings.length - 1; i++) for (let s = 0; s < sides; s++) {
     const p0 = rings[i][s], p1 = rings[i][s + 1], q0 = rings[i + 1][s], q1 = rings[i + 1][s + 1];
     B.tri(p0, q0, p1); B.tri(p1, q0, q1);
@@ -175,7 +180,38 @@ export function leafCards(B, c, rx, ry, rz, rnd, opts) {
   }
 }
 
-// A single tapered stroke (grass blade, fern frond): a ribbon that arches outward.
+// A CLUSTER OF LEAVES ON ONE CARD (the trees to 30 a second, package T2, 2026-11-24; docs/lead/TREES-DESIGN.md on
+// r2; only with ?trees2=1). A crown laid one leaf at a time is some 1,300 leaves, 5,200 triangles, every one of them a
+// shape the graphics card has to set up even when it is a few pixels big. Here a clump of leaves is ONE flat
+// six-cornered card, and the leaves on it are not geometry at all: the plant's leaf program (materials.js
+// CLUSTER_FRAG) finds, for each pixel of the card, the leaf dab that lies there in the baked layer of dabs the ground
+// already uses (dabtex.js), and lays that leaf whole -- lit, shaded and coloured at its own exact centre -- or lets
+// the sky through. Four triangles carry a dozen leaves.
+//   c the card's centre; n the way it faces; t a way along it (made square to n here); R the radius of its corners
+//   (m); o.cell the dab layer's cell on this card (m: about half a leaf's length). Every corner carries the centre
+//   (aCard), the card's own mass normal (o.mass: the crown's roundness, for its light), and, in uv, where the corner
+//   lies on the card along t and along n x t IN CELLS: so the shader has the card's whole frame, and the size of its
+//   leaves, from any one corner, and needs no number of the kind's own (materials.js PROP_VERT, PC_TREE_CARD;
+//   dabtex.js SPRAY_GLSL). part 7.
+export function clusterCard(B, c, n, t, R, opts) {
+  const o = Object.assign({ part: 7, sway: 0.6, shade: 0, hash: 0.5, mass: null, rot: 0, cell: 0.28 }, opts || {});
+  if (o.branch != null) B.branch = o.branch;
+  let nx = n.x, ny = n.y, nz = n.z; let l = Math.hypot(nx, ny, nz) || 1; nx /= l; ny /= l; nz /= l;
+  let ux = t.x, uy = t.y, uz = t.z; const k = ux * nx + uy * ny + uz * nz; ux -= nx * k; uy -= ny * k; uz -= nz * k;
+  l = Math.hypot(ux, uy, uz);
+  if (l < 1e-4) { ux = Math.abs(nx) < 0.9 ? 1 : 0; uy = Math.abs(nx) < 0.9 ? 0 : 1; uz = 0; const k2 = ux * nx + uy * ny; ux -= nx * k2; uy -= ny * k2; uz -= nz * k2; l = Math.hypot(ux, uy, uz) || 1; }
+  ux /= l; uy /= l; uz /= l;
+  const vx = ny * uz - nz * uy, vy = nz * ux - nx * uz, vz = nx * uy - ny * ux;
+  const m = o.mass || { x: nx, y: ny, z: nz };
+  B.card = [c.x, c.y, c.z];
+  const ids = [];
+  for (let i = 0; i < 6; i++) {
+    const a = o.rot + i * Math.PI / 3, cu = Math.cos(a) * R, cv = Math.sin(a) * R;
+    ids.push(B.vert(c.x + ux * cu + vx * cv, c.y + uy * cu + vy * cv, c.z + uz * cu + vz * cv, nx, ny, nz, m.x, m.y, m.z, cu / o.cell, cv / o.cell, o.sway, o.part, o.shade, o.hash));
+  }
+  B.tri(ids[0], ids[1], ids[5]); B.tri(ids[1], ids[2], ids[5]); B.tri(ids[2], ids[4], ids[5]); B.tri(ids[2], ids[3], ids[4]);
+  B.card = null;
+}
 
 // A single tapered stroke (grass blade, fern frond): a ribbon that arches outward.
 export function stroke(B, root, dir, len, width, arch, rnd, opts) {
