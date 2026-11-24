@@ -32,6 +32,7 @@ import { VERT_PARS, VERT_END, FRAG_PARS } from './chunks.js';
 import { FOG_VERT, SKYUP, PC_UP_F, FARCROWN, makePaintUniforms } from './materials.js';
 import { FRAME_HOOKS, register, OIL, PHYS, LOOK } from './shared.js';
 import { FLORA_GLSL } from '../physics/flora.glsl.js';
+import { FAR_SHADOW } from './shadow.js';
 
 const _q = (() => { try { return new URLSearchParams(location.search); } catch { return null; } })();
 const _qn = (k, d, lo, hi) => { const v = _q && _q.has(k) ? +_q.get(k) : NaN; return isFinite(v) ? Math.max(lo, Math.min(hi, v)) : d; };
@@ -1079,7 +1080,9 @@ export function makeImpostorShadowMaterial(impMat, uInv) {
       uOrigin: { value: new THREE.Vector3() }, uCamLocal: { value: new THREE.Vector3() }, uLod: { value: new THREE.Vector4(0, 1e9, 0, 0.9) },
       uWashIn: { value: new THREE.Vector3(1e6, 0, 0.55) },
       uInv, uSunDirL: u.uSunDirL, uImpK: u.uImpK, uImpAtlas: u.uImpAtlas, uImpC: u.uImpC, uImpH: u.uImpH, uImpTex: u.uImpTex,
-      uShK: OIL.uShK, uThinLeaf: { value: 0.66 },
+      // (with the far crowns' shadows, ?farshadow=1, the WHOLE crown casts: the ground reads the map taken down to a patch
+      //  of some metres there, and a third of the strokes made a shade too thin to cross its threshold)
+      uShK: OIL.uShK, uThinLeaf: { get value() { return FAR_SHADOW.on ? 0 : 0.66; } },
     },
     vertexShader: IMP_SH_VERT, fragmentShader: IMP_SH_FRAG, side: THREE.DoubleSide,
   });

@@ -532,7 +532,22 @@ FV7 of `docs/lead/FARVIEW-DESIGN.md`. A second session (A2, branch `trees-near`)
 the same time: this lane touches only the far parts of `flora.js`, `florakit.js`, the plant material's far branch,
 `render/impostor.js`, `render/shadow.js` and new rows in `core/bench.js`.
 
-**State (update this line every step):** (24 Nov, about 19:15) THE FAR SPRUCE 'near' IS THE DEFAULT (F chose D: today's near-tree
+**State (update this line every step):** (24 Nov, about 19:30) THE FAR CROWNS' SHADOWS ON THE GROUND (the coordinator's new
+job, F's audit finding 1, taken from C's list; C told, C keeps the glades): BUILT AND SEEN, OFF BY DEFAULT, ?farshadow=1
+(render/shadow.js FAR_SHADOW; ?farshr= the square's half-size, 860). From the air (eye over 60 m) the shadow square grows
+to 860 m a side-half and lies 0.75 of it ahead of the eye (the impostors reach 1,500 m), its depth stretched for a low
+sun; every far impostor in view (+60 m) casts its WHOLE crown into it (the twin's uThinLeaf 0 with the switch); the ground
+reads it already (pcSunAtSoft), so a stroke beside a crown on its shadow side lies a level down, whole. Bench row
+farShadow at 150 m and 400 m (bench.js). MEASURED one frame, calls / triangles off -> on: 150 m 137 -> 203, 420 m 162 ->
+260, 1 km 128 -> 200 (+140k to +220k triangles); the view cull cut 98-129 extra calls to 66-98. SEEN (F's views, autumn
+noon): the pools show only on the OPEN ground (land under V 0.3 at 150 m 9.7 -> 11.0 percent; 420 m and 1 km nearly
+nothing), because the canopy painted into the ground (farground.js pcCanopyAt, C's) lights its own dabs and never reads
+the map. A PROTOTYPE hook there (never committed; the patch is in the message to C: a canopy dab in the map's shadow takes
+a neighbour's-shadow level, min(gCanL, pcLevel(0.33))) gives the pools in the wood: 150 m 9.7 -> 14.6 percent, 420 m
+0.9 -> 1.25, 1 km 1.56 -> 1.67 (the impostors reach only the bottom of the 1 km view; past them the roof has its own
+shade). Sheets A1_farshadow_{150m,420m,1km}_ABC (+ zooms). ASKED C for the hook; sent F the A/B/C. Next if F wants it
+and the bench says the calls matter: cache the far crowns' part of the map (they do not move).
+Before: THE FAR SPRUCE 'near' IS THE DEFAULT (F chose D: today's near-tree
 bake floored at V 0.24, deep green not near-black; ?farspruce=0 the old, ?farspruce=bough the by-bough tree; ?pines=0 the
 old whatever). RENDERED on trees-far at F's 150 m autumn view: dark-green pixels V median 0.251 -> 0.282, their share 9.7
 -> 9.9 percent, land under V 0.3 10.7 -> 9.7; the spruces' shapes the same. F TAKES THE 1 KM DARKS (the air's, its lane).

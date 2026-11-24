@@ -53,6 +53,23 @@ export const SHADOW_TIERS = { mid: MID_TIER };
 export const SHADOW_WHOLE = new Set();
 export const SHADOW_OPTS = { whole: (() => { try { return new URLSearchParams(location.search).get('shwhole') !== '0'; } catch (e) { return true; } })() };
 const NO_GROUPS = Object.freeze([]);
+// EACH FAR CROWN'S SHADOW BESIDE IT, FROM THE AIR (the look director's audit 2, finding 1, the part the coordinator gave
+// the far trees, 24 Nov: "the wood lacks its darks", 0.02 per cent of the land under V 0.3 at 1 km; the references from
+// a few hundred metres up: "each tree ... with its shadow lying on the grass beside it"). From the air (the eye over
+// 60 m) no near or middle tree stands in this square, so it needs none of its fine texels: it grows to FAR_SHADOW.R
+// metres to each side (860: the impostors reach 1,500 m ahead, flora.js FAR_REACH) and lies AHEAD of the eye, under the
+// land in view, and every far impostor throws its whole crown into it (render/impostor.js, the shadow twin, flora.js
+// the list). The ground already asks the map for each stroke (chunks.js pcSunAtSoft): a stroke on a crown's shadow side
+// lies in the shade whole, one light level down -- a pool cut along the strokes, never a darkening laid over them. What
+// is NOT reached: the canopy painted into the ground (render/farground.js) lights its own dabs. ?farshadow=1 on (OFF by
+// default until the look director passes it); ?farshr= the square's half-size in metres.
+export const FAR_SHADOW = (() => {
+  try {
+    const q = new URLSearchParams(location.search), v = q.get('farshadow'), r = +q.get('farshr');
+    return { on: v === '1' || v === 'true', R: isFinite(r) && r >= 200 && r <= 3000 ? r : 860 };
+  } catch (e) { return { on: false, R: 860 }; }
+})();
+const FAR_AHEAD = 0.75;      // (the square's middle this many of its half-sizes ahead of the eye: from 0.25 behind to 1.75 ahead)
 // Looking DOWN this steeply (the sines of 48 and 58 degrees) the middle distance has left the frame, so the square
 // comes back in and the near shadow has its finest texels again. Two numbers and not one so that a view held near
 // the threshold does not change the texels a shadow is cut on from frame to frame.
@@ -247,6 +264,12 @@ export class ShadowMap {
     const alt = Math.max(0, SHADOW.alt || 0);
     let R = this.R0;
     while (R < 359 && alt * 1.5 > R) R *= Math.SQRT2;
+    // (the far crowns' shadows from the air: FAR_SHADOW above. Its depth reaches over the whole square however low the
+    //  sun: the ground under a square of half-size R lies up to R / tan(the sun's height) nearer or further along the sun)
+    const farSh = FAR_SHADOW.on && alt > 60;
+    if (farSh) R = FAR_SHADOW.R;
+    const D = farSh ? 400 + R * Math.min(4, Math.sqrt(Math.max(1 - Math.min(1, Z.dot(up)) ** 2, 0)) / Math.max(Z.dot(up), 0.25)) : 400;
+    if (D !== this.D) { this.D = D; this.cam.far = 2 * D; this.cam.updateProjectionMatrix(); this.mat.uniforms.uInv.value = 1 / (2 * D); }
     // ...AND WHEN THE EYE LOOKS ALONG THE LAND, not only when it is high. Standing on level ground the ladder above
     // leaves the square at 90 m however far the player is looking, so a wood at 150 m had no cast shadow at all and
     // the leaf pattern stood in for it. One step of the same ladder, 90 m to 127 m, carries the shadows out to 160 m
@@ -261,11 +284,10 @@ export class ShadowMap {
       for (let s = 0; this._far && s < REACH && R < 359 && (LEAD + FULL) * R < SHADOW_TIERS.mid; s++) R *= Math.SQRT2;
     }
     if (R !== this.R) { this.R = R; const sc = this.cam; sc.left = -R; sc.right = R; sc.top = R; sc.bottom = -R; sc.updateProjectionMatrix(); }
-    const c = this._c.copy(camL).addScaledVector(up, -alt).addScaledVector(f, this.R * LEAD);
+    const c = this._c.copy(camL).addScaledVector(up, -alt).addScaledVector(f, this.R * (farSh ? FAR_AHEAD : LEAD));
     const tx = (2 * this.R) / this.size;
     const cx = Math.round(c.dot(X) / tx) * tx, cy = Math.round(c.dot(Y) / tx) * tx, cz = c.dot(Z);
     c.set(0, 0, 0).addScaledVector(X, cx).addScaledVector(Y, cy).addScaledVector(Z, cz);
-    const D = this.D;
     // body-local -> (x, y in -1..1 over the square; z: 0 at the sun's side .. 1), as chunks.js pcSunAt reads it
     OIL.uShM.value.set(
       X.x / R, X.y / R, X.z / R, -cx / R,
@@ -325,9 +347,18 @@ export class ShadowMap {
     if (SHADOW_CROWD.size) {
       const au2 = renderer.autoClear; renderer.autoClear = false;
       cam.layers.enableAll();
+      // (an entry marked viewCull -- the far impostors, flora.js -- is drawn only if it stands in the eye's view or within
+      //  60 m of it, which is as far as a tree's shadow reaches into the view from outside it: of the 249 far meshes
+      //  shown from 1 km up, 78. The rest lie in the sun's square but out of sight.)
+      let fr = null;
       for (const e of SHADOW_CROWD) {
         const mesh = e.mesh;
         if (!mesh || !mesh.visible || !mesh.count || !mesh.parent) continue;
+        if (e.viewCull && mesh.boundingSphere) {
+          if (!fr) { fr = this._fr || (this._fr = new THREE.Frustum()); this._pm = this._pm || new THREE.Matrix4(); this._bs = this._bs || new THREE.Sphere(); fr.setFromProjectionMatrix(this._pm.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse)); }
+          const bs = this._bs.copy(mesh.boundingSphere).applyMatrix4(mesh.matrixWorld); bs.radius += 60;
+          if (!fr.intersectsSphere(bs)) continue;
+        }
         let sm = this._figMats.get(e.material);
         // the crowd hands in its OWN way of building the shadow twin, so this file never imports the
         // creatures: with the animals off, not one byte of render/beastmat.js is fetched (the powers' rule).
