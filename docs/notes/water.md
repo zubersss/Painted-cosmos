@@ -55,7 +55,14 @@ The weather group lands the rain field (its section 9.3: `fields.rain` at 32 a f
   Test: `src/world/waterhooks.test.mjs` (switches, nothing attached without a switch, the hooks asked only when attached,
   the fields written every time, the frame).
 
-### W1 RIVERS (built 24 Nov, this session; behind ?rivers=tree)
+### W1 RIVERS (built 24 Nov, this session; behind ?rivers=tree) -- REVIEWED BY F: PASS
+
+F (look director), 24 Nov, on ab-150m, ab-1km, ab-bank, ab-main150, ab-coast150, B-game-landing: "B is one river system
+where A was scraps; the brook at the landing sits right." Its one open point (the far water near V 0.8 against the rules'
+0.45-0.70; hue from the sky's zenith, not grey) is the paint's: forwarded to E-W3/W4 (session_01R5Bri2fSASVVvyrSG11UGF).
+The other water sessions: E-W2 bodies (lakes, ponds, puddles, falls, fjords), session_01R5Bri2xowNiwS1SnP3VG3f, branch
+water-bodies; E-W3/W4 paint and player (with FV5 and the night key), session_01R5Bri2fSASVVvyrSG11UGF, branch water-paint.
+This session is the water group's lead: it answers their questions on the design and their seams.
 
 - `src/world/drainage.js`: `keepTree` keeps `to`, a float `accF`, the routing order `ordR`; `rough` (2.5 m at 450 m) is laid on
   the base field for a SECOND flood used only for the routing (`lvlR`), so the levels (`lvl`, the lakes, the staircase) stay
