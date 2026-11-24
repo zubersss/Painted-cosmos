@@ -537,7 +537,7 @@ scratch merge with it, 16 h (sun 25 deg up: a 14 m tree's shadow 30 m long), 150
 16.5, at 0.40 13.4 percent; near-black 0.94 / 1.34 / 1.02; the pools lighter umber-grey (A1_farshadow_16h_150m_zoom_040).
 BUT the open lime clearing in that zoom is GROUND, not the painted canopy (seen with ?candebug=1), so 0.40 does not reach
 it: its lit share 44 percent off, 22 at true length. A shadow-length dial ?farshlen= (default 1, the twin's crown height
-scaled; 3cf... this commit) at 0.75 / 0.6 lifts it only to 23 / 27 percent (A1_farshadow_16h_150m_zoom_len): the clearing
+scaled; 73c33a0) at 0.75 / 0.6 lifts it only to 23 / 27 percent (A1_farshadow_16h_150m_zoom_len): the clearing
 is narrower than the shadows. Asked F: accept (a low sun shades a small clearing), or a lighter ground shade under far
 shadows (C's / F's ground code).
 Before: v39.5 LIVE (look-proto 1cb697c) with the far spruce, the storm
