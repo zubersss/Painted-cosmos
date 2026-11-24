@@ -111,7 +111,7 @@ export function buildRivers(S, D, opts) {
   // each node down its steepest slope on the mountain's own height (hM, the alpine recipe's large scale), into the valley
   // floors, where a torrent ends (it sinks into the meadow) or runs on off the mountain into the wood's own tree. The tree,
   // the catchments and the order below are this hybrid's; the field itself is untouched.
-  const MT = S.mount, aS = MT ? new Float32Array(len) : null, hM = MT ? new Float32Array(len) : null;
+  const MT = S.mount, aS = MT ? new Float32Array(len) : null, hM = MT ? new Float32Array(len) : null, mD = MT ? new Float32Array(len) : null;
   if (MT) {
     const ww = new Float32Array(S.nB), nb8 = new Int32Array(8), sh = D.share;
     for (let f = 0; f < 6; f++) for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
@@ -150,7 +150,14 @@ export function buildRivers(S, D, opts) {
     const ordR2 = new Int32Array(nO);
     for (let t = 0; t < nO; t++) ordR2[t] = ord2[nO - 1 - t];
     to = to2; accF = acc2; ord = ordR2;
-    if (globalThis.__MTDBG) { const h = [0, 0, 0, 0, 0, 0]; let pits = 0, nm = 0; for (let p = 0; p < len; p++) { if (aS[p] <= 0.5) continue; nm++; if (to2[p] < 0) pits++; const a = acc2[p]; h[a >= 48 ? 5 : a >= 24 ? 4 : a >= 12 ? 3 : a >= 6 ? 2 : a >= 3 ? 1 : 0]++; } console.log('mountain nodes', nm, 'pits', pits, 'acc <3,3+,6+,12+,24+,48+', h.join(' ')); }
+    // (how much of the wood's wander a mountain stream gives up: the whole of mountWander's share on a steep flank, none on a
+    //  valley's gentle floor, where it wanders as the wood's brooks do -- F, 24 Nov)
+    for (let p = 0; p < len; p++) {
+      if (aS[p] <= 0) continue;
+      const q = to[p];
+      const sl = q >= 0 ? (hM[p] - hM[q]) / ((len3(dir[p * 3] - dir[q * 3], dir[p * 3 + 1] - dir[q * 3 + 1], dir[p * 3 + 2] - dir[q * 3 + 2]) || 1e-9) * R) : 0;
+      mD[p] = aS[p] * smoothstep(0.03, 0.12, sl);
+    }
   }
   // (springs: catchment added at a node a few steps up the tree from a place, and carried down its path, so that a stream
   //  runs past it: the landing's brook, which the noise rivers had by `oil.riverAt`)
@@ -301,26 +308,26 @@ export function buildRivers(S, D, opts) {
       nR += stp[k];
     }
     const X = new Float64Array(nR), Y = new Float64Array(nR), Z = new Float64Array(nR), RW = new Float64Array(nR);
-    const RP = new Float64Array(nR), RQ = new Float64Array(nR), RR = new Int32Array(nR), RA = aS ? new Float32Array(nR) : null;
+    const RP = new Float64Array(nR), RQ = new Float64Array(nR), RR = new Int32Array(nR), RA = aS ? new Float32Array(nR) : null, RS = aS ? new Float32Array(nR) : null;
     let nk = 0;
     for (let k = 0; k < m - 1; k++) {
       const a = ctl[k], b = ctl[k + 1], c = ctl[k + 2], d = ctl[k + 3], steps = stp[k];
       const toJ = join && k === m - 2, qa = accF[cn[k]], qb = toJ ? qa : accF[cn[k + 1]], kb = toJ ? cn[k] : cn[k + 1];
       const wa = wOf(cn[k], qa), wb = wOf(kb, qb), pa = P[cn[k]], pb = P[cn[k + 1]], r = pieceR[cn[k]];
-      const aa = aS ? aS[cn[k]] : 0, ab = aS ? aS[kb] : 0;
+      const aa = mD ? mD[cn[k]] : 0, ab = mD ? mD[kb] : 0, sa = aS ? aS[cn[k]] : 0, sb = aS ? aS[kb] : 0;
       at[k] = nk;
       for (let s = 0; s < steps; s++, nk++) {
         const u = s / steps;
         catmull(a, b, c, d, u, pt);
         const l = len3(pt[0], pt[1], pt[2]);
         X[nk] = pt[0] / l; Y[nk] = pt[1] / l; Z[nk] = pt[2] / l; RW[nk] = wa + (wb - wa) * u; RP[nk] = pa + (pb - pa) * u; RQ[nk] = qa + (qb - qa) * u; RR[nk] = r;
-        if (RA) RA[nk] = aa + (ab - aa) * u;
+        if (RA) { RA[nk] = aa + (ab - aa) * u; RS[nk] = sa + (sb - sa) * u; }
       }
     }
     {
       const b = ctl[m], l = len3(b[0], b[1], b[2]), ke = join ? cn[m - 2] : cn[m - 1], qe = accF[ke];
       at[m - 1] = nk;
-      if (RA) RA[nk] = aS[ke];
+      if (RA) { RA[nk] = mD[ke]; RS[nk] = aS[ke]; }
       X[nk] = b[0] / l; Y[nk] = b[1] / l; Z[nk] = b[2] / l; RW[nk] = wOf(ke, qe); RP[nk] = P[cn[m - 1]]; RQ[nk] = qe; RR[nk] = pieceR[cn[m - 2]];
     }
     const sArr = new Float64Array(nR);
@@ -453,7 +460,7 @@ export function buildRivers(S, D, opts) {
         j = c;
       }
       const kS1 = kSAt(j);
-      SA.push(OX[i0], OY[i0], OZ[i0]); SB.push(OX[j], OY[j], OZ[j]); SW.push(OH[i0], OH[j]); SP.push(RP[i0], RP[j]); SQ.push(RQ[i0]); SR.push(RR[i0]); SK.push(kS0, kS1); if (RA) SM.push(RA[i0] > 0.5 ? 1 : 0);
+      SA.push(OX[i0], OY[i0], OZ[i0]); SB.push(OX[j], OY[j], OZ[j]); SW.push(OH[i0], OH[j]); SP.push(RP[i0], RP[j]); SQ.push(RQ[i0]); SR.push(RR[i0]); SK.push(kS0, kS1); if (RS) SM.push(RS[i0] > 0.5 ? 1 : 0);
       i0 = j; kS0 = kS1;
     }
     if (st.end === 'sea' || st.end === 'edge') {
