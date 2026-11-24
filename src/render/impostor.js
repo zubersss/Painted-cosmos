@@ -217,9 +217,11 @@ function hook() {
   });
 }
 
-// The atlas for one world: `variants` = [{ geo, layer }], the kit geometries in layer order.
+// The atlas for one world: `variants` = [{ geo, layer }], the kit geometries in layer order. opts.floors: per layer,
+// the least brightness (V) its crown is painted at, 0 for none but the common floor; opts.leafK: per layer, how much
+// larger its leaves are drawn, 0 for the density rule below (both flora.js FAR_SPRUCE).
 export class ImpostorAtlas {
-  constructor(geos) {
+  constructor(geos, opts = {}) {
     this.geos = geos;
     this.n = geos.length;
     this.rows = Math.max(1, Math.ceil(this.n / IMP.cols));
@@ -231,6 +233,7 @@ export class ImpostorAtlas {
     // is framed on the cylinder seen from its direction, which wastes far fewer texels than the ball did (a poplar is
     // seven metres across and fifteen high): see viewRect.
     this.cr = []; this.ch = [];
+    const floors = opts.floors || [], leafKs = opts.leafK || [];
     for (const g of geos) {
       if (!g.boundingBox) g.computeBoundingBox();
       const b = g.boundingBox, cx = (b.min.x + b.max.x) / 2, cy = (b.min.y + b.max.y) / 2, cz = (b.min.z + b.max.z) / 2;
@@ -267,10 +270,11 @@ export class ImpostorAtlas {
         this.ce = this.ce || [];
         this.ce.push([new THREE.Vector3((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2), new THREE.Vector3(Math.max(0.5, (x1 - x0) / 2 * 1.1), Math.max(0.5, (y1 - y0) / 2 * 1.1), Math.max(0.5, (z1 - z0) / 2 * 1.1))]);
         const dens = area > 0 && sil > 1e-3 ? area * 0.5 / sil : 1;
-        this.leafK.push(Math.min(IMP.leafHi, Math.max(IMP.leafLo, Math.sqrt(IMP.dens / dens))));
+        const own = leafKs[this.leafK.length];
+        this.leafK.push(own > 0 ? own : Math.min(IMP.leafHi, Math.max(IMP.leafLo, Math.sqrt(IMP.dens / dens))));
       }
       this.cr.push(new THREE.Vector4(cx, cy, cz, rc));
-      this.ch.push(new THREE.Vector4(hh, Math.hypot(rc, hh), 0, 0));
+      this.ch.push(new THREE.Vector4(hh, Math.hypot(rc, hh), floors[this.ch.length] || 0, 0));
     }
     this.texture = null; this.ready = false; this.renderer = null;
     this.uniforms = {
@@ -505,6 +509,7 @@ flat varying vec3 vSunK;
 flat varying vec3 vUpK;
 flat varying vec3 vDepth;
 flat varying vec2 vKB;    // x the kind (twigs, snow), y the light of a crown seen against the sun
+flat varying float vVF;   // the least brightness its crown is painted at (uImpH.z of its layer; 0: only the common floor)
 #ifdef PC_MASS
 flat varying vec3 vMass;  // x the crown's width on the screen (px), y the share of its seen face that its sunward side lights, z its autumn (the family run's weight)
 uniform vec4 uMassK2;     // x the share of trees that take their stand's colour, y a warm crown's paint (1: as it was, lower: deeper)
@@ -525,6 +530,7 @@ void main() {
   int sp = int(aInst2.x + 0.5), ly = int(aInst2.y + 0.5);
   vec4 CR = uImpC[ly];
   vec2 HR = uImpH[ly].xy;   // the cylinder's half height, the ball's radius
+  vVF = uImpH[ly].z;
   mat3 ir = mat3(im);
   mat3 iv = inverse(ir);
   // the nearest baked view, from the eye's direction in the kit's own space (render/impostor.js viewCell)
@@ -681,6 +687,7 @@ flat varying vec2 vKB;
 #ifdef PC_GUST
 flat varying vec3 vGust;
 #endif
+flat varying float vVF;
 #ifdef PC_MASS
 flat varying vec3 vMass;
 #endif
@@ -892,9 +899,10 @@ void main() {
     // (the shade of a crown through the shared foliage shade where the build has it, chunks.js pcShadeLeaf, as a
     //  near leaf takes its own; otherwise pcTone alone)
     c = ${'${IMPSHADE}'};
-    // (nothing of a crown under V 0.18: the look director's floor for the darkest conifer, R1.2c)
-    float vmx = max(c.r, max(c.g, c.b));
-    if (vmx < 0.18) c *= 0.18 / max(vmx, 1e-3);
+    // (nothing of a crown under V 0.18: the look director's floor for the darkest conifer, R1.2c; a layer may ask for
+    //  more: the spruce from its by-bough tree at 0.24, its middle tree's needles from 20 m out, flora.js FAR_SPRUCE)
+    float vmx = max(c.r, max(c.g, c.b)), vfl = max(0.18, vVF);
+    if (vmx < vfl) c *= vfl / max(vmx, 1e-3);
     rid = 4.0 + fract(vInst.z * 7.0 + id * 0.37) * 0.9;
     #ifdef PC_MASS
       if (mass) rid = 4.0 + fract(vInst.z * 7.0) * 0.9;      // (one region a crown, as it is one colour family)
