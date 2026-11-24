@@ -794,8 +794,19 @@ void main() {
   // meant to mend; above 0.79 it does cut, but easing it there lifts the far picture, which is exactly what the
   // owner called "kinda light" and measured against (the shoulder's note below). The far land's modelling is put
   // back by the local-contrast gain above instead, which moves no mean value at all.)
-  vec3 s = col * col * (3.0 - 2.0 * col);
-  col = mix(col, s, 0.35);
+  // (L7, 2026-11-24, QUIET DARKS; LOOK-AUDIT F4: the S laid on each channel pushed a dark colour's small channels down
+  // faster than its large one, so every shadow came out purer than it was painted -- (0.20, 0.12, 0.18) went from
+  // saturation 0.40 to 0.53 here and the push below. With uLookF.w on, the S is laid on the VALUE only and the colour
+  // scaled to it, so a colour keeps its hue and its saturation and only its value moves along the same S.)
+  if (uLookF.w > 0.5) {
+    // (never above where the old S took the brightest channel: laid on the value alone, a bright saturated colour's
+    // top channel rose further than it did, and the share of the picture over 0.90 grew, 4.1 to 4.8 per cent on S2)
+    float l0 = max(dot(col, W), 1e-4), vm0 = max(max(col.r, col.g), max(col.b, 1e-4));
+    col *= min(mix(l0, l0 * l0 * (3.0 - 2.0 * l0), 0.35) / l0, mix(vm0, vm0 * vm0 * (3.0 - 2.0 * vm0), 0.35) / vm0);
+  } else {
+    vec3 s = col * col * (3.0 - 2.0 * col);
+    col = mix(col, s, 0.35);
+  }
   // colours that pop (the owner, 2026-11-15): every colour pushed from its grey, the dull ones most and the pure ones
   // hardly, so nothing clips; a pixel's own colour only, no neighbour is read: no edge is touched
   // (2026-11-22: and the push eases from 0.28 to uFarC.z with distance. It is strongest where the colour is weakest,
@@ -804,7 +815,12 @@ void main() {
   // dot(col, W) for any g -- so easing it cannot lighten the far picture and the measured shares do not move.
   // ?farsat= sets it; 0.28 is the look as it was.)
   float lw = dot(col, W), sat = max(col.r, max(col.g, col.b)) - min(col.r, min(col.g, col.b));
-  col = clamp(mix(vec3(lw), col, 1.0 + mix(0.28, uFarC.z, far) * (1.0 - sat)), 0.0, 1.0);
+  // (L7: "dull" was measured as max - min, which is small for EVERY dark colour, so every shadow got the whole push.
+  // With uLookF.w on it is the colour's real saturation, and the push fades out under a value of 0.30: the darks are
+  // left as painted, deep and quiet, and the lights and middle values still pop.)
+  float pushK = 1.0;
+  if (uLookF.w > 0.5) { float vmx = max(col.r, max(col.g, col.b)); sat = sat / max(vmx, 1e-4); pushK = smoothstep(0.20, 0.42, vmx); }
+  col = clamp(mix(vec3(lw), col, 1.0 + mix(0.28, uFarC.z, far) * (1.0 - sat) * pushK), 0.0, 1.0);
   col = mix(vec3(0.07, 0.06, 0.09), col, smoothstep(0.0, 1.0, uLaid));
   // (2026-11-18, the owner: "It's kinda light".) THE SHOULDER: nothing clips to paper white any more.
   // Measured on rendered stills against the owner's twenty oil paintings: HALF the game's aerial picture was

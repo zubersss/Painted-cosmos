@@ -190,7 +190,11 @@ export const OIL = {
   //   x THE NIGHT KEY (L1, `?nightkey=`): by the moon a colour goes part of the way to its own value in the night
   //     key's hue and the moonlit paint is laid at the night's own strength (chunks.js pcTone); the last pass excuses
   //     from the night's grade only what the lantern lights and what is itself a light, not every warm pixel (post.js)
-  //   y, z, w: kept for L2 (one foliage shade), L3 (one light), L7 (quiet darks in the last pass)
+  //   y ONE FOLIAGE SHADE (L2, `?leafshade=`): the shade of leaves, blades, far crowns and green floor dabs from one
+  //     function, quieted to its own value (chunks.js pcShadeLeaf)
+  //   z kept for L3 (one light)
+  //   w QUIET DARKS (L7, `?postdark=`): the last pass's S laid on the value only, and its colour push faded out under
+  //     a value of 0.30 and measured by the real saturation (post.js OIL_FRAG)
   uLookF: { value: new THREE.Vector4(_qn('nightkey', 1), _qn('leafshade', 1), _qn('onelight', 1), _qn('postdark', 1)) },
   // THE NIGHT'S TWO NUMBERS for the world the eye is on (world/index.js sets them each frame from the world's look):
   //   x how strong the moonlit paint is against the sunlit (a look's oil.night.v; 0.60, or 0.85 where the world has a

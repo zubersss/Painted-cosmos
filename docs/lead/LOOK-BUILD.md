@@ -47,7 +47,7 @@ its A).
 | L0 | DONE | see git log (`[painter] L0`) | 7 stills (S1-S6 + S3 at night) against v37: 6 identical to the pixel, 1 with 2 pixels off by 1 of 255 (the 275 m night still); the shader text of all 36 materials of the autumn wood (comments and spaces taken out) identical, the 9 plant shaders with `pcFogAmountV` included, so those 2 pixels are the software renderer's run-to-run noise, not the change. Suites 325 / 65 / 416 pass. |
 | T1 | DONE | see git log (`[painter] T1`) | see the T1 section below; stills in docs/shots/painter/look-director/build/T1 (A = `?skyceil=0`, B = on) |
 | L1 | DONE | see git log (`[painter] L1`) | see the L1 section below; stills in docs/shots/painter/look-director/build/L1 (_A off, _B on) |
-| L2 + L7 | not started | | |
+| L2 + L7 | DONE | see git log (`[painter] L2 + L7`) | see the L2 + L7 section below; stills in docs/shots/painter/look-director/build/L2-L7 |
 | L3 | not started | | |
 
 ## T1, the sky ceiling: what was built and what was seen
@@ -114,3 +114,22 @@ its A).
 - LEFT AS IT IS (not this step): by night the stream is now the lightest and bluest thing in the wood, because water
   is not painted through pcTone; group E's (LOOK-RULES R1.2c, C11). Neptune's lake by night is still the loud
   green-and-navy field (audit, Neptune).
+
+## L2 + L7, one foliage shade and quiet darks: what was built and what was seen
+
+- `chunks.js` `pcShadeLeaf(c)`: the recipe the five copies shared, once, then half of it at its own value in a
+  breath of the cool key's hue (luminance kept), lifted a tenth; `uLookF.y` 0 the recipe as it was. THE ONE-LINE
+  SWAPS IN OTHER GROUPS' LINES (materials.js at this commit): 489 (TERRAIN_FRAG pcGroundPaint, the green dabs'
+  shade: group C), 1839 (PROP_VERT `deepL`, a leaf: group A), 2207 (PROP_FRAG `deepF`, crown dabs: group A),
+  2943 (NEAR_FRAG `deepO`, the near ground: group B). The watercolour crown's variant (`pcDensity(c, 1.45) * ...`,
+  only by day in the watercolour path) is untouched.
+- `post.js` OIL_FRAG (L7, `uLookF.w`): the S laid on the value and the colour scaled to it, never above where the
+  old S took the brightest channel (without that cap the share of S2 over V 0.90 grew 4.1 -> 4.8 per cent; with it
+  4.1 -> 4.0); the colour push measured by the real saturation and faded out under V 0.30.
+- SEEN (22 stills, A both off, B both on, one page each; all opened): S(V<.3) by lookstats, A -> B: autumn wood
+  16.8 0.55 -> 0.35, its night 0.45 -> 0.34, green wood noon 0.42 -> 0.29, its morning 0.58 -> 0.31, its night
+  0.45 -> 0.34, 275 m 0.27 -> 0.13, alpine 0.36 -> 0.26, Mars 0.59 -> 0.46, Venus 0.72 -> 0.45, Neptune night
+  0.86 -> 0.72. The lights keep their colour (satL 0.48 -> 0.47 on S2, 0.37 -> 0.35 on S1) and the share over V
+  0.90 does not grow anywhere. By eye: the golden hour's shaded leaves and banks go from lurid red-brown and acid
+  green to a deep, quieter red and olive (the approved picture moves: the owner should see S1 A/B); the crowns at
+  275 m lose their maroon; Neptune's night is the same picture with the snow a breath less bright.

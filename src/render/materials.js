@@ -486,7 +486,7 @@ vec3 pcGroundPaint(vec3 c, vec3 leaf, float fk, vec3 rnd, float snowC, float lvl
   // shade on grass blue-green. Only where the stroke's wash is green; earth, litter, rock and snow shade as they did.)
   vec3 tn = pcTone(k, lvl);
   float grn = smoothstep(0.02, 0.10, k.g - max(k.r, k.b)) * (1.0 - snowC);
-  if (grn > 0.0) tn = mix(tn, mix(pcBody(pcDensity(k, 1.35)) * mix(vec3(1.0), pcOilShadeC(), 0.5) * 0.80, tn, smoothstep(1.2, 2.0, lvl)), grn);
+  if (grn > 0.0) tn = mix(tn, mix(pcShadeLeaf(k), tn, smoothstep(1.2, 2.0, lvl)), grn);
   #ifdef PC_FIRE
     // (the powers, fire) WHERE THE FIRE PASSED, THIS STROKE IS LAID IN CHARCOAL instead of its own colour. It is asked
     // at the STROKE'S OWN CENTRE (gBc, which is where this stroke's paint is worked out anyway), so the edge of a burn
@@ -1836,7 +1836,7 @@ void main() {
       // It is laid in the deep tone whatever the sun: the dark the leaves stand on. Nothing else has a shade over 1.)
       if (aData.z > 1.5) xl = 0.2;
       float lvL = pcLevel(xl, 0.03);
-      vec3 deepL = pcBody(pcDensity(cs, 1.35)) * mix(vec3(1.0), pcOilShadeC(), 0.5) * 0.80;
+      vec3 deepL = pcShadeLeaf(cs);      // (L2: the one foliage shade, chunks.js)
       vLeafC.rgb = mix(deepL, pcTone(cs, lvL), smoothstep(1.2, 2.0, lvL));
       vLeafK.rgb = cs;
       #ifdef PC_FIRE
@@ -2204,7 +2204,7 @@ void main() {
         float lvl = pcLevel(xs_, 0.03);
         // (a crown's shade is its own colour laid heavier with half the cool key over it: the key alone over an orange
         // crown is mud; light comes through leaves)
-        vec3 deepF = pcBody(pcDensity(cs, 1.35)) * mix(vec3(1.0), pcOilShadeC(), 0.5) * 0.80;
+        vec3 deepF = pcShadeLeaf(cs);      // (L2: the one foliage shade, chunks.js)
         vec3 lit = pcLamp(mix(deepF, pcTone(cs, lvl), smoothstep(1.2, 2.0, lvl)), cs, Bc, rnd.y);
         #ifdef PC_FIRE
           lit = pcFireLit(lit, cs, Bc, rnd.y);      // (the powers, fire: the leaves over a fire are lit by it, dab by dab)
@@ -2940,7 +2940,7 @@ void main() {
       ko = mix(ko, vec3(1.0), uWx.z * smoothstep(0.35, 0.9, vS.x) * 0.8);
       // (in the shade a stroke is its own colour laid heavier with half the cool key over it, as a leaf's is: the key
       // whole made the grass of a shaded bank a violet brown)
-      vec3 deepO = pcBody(pcDensity(ko, 1.35)) * mix(vec3(1.0), pcOilShadeC(), 0.5) * 0.80;
+      vec3 deepO = pcShadeLeaf(ko);      // (L2: the one foliage shade, chunks.js)
       vec3 co = pcLamp(mix(deepO, pcTone(ko, lv), smoothstep(1.2, 2.0, lv)), ko, vRootB, r3o.y);
       #ifdef PC_FIRE
         // (the powers, fire: the grass at the foot of a fire is lit by it, blade by blade, and the blades standing

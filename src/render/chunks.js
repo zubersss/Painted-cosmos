@@ -179,6 +179,22 @@ vec3 pcNight(vec3 c) {
   return mix(c, clamp(vec3(dot(c, vec3(0.3, 0.5, 0.2))) * kh, 0.0, 1.0), uLookN.y * nk);
 }
 vec3 pcBody(vec3 c) { return pcDensity(pcNight(c), uOilA.y); }
+// THE ONE FOLIAGE SHADE (L2, 2026-11-24; LOOK-AUDIT F4). Leaves, blades, far crowns and green floor dabs took their
+// shade from a private recipe written out five times in materials.js -- pcBody(pcDensity(c, 1.35)) * mix(1, the cool
+// key, 0.5) * 0.80 -- which takes the autumn wood's orange leaf to (0.57, 0.20, 0.03), saturation 0.94, and a green
+// blade to (0.10, 0.27, 0.03), 0.91 at value 0.27, where the owner's references put a meadow in shade at 0.49 and 0.33
+// and a conifer at 0.31 and 0.26: the poster-paint darks the art pass of 18 Nov measured. This is that recipe ONCE,
+// and then half of it laid at its own value in a breath of the cool key's hue (so its luminance stays where it was:
+// the shade does not move up or down the value ladder, it only stops shouting), lifted a tenth. Worked through: the
+// green blade comes out (0.151, 0.238, 0.120), saturation 0.50 at value 0.24; the orange leaf (0.466, 0.257, 0.191),
+// 0.59 at 0.47. It takes pcBody, so it is in the night's key (L1). uLookF.y 0 is the recipe exactly as it was.
+vec3 pcShadeLeaf(vec3 c) {
+  vec3 shC = pcOilShadeC();
+  vec3 d = pcBody(pcDensity(c, 1.35)) * mix(vec3(1.0), shC, 0.5) * 0.80;
+  if (uLookF.y < 0.5) return d;
+  vec3 g = vec3(dot(d, vec3(0.3, 0.5, 0.2))) * mix(vec3(1.0), shC / max(dot(shC, vec3(0.3, 0.5, 0.2)), 1e-3), 0.5);
+  return mix(d, g, 0.5) * 1.10;
+}
 // WHICH WAY A SURFACE FACES, FOR THE LIGHT THAT KNOWS UP FROM DOWN (2026-11-22). THE CONTRACT, so a material and
 // this chunk cannot drift apart:
 //   WHAT IT IS. pcUp is dot(normalize(vBody), n) -- the body's own up against the normal the surface is shaded by.
