@@ -40,6 +40,7 @@
 import { FACES } from './cubesphere.js';
 import { smoothstep } from './noise.js';
 import { getSurface } from './surface.js';
+import { MODE } from '../data/mode.js';
 
 // Defaults, all in metres. H is the pool band: the water stands level for a band of H and then falls H
 // at the lip. 4.0 m against the wood's measured mean fall (c.L's maximum slope is 2 pi * 12 / 1900 =
@@ -53,6 +54,12 @@ export const DRAIN_DEF = {
   edge: 0.14,     // the share of a band spent falling at the lip (0.14 of 4 m over about 24 m of ground)
   lakeMin: 1.2,   // a basin filled deeper than this stands at its own sill level, not on the band
   divide: 30.0,   // how high dry ground reads in the base field, so water routes round it, not through
+  // (?rivers=tree, docs/lead/WATER-DESIGN.md 3.2: the rivers are drawn from this field's own flow tree, which is then KEPT,
+  //  and routed over a little ROUGHNESS, because steepest descent on an even slope draws parallel combs -- seen in the
+  //  maps of 24 Nov. The roughness is for the routing only: the levels are solved without it and are v34's exactly.)
+  keepTree: false, // keep `to` (each node's downstream node), `accF` (the catchment as a float) and `ordR` (the routing order)
+  rough: 0,       // metres of routing roughness (0: none, and the routing is the levels' own flood)
+  roughL: 450,    // its scale, metres
 };
 
 // ---- the grid ---------------------------------------------------------------------------------------
@@ -137,6 +144,8 @@ export class Drainage {
     this.acc = new Uint16Array(len);      // how many nodes drain through this one (1 = only itself)
     this.cell = (Math.PI * 0.5 * this.R) / o.n;   // metres a cell at a face centre
     this.lakeNodes = 0; this.deepest = 0;   // kept for the log, not read by the game
+    this.keepTree = !!o.keepTree || o.rough > 0; this.rough = +o.rough || 0; this.roughL = +o.roughL || 450;
+    this.to = null; this.accF = null; this.ordR = null; this.lvlR = null;
     this.ms = { base: 0, flood: 0, flow: 0, halo: 0 };
     this._o = this.out();
   }
@@ -145,8 +154,14 @@ export class Drainage {
 
   build() {
     this._sampleBase();
-    this._flood();
-    this._flow();
+    this._flood(this.ter, this.lvl, false);       // the levels (with no roughness this is also the routing)
+    let rl = this.lvl;
+    if (this.rough > 0) {                          // (?rivers=tree: the routing's own flood, over the roughened base)
+      rl = new Float32Array(this.g.len);
+      this._flood(this._roughen(), rl, true);
+      this.lvlR = rl;
+    }
+    this._flow(rl);
     this._halo();
     this.ready = true;
     return this;
@@ -168,9 +183,9 @@ export class Drainage {
   // off, so the sea (where the base field is the sea level) is the outlet; a world with no sea pours
   // into its own lowest node. Popping the lowest known node and carrying its level outward fills every
   // depression to the height of the lowest pass out of it, which is where its water really stands.
-  _flood() {
+  _flood(ter, lvl, routeOnly) {
     const t0 = now();
-    const g = this.g, n = g.n, ter = this.ter, lvl = this.lvl, len = g.len;
+    const g = this.g, n = g.n, len = g.len;
     const done = new Uint8Array(len);
     const from = new Int32Array(len).fill(-1);
     const ord = new Int32Array(6 * n * n);     // the pop order: a valid downhill ordering for step 3
@@ -200,6 +215,7 @@ export class Drainage {
     }
     this.ord = ord.subarray(0, k);
     this.from = from;
+    if (routeOnly) { this.ms.flood += now() - t0; return; }
     // what the fill came to, for the log
     let lk = 0, deep = 0;
     for (let f = 0; f < 6; f++) for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
@@ -208,6 +224,21 @@ export class Drainage {
     }
     this.lakeNodes = lk; this.deepest = deep;
     this.ms.flood = now() - t0;
+  }
+
+  // (?rivers=tree) the base field roughened for the routing: a noise of `rough` metres at `roughL`, laid only where the
+  // base stands over the outlet's level (the sea's nodes stay one level, so the sea stays the one outlet it is)
+  _roughen() {
+    const g = this.g, n = g.n, S = this.S, ter = this.ter, out = new Float32Array(g.len), d = [0, 0, 0];
+    let lo = Infinity;
+    for (let f = 0; f < 6; f++) for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) { const t = ter[g.pid(f, i, j)]; if (t < lo) lo = t; }
+    const k = this.R / this.roughL, nA = S.nA.n3;
+    for (let f = 0; f < 6; f++) for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
+      const p = g.pid(f, i, j);
+      g.dirOf(f, i, j, d);
+      out[p] = ter[p] + this.rough * nA(d[0] * k + 13.7, d[1] * k - 51.2, d[2] * k + 7.9) * smoothstep(lo + 1, lo + 4, ter[p]);
+    }
+    return out;
   }
 
   // the neighbours of an interior node, as padded interior indices. Inside a face this is arithmetic;
@@ -230,9 +261,9 @@ export class Drainage {
   // 3. which way each node drains, and how much drains through it. Steepest descent on the FILLED
   // surface where there is any descent; inside a filled basin every level is equal, so the water is
   // sent back the way the flood reached it, which is the way out to the sill.
-  _flow() {
+  _flow(lvl) {
     const t0 = now();
-    const g = this.g, lvl = this.lvl, acc = this.acc, ord = this.ord, from = this.from;
+    const g = this.g, acc = this.acc, ord = this.ord, from = this.from;
     const rank = new Int32Array(g.len).fill(-1);
     for (let t = 0; t < ord.length; t++) rank[ord[t]] = t;
     const to = new Int32Array(g.len).fill(-1);
@@ -249,14 +280,19 @@ export class Drainage {
       to[p] = best >= 0 ? best : (from[p] >= 0 ? from[p] : -1);
       acc[p] = 1;
     }
+    // (?rivers=tree: the catchment again as a float, which a finer grid would saturate in 16 bits)
+    const accF = this.keepTree ? new Float32Array(g.len) : null;
+    if (accF) for (let t = 0; t < ord.length; t++) accF[ord[t]] = 1;
     for (let t = ord.length - 1; t >= 0; t--) {
       const p = ord[t], q = to[p];
       if (q < 0) continue;
       const a = acc[q] + acc[p];
       acc[q] = a > 65535 ? 65535 : a;
+      if (accF) accF[q] += accF[p];
     }
     this.ms.flow = now() - t0;
-    this.from = null; this.ord = null;        // only the field is kept
+    if (this.keepTree) { this.to = to; this.accF = accF; this.ordR = ord; }
+    this.from = null; this.ord = null;        // only the field is kept (and, for the rivers, the tree)
   }
 
   // 4. the halo: each face's border node is a copy of whichever node really owns that direction, so a
@@ -393,5 +429,14 @@ export function ensureDrainage(bodyId, opts) {
   const done = ensureDrainage._d || (ensureDrainage._d = new Set());
   if (done.has(bodyId)) { const S = getSurface(bodyId); return S ? S.drain : null; }
   done.add(bodyId);
+  // (?rivers=tree: the field keeps its flow tree and routes over a little roughness; world/rivers.js. Read at the call:
+  //  MODE is set in the page's own body, after this module has loaded.)
+  //  Only on a world with a WOOD, the one recipe the tree rivers serve (world/rivers.js attachRivers): elsewhere the rough
+  //  routing changed the catchment o.turb reads, and so the white water, for nothing (measured 24 Nov: 12 to 33 values in
+  //  40,000 samples on Venus, Jupiter, Saturn, Uranus and Neptune).
+  if (MODE.water && MODE.water.rivers && MODE.oil) {
+    const S0 = getSurface(bodyId);
+    if (S0 && S0.biomes.some((b) => b.terrain === 'forest')) opts = Object.assign({ keepTree: true, rough: 2.5 }, opts || {});
+  }
   try { return attachDrainage(getSurface(bodyId), opts); } catch (e) { return null; }
 }
