@@ -26,7 +26,9 @@ const FLORA_TF = {      // the green wood: carpets under the open canopy, campio
   // stills, ?bladegreen=0 -> on: hue 70 -> 66 here and 72 -> 64 at the autumn landing, V 0.71 -> 0.69 and 0.72 -> 0.66, S
   // 0.79-0.84 both ways (the ground under the blades, which is another lane's, and the paint's own richness): so the
   // washes are quieter, olive with yellow ochre, and take less of the ground's colour, gm 0.12)
-  sward: { floor: 0.10, gm: 0.12, leaf: [M('oliveGreen', 'yellowOchre', 0.4), pig('oliveGreen'), M('oliveGreen', 'hookersGreen', 0.5)] },
+  // (the look director on the final set: the darkest blades came out near-black olive slashes in the shade; low in
+  // saturation, so the shared shade leaves them; the ladder lifted a step, so a shaded blade stays at V 0.25 or more)
+  sward: { floor: 0.10, gm: 0.12, leaf: [M('oliveGreen', 'yellowOchre', 0.4), M('oliveGreen', 'yellowOchre', 0.2), M('oliveGreen', 'sapGreen', 0.3)] },
   blooms: [
     { kind: 'bluebell', shape: 'bell', c: M('cobaltViolet', 'ultramarine', 0.2), head: [0.010, 0.015], stalk: [0.16, 0.30], heads: [3, 6], drift: 8, peak: 22, share: 0.8, hab: { canopy: [0.05, 0.35] }, season: [0, 0.45], bold: 1 },
     { kind: 'wood anemone', shape: 'rayed', c: D('cobaltViolet', 0.86), eye: M('quinGold', 'lemonYellow', 0.4), head: [0.012, 0.018], stalk: [0.08, 0.16], heads: [1, 1], drift: 6, peak: 26, share: 0.7, hab: { canopy: [0.05, 0.30] }, season: [0, 0.35] },
@@ -44,7 +46,7 @@ const FLORA_TF = {      // the green wood: carpets under the open canopy, campio
 const FLORA_AW = {      // the autumn wood: violet against the gold and yellow-green is the floor's own complement
   // (its trees stand apart over grass, so its flowers grow well under the crowns: the landing's canopy share is 0.66 and at
   // the old ramps, which ended at 0.5, the first place the owner sees had no flower in view, COUNTED 24 Nov)
-  sward: { floor: 0.10, gm: 0.12, leaf: [M('oliveGreen', 'yellowOchre', 0.5), M('oliveGreen', 'rawSienna', 0.2), M('oliveGreen', 'hookersGreen', 0.4)] },   // (the blades' own greens, as the green wood's, a step more golden)
+  sward: { floor: 0.10, gm: 0.12, leaf: [M('oliveGreen', 'yellowOchre', 0.5), M('oliveGreen', 'rawSienna', 0.2), M('oliveGreen', 'hookersGreen', 0.2)] },   // (the blades' own greens, as the green wood's, a step more golden)
   blooms: [
     { kind: 'Michaelmas aster', shape: 'rayed', c: M('cobaltViolet', 'roseMadder', 0.15), eye: M('quinGold', 'cadOrange', 0.2), head: [0.012, 0.019], stalk: [0.28, 0.55], heads: [2, 4], drift: 9, peak: 11, share: 0.9, hab: { canopy: [0.88, 0.35] }, edge: -0.2, season: [0.3, 1], bold: 1 },
     { kind: 'harebell', shape: 'bell', c: pig('cobaltViolet'), head: [0.010, 0.015], stalk: [0.20, 0.36], heads: [1, 3], drift: 7, peak: 12, share: 0.6, hab: { canopy: [0.92, 0.4] }, edge: -0.2 },
@@ -74,7 +76,7 @@ const FLORA_AM = {      // the alpine meadow: gentian and pinks on the high turf
     { kind: 'alpine aster', shape: 'rayed', c: M('cobaltViolet', 'roseMadder', 0.15), eye: M('quinGold', 'lemonYellow', 0.3), head: [0.014, 0.021], stalk: [0.10, 0.20], heads: [1, 1], drift: 8, peak: 12, share: 0.45 },
     { kind: 'ox-eye daisy', shape: 'rayed', c: D('neutralTint', 0.70), eye: M('quinGold', 'lemonYellow', 0.3), head: [0.020, 0.030], stalk: [0.25, 0.50], heads: [1, 2], drift: 10, peak: 16, share: 1.0, hab: { wet: [0.6, 0.0] }, season: [0, 0.6], bold: 1 },
     { kind: 'globe flower', shape: 'cup', c: K('lemonYellow', 'lemonYellow'), eye: mixc(K('lemonYellow', 'lemonYellow'), pig('oliveGreen'), 0.25), head: [0.016, 0.024], stalk: [0.25, 0.45], heads: [1, 1], drift: 9, peak: 10, share: 0.6, hab: { wet: [0.0, 0.5] }, season: [0, 0.45] },
-    { kind: 'alpine pink', shape: 'cushion', c: pig('roseMadder'), body: M('sapGreen', 'hookersGreen', 0.5), head: [0.05, 0.10], stalk: [0, 0], heads: [1, 1], drift: 7, peak: 6, share: 0.5, season: [0, 0.7] },
+    { kind: 'alpine pink', shape: 'cushion', c: pig('roseMadder'), body: M('davysGrey', 'sapGreen', 0.35), head: [0.05, 0.10], stalk: [0, 0], heads: [1, 1], drift: 7, peak: 6, share: 0.5, season: [0, 0.7] },
     { kind: 'alpine poppy', shape: 'cup', c: M('cadScarlet', 'alizarin', 0.25), eye: M('alizarin', 'sepia', 0.5), head: [0.020, 0.032], stalk: [0.20, 0.40], heads: [1, 2], drift: 10, peak: 14, share: 1.0, season: [0, 0.85], bold: 1 },
     { kind: 'meadow buttercup', shape: 'cup', c: K('lemonYellow', 'lemonYellow'), eye: mixc(K('lemonYellow', 'lemonYellow'), pig('oliveGreen'), 0.25), head: [0.011, 0.017], stalk: [0.25, 0.50], heads: [1, 2], drift: 10, peak: 13, share: 0.75, season: [0, 0.7], bold: 1 },
     // (the year: the high meadow's autumn, pale violet crocus cups out of the turf, and the hawkbit's yellow)
@@ -87,7 +89,7 @@ const FLORA_SC = {      // the sea cliffs: thrift along the edge, campion on the
   blooms: [
     // (SEEN, 24 Nov: the cliff top's grass is yellow ochre, and its yellow trefoil and vetch vanished on it. Pink, white and
     // violet are the flowers that show on ochre; the yellow ones are kept few.)
-    { kind: 'thrift', shape: 'cushion', c: pig('roseMadder'), body: M('sapGreen', 'oliveGreen', 0.4), head: [0.05, 0.11], stalk: [0, 0], heads: [1, 1], drift: 7, peak: 10, share: 1.0, sprinkle: 0.10, season: [0, 0.65], bold: 1 },
+    { kind: 'thrift', shape: 'cushion', c: pig('roseMadder'), body: M('davysGrey', 'sapGreen', 0.35), head: [0.05, 0.11], stalk: [0, 0], heads: [1, 1], drift: 7, peak: 10, share: 1.0, sprinkle: 0.10, season: [0, 0.65], bold: 1 },
     { kind: 'sea campion', shape: 'rayed', c: D('cerulean', 0.88), eye: D('yellowOchre', 0.3), head: [0.013, 0.020], stalk: [0.08, 0.18], heads: [1, 2], drift: 8, peak: 12, share: 0.8, season: [0, 0.85], bold: 1 },
     { kind: 'sea aster', shape: 'rayed', c: M('cobaltViolet', 'roseMadder', 0.2), eye: M('quinGold', 'lemonYellow', 0.3), head: [0.012, 0.018], stalk: [0.15, 0.30], heads: [2, 4], drift: 9, peak: 10, share: 0.7, hab: { wet: [0.0, 0.5] }, season: [0.3, 1], bold: 1 },
     { kind: "bird's-foot trefoil", shape: 'cup', c: M('quinGold', 'cadOrange', 0.45), head: [0.008, 0.012], stalk: [0.04, 0.10], heads: [2, 4], drift: 8, peak: 18, share: 0.35, season: [0, 0.7] },
