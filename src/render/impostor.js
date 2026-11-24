@@ -525,7 +525,7 @@ flat varying vec3 vDepth;
 flat varying vec2 vKB;    // x the kind (twigs, snow), y the light of a crown seen against the sun
 flat varying float vVF;   // the least brightness its crown is painted at (uImpH.z of its layer; 0: only the common floor)
 #ifdef PC_MASS
-flat varying vec3 vMass;  // x the crown's width on the screen (px of a 480-line picture, R3.9), y the share of its seen face that its sunward side lights, z its autumn (the family run's weight)
+flat varying vec3 vMass;  // x the crown's width on the screen (px), y the share of its seen face that its sunward side lights, z its autumn (the family run's weight)
 uniform vec4 uMassK2;     // x the share of trees that take their stand's colour, y a warm crown's paint (1: as it was, lower: deeper)
 #endif
 #ifdef PC_GUST
@@ -556,7 +556,7 @@ void main() {
     vec4 cc = projectionMatrix * modelViewMatrix * vec4(io + ir * CR.xyz + pcRound(io + uOrigin), 1.0);
     float kx = rS * sqrt(projectionMatrix[0][0] * projectionMatrix[0][0] + 1.0), ky = rS * sqrt(projectionMatrix[1][1] * projectionMatrix[1][1] + 1.0);
     // (and a crown under uImpMinPx pixels across, where the painted canopy stands for it: IMP_MINPX)
-    bool tiny = uImpMinPx > 0.0 && uImpH[ly].w > 0.5 && 2.0 * CR.w * length(ir[0]) < uImpMinPx * (max(uOilPx.y, 1.0) / 480.0) * di * uOilPx.x;
+    bool tiny = uImpMinPx > 0.0 && uImpH[ly].w > 0.5 && 2.0 * CR.w * length(ir[0]) < uImpMinPx * di * uOilPx.x;
     if (vis <= 0.0 || tiny || cc.w < -rS || cc.x - cc.w > kx || -cc.x - cc.w > kx || cc.y - cc.w > ky || -cc.y - cc.w > ky) {
       gl_Position = vec4(0.0, 0.0, 2.0, 1.0);
       return;
@@ -658,7 +658,7 @@ void main() {
   //  made fewer specks: the specks are the turned crowns' own lit strokes, a paler third colour in a wood of 2 to 5 px
   //  crowns of lit and dark strokes. What the far bands should be is with the look director.)
   #ifdef PC_GUST
-    float gPx = 2.0 * hwv.x * length(ir[0]) / max(di * uOilPx.x, 1e-4) * (480.0 / max(uOilPx.y, 1.0));      // (the crown's width on the screen, px of a 480-line picture: R3.9)
+    float gPx = 2.0 * hwv.x * length(ir[0]) / max(di * uOilPx.x, 1e-4);      // (the crown's width on the screen, px)
     float gK = smoothstep(4.0, 10.0, gPx);
     float gTh = 0.375 + (fract(inst.z * 4.37 + 0.11) - 0.5) * 0.45 * gK;
     float gT = step(gTh, pcGustBand(io + uOrigin)) * uImpGust;
@@ -678,11 +678,7 @@ void main() {
   vDepth = ir * (dc * HR.y);
   vKB = vec2(uFarKind[sp], pow(max(dot(normalize(io - uCamLocal), uSunDirL), 0.0), 1.5));
   #ifdef PC_MASS
-    // (THE CROWN'S WIDTH IN PIXELS OF A 480-LINE PICTURE, LOOK-RULES R3.9, the look director, 24 Nov: every threshold of the
-    //  look written in pixels -- crown mass 30, one tone 4 to 7, bark as leaves 30, the filled gaps 8, the gust's small
-    //  crowns 4 to 10, ?impminpx -- is a size at 480 lines, so the design does not change with the picture's size and a
-    //  step of the dynamic resolution never flips a crown from strokes to a patch. At 480 lines the factor is 1, exactly.)
-    vMass = vec3(2.0 * hwv.x * length(ir[0]) / max(di * uOilPx.x, 1e-4) * (480.0 / max(uOilPx.y, 1.0)), clamp(0.5 + 0.5 * dot(vSunK, dc), 0.0, 1.0), famL.a);
+    vMass = vec3(2.0 * hwv.x * length(ir[0]) / max(di * uOilPx.x, 1e-4), clamp(0.5 + 0.5 * dot(vSunK, dc), 0.0, 1.0), famL.a);
   #endif
   vFog = pcFogAmountV(di * pcFogBank(vBody));
   gl_Position = projectionMatrix * mv;
@@ -1056,7 +1052,7 @@ void main() {
   vec2 HR = uImpH[ly].xy;
   mat3 ir = mat3(im);
   // (a crown too small to be drawn casts nothing either: IMP_MINPX)
-  if (uImpMinPx > 0.0 && uImpH[ly].w > 0.5 && 2.0 * CR.w * length(ir[0]) < uImpMinPx * (max(uOilPx.y, 1.0) / 480.0) * di * uOilPx.x) { gl_Position = vec4(0.0, 0.0, 2.0, 1.0); return; }
+  if (uImpMinPx > 0.0 && uImpH[ly].w > 0.5 && 2.0 * CR.w * length(ir[0]) < uImpMinPx * di * uOilPx.x) { gl_Position = vec4(0.0, 0.0, 2.0, 1.0); return; }
   vec3 d = normalize(inverse(ir) * uSunDirL);
   vec3 dh = vec3(d.x, max(d.y, 0.0), d.z);
   dh /= abs(dh.x) + dh.y + abs(dh.z) + 1e-6;
