@@ -734,13 +734,16 @@ function makeStormTemplate(id, gen) {
   }
   // the anvil: a FLAT shelf of smaller flattened lobes from over the tower out downwind, fanning out, its underside level
   // (bigger round lobes over the column made a puffy cap: the mushroom)
+  // (rework: the anvil SITS ON the tower's top and spreads past it -- a little upwind, mostly downwind -- thick enough to
+  // read as a shelf with a flat shaded underside; at 0.95 of the height, thin and small, it hid in the tower's top dome
+  // and the storm from the coast at 3.3 km had no anvil)
   const NA = 18;
   for (let i = 0; i < NA; i++) {
     const t = i / (NA - 1);
-    const x = 0.05 + 1.05 * t + (H(j++) - 0.5) * 0.06;
-    const half = 0.14 + 0.32 * t;
+    const x = -0.22 + 1.25 * t + (H(j++) - 0.5) * 0.06;
+    const half = 0.18 + 0.30 * t;
     const z = (H(j++) - 0.5) * 2 * half;
-    L.push({ x, z, y: 0.95 + (H(j++) - 0.5) * 0.02 - 0.02 * t, r: 0.09 + 0.05 * H(j++) + 0.04 * (1 - t), k: K + 1, a: 1 });
+    L.push({ x, z, y: 1.02 + (H(j++) - 0.5) * 0.02 - 0.02 * t, r: 0.13 + 0.06 * H(j++) + 0.05 * (1 - t), k: K + 1, a: 1 });
   }
   return L;
 }
@@ -962,7 +965,7 @@ export function createClouds(scene) {
       if (handK > 0 && hash(k, 77, 1) < handK * 1.15) continue;
       // where the slot is now, on the world
       _w.set(sx, sy, sz).applyQuaternion(Q);
-      let cover, base, thick, storm = 0, conv = 1, deckK = 0;
+      let cover, base, thick, storm = 0, conv = 1, deckK = 0, mountK = 0;
       if (C) {
         C.at(_w.x, _w.y, _w.z, _cOut);
         conv = _cOut.conv;
@@ -995,7 +998,10 @@ export function createClouds(scene) {
           // (the base from the HIGHEST land under the cloud's footprint, 180 m round the slot: from the land at the slot
           // alone, on a steep range the cloud stood inside the rock and none showed, the first mountain stills)
           const gM = mountTop(k, _w.x, _w.y, _w.z);
-          cover = Math.min(0.95, cover + 0.22 * mK); base = Math.min(base, gM - 50 + 90 * hash(k, 9, 3)); thick = Math.min(thick, 500);
+          // (its base WELL UNDER the summit, so the peak stands up into the cloud's body and the slopes vanish into it:
+          // with the base at the summit's height it sat on the top as a flat white lid, the mountain stills)
+          cover = Math.min(0.95, cover + 0.22 * mK); base = Math.min(base, gM - 140 + 80 * hash(k, 9, 3)); thick = Math.min(thick, 500);
+          mountK = mK;
         }
         keep = Math.max(keep, mK);
         // (and a TOWERING cumulus of the map -- thick and convective, a storm in its early stages, before the map names it
@@ -1028,6 +1034,8 @@ export function createClouds(scene) {
       let Rc = (95 + 230 * Math.pow(hash(k, gen, 13), 2.2)) * (0.75 + 0.5 * cover) * (0.55 + 0.45 * s) * CLOUDS.size;
       const fairT = Rc * (0.65 + 0.55 * hash(k, gen, 17));
       let T = Math.max(60, (thick > 0 ? Math.max(fairT, thick * (0.55 + 0.45 * hash(k, gen, 19)) * (0.4 + 0.6 * conv)) : fairT) * (0.5 + 0.5 * s));
+      // (a cloud caught on a mountain is a heap round the summit, smaller and taller than a cumulus over the plain)
+      if (mountK > 0) { Rc *= 1 - 0.25 * mountK; T = Math.max(T, Rc * (0.9 + 0.5 * mountK)); }
       // THE SEA OF CLOUD (the owner's Aloft reference): seen from above a closed deck, a cumulus is one of the deck's own
       // HEAPS -- wide, low, its lower third sunk in the sheet -- so the deck reads as one rolling floor with the peaks out of
       // it. Drawn as whole cumulus they stood on it as a field of cotton balls, the first stills from 1.6 km.
@@ -1147,7 +1155,7 @@ export function createClouds(scene) {
           const y = o.y * cl.T, r = o.r * cl.La;
           const px = cl.bx + (ax * o.x + bxw * o.z) * cl.La + ux * y, py = cl.by + (ay * o.x + byw * o.z) * cl.La + uy * y, pz = cl.bz + (az * o.x + bzw * o.z) * cl.La + uz * y;
           const ac = 0.45 * cl.La, cy0 = cl.T * 0.94;
-          emit(px, py, pz, r, cl.bx + ax * ac + ux * cy0, cl.by + ay * ac + uy * cy0, cl.bz + az * ac + uz * cy0, cl.T * 0.06 + r * 0.2, ex, ey, ez, nx, ny, nz, pa, seed, 0.20, cl.T, 1, air);
+          emit(px, py, pz, r, cl.bx + ax * ac + ux * cy0, cl.by + ay * ac + uy * cy0, cl.bz + az * ac + uz * cy0, cl.T * 0.05 + r * 0.25, ex, ey, ez, nx, ny, nz, pa, seed, 0.34, cl.T, 1, air);
           continue;
         }
         const y = o.y * cl.T;
