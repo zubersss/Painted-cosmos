@@ -43,15 +43,17 @@ export function groundSeasonOn(bodyId) { return !!(MODE.oil && GROUND_SEASON && 
 export const ROCKFIELD = (() => { const v = _q && _q.has('rockfield') ? +_q.get('rockfield') : 1; return isFinite(v) && v > 0; })();
 export function rockfieldOn(bodyId) { return !!(MODE.oil && ROCKFIELD && CANOPY_WORLDS[bodyId]); }
 
-// ?bloomfar=1: THE FLOWER DRIFTS FROM THE AIR (FV6(b), with flora B: world/bloom.js writes each full sample's drift
-// cover o.fd and its colour as an index into the world's 16-colour palette o.fi; the mesher packs them, the ground lays
-// that share of its dabs in the flower's own colour, whole). The same switch as bloom.js's own (bloomSwitches().far),
-// read here too because the ground's program is compiled before any world. Read once; off by default.
-export const BLOOM_FAR = (() => { try { return new URLSearchParams(location.search).get('bloomfar') === '1'; } catch (e) { return false; } })();
+// THE FLOWER DRIFTS FROM THE AIR (FV6(b), with flora B: world/bloom.js writes each full sample's drift cover o.fd and its
+// colour as an index into the world's 16-colour palette o.fi; the mesher packs them, the ground lays that share of its
+// dabs in the flower's own colour, whole). ONE SWITCH with flora B's: bloom.js bloomSwitches().far decides it (?bloomfar,
+// ?flora=old, ?bloom=0, ?bloomair=0), read LAZILY, since bloom.js settles it once and needs the look set first; the ground's
+// program asks it when the material is made, after the look is chosen. (It was this module's own ?bloomfar=1 read, which
+// could disagree with B's.)
+export function bloomFar() { try { return !!(MODE.oil && BL.bloomSwitches && BL.bloomSwitches().far); } catch (e) { return false; } }
 // on for a world whose flowers bloom.js can hand over: the oil look, the switch, a palette with colours in it. (The
 // namespace import: on a branch whose bloom.js has no palette yet this is simply off.)
 export function bloomFarOn(S) {
-  if (!MODE.oil || !BLOOM_FAR || typeof BL.bloomPalette !== 'function') return false;
+  if (!MODE.oil || !bloomFar() || typeof BL.bloomPalette !== 'function') return false;
   const p = BL.bloomPalette(S);
   return !!(p && p.count > 0);
 }

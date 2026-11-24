@@ -32,11 +32,11 @@
 // ?canopy=0 takes it out (world/farstand.js reads it): the ground's program is compiled without any of it and the
 // mesher packs nothing new, so the picture is the one before to the bit. Only in the oil look, only on CANOPY_WORLDS.
 import { SEASON, leafNow } from '../data/season.js';
-import { CANOPY, NEEDLE, CANOPY_WORLDS, GROUND_SEASON, ROCKFIELD, canopyOn, BLOOM_FAR, bloomFarOn, bloomPaletteOf } from '../world/farstand.js';
+import { CANOPY, NEEDLE, CANOPY_WORLDS, GROUND_SEASON, ROCKFIELD, canopyOn, bloomFar, bloomFarOn, bloomPaletteOf } from '../world/farstand.js';
 import { MODE } from '../data/mode.js';
 import { pig, dilute, mixc } from '../data/looks/common.js';
 
-export { CANOPY, canopyOn, GROUND_SEASON, ROCKFIELD, BLOOM_FAR };
+export { CANOPY, canopyOn, GROUND_SEASON, ROCKFIELD, bloomFar };
 // ?candab=: the canopy's own dabs against the ground's (0.5: its finer layer is half the ground's finest, its coarser
 // layer the ground's finest). From a few hundred metres up the ground's dab is as big as a whole crown, so the roof's
 // cap and shaded side could not be laid with it; a crown wants three or four strokes across.
@@ -278,7 +278,8 @@ void pcCanopyAt(vec3 P, vec2 ch, float stand, float needle, vec3 floorC, float l
       if (inF > 0.5) {
         vec2 fF = textureLod(uShAir, qF.xy * 0.5 + 0.5, 0.5).rg;
         float covF = fF.r * step(fF.g / max(fF.r, 1e-3) - 0.0006, qF.z);
-        if (covF > 0.40 + 0.26 * fract(rnd.y * 5.7)) gCanL = min(gCanL, pcLevel(0.33, 0.03));
+        // (one notch lighter than the neighbour's-shadow level, 0.40 for 0.33, the look director: so the sunlit glades stay bright at 16 h)
+        if (covF > 0.40 + 0.26 * fract(rnd.y * 5.7)) gCanL = min(gCanL, pcLevel(0.40, 0.03));
       }
     }
   #endif
