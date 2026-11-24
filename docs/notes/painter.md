@@ -330,7 +330,12 @@ FV7 of `docs/lead/FARVIEW-DESIGN.md`. A second session (A2, branch `trees-near`)
 the same time: this lane touches only the far parts of `flora.js`, `florakit.js`, the plant material's far branch,
 `render/impostor.js`, `render/shadow.js` and new rows in `core/bench.js`.
 
-**State (update this line every step):** (24 Nov, about 13:45) look-proto v39 (d9d9ed7) merged into trees-far and
+**State (update this line every step):** (24 Nov, about 14:35) SMALL CROWNS ARE THE DEFAULT (`?impsmall=0` the old
+way), after F passed them with its colour fixes; look-director at 64f1742 merged into trees-far on the coordinator's
+word (8f3848d; the impostor.js conflict kept my azL line and added F's pcSummerTree line). SEEN on the real branch,
+phone settings, autumn wood 15.4 h, roof on (`A1_small_default_*`): 1 km, the impostor zone hue 92 S 0.36 V 0.56 with
+?impsmall=0, hue 85 S 0.46 V 0.68 by default, C's roof past the reach hue 77 S 0.46 V 0.74; 150 m V 0.48 -> 0.51,
+pixels under V 0.3 29 -> 26 percent; the same to 2/255 as the scratch measurement. Goes into v39.3. Before that: look-proto v39 (d9d9ed7) merged into trees-far and
 pushed (my far trees compile under the new light: guard not tripped, swap 21 ms). NEXT, ON THE COORDINATOR'S WORD
 "v39.2 is on look-proto" (it carries F's colour fixes, look-director up to 64f1742): merge origin/look-proto, make the
 small crowns the default (IMP.small 12, ?impsmall=0 the opt-out), run the 1 km seam check F asked for (hue and
@@ -341,7 +346,7 @@ either way). The same with F's colour fixes is being measured in a scratch copy 
 coordinator): the split trees drawn whole in the shadow pass behind `?shwhole=1` (OFF), row 'split trees whole in
 shadow pass'; MEASURED on foot with ?trees2=1: 226 -> 207 draws (every visible casting split mesh), picture
 byte-identical; the default is the coordinator's call. The bake fix's 1-2/255 difference: accepted by the coordinator.
-Scratch worktrees `seam` and `ld` (never pushed). URGENT FIX DONE for v39.1 (the coordinator): during
+Scratch worktrees removed. URGENT FIX DONE for v39.1 (the coordinator): during
 the bake over frames the far wood was gone; now today's far trees stand in until the bake is done and hand over in that
 frame (flora.js impWant / impOn, _impReady; impostor.js step(), onReady, bakeTick), the bake counts as busy from the
 frame it is asked for. SEEN, gallery autumn wood 16.8 h on foot, phone settings: mid-bake (step 5 of 78, not ready,

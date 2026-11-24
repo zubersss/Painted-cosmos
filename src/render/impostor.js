@@ -53,9 +53,10 @@ export const IMP = {
   leafLo: 1.4, leafHi: 4.0,                              // (never less, never more, than this much larger)
   variants: Math.round(_qn('impvar', 1, 1, 2)),          // trees baked of each kind (?impvar=2: two, at twice the memory)
   minLeaf: _qn('impminleaf', 2.0, 0, 6),                 // and never under this many texels across, at any level
-  // SMALL CROWNS IN TWO STEPS (?impsmall=1, or =N texels; OFF by default until the look director has seen the A/B): a
-  // view of 12 texels or fewer paints a crown's strokes in two light levels, its cap and its body (IMP_FRAG)
-  small: (() => { const v = _q && _q.get('impsmall'); if (!v || v === '0') return 0; const n = +v; return v === '1' || !isFinite(n) ? 12 : Math.max(0, Math.min(96, n)); })(),
+  // SMALL CROWNS IN TWO STEPS (by default since the look director passed it, 24 Nov; ?impsmall=0 the old way, =N
+  // texels to try others): a view of 12 texels or fewer paints a crown's strokes in two light levels, its cap and its
+  // body (IMP_FRAG)
+  small: (() => { const v = _q && _q.get('impsmall'); if (v === '0') return 0; const n = v == null ? NaN : +v; return v == null || v === '' || v === '1' || !isFinite(n) ? 12 : Math.max(0, Math.min(96, n)); })(),
 };
 // (the levels: halving until a view is a single texel; 96 texels give 96, 48, 24, 12, 6, 3 and the last is cut at 1.5
 //  so it stops at 3 -- six levels)
@@ -664,7 +665,7 @@ void main() {
     // a stroke of leaves: its colour from the tree's run by its own number, its light at its centre (PROP_VERT, "a
     // leaf's paint, once a leaf": the same steps, and the same tone function every surface takes, pcTone)
     float twig = step(1.5, vKB.x);
-    // SMALL CROWNS IN TWO STEPS (?impsmall=; the look director, 24 Nov: "at the coarse levels only (a view of 12 texels
+    // SMALL CROWNS IN TWO STEPS (the default; ?impsmall=0 the old way; the look director, 24 Nov: "at the coarse levels only (a view of 12 texels
     // or fewer), pull a crown's strokes toward two steps: the cap one step, the rest of the crown one step, so each small
     // crown reads as one lit mass with its shade, not lit and dark alternating; leave 24+ texels as they are. Keep the
     // step difference between cap and body at one level (not less)". SEEN before it, from 1 km over the far view's
