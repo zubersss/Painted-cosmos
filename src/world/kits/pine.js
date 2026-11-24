@@ -49,6 +49,7 @@ import { mulberry32 } from '../noise.js';
 // (spec.slender, as in birchGeometry and pineGeometry: the oil look's deep woods want a taller, narrower tree.)
 export function tallPineGeometry(seed, lod, spec) {
   const rnd = mulberry32(seed), B = new Builder();
+  B.axis = !!(spec && spec.trees2);      // (?trees2=: kitbuild.js tube, the wood's pinch at the lens)
   const near = lod === 0;
   const sl = !!(spec && spec.slender);
 

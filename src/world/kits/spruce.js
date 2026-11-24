@@ -33,6 +33,7 @@ import { mulberry32 } from '../noise.js';
 // tall kits read it (florakit.js birchGeometry, pineGeometry).
 export function spruceGeometry(seed, lod, spec) {
   const rnd = mulberry32(seed), B = new Builder();
+  B.axis = !!(spec && spec.trees2);      // (?trees2=: kitbuild.js tube, the wood's pinch at the lens)
   const sl = !!(spec && spec.slender);
   const H = sl ? 13.5 + rnd() * 5.5 : 10.5 + rnd() * 5.0;
   // a spruce stands nearly straight: a little lean, and none of the birch's S-bend
