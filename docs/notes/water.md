@@ -250,6 +250,13 @@ after: they are not confluences). The sample costs about 9 % more near the landi
 (`docs/shots/painter/water-default/confluence-step-before-after.jpg`, B's view and near the first view): the white band, the
 staircase and the straight lines GONE; HONEST: the strokes now follow a current that curves through the confluence, so they
 swirl and marble there, and a faint line of fine hatching remains along where the seam was: for the look director.
+- F (19:52): keep the level blend; the swirl NOT acceptable (marbled paper). MADE (14772ce): the current blended over 1.5 m only
+  (RIVER_DEF.blendDir), the level still over 8 m (the step stays gone: 3 cm a metre at most). SEEN (`confluence-current-short-
+  turn.jpg`: v39.3 | both over 8 m | current over 1.5 m, B's view and near the first view): the tributary's strokes long and
+  nearly straight again to where the rivers meet; some curved banding and fine hatching remain on the main river by the meeting,
+  as v39.3's own frame shows on that bending reach. CAUSE of that (read in WATER_FRAG, v37's strokes, the default): a current
+  turns the stroke chart at each pixel about the middle of a 26 m cell, so where a river bends a point 13 m from the middle
+  shifts metres for a few degrees and the strokes bunch: ONE DIRECTION PER STROKE needs the paint (W3's), asked.
 
 ### THE WATER FROM THE AIR (24 Nov 14:50-16:15, this session; the coordinator held the water out of v39.2 for it)
 
