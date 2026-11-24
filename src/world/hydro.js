@@ -32,7 +32,9 @@
 //   PONDS (?ponds=1, pondAt). A jittered grid of 120 m cells; a cell may hold one small still pond in an open, level glade: its
 //     outline a bent ellipse, its level just under the lowest point of its rim (so it is always held in), its bed a bowl.
 //   PUDDLES (?puddles=1, puddleCap). The fine relief's hollows on near-level ground: c.cap is how deep water stands there at
-//     full wetness (at most 0.12 m). The paint (lane W3) lets them come and go with the ground's wetness.
+//     full wetness (at most 0.12 m). The paint (lane W3) lets them come and go with the ground's wetness. On a river's flat floor
+//     (where the land is near level everywhere, so the slope alone would let every hollow hold one) a hollow must be deeper,
+//     and none lies right at the water's edge: they stay few beside a wide river too.
 // THE FALLS LIST (S.hydro.falls) is what world/falls.js draws: one entry a lip, with its place, its way, width, the level at the
 // lip and at the foot, and the water's speed over it.
 //
@@ -42,6 +44,7 @@ import { MODE } from '../data/mode.js';
 import { smoothstep } from './noise.js';
 import { NOLQ, makeSample } from './surface.js';
 import { FACES as FACES_LOCAL } from './cubesphere.js';
+import { alpineMacro } from './mountain.js';
 
 export const HYDRO_DEF = {
   // lakes
@@ -49,6 +52,14 @@ export const HYDRO_DEF = {
   lakeDrop: 1.4,     // metres the bed is let down under the base level where the fill is deep
   lakeIn: 1.6,       // the hills go down over (lakeIn - 1) * lakeMin of fill from where the drowning starts
   lakeArea: 0.75,    // km2: the most of any basin that becomes open water (its deepest core; about a kilometre across)
+  // tarns (?mount=1 with the lakes: small still lakes in the mountains' hollows where their streams gather)
+  tarnAcc: 15,       // nodes of the mountain draining into a hollow, at least (where the streams gather)
+  tarnGap: 350,      // metres between two tarns, at least
+  tarnMax: 24,       // tarns a world, at most
+  tarnCell: 18, tarnN: 13,   // the ground measured round a hollow at load: 13 x 13 points 18 m apart
+  tarnArea: 0.038,   // km2: a tarn no larger (about 220 m across)
+  tarnDepth: 7,      // metres: and no deeper than this under its rim
+  tarnMin: [6, 0.8], // and at least this many of those points, and this deep, or it is no tarn
   // the mouth cut
   step: 6,           // metres between the stations of a corridor
   maxLen: 640,       // metres: a corridor no longer than this
@@ -81,6 +92,9 @@ export const HYDRO_DEF = {
   // puddles (a biome's oil.puddles, else the world's: 0 none .. 1)
   capMax: 0.12,      // metres
   capSlope: 0.03,    // no puddle on a slope steeper than this
+  capFloor: 0.12,    // metres: on a river's flat floor a hollow must be this much deeper to hold one (times (1 - rise)^2, the
+                     // wood's rise: 0 on the floor, 1 some 95 m from the water) ...
+  capBank: [4, 10],  // ... and none within the first of these metres of the water's edge, all by the second
 };
 
 const D2 = Math.PI / 4;
@@ -153,10 +167,10 @@ export function pondAt(rho, h, level, dep, out) {
 }
 
 // PUDDLES: the depth water stands at full wetness in a hollow of the fine relief (sm: the 15.5 m term, amplitude 0.42 m; mi: the
-// 3.4 m term), on ground whose slope is `slope`. 0 where there is none.
-export function puddleCap(sm, mi, slope, o, k) {
+// 3.4 m term), on ground whose slope is `slope`; `deep` (metres, default 0) more of a hollow asked for. 0 where there is none.
+export function puddleCap(sm, mi, slope, o, k, deep) {
   if (!(k > 0) || slope > o.capSlope) return 0;
-  const hollow = -sm - mi * 0.6 - 0.13;        // deeper than 13 cm under the mean of the 15 m relief
+  const hollow = -sm - mi * 0.6 - 0.13 - (deep || 0);   // deeper than 13 cm under the mean of the 15 m relief (and `deep`)
   if (hollow <= 0) return 0;
   const flat = 1 - smoothstep(o.capSlope * 0.5, o.capSlope, slope);
   const cap = Math.min(o.capMax, hollow * 0.55) * flat * Math.min(1, k);
@@ -184,12 +198,13 @@ class Hydro {
     this.lakes = !!want.lakes; this.ponds = false; this.puddles = false;
     this.cors = []; this.nCor = 0; this.falls = [];
     this.cn = Math.max(4, Math.round((Math.PI * 0.5 * S.R) / o.pondCell));   // (the 120 m cells' count a face edge)
-    this.ms = { lakes: 0, cuts: 0, ponds: 0 };
+    this.ms = { lakes: 0, tarns: 0, cuts: 0, ponds: 0 };
     this._q = { x: NaN, y: NaN, z: NaN, i: -1, t: 0, d: 0, k: 0, f: 0 };
     this._lv = [NaN];
     // (the two hooks, bound so surface.js can call them as S.hydro.forest / S.hydro.coast)
     this.forest = this.forest.bind(this);
     this.coast = this.coast.bind(this);
+    this.alpine = this.alpine.bind(this);
   }
 
   // ---- built once, at load ---------------------------------------------------------------------------------------------
@@ -199,6 +214,7 @@ class Hydro {
     this._bw = new Float32Array(S.nB);
     const W = this.want;
     if (W.lakes) this._buildLakes();
+    if (W.tarns) this._buildTarns();
     if (W.falls || W.fjord) this._buildCuts();
     if (W.ponds) this._buildPonds();
     if (W.puddles) this._puddleSetup();
@@ -583,6 +599,139 @@ class Hydro {
     return q;
   }
 
+  // ---- tarns ----------------------------------------------------------------------------------------------------------
+  // THE MOUNTAIN TARNS (?mount=1 with the lakes; the coordinator, 24 Nov). The mountains' streams (world/mountain.js, the water
+  // lead's) run down the mountain's own large-scale height into the valley floors and end there. Those hollows are ringed by
+  // ridges, so filled to their sills they would be lakes a hundred metres deep; a tarn is small. So: the hollows where a
+  // stream's catchment gathers (local lows of alpineMacro among the field's alpine nodes, with at least tarnAcc nodes draining
+  // in by steepest descent), at least tarnGap apart, below the snow; round each the REAL ground is measured on a small grid,
+  // and flooded from its lowest point up, cell by cell, stopping before it spills off the grid, passes tarnArea or tarnDepth.
+  // The tarn's level is the last cell taken; its cells are its basin, the cells next to them its rim. In the alpine recipe the
+  // water stands where the ground is under the level inside the basin; on the rim the ground is raised to just over the level
+  // where it dips (so there is never a wall of water), and a margin of stones runs round it. Never on a slope: the level is a
+  // flood's, so the water only fills what holds it.
+  _buildTarns() {
+    const t0 = now();
+    const S = this.S, D = this.D, g = D.g, n = g.n, len = g.len, R = this.R, o = this.o;
+    const ai = S.biomes.findIndex((b) => b.terrain === 'alpine');
+    this.tarns = []; this.nTarns = 0;
+    if (ai < 0 || !S.mount || !this._macro) { this.ms.tarns = now() - t0; return; }
+    const T = S.biomes[ai].t || {}, snow = (T.snow || 190) - 40;
+    const bw = this._bw, d3 = [0, 0, 0], nb = new Int32Array(8);
+    const hM = new Float32Array(len).fill(NaN);
+    for (let f = 0; f < 6; f++) for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
+      const p = g.pid(f, i, j); g.dirOf(f, i, j, d3);
+      // (the field took ground with no water of its own -- the mountains among it -- for a wall `divide` over the base level:
+      //  only those nodes are asked their biome, a third of them)
+      if (D.ter[p] - S._bigL(d3[0], d3[1], d3[2]) < 0.8 * D.divide) continue;
+      S.biomeWeights(d3[0], d3[1], d3[2], bw);
+      if (bw[ai] >= 0.98) hM[p] = this._macro(S, d3[0], d3[1], d3[2], T);
+    }
+    // steepest descent over the mountain's own height, and what drains through each node
+    const order = [], to = new Int32Array(len).fill(-1), acc = new Float32Array(len);
+    for (let p = 0; p < len; p++) if (hM[p] === hM[p]) order.push(p);
+    for (const p of order) {
+      const k = D._nbs(p, nb); let best = -1, bh = hM[p];
+      for (let t = 0; t < k; t++) { const q = nb[t]; if (hM[q] === hM[q] && hM[q] < bh) { bh = hM[q]; best = q; } }
+      to[p] = best;
+    }
+    order.sort((a, b) => hM[b] - hM[a]);
+    for (const p of order) acc[p] += 1;
+    for (const p of order) if (to[p] >= 0) acc[to[p]] += acc[p];
+    const cand = [];
+    for (const p of order) if (to[p] < 0 && acc[p] >= o.tarnAcc && hM[p] < snow) cand.push(p);
+    cand.sort((a, b) => acc[b] - acc[a]);
+    const smp = this._smp, N = o.tarnN, cs = o.tarnCell, half = (N - 1) / 2, maxCells = (o.tarnArea * 1e6) / (cs * cs);
+    const chosen = [];
+    for (const p of cand) {
+      if (chosen.length >= o.tarnMax) break;
+      const ff = Math.floor(p / g.s2), r0 = p - ff * g.s2, ii = (r0 % g.w) - 1, jj = ((r0 - (r0 % g.w)) / g.w) - 1;
+      const c0 = g.dirOf(ff, ii, jj, [0, 0, 0]);
+      if (chosen.some((q) => Math.hypot(q[0] - c0[0], q[1] - c0[1], q[2] - c0[2]) * R < o.tarnGap)) continue;
+      // the real ground round it (the surface as it is, the streams' gullies in it: S.hydro is not attached yet)
+      const [u, v] = axes(c0), H = new Float32Array(N * N);
+      for (let b = 0; b < N; b++) for (let a = 0; a < N; a++) {
+        const du = (a - half) * cs / R, dv = (b - half) * cs / R;
+        const q = norm3([c0[0] + u[0] * du + v[0] * dv, c0[1] + u[1] * du + v[1] * dv, c0[2] + u[2] * du + v[2] * dv]);
+        S.sample(q[0], q[1], q[2], smp, false);
+        H[b * N + a] = smp.h;
+      }
+      // the flood from the lowest point near the middle
+      let start = -1;
+      for (let b = half - 3; b <= half + 3; b++) for (let a = half - 3; a <= half + 3; a++) { const k = b * N + a; if (start < 0 || H[k] < H[start]) start = k; }
+      const inB = new Uint8Array(N * N), seen = new Uint8Array(N * N), heap = [[H[start], start]];
+      seen[start] = 1;
+      let level = H[start], cells = 0;
+      const hmin = H[start];
+      while (heap.length) {
+        let bi = 0; for (let k = 1; k < heap.length; k++) if (heap[k][0] < heap[bi][0]) bi = k;
+        const [hk, k] = heap.splice(bi, 1)[0];
+        const a = k % N, b = (k - a) / N;
+        if (a <= 1 || b <= 1 || a >= N - 2 || b >= N - 2) break;              // (it would spill near the grid's edge: stop before)
+        if (hk - hmin > o.tarnDepth || cells + 1 > maxCells) break;
+        inB[k] = 1; cells++; level = Math.max(level, hk);
+        for (const [da, db] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const q = (b + db) * N + (a + da); if (!seen[q]) { seen[q] = 1; heap.push([H[q], q]); } }
+      }
+      if (cells < o.tarnMin[0] || level - hmin < o.tarnMin[1]) continue;
+      // the shore and the rim. 1 the basin; 2 the cells beside it, where the water may still stand wherever the ground is under the
+      // level (the true shore, the level's contour, lies between a basin point and the next, so it falls in these cells and the
+      // shore follows the land, not the grid); 3 the cells beside those, where the ground is raised to just over the level if
+      // it dips (the rim that holds it in)
+      const mask = new Uint8Array(N * N);
+      for (let k = 0; k < N * N; k++) if (inB[k]) mask[k] = 1;
+      for (const [from, put] of [[1, 2], [2, 3]]) {
+        const add = [];
+        for (let b = 1; b < N - 1; b++) for (let a = 1; a < N - 1; a++) {
+          const k = b * N + a; if (mask[k]) continue;
+          for (let db = -1; db <= 1; db++) for (let da = -1; da <= 1; da++) if (mask[(b + db) * N + (a + da)] === from) { add.push(k); db = 2; break; }
+        }
+        for (const k of add) mask[k] = put;
+      }
+      chosen.push(c0);
+      this.tarns.push({ c: c0, u, v, level, hmin, cells, mask, acc: acc[p] });
+    }
+    this.nTarns = this.tarns.length;
+    // the 120 m cells each tarn's grid reaches, marked once (index + 1), so a sample anywhere else asks nothing
+    const mark = new Uint16Array(6 * this.cn * this.cn), reach = half * cs + cs;
+    this.tarns.forEach((tr, i) => {
+      for (let b = -reach; b <= reach; b += 20) for (let a = -reach; a <= reach; a += 20) {
+        const q = norm3([tr.c[0] + (tr.u[0] * a + tr.v[0] * b) / R, tr.c[1] + (tr.u[1] * a + tr.v[1] * b) / R, tr.c[2] + (tr.u[2] * a + tr.v[2] * b) / R]);
+        const k = this._cell(q[0], q[1], q[2]); if (!mark[k]) mark[k] = i + 1;
+      }
+    });
+    this.tarnMark = mark;
+    this.ms.tarns = now() - t0;
+  }
+
+  // THE TARN IN THE ALPINE RECIPE (world/mountain.js calls it after its own stream, the water lead's hook): the recipe's height
+  // h; returns the height; raises c.lqA to the tarn's level where its water stands, and its margin's wash and wetness
+  alpine(S, c, h) {
+    if (!this.nTarns) return h;
+    const id = this.tarnMark[this._cell(c.x, c.y, c.z)];
+    if (!id) return h;
+    const tr = this.tarns[id - 1], o = this.o, N = o.tarnN, half = (N - 1) / 2, R = this.R;
+    const dx = c.x - tr.c[0], dy = c.y - tr.c[1], dz = c.z - tr.c[2];
+    const a = Math.round((dx * tr.u[0] + dy * tr.u[1] + dz * tr.u[2]) * R / o.tarnCell + half);
+    const b = Math.round((dx * tr.v[0] + dy * tr.v[1] + dz * tr.v[2]) * R / o.tarnCell + half);
+    if (a < 0 || b < 0 || a >= N || b >= N) return h;
+    const m = tr.mask[b * N + a];
+    if (!m) return h;
+    const lv = tr.level;
+    if (m === 3) { if (h < lv + 0.15) h = lv + 0.15; }                      // (the rim holds the water in)
+    else if (h < lv) {
+      c.lqA = c.lqA === c.lqA ? Math.max(c.lqA, lv) : lv;
+      c.still = 1; c.turbW = 0; c.fspdW = 0; c.fu = 0; c.fv = 0;
+      c.swell = Math.max(c.swell, 0.4);
+      c.growA = 0;
+    }
+    // a margin of stones and wet ground round the water
+    const shore = 1 - smoothstep(lv + 0.1, lv + 1.2, h);
+    c.bedA = Math.max(c.bedA, shore * 0.85);
+    c.wetA = Math.max(c.wetA, shore * 0.7);
+    if (shore > 0.5) c.growA = Math.min(c.growA, 1 - shore);
+    return h;
+  }
+
   // ---- the hooks ------------------------------------------------------------------------------------------------------
   forest(S, c, b, H) {
     if (this.lakes) {
@@ -820,7 +969,10 @@ class Hydro {
 
   _puddle(S, c, b, H) {
     if (b.lq > b.h - 0.3) return;                         // water already stands here
-    if (-H.sm - H.mi * 0.6 - 0.13 <= 0) return;           // (no hollow: the slope is not even asked)
+    const o = this.o, bank = smoothstep(o.capBank[0], o.capBank[1], H.s);   // (H.s: metres from the water's edge)
+    if (!(bank > 0)) return;
+    const fl = 1 - H.rise, deep = o.capFloor * fl * fl;   // a river's flat floor: a deeper hollow asked for
+    if (-H.sm - H.mi * 0.6 - 0.13 - deep <= 0) return;    // (no hollow: the slope is not even asked)
     // the slope of the land the hollow lies in: the hills (1,900 m, 350 m, 98 m terms), by differences 4 m apart
     const R = this.R, x = c.x, y = c.y, z = c.z, e = 4 / R, nA = S.nA.n3;
     const [u, v] = axes([x, y, z]);
@@ -831,7 +983,7 @@ class Hydro {
     const ru = big(ux, uy, uz) + forestRelief(S, ux, uy, uz) * H.rise, rv = big(vx, vy, vz) + forestRelief(S, vx, vy, vz) * H.rise;
     const slope = Math.hypot(ru - r0, rv - r0) / 4;
     // (the max rule shared with the rivers' runnels, which set c.cap in _base before this: never take a runnel's away)
-    c.cap = Math.max(c.cap, puddleCap(H.sm, H.mi, slope, this.o, this.puddleK));
+    c.cap = Math.max(c.cap, puddleCap(H.sm, H.mi, slope, o, this.puddleK * bank, deep));
   }
 }
 
@@ -848,10 +1000,15 @@ export function attachHydro(S, drain, rivers, opts) {
   // So the switches can be on by default in the oil look and change Earth alone (the coordinator, 24 Nov: Earth first).
   const lookO = (S.look && S.look.oil) || {};
   const want = { lakes: !!W.lakes && lookO.lakeK != null, ponds: !!W.ponds, puddles: !!W.puddles, falls: !!W.falls, fjord: !!W.fjord && !!lookO.fjords };
+  // (tarns: with the mountains' streams, ?mount=1, which attached S.mount before this; their large-scale height is the water
+  //  lead's alpineMacro, world/mountain.js, read only)
+  want.tarns = want.lakes && !!W.mount && !!S.mount;
   if (!want.lakes && !want.ponds && !want.puddles && !want.falls && !want.fjord) return null;
-  const hy = new Hydro(S, drain, rivers || S.rivers || null, want, opts).build();
+  const hy = new Hydro(S, drain, rivers || S.rivers || null, want, opts);
+  hy._macro = alpineMacro;
+  hy.build();
   // nothing of it does anything: leave the surface as it was
-  if (!hy.lakes && !hy.ponds && !hy.puddles && !hy.nCor) { S.hydroInfo = hy; return null; }
+  if (!hy.lakes && !hy.ponds && !hy.puddles && !hy.nCor && !hy.nTarns) { S.hydroInfo = hy; return null; }
   S.hydro = hy;
   return hy;
 }

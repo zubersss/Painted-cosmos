@@ -159,6 +159,24 @@ test('puddles: shallow, few, only in hollows on near-level ground', () => {
     dry++; if (o.cap > 0) { cap++; assert.ok(o.cap <= k.capMax + 1e-9); }
   }
   assert.ok(cap > 0 && cap / dry < 0.04, 'puddles on ' + (100 * cap / dry).toFixed(2) + '% of the dry ground (at most 4 %)');
+  // a hollow on a river's flat floor must be deeper (puddleCap's `deep`) ...
+  assert.ok(HY.puddleCap(-0.4, 0, 0.005, k, 1, 0.12) < HY.puddleCap(-0.4, 0, 0.005, k, 1), 'shallower on a river floor');
+  assert.equal(HY.puddleCap(-0.2, 0, 0.005, k, 1, 0.12), 0, 'none in a shallow hollow on a river floor');
+  // ... so beside the widest rivers, whose floors are near level all the way across, they stay few too (measured 24 Nov:
+  // 5 to 9 % there before the floor rule)
+  let wide = -1, ww = 0;
+  for (let s = 0; s < net.nSeg; s++) { const w = Math.min(net.sW[2 * s], net.sW[2 * s + 1]); if (w > ww) { ww = w; wide = s; } }
+  assert.ok(wide >= 0 && ww >= 6, 'a wide river on Earth: half width ' + ww);
+  const a = wide * 3, m = unit([(net.sA[a] + net.sB[a]) / 2, (net.sA[a + 1] + net.sB[a + 1]) / 2, (net.sA[a + 2] + net.sB[a + 2]) / 2]);
+  dry = 0; cap = 0;
+  for (let j = 0; j < 120; j++) for (let i = 0; i < 120; i++) {
+    const p = unit([m[0] + (i - 60) * 0.0006, m[1] + (j - 60) * 0.0006, m[2]]);
+    S.sample(p[0], p[1], p[2], o, true);   // (full: o.s, the metres from the water's edge, is written only then)
+    if (o.lq > o.h - 0.3) continue;
+    dry++; if (o.cap > 0) cap++;
+    if (o.cap > 0 && o.s < k.capBank[0]) assert.fail('a puddle at the water\'s edge');
+  }
+  assert.ok(cap / dry < 0.04, 'beside the widest river puddles on ' + (100 * cap / dry).toFixed(2) + '% of the dry ground (at most 4 %)');
 });
 
 test('the cross sections are continuous where they meet the land', () => {

@@ -270,6 +270,7 @@ The coordinator's order (3c). Plan sent to the coordinator before touching surfa
 - Test: `src/world/mountain.test.mjs` (the switch and the groups; streams on the mountains, narrow, their water never rising,
   dry stretches under 15 %; water in every wet gully under the snow line, white water, the snow rule asked directly; the
   landing as without the switch).
+
 ### W2 THE BODIES OF WATER (branch `water-bodies`, session_01R5Bri2xowNiwS1SnP3VG3f; READ THIS to pick W2 up)
 
 Branch `water-bodies` = lane 0 + look-proto v37.1 + `origin/design-water` (W1's rivers, merged 24 Nov for `net.mouths` and
@@ -341,7 +342,24 @@ Branch `water-bodies` = lane 0 + look-proto v37.1 + `origin/design-water` (W1's 
   `oil.ponds`, `oil.puddles`); with every switch on only Earth changes (test). The flip itself is E's, in data/mode.js
   (exact lines sent: `n('lakes', 1)` etc., falls staying `n('falls', 0)`). THE FALLS FLIP (`n('falls', 1)`) IS HELD until
   W3's curtain lines land and F has seen the falls without the curtain.
-- NEXT: E's flip, then merge design-water and re-check; F's second look; W3's curtain fix; bench.js's falls view.
+- **F's second look: PASS** (688c2b6); its one note (smaller, fewer spray dabs near the eye) done in 55293a2.
+- **MOUNTAIN TARNS (67dd740, ?mount=1 with the lakes; the coordinator's next job):** `_buildTarns` finds the hollows of
+  mountain.js `alpineMacro` (E's, imported read only) where 15+ nodes drain in by steepest descent, 350 m apart, below the
+  snow; round each it floods the REAL ground on 13 x 13 points 18 m apart, stopping before a spill, 0.038 km2 or 7 m. Mask:
+  1 basin, 2 the ring beside it (water where the ground is under the level: the shore is the land's contour), 3 the rim
+  (raised to level + 0.15 where it dips). `hydro.alpine(S, c, h)` is the hook; it is called ONLY once E lands one line in
+  mountain.js prepareMountain (asked 11:15; the exact line is in my message to E; my test wraps the hook itself). 24 tarns
+  on Earth, 41-55 ms at load. Seen (with the line in a scratch copy only): `tarns-AB-floor-150m-400m-scratchhook.jpg`.
+- **E's DEFAULT FLIP is in (4873c6a, merged):** with ?look=oil, rivers=tree, lakes, ponds, puddles and fjord default on
+  (?rivers=old, ?lakes=0 ... to opt out); falls stays off. E commits the held falls flip when W2 sends the word.
+- **E's mountain line is in (597ab63, merged 4fdf9bf):** prepareMountain's alpine hook now calls `hydro.alpine`, so the
+  tarns need no scratch copy any more. SEEN with the real hook, in the gallery (`?look=oil&flow=1&mount=1`, 24 tarns
+  reported by the page, no console problems): `tarns-real-hook.jpg` (valley floor 1.7 m, 150 m, 400 m; the same views as
+  the scratch A/B, and they match it). The shore is crisp against meadow and trees, the water flat and level, nothing on a
+  slope. Not good yet, said plainly: at 150 m the surface reads as long grey-blue bands (the shared still-water strokes, as
+  on the lakes), more like ribbed metal than a still tarn; for F to judge. Not yet looked at in the game itself (only the
+  gallery, which uses the same surface code).
+- NEXT: W3's curtain fix (then F looks at the falls, then the word to E for the falls flip); whatever F says of the tarns.
 
 ## Stations and tools
 
