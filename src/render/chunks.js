@@ -147,7 +147,7 @@ float pcLevel(float x, float soft) {
     // by group D in the gallery -- the land still stood at the LOCAL level, and the oil look's local colour of grass and
     // leaves is light, so a meadow under a thunderhead read as a fair noon. Here the storm takes every form a further
     // step down, toward the cool glaze: a lit face to the turn between local and glaze, a turned one into the glaze.
-    // Still a level, never a darkening multiplied on (R1.3b). ?stormland=0 (uLookS.x) is the light as it was.)
+    // Still a level, never a darkening multiplied on (R1.3b). ?stormlight=0 (uLookS.x) is the light as it was.)
     x = mix(x, 0.20 + x * 0.38, uStorm * uLookS.x);
   #endif
   return smoothstep(0.26 - soft, 0.26 + soft, x)

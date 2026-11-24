@@ -107,7 +107,7 @@ export const LOOK = {
   canopyGreen: _qn('canopygreen', _LN),
   treeVar: _qn('treevar', _LN),      // (each summer tree its own green: OIL.uLookG.y)
   airDark: _qn('airdark', _LN),
-  stormLand: _qn('stormland', _LN),      // (under a storm the land's light steps down: OIL.uLookS.x, chunks.js pcLevel)
+  stormLight: _qn('stormlight', _LN),        // (under a storm the land's light steps down: OIL.uLookS.x, chunks.js pcLevel)
   stormSky: _qn('stormsky', _LN),        // (and a storm the 3D clouds hold over the eye counts as one: world/index.js)      // (high up a dark stroke takes less of the air: OIL.uLookG.w, set each frame by the horizon's dip)
 };
 MODE.oil = LOOK.oil;      // (for the look data and the surface, which do not load this module: data/mode.js)
@@ -236,7 +236,7 @@ export const OIL = {
   // w: how far, high up, a dark stroke takes less of the air than a light one (chunks.js pcAtmosV; world/index.js sets it
   //    each frame from LOOK.airDark and the horizon's dip; ?airdark=0 the air as before)
   uLookG: { value: new THREE.Vector4(_qn('goldsky', _LN), 0, _qn('skylimb', _LN), 0) },
-  // x: how far a storm takes the land's light down a step (chunks.js pcLevel; world/index.js sets it from LOOK.stormLand)
+  // x: how far a storm takes the land's light down a step (chunks.js pcLevel; world/index.js sets it from LOOK.stormLight)
   uLookS: { value: new THREE.Vector4(0, 0, 0, 0) },
 };
 
