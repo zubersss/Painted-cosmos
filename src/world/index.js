@@ -55,6 +55,9 @@ const AIR_HIGH_0 = 200, AIR_HIGH_W = 2400;
 // Not one byte of drainage.js is fetched without the flag.
 let DRAIN = null;
 if (typeof location !== 'undefined' && /[?&]flow=[^0&]/.test(location.search)) import('./drainage.js').then((m) => { DRAIN = m; }).catch(() => {});
+// THE WATER'S PARTS (world/waterhooks.js; docs/lead/WATER-DESIGN.md): fetched only behind a water switch (data/mode.js
+// MODE.water.on), and on first use, because MODE is set in main.js's own body after this module has run (the animals' lesson).
+let WATERH = null, waterAsked = false;
 
 // THE ANIMALS (?beasts=N with ?look=oil; the owner, 23 Nov). The three modules are fetched only behind the
 // flag, exactly as the powers are, and a body gets its own crowd the first time the eye is on it.
@@ -404,6 +407,8 @@ export function createWorld(scene) {
     // (?flow=1: the drainage field for a world the eye has arrived at. It is built once -- 79 ms on Earth, at
     //  the moment the arrival veil is up -- and every call after that returns the same field in 0.007 ms.)
     if (DRAIN && active) DRAIN.ensureDrainage(active.id);
+    if (MODE.water && MODE.water.on && !waterAsked) { waterAsked = true; import('./waterhooks.js').then((m) => { WATERH = m; }).catch(() => {}); }
+    if (WATERH && active) WATERH.ensureWater(active.id);      // (before any patch of a world the eye has just reached is built)
     // PHYSICS' flora field for the body it is running on (it has already updated this frame)
     syncPhysFlora(physics && physics.fields && active && (!physics.here || !physics.here.bodyId || physics.here.bodyId === active.id) ? physics.fields.flora : null);
     const physHere = physics && physics.fields && active && (!physics.here || !physics.here.bodyId || physics.here.bodyId === active.id);
@@ -839,6 +844,8 @@ export function createWorld(scene) {
           if (st.fauna.kills.count) BEASTMOD.F.clearKills(st.fauna);
         }
       }
+      // ---- THE WATER'S OWN FRAME (falls, puddles, the water's uniforms: world/waterhooks.js; nothing without a switch) ----
+      if (WATERH) WATERH.frame(st, dt, _camL, lighting);
     } else {
       // deep space: no atmosphere anywhere
       skyU.uAtmo.value.set(1, 1, 0.03, 1);
