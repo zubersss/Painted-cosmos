@@ -524,7 +524,22 @@ whether the performance work is one more version or a redesign.** Their own row 
 
 ## 3. State right now (update this before you stop)
 
-**STATE 24 Nov, 11:30 (first account): TWELVE HELPER SESSIONS BUILDING, EACH ON ITS OWN BRANCH. `main` is v39.**
+**STATE 24 Nov, 13:20 (first account; the owner asleep since 10:25, hourly check-ins until about 18:25): TWELVE HELPER SESSIONS BUILDING, EACH ON ITS OWN BRANCH. `main` is v39.1.**
+- v39.1 is LIVE (pull request #44, main 038b885; look-proto 402a7c8): the split near trees and the impostor far trees
+  are the default oil look (each with a compile guard; ?trees2=0, ?fartree=old), the far trees' stand-in while the
+  atlas bakes, F's L5 (?airfar=0), golden-hour sky (?goldsky=0), summer canopy (?canopygreen=0), flora batch 1
+  (?flora=old). Gate: watercolour 0 pixels; oil with all new parts off 0 pixels; on foot and from high OPENED.
+- v39.2 IN ITS GATE (scratch copy /home/user/wt-v392, c8ebc71, not pushed; log scratchpad/v392.log): + look-director
+  to 64f1742 (each summer tree its own green, ?treevar=0), farview 0e6dd1e (FV3 the year in the far colour and the
+  floor, ?groundseason=0; FV4 rock faces compiled out), trees-far ?shwhole default (19 fewer draws, byte-identical),
+  design-water 2d40220 (rivers from the flow tree with the landing's 18.8 m river, lakes, ponds, puddles, fjord, FALLS
+  on; water paint ?wpaint=0 = v37 strokes, because the sea from the air was a checker with the new strokes),
+  trees-near ?bench=foot. If the gate passes: push look-proto, pull request, merge, then tell A1 (impsmall default),
+  E and C (merge look-proto; C checks ?rockfield=1 after the patchgen slot move to 24).
+- FOR THE OWNER ON WAKING: one speed-test run of bench=trees, bench=air and bench=foot on the newest version (A2
+  derives about 22 ms on foot for v39.1, never measured; only the phone can say), and the two visual checks.
+- DECISIONS THIS MORNING (log): water-paint held as a default until F passes E-W2/W3's sea fix (water-sea 9525b16);
+  step 4 (wakes, splash) passed F; A2 found no 30 ms in the ground from the air (closed).
 - The owner's direction (24 Nov): 30 a second on the S23 Ultra, the view from the air good to a mile, much denser
   grass, flowers and more plants, flora before fauna. The v37 speed test that drives it is in the log (24 Nov): as
   set about 89 ms (11 a second); near trees about 52 ms, far trees about 17-21, the plants' fragment work about 34;
@@ -539,9 +554,6 @@ whether the performance work is one more version or a redesign.** Their own row 
 - v38.1 is live (pull request #40): A2's split trees behind ?trees2=1 (the same picture), its rows in bench=trees.
   WAITING FOR THE OWNER: bench=trees once more, to price 'trees: two short programs'; if it saves what the wood costs,
   split becomes the default after the look director's review.
-- IN THE GATE / HELD (11:30): v39.1 (split trees + impostors default with guards, L5, cloud-shadow hooks) gating on
-  look-proto; the water default flip (design-water 4873c6a) HELD until the landing keeps a 15-25 m river; the flora's
-  final A/B set rendering (then v39.2); the falls' default waits for water-paint's blue-curtain lines.
 - v39 is live (pull request #43): THE NEW LIGHT and THE CANOPY IN THE GROUND are the default oil look (the owner's
   leave at 10:35); ?light=old and ?canopy=0 give the old look. Next: v39.1 (the split trees and the impostors as
   default, both with compile guards; F's L5 and cloud-shadow hooks), v39.2 (the flora), then the water defaults.
