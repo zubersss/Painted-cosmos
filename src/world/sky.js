@@ -476,7 +476,7 @@ void main() {
       // the land's horizon (for any height: a ray that grazes the ground meets the shell at that angle). Where it is
       // small the masses SHRINK AWAY WHOLE (their threshold rises), so no edge goes soft: the clouds nearest the land's
       // horizon stay. Only with the air's top on (uSkyAir.z < 0) and ?skylimb (uLookG.z), so ?light=old is as it was.
-      if (uLookG.z > 0.5 && rc > uCloud.x && uSkyAir.z < -1e-4) thO += 0.6 * (1.0 - smoothstep(0.05, 0.22, abs(dot(d, normalize(hp)))));
+      if (uLookG.z > 0.5 && rc > uCloud.x && uSkyAir.z < -1e-4) thO += 1.0 * (1.0 - smoothstep(0.06, 0.24, abs(dot(d, normalize(hp)))));
       // the lobes: rounded bumps about a hundred metres across, a fifth of a mass, their phase thrown out by the
       // mass's own field so they never read as a grid
       float la = q.x * 30.0 + c1 * 6.3, lb = q.y * 34.0 + c2 * 6.3, lc = q.z * 26.0 + c1 * 4.1;
