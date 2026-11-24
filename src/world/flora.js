@@ -19,6 +19,7 @@ import { INST_STRIDE, U_GRASS, U_FERN, U_BUSH, U_ROCK, U_FLOWER, U_STONE, U_REED
 import { SEASON, leafNow } from '../data/season.js';
 import { FLORA_PHYS, TALL_KITS, farCardGeometry, farBlobGeometry, sortLeafCards, leafDrawCount, farTreeGeometry, grassGeometry, grassPatchGeometry, reedGeometry, fernGeometry, bushGeometry, rockGeometry, flowerGeometry, shardGeometry } from './florakit.js';
 import { makePropMaterial, TREE_DEPTH } from '../render/materials.js';
+import { ImpostorAtlas, makeImpostorMaterial, impostorQuadGeometry, IMP } from '../render/impostor.js';
 import { treeCell, underCell, hasCell, TREE_LEVEL, UNDER_LEVEL } from './obstacles.js';
 import { QUALITY, G, LOOK, SCREEN, SHADOW } from '../render/shared.js';
 import { SHADOW_LAYER } from '../render/shadow.js';
@@ -83,6 +84,13 @@ function splitGroups(geo) {
   geo.clearGroups(); geo.addGroup(0, base, 0); geo.addGroup(base, geo.index.count - base, 1);
   return geo;
 }
+// THE FAR TREES AS PAINTED IMPOSTORS (2026-11-24, the trees lane, T1 of docs/lead/TREES-DESIGN.md on r2): each kind's
+// own full tree, baked once per world from 64 directions into an atlas and drawn as two triangles a tree, painted
+// stroke by stroke in the tree's own colour run with the crown's lit and shaded sides (render/impostor.js). Kinds that
+// are not trees in leaf (CAN_CARD below) keep the form they had. ?fartree=impostor; the default stays the tree of
+// flat pieces until the owner's phone and the stills say otherwise.
+const FAR_IMP = typeof location !== 'undefined' && /[?&]fartree=impostor\b/.test(location.search || '');
+const FAR_REACH = (() => { try { const q = new URLSearchParams(location.search).get('farreach'); const n = q == null ? NaN : +q; return isFinite(n) && n >= 0 && n <= 4000 ? n : 1500; } catch { return 1500; } })();
 const RANGE_SCALE = [0.28, 0.6, 1.0];                    // (the lower tiers keep the ranges they had)
 const TRIM = [1, 1];          // (was [0.82, 0.88] to pay for a triangle budget; the owner withdrew the budget: trees hand over where they read best)
 const WASH_T = 0.55;                   // seconds a new thing takes to wash in, and a tree to change hands between two tiers
@@ -292,6 +300,28 @@ export class Flora {
       grass: grassGeometry(31, { oil: LOOK.oil }), patch: grassPatchGeometry(37, { oil: LOOK.oil }), fern: fernGeometry(41, { oil: LOOK.oil }), reed: reedGeometry(81), bush: bushGeometry(51, { oil: LOOK.oil }),
       rock: rockGeometry(61), flower: flowerGeometry(71, { oil: LOOK.oil }), shard: shardGeometry(91),
     };
+    this.impOn = false;
+    if (LOOK.oil && FAR_IMP && this.mats.far) this._impostors(true);
+  }
+
+  // The far impostors made (once) and switched on or off. Every kind drawn far off as leaves gets two layers of the
+  // atlas, its two lod-0 trees; the atlas itself is baked the first time an impostor is drawn (render/impostor.js).
+  _impostors(on) {
+    if (on && !this.imp) {
+      const geos = [];
+      for (const sp of this.species) {
+        if (!sp.canCard) { sp.impLayer = -1; continue; }
+        sp.impLayer = geos.length;
+        geos.push(sp.geo0[0]);
+        if (IMP.variants > 1) geos.push(sp.geo0[1]);
+      }
+      if (!geos.length) return false;
+      this.imp = new ImpostorAtlas(geos);
+      this.mats.imp = makeImpostorMaterial(this.bodyUniforms, this.imp, this.mats.far);
+      this.kit.impQuad = impostorQuadGeometry();
+    }
+    this.impOn = !!on && !!this.imp;
+    return this.impOn;
   }
 
   // Every wash this world's flora can be drawn with, each with a kit geometry it is drawn on (kits and
@@ -303,6 +333,7 @@ export class Flora {
     if (!this.ready) this._init();
     const K = this.kit, M = this.mats, out = this.species.flatMap((s) => (s.mat1 && s.mat1 !== s.mat ? [[s.mat, s.geo0[0]], [s.mat1, s.geo1]] : [[s.mat, s.geo1]]));      // (?trees2: each tier its own programs)
     if (M.far) out.push([M.far, K.far]);
+    if (this.impOn && M.imp) out.push([M.imp, K.impQuad]);
     out.push([M.under, K.grass], [M.patch, K.patch], [M.bush, K.bush], [M.rock, K.rock], [M.shard, K.shard]);
     return out;
   }
@@ -455,6 +486,8 @@ export class Flora {
         }
       }
       if (u.uWashIn) u.uWashIn.value.set(flora.washNow, mesh.userData.laid, WASH_T);
+      // (a far impostor: its atlas is baked once, outside a render, by the next frame's hook: render/impostor.js)
+      if (far && material.userData.impAtlas && !material.userData.impAtlas.ready) material.userData.impAtlas.request(renderer);
       if (u.uFocus) u.uFocus.value.copy(flora._focus(renderer, camera));
       if (u.uPlantHeight && mesh.userData.plantH) u.uPlantHeight.value = mesh.userData.plantH;
       material.uniformsNeedUpdate = true;
@@ -569,13 +602,17 @@ export class Flora {
     // groups: which trees can appear in which mesh
     const groups = {};
     const add = (key, i, geo, mat, far) => {
-      const g = groups[key] || (groups[key] = { list: [], geo, mat, far: !!far, mesh: null, tierKey: key[0] });
+      const g = groups[key] || (groups[key] = { list: [], geo, mat, far: !!far, imp: key === '2i', mesh: null, tierKey: key[0] });
       g.list.push(i);
     };
     for (let i = 0; i < n; i++) {
       const o = i * INST_STRIDE;
       this._layTree(chunk, i);
-      if (chunk.kind === 'far') { const cf = this.species[d[o + 5]] && this.species[d[o + 5]].cardFar; add(cf ? '2c' : '2', i, cf ? this.kit.farCards : this.kit.far, this.mats.far, true); }
+      if (chunk.kind === 'far') {
+        const spf = this.species[d[o + 5]], cf = spf && spf.cardFar;
+        if (this.impOn && spf && spf.impLayer >= 0) add('2i', i, this.kit.impQuad, this.mats.imp, true);
+        else add(cf ? '2c' : '2', i, cf ? this.kit.farCards : this.kit.far, this.mats.far, true);
+      }
       else {
         const kind = d[o + 5], v = d[o + 6] % 2, sp = this.species[kind];
         add('0:' + kind + ':' + v, i, sp.geo0[v], sp.mat);
@@ -686,7 +723,12 @@ export class Flora {
         // when it came (it washes in), or when it left (it is lifted out); one that only changed within the mesh keeps its place
         ab[w] = out ? -Math.max(since[i], 1e-3) : (inTier(prev[i]) ? 0 : since[i]);
         const o = i * INST_STRIDE, mo = i * 16, wo = w * 16;
-        if (g.far) {
+        if (g.imp) {
+          // an impostor stands exactly where its tree stands, at the tree's own size and lean: the quad is the kit's
+          // own picture, so it takes the near tree's matrix; its layer is its kind's pair and its own variant
+          for (let q = 0; q < 16; q++) im[wo + q] = mat[mo + q];
+          ib[w * 2] = d[o + 5]; ib[w * 2 + 1] = this.species[d[o + 5]].impLayer + (IMP.variants > 1 ? d[o + 6] % 2 : 0);
+        } else if (g.far) {
           // the unit far tree: size it to the species. A thinned tree (tier 3) stands in for three and is grown to
           // cover for them -- which is what made the far wood read as sized blobs rather than trees. Where the band is
           // filled there is no tier 3 at all (see above), so t is never 3 here and nothing is grown.
@@ -868,8 +910,11 @@ export class Flora {
   // nothing to swap (not the oil look, or not yet made).
   setFarForm(form) {
     if (!LOOK.oil || !this.ready) return null;
-    const now = this.farForm || (this.species.some((sp) => sp.cardFar) ? (FAR_BLOB ? 'blob' : 'cards') : 'lump');
+    const now = this.farForm || (this.impOn ? 'impostor' : this.species.some((sp) => sp.cardFar) ? (FAR_BLOB ? 'blob' : 'cards') : 'lump');
     if (form === now) return now;
+    // (the impostors stand in front of whatever far form the cards would be: the cards stay the tree of flat pieces)
+    if (form === 'impostor') { if (!this._impostors(true)) return now; this.farForm = form; this._dropFar(); return form; }
+    this._impostors(false);
     // (ordered for thinning here too, or the speed test's swap loses it)
     // (each form made once and kept: its buffers stay on the graphics card while the meshes come and go)
     const fg = this._farGeo || (this._farGeo = {});
@@ -1059,6 +1104,17 @@ export class Flora {
       // (on every tier: the far tree is the cheapest thing in the wood, and at the middle tier on a phone the two cuts
       // together ended the trees 170 m off, bare hills behind: "most of the things haven't rendered", the owner)
       ts *= sk; fs = Math.max(sk, 0.75) * air * (1 + Math.round(Math.min(1, (SHADOW.alt || 0) / 220) * 4) / 4);
+      // THE FAR TREES REACH WHAT THE EYE NEEDS FROM THE AIR (FV2-T of docs/lead/FARVIEW-DESIGN.md; the owner, 24 Nov:
+      // "when im flying high in the sky up to a mile I want trees from a distance to look good"). With the far tree a
+      // mesh of 138 triangles the reach topped out at 900 m in 3D on the phone, so 1 km up no tree was drawn at all.
+      // An impostor is two triangles: from the air its reach is hypot(height, FAR_REACH), held to the horizon of
+      // these small worlds (sqrt(2Rh + h^2): 126 m on foot, 1.1 km at 150 m up, 3 km at 1 km), in quarter steps so
+      // the tiers are not sorted again with every metre climbed. On foot it changes nothing (the horizon is nearer
+      // than the reach the ground already gives). ?farreach=<m> (0: off).
+      if (this.impOn && FAR_REACH > 0) {
+        const h = Math.max(0, SHADOW.alt || 0), hz = Math.sqrt(2 * this.R * h + h * h);
+        fs = Math.max(fs, Math.round(Math.min(hz, Math.hypot(h, FAR_REACH)) / T_FAR * 4) / 4);
+      }
     }
     // (THE SPEED TEST'S OWN HANDLE, core/bench.js. The owner's phone says the NEAR trees are 62.7 ms of a 101 ms
     //  frame and nothing in the table says how much of that is their leaves and how much their size on the screen.
