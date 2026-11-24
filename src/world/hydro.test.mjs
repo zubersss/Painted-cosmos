@@ -31,7 +31,9 @@ const unit = (v) => { const l = Math.hypot(v[0], v[1], v[2]); return [v[0] / l, 
 test('no switch, or no oil look: nothing is attached', () => {
   const W = MODE.water, keep = { ...W };
   try {
-    waterFromSearch('?look=oil&rivers=tree');
+    // (the oil look's parts are on by default since 24 Nov, the falls too: 'no part asked for' turns each one off -- E, at
+    //  the falls flip)
+    waterFromSearch('?look=oil&rivers=tree&lakes=0&ponds=0&puddles=0&fjord=0&falls=0');
     const S2 = { R: 4000, hydro: null, look: {}, biomes: [], lqGroup: [] };
     assert.equal(HY.attachHydro(S2, D, null), null, 'no part asked for');
     MODE.oil = false; waterFromSearch('?lakes=1');

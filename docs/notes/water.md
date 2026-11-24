@@ -13,14 +13,12 @@ review before a step is called done, a short message to the coordinator (session
 The weather group lands the rain field (its section 9.3: `fields.rain` at 32 a face, mm/h, 2 Hz, `rainAt`,
 `rainBetween`, a GPU channel `pcRainAt`): use theirs for rain (the design's `uRainCells[8]` and `rainAt` are replaced).
 
-**STATE (24 Nov, about noon), the short of it.** Pushed on design-water: W1 rivers with S-bends (aeca809), the index fix,
-mountain streams behind ?mount=1 (1eed43a; F: keep behind the switch, the white water is the paint's), THE DEFAULT FLIP in the
-oil look (4873c6a: rivers of the tree, lakes, ponds, puddles, fjord on; falls held), the speed test's falls view and
-?bench=water (597ab63), the stills of the landing's river (1ec1984, ACCEPTED by the coordinator). COMMITTED, NOT YET PUSHED:
-c229268 the landing's river (Earth's oil.springs / oil.keep, the save's nudge to 24 m) and dfbe555 (mountain floors wander):
-held only for E-W2's puddle fix (its hydro.test puddle share near the landing reads 7.73 % against 4 % with the wide river;
-E-W2 is fixing its rule; my measured suggestion: no puddle within 30 m of a stream). When water-bodies has it: merge, run the
-three suites, push, tell the coordinator (who ships the flip into the next release). OPEN: F's sand-bar notes (colour, grass,
+**STATE (24 Nov, 12:10), the short of it.** Pushed on design-water (01ec60c, ready for the coordinator's release): W1 rivers
+with S-bends (aeca809), the index fix, mountain streams behind ?mount=1 (1eed43a, dfbe555; F: keep behind the switch, the
+white water is the paint's), THE DEFAULT FLIP in the oil look (4873c6a: rivers of the tree, lakes, ponds, puddles, fjord on;
+falls held), the speed test's falls view and ?bench=water (597ab63), the landing's river (c229268: Earth's oil.springs and
+oil.keep, the save's nudge to 24 m; ACCEPTED by the coordinator from the stills 1ec1984), E-W2's puddle fix merged (110b43e:
+round the landing 1.39 % of the dry ground). THEN (a877068): water-paint merged (f05eee3) with THE FALLS FLIP (W.falls = n('falls', d), E-W2's line, F passed the falls with the paint's curtain fix; they ship with water-paint, never before). THEN (2d40220, THE v39.2 WATER, the coordinator's ruling): ?wpaint defaults to 0 (v37's strokes: the look director found the sea from the air a blocky checker with ?wpaint=1 and 2); the falls stay on; stills v392-*.jpg. NEXT: merge look-proto when the coordinator says v39.1 has landed; W3 will later make its strokes the default for rivers and ponds only. OPEN: F's sand-bar notes (colour, grass,
 pebbles: C's recipe, asked; the trees' line can read c.barZone); the runoff paint (E-W3/W4) and its A/B in a storm; the
 falls flip (one line in mode.js when E-W2 sends it). The lead's sessions: coordinator session_01R5Bri1TV3HBTyuxNZZuhNw,
 F session_01R5Brhzz2JPPF6Ecz6XRQHx, E-W2 session_01R5Bri2xowNiwS1SnP3VG3f, E-W3/W4 session_01R5Bri2fSASVVvyrSG11UGF,
@@ -409,6 +407,7 @@ Branch `water-bodies` = lane 0 + look-proto v37.1 + `origin/design-water` (W1's 
   with the camera, a seam between near and far): F to choose.
 - NEXT: F's word on the sea; after the branches meet (the coordinator's call): the pool's pcThinLayer to W3's
   pcWStrokes, pcFallMilk and the FALL_ colours into waterchunk.js.
+- Camera places for the falls views: `fallsView(S)` and the scratch `fallcams.mjs` (sea60, sea150, air400, bank, E7).
 
 ## Stations and tools
 

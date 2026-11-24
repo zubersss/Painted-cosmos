@@ -103,6 +103,9 @@ export class AirGrid {
     this.gustShift = new Float64Array(6);
     this._gc1 = NaN; this._gc2 = NaN; this._gbody = null; this._gp = new Float64Array(4);
     this.bodyId = null;
+    // (group D, ?nearmap=1) the wind map of the whole world (windmap.js), set by physics/index.js while the switch is on:
+    // the lattice below then takes its large-scale wind from it instead of windLarge. null: exactly as it was.
+    this.windMap = null;
     this.time = 0;
     this.ready = false;
     // patch-wide values of this frame
@@ -163,7 +166,8 @@ export class AirGrid {
     const la = Math.floor((gi0 - this._si) / L), lb = Math.floor((gj0 - this._sj) / L);
     for (let b = 0; b < 3; b++) for (let a = 0; a < 3; a++) {
       frame.dir(((la + a) * L + this._si) * cell, ((lb + b) * L + this._sj) * cell, _d);
-      windLarge(bodyId, _d[0], _d[1], _d[2], t, this.seed, _w);
+      if (this.windMap && this.windMap.ready && this.windMap.bodyId === bodyId) this.windMap.nearVecAt(_d[0], _d[1], _d[2], _w);
+      else windLarge(bodyId, _d[0], _d[1], _d[2], t, this.seed, _w);
       weatherWind(bodyId, _d[0], _d[1], _d[2], t, this.seed, _ww);
       const mul = _ww[0], blow = _ww[5];
       // (P12) both winds lie in the tangent plane at their own node, up to 640 m from the anchor. They
@@ -551,7 +555,9 @@ export function airAt(bodyId, px, py, pz, t, seed, grid, frame, sunDir, height, 
     { const ti = (_s.I + grid.gustiness * 0.15) * Math.hypot(grid.cwe, grid.cwn), tb = ti * fMean / (1 + zh / 300), fo = heightFactor(zh, _s.z0 > 0 ? _s.z0 : WIND.refRoughness) * aloftFactor(bodyId, zh), ts = ti * Math.min(1, fMean / Math.max(fo, 1e-3)); o.turbulence = Math.sqrt(tb * tb + ts * ts * _sub[2]); }
     o.height = zh; o.near = true; dT = _s.dT;
   } else {
-    windLarge(bodyId, ux, uy, uz, t, seed, _w);
+    // (group D, ?nearmap=1: away from the grid the wind map's wind, land and all, where the grid has none of its own)
+    if (grid && grid.windMap && grid.windMap.ready && grid.windMap.bodyId === bodyId) grid.windMap.vecAt(ux, uy, uz, _w);
+    else windLarge(bodyId, ux, uy, uz, t, seed, _w);
     weatherWind(bodyId, ux, uy, uz, t, seed, _ww);
     let wx = _w[0] * _ww[0] + _ww[1], wy = _w[1] * _ww[0] + _ww[2], wz = _w[2] * _ww[0] + _ww[3];
     { const bs = Math.hypot(wx, wy, wz), bl = bs > 1e-6 ? _ww[5] * Math.min(1, bs / 2) / bs : 0; wx *= 1 + bl; wy *= 1 + bl; wz *= 1 + bl; }   // the system's own wind
