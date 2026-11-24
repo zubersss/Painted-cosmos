@@ -24,11 +24,13 @@ import { smoothstep } from './noise.js';
 export const SHORE_DEF = {
   lattice: 160,              // metres between the field's nodes
   rings: [120, 250, 450, 700],   // metres: the rings the ground is read on (the last for the crossing's width only)
-  near: [1.0, 0.8, 0.35, 0],     // nearness when the land found is on that ring
+  near: [1.0, 0.3, 0, 0],        // nearness when the land found is on that ring (the look director: the turn only within
+                                 // about 120 m of the shore; farther out the wind's own crests)
   na: 8,                     // points a ring
   deep: 30,                  // metres of water at the node: no shore near (not measured)
   clampH: [-20, 12],         // metres about the sea: a cliff's top cannot outweigh the shore's line
-  share: [0.15, 0.45],       // the share of a ring on land over which it counts from nothing to fully near
+  share: [0.2, 0.5],         // the share of a ring on land over which it counts from nothing to fully near (a stack, a
+                             // rock, one point of eight: nothing; the swell bends toward a beach, it does not circle a rock)
   open: 1500,                // metres: the narrowest crossing counted as open water (the width byte's full scale)
 };
 
