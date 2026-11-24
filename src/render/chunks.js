@@ -64,6 +64,7 @@ uniform vec4 uLookF;   // the look director's switches and the night's two numbe
 uniform vec4 uLookN;
 uniform vec4 uLookG;   // x the golden hour's sky (sky.js), y how far summer crowns vary tree by tree (shared.js)
 uniform vec4 uLookS;   // x a storm takes the land's light down a step; y the lit middle distance on foot, z w its air's lightness away from and toward the sun (shared.js OIL.uLookS)
+uniform vec4 uLookM;   // the lit middle distance: x y how far its air comes to the ceiling at noon and toward a golden-hour sun, z w the air's share where it starts and is whole (shared.js OIL.uLookM)
 #endif
 `;
 
@@ -568,6 +569,7 @@ uniform vec4 uLookF;   // the look director's switches (shared.js OIL.uLookF; al
 uniform vec4 uLookN;   // the night's two numbers for the world the eye is on (shared.js OIL.uLookN)
 uniform vec4 uLookG;   // x the golden hour's sky, y summer crowns tree by tree (shared.js OIL.uLookG)
 uniform vec4 uLookS;   // x a storm takes the land's light down a step; y the lit middle distance on foot, z w its air's lightness away from and toward the sun (shared.js OIL.uLookS)
+uniform vec4 uLookM;   // the lit middle distance: x y how far its air comes to the ceiling at noon and toward a golden-hour sun, z w the air's share where it starts and is whole (shared.js OIL.uLookM)
 uniform vec4 uOilL;    // x 1: the lighter paint (phones); y the speed test's flat modes (shared.js)
 uniform vec4 uOilPx;
 uniform mat4 uShM;
@@ -643,6 +645,7 @@ ${AIR_SRC}
 // the picture at brightness 0.78; at 0.35 they are 2.8 per cent at 0.65, which is the owner's own 0.24 saturation
 // and 0.63 brightness almost exactly; at 0.60 they are 5.8 per cent at 0.68, past them. The whole picture's middle
 // brightness goes 0.93, 0.84, 0.78 against the references' 0.62. 0.35 IS THE DEFAULT; ?hazeblue=0 is the old look.
+float pcSmooth01(float x) { x = clamp(x, 0.0, 1.0); return x * x * (3.0 - 2.0 * x); }
 vec3 pcOilHaze(vec3 h) {
   vec3 warm = mix(pow(h, vec3(uOilC.x)), vec3(0.95, 0.85, 0.63), 0.75 * pcGold());
   return mix(warm, vec3(0.48, 0.50, 0.63), uOilS.x);
@@ -681,21 +684,31 @@ vec3 pcAtmosV(vec3 c, float f, vec3 viewPos) {
   }
   // THE LIT MIDDLE DISTANCE (the light's design on foot; fresh-eyes audit 2, docs/lead/LOOK-AUDIT-2.md, also seen: the
   // light has no design). The owner's references are built as a dark frame of shade round a BRIGHT, WARM, MISTY middle
-  // distance. MEASURED in the green wood on foot (audit2/green_vista_*.jpg): the wood's middle distance stood at V 0.43
-  // to 0.49, no lighter than the lit floor in front of it (V 0.44 at 16.8, 0.60 at noon), GREY at noon (S 0.03 to
-  // 0.09) and KHAKI at 16.8 (hue 44, S 0.38): the far air on foot is one fixed mix of the gold and the blue-violet,
-  // and the two are complementary, so mixed over green they make grey and khaki. The air a painter lays there is the
-  // air LIT: the light's own colour toward the sun (pale gold at a golden hour), the sky's away from it, and a step
-  // lighter than the near shade, so the near reads as the dark frame round it. Only the air's colour moves: a far
-  // thing keeps the same share of its own paint as before, so its detail steps keep their size (no edge moves, no
-  // softening). On foot only ((1 - uLookN.w): from the air L5 has its own split), by day, in fair weather.
+  // distance. MEASURED in the green wood on foot (audit2/green_vista_*.jpg and the lab, 24 Nov): the wood seen between
+  // the trunks stands at V 0.44 to 0.50, no lighter than the lit floor in front of it, grey at noon (S 0.03 to 0.09)
+  // and khaki at 16.8 (hue 45, S 0.37). Two causes, both read from the page: (1) on foot the far air is the sky's pale
+  // air mixed a third of the way to the blue-violet that the owner's AERIAL paintings have (uOilS.x), which at noon
+  // is a cool blue-grey (0.77, 0.79, 0.85) and over green makes grey; (2) the wood one sees between the trunks is only
+  // 30 to 50 m off, where the air takes about half, so the back of the wood is half dark crown.
+  // So, on foot only ((1 - uLookN.w): from the air L5 has its own split), by day, in fair weather: (a) the far air is the
+  // air LIT: the light's own colour toward the sun (pale gold at a golden hour), the sky's air away from it, never
+  // darker than it was (uLookS.z away, w toward, as lightness floors); (b) in the middle distance only (where the
+  // air already takes 0.10 to 0.40, uLookM.z w: so it scales with each world's own air), the air comes closer to its
+  // ceiling, more toward the sun at a golden hour (uLookM.y) than at noon (uLookM.x). The ceiling itself is never
+  // passed (the owner's "fully rendered from 300 yards": the far land keeps its quarter of paint) and the near ground
+  // (the dark frame) is untouched. Flat mixes only: no edge moves, nothing is softened.
   // ?midlight=0 (uLookS.y) is the air as it was.
+  float fM = f;
   float wM = uLookS.y * (1.0 - uLookN.w) * uDayness * (1.0 - uMoon) * (1.0 - uWx.x) * (1.0 - uStorm);
   if (wM > 0.0) {
     float sideM = smoothstep(-0.5, 0.8, dot(normalize(viewPos), sunV));
-    vec3 litM = mix(pcHazeAt(viewPos), pcOilSunC(), mix(0.35, 0.80, sideM));      // (more of the light's own colour toward the sun)
-    litM *= mix(uLookS.z, uLookS.w, sideM) / max(dot(litM, vec3(0.3, 0.5, 0.2)), 0.05);      // (its lightness: a step over the near shade)
+    float gM = pcGold();
+    vec3 litM = mix(pcHazeAt(viewPos), pcOilSunC(), mix(0.30, 0.80, sideM));      // (more of the light's own colour toward the sun)
+    float lM = dot(litM, vec3(0.3, 0.5, 0.2)), lH = dot(h, vec3(0.3, 0.5, 0.2));
+    litM *= max(lH, mix(uLookS.z, uLookS.w, sideM)) / max(lM, 0.05);      // (its lightness: never darker than the air was, and lighter toward the sun)
     h = mix(h, min(litM, vec3(1.0)), wM);
+    float capM = 1.0 - uOilAir.x;      // (pcSmooth01: a smoothstep that stays defined if a material is ever given no uLookM)
+    fM = f + max(capM - f, 0.0) * wM * mix(uLookM.x, uLookM.y, gM * sideM) * pcSmooth01((f - uLookM.z) / max(uLookM.w - uLookM.z, 1e-3));
   }
   float toward = pow(max(dot(normalize(viewPos), sunV), 0.0), 3.0) * uDayness * (1.0 - uMoon) * (1.0 - uWx.x);
   h = mix(h, min(mix(pcOilSunC(), vec3(1.0), 0.5) * 1.05, vec3(1.0)), toward * uOilC.y);
@@ -708,8 +721,8 @@ vec3 pcAtmosV(vec3 c, float f, vec3 viewPos) {
   // keep their depth: a first laying from every height (down to 0.35, from 150 m) made the far wood at 150 m as dark
   // as the near and lifted its saturation 0.61 to 0.74 (SEEN, rejected). The stroke's own colour is one flat colour,
   // so this is one flat amount for the whole stroke and no edge moves. ?airdark=0 (uLookG.w) is the air as it was.
-  float fk = f;
-  if (uLookG.w > 0.0) fk = f * mix(1.0, mix(0.60, 1.0, smoothstep(0.08, 0.40, dot(c, vec3(0.3, 0.5, 0.2)))), uLookG.w * uLookN.w);
+  float fk = fM;
+  if (uLookG.w > 0.0) fk = fM * mix(1.0, mix(0.60, 1.0, smoothstep(0.08, 0.40, dot(c, vec3(0.3, 0.5, 0.2)))), uLookG.w * uLookN.w);
   return mix(c, ${_far('c', 'h')}, fk);      // (where ?farlight= is on, the thing's own light is carried into the air it stands in here: pcFarLight above. It is laid on the haze AFTER the sun's glow, so toward the sun, where the air goes to white, the gain can only be 1 or under and nothing burns out.)
 }
 vec3 pcAtmosVWash(vec3 c, float f, vec3 viewPos) {

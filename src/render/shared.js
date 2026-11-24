@@ -240,7 +240,10 @@ export const OIL = {
   // y: THE LIT MIDDLE DISTANCE on foot (chunks.js pcAtmosV: the far air the light's own colour toward the sun and the
   //    sky's away from it, a step lighter than the near shade; ?midlight=0 the air as it was), z and w the lightness of
   //    that air away from the sun and toward it
-  uLookS: { value: new THREE.Vector4(0, _qn('midlight', 0), 0.74, 0.88) },
+  uLookS: { value: new THREE.Vector4(0, _qn('midlight', 0), 0.80, 0.90) },
+  // THE LIT MIDDLE DISTANCE'S AIR (chunks.js pcAtmosV, with uLookS.y): x how far the middle distance's air comes toward
+  // the air's ceiling at noon, y toward a golden-hour sun; z w the air's own share where this starts and where it is whole
+  uLookM: { value: new THREE.Vector4(0.25, 0.50, 0.10, 0.40) },
 };
 
 // WHERE THE FIRE HAS BEEN, FOR THE GROUND'S OWN PAINT (the powers, fire; the paint itself is materials.js TERRAIN_FRAG).
