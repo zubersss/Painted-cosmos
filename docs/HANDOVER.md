@@ -544,8 +544,15 @@ whether the performance work is one more version or a redesign.** Their own row 
   C's hook (?farshadow=1: F passed the look and recommends it as the default after the owner's phone run prices it),
   ?leafgrow=1, ?bloomfar=1 (with the far dab index fix). Fast gate: suites 328 / 144 / 449, all.mjs static+unit,
   one oil render on foot OPENED (the flower patches in the middle distance, nothing missing, console clean), boot
-  clean on / and /?look=oil ('v39.5 (24 Nov)'). AFTER-RELEASE CHECKS RUNNING (scratchpad/post395.sh, post395.log):
-  watercolour 0 px vs v39.4, the high river frame, the same-switch off-set vs v39.4. Read them; fix forward if any fails.
+  clean on / and /?look=oil ('v39.5 (24 Nov)'). AFTER-RELEASE CHECKS PASSED: watercolour 0 px vs v39.4; the high river
+  frame opened; the same-switch off-set differed only by E's confluence fix (with ?rivers=old added on both sides: 0 px).
+  The owner's three phone tables on v39.5: docs/lead/bench/2026-11-24-v39.5-owner-phone.md (held at 60 / 56: goal met).
+- NEXT, v39.6 (about 2 h): trees-far (ee22d1f farshadow fixes, caadb47 early-out ON, impminpx OFF, the rows), FV6 the
+  flower drifts default (design-flora 1b0444e + farview 5b9400e TOGETHER), B's u2cells default once F passes, E's
+  bench=water rows (e9f06de), W3's new paint default if F passes (sea per F), A2's near trees after the ground. Then
+  v39.7: A2's sharper phone picture (rung 1 = 1.2x each way, climb to 1.4x, line 27 ms, ?sharp=0; approved plan).
+  The owner will spend a last bit of another model on a READ-ONLY review of v39.6: push the candidate to branch `v396`
+  and tell the owner; the paste-ready brief is in the chat of 24 Nov ~21:55 (git diff origin/main origin/v396 -- src).
 - v39.4 LIVE (#47, e42452a): the mountains, the land under a storm, the water's gold, the anvil, tufts and comb.
 - v39.3 LIVE (#46), v39.2 LIVE (#45), v39.1 LIVE (#44): see the log.
 - BUG FOUND AND FIXED (v39.5): the far dabs' palette index was never written (farview d4cab64; a trailing comment
