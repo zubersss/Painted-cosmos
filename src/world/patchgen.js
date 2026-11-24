@@ -40,8 +40,8 @@ export const PATCH_VERTS = V * V + 4 * V;
 const _d = [0, 0, 0];
 const _px = new Float64Array(E * E), _py = new Float64Array(E * E), _pz = new Float64Array(E * E);
 const _hh = new Float32Array(E * E), _lq = new Float32Array(E * E);
-const CS = 24;   // floats kept per sample: wash, far wash, parameters, liquid look, strata, the current, the fall, the stand
-                 // (21, 22: the far view's), how still (23: the water's)
+const CS = 26;   // floats kept per sample: wash, far wash, parameters, liquid look, strata, the current, the fall, the stand
+                 // (21, 22: the far view's), how still (23: the water's), runoff's cap and swell (24, 25: the water's)
 const _col = new Float32Array(E * E * CS);
 const _fs = [0, 0];     // (the stand and its needle share at a sample: world/farstand.js)
 let _s = null;
@@ -128,6 +128,7 @@ export function stepPatch(job, deadline) {
         _col[c + 19] = s.fspd || 0; _col[c + 20] = s.turb || 0;  // (the drainage field's own speed and churn, where a surface gives them; 0 otherwise)
         if (can) { standAt(S, _d[0], _d[1], _d[2], s, _fs); _col[c + 21] = _fs[0]; _col[c + 22] = _fs[1]; }
         _col[c + 23] = s.still || 0;                              // (the water's: how still, where a water part says; 0 otherwise)
+        _col[c + 24] = s.cap || 0; _col[c + 25] = s.swell || 0;  // (the water's runoff, ?runoff=1: water only in the wet, and how much it rises)
       }
     }
   }
@@ -352,6 +353,18 @@ export function stepPatch(job, deadline) {
         wturb[q + 3] = b8(sv);
       }
     }
+    // THE WATER THAT COMES AND GOES WITH THE RAIN (?runoff=1; the water group's lead, world/rivers.js and waterstate.js): one
+    // more attribute, aWater2, only with the switch: x the depth of water that exists only in the wet (o.cap, 0 .. 0.6 m, a
+    // byte of 0.6 m), y how much this water rises after rain (o.swell, 0..1). The paint (WATER_FRAG, PC_RUNOFF) shows a
+    // runnel only as deep as the world's wetness fills it and lifts the rest by the streams' rise. No switch: not built.
+    let w2 = null;
+    if (MODE.water && MODE.water.runoff) {
+      w2 = new Uint8Array(V * V * 4);
+      for (let j = 0; j < V; j++) for (let i = 0; i < V; i++) {
+        const c = ((j + 1) * E + (i + 1)) * CS, q = (j * V + i) * 4;
+        w2[q] = b8(_col[c + 24] / 0.6); w2[q + 1] = b8(_col[c + 25]);
+      }
+    }
     const widx = [];
     // (NO BLUE CURTAIN AT A FALL, for the bodies-of-water lane's waterfalls, E-W2: a cell with one wet corner is kept, so a
     // cell across a lip -- the river cut at 19.6 m, the sea at 0 -- was one water quad as tall as the cliff, painted with
@@ -375,7 +388,7 @@ export function stepPatch(job, deadline) {
     }
     stepPatch.fallCells = (stepPatch.fallCells || 0) + dropped;      // (counted for the test that proves none drop where nothing falls)
     // thin water (a brook) is left to the terrain's far colour on coarse patches
-    if (widx.length && (level >= 5 || widx.length > N * N * 6 * 0.08)) water = { positions: wpos, depth: wdep, liq: wliq, liqP: wlp, turb: wturb, indices: new Uint16Array(widx) };
+    if (widx.length && (level >= 5 || widx.length > N * N * 6 * 0.08)) water = { positions: wpos, depth: wdep, liq: wliq, liqP: wlp, turb: wturb, w2, indices: new Uint16Array(widx) };
   }
   return {
     origin: [ox, oy, oz], positions: pos, normals: nor, morph: mor, colors: col, colors2: col2, params: par,

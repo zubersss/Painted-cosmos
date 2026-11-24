@@ -175,6 +175,24 @@ low flight's furrow, the gust and tornado. The script is in the scratch (lab: op
 `wet01`. Phone cost DERIVED (not measured): the ring sum is about 30 instructions a source a pixel, only within 30 m
 and only while a ring lives; a wader keeps 10 to 16 alive.
 
+**Step 5 (24 Nov): rain on the water, and the runoff's paint (after merging origin/look-proto, 46b7657).** Behind
+`?wpaint=2`: under a closed sky the water takes the storm's grey and goes darker (`uWx.x`); RAIN RINGS in
+`waterchunk.js pcRainRings`: thin circles, small ones whole and larger ones broken into arcs, growing and fading in a third
+of a second, from three hashed grids in the water's own chart, as many as the veil of rain at the eye (`uWx.w`, 25 mm/h at
+its full) to 60 m (the kits' own ripples lie over them near the eye in the game). SEEN under the forced rain sky (`&wx=rain`):
+`s5-E1-forced-rain-bank-ab.jpg` (water median value 0.71 to about 0.6, still above the dark storm land), `s5-E1-forced-rain-
+4m-down-ab.jpg` (rings of all sizes on the darkened stream). NOT YET: the rate PER POINT from the weather's rain cells
+(`physics.fields.rain.cells` / `RAIN_GLSL` with `?cloudmap=1`): it needs a per-frame binding (a WATER_PART, which only runs
+with a water world switch) -- the rule is to bind in the same commit as the shader reads it, so it waits.
+RUNOFF (the water lead's contract, `?runoff=1` with `?rivers=tree`): patchgen packs `o.cap` (a byte of 0.6 m) and
+`o.swell` into a new attribute `aWater2` only with the switch (terrain.js binds it: one line); `WATER_FRAG` (`PC_RUNOFF`)
+shows water that exists only in the wet as deep as `WATERSTATE.wet` fills it (the gully bare in the dry), lifts the rest
+by `rise x swell`, and lays the brown of a swollen stream by `mud x swell` over its strokes. `uRunoff` reads
+`world/waterstate.js` every frame (fetched only with the switch). SEEN: `s5-runoff-runnel-dry-wet.jpg` (a runnel 24 m from
+the landing: a dry gully, then running after rain; 3 % of the picture changed).
+STILL TO DO, asked by E and F: white water as broken foam strokes (not a flat white: E's mountain streams, F's three
+points); Neptune's aurora path on the lake (F agreed; where the aurora hangs asked of F); the far water byte for C.
+
 NOT done of FV5: shore-tangent dashes (they would bring the whorl back; the design lays still water along the wind)
 and the shore hairline (the owner's rule: no outlines) -- both said to C; the current made visible from 400 m.
 
