@@ -159,8 +159,12 @@ The coordinator's order (3a): the references' long S-bends on the big rivers. Al
   now drainage 56-60 + rivers 98-125 = 157-167 ms (one outlier 201). The S-bends cost about 25 ms; paid for by `len3` in place
   of `Math.hypot` in the build and the index (the index 47-54 ms, was 64-73), the slow noises asked on a coarse grid, the turn
   asked once a point. The machine is slower this hour than when W1's 143-147 ms was measured: HEAD itself reads 159-171 now.
-- SEEN (Node maps of the surface, not the renderer): the river south of the landing winds in S-bends with bars inside them;
-  tributaries meet it; the contours run through the bars without steps. Stills: see below.
+- SEEN (Node maps of the surface): the river south of the landing winds in S-bends with bars inside them; tributaries meet
+  it; the contours run through the bars without steps (`docs/shots/painter/water-sbends/map-ab-*.jpg`). SEEN (the gallery,
+  A `?bends=0` | B, `ab-*.jpg` there): 150 m over the river south of the landing (A straight, B one long S with its
+  tributary meeting it); 1 km (B winds into the distance in S-bends); 35 m over a bend (B's bar a pale crescent between the
+  trees and the water); on the bar at 1.7 m (pale ground, pebbles and thin grass, the river beside: it reads as a pebbly
+  bank more than as sand). The bars do not show from 150 m (the water's paint and the trees hide them).
 - Test changes (`src/world/rivers.test.mjs`): test 3 skips reaches the edge thinning reached into (`thin`); test 4 takes its
   river inland (a reach ending in a junction, not thinned: at the sea the mouth is W2's, and the widest segment there was a
   river thinning into a meadow).
