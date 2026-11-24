@@ -48,12 +48,26 @@ far-view lane edits that file).
    (flora.js: HELD); some dark accent blades in shade are near black (a look-director question: the root step and the
    dark tone together).
 
+4. G3, THE MIDDLE BAND (`materials.js NEAR_VERT` `vTeeth` and the fan's growth, `NEAR_FRAG` the fan's blade count;
+   `nearground.js` the mid ring's own ranges and `layBroad`'s grass touches): a fan-brush touch is cut into as many blades
+   as leave each about two pixels (never under two; it was five to ten whatever its size); each touch's own range is
+   0.4 to 1 of the ring's (was 0.66 to 1), so past about 25 m the band thins, and a touch grows up to 1.4 times by 40 m
+   to keep the cover; the touches are narrower (0.6), more upright, and in the blades' own greens. SEEN
+   (`g3-meadow-10m-before-after.jpg`, `g234-*`): from 10 m the meadow's speckle of tiny yellow combs is mostly gone; from
+   1.8 m the band at 12-40 m is calmer, with its white flower dashes still there (they go in step 5). MEASURED (scratch
+   overdraw counter, the touches' growth mirrored in it; `tools/overdraw.mjs` itself, the coordinator's file, does not know
+   it yet): the middle ring's fragments 114,040 -> 59,756 at the meadow (self-lap 2.12 -> 1.53) and 140,971 -> 99,057 at
+   the landing (3.76 -> 2.89; its stones by the river are unchanged). THE WHOLE NEAR GRASS, carpet included, against
+   24 Nov: +11,300 fragments at the meadow (205,826 -> 217,000) and +23,600 at the landing (230,452 -> 254,100). DERIVED
+   for the phone: +0.2 to +0.5 ms for four times the blades near the feet, before the cull's saving (-0.3 to -1.9 ms).
+
 **Tests:** `tests/` 325 of 325, `src/world/` + `src/data/looks/` 65 of 65. `src/physics/` 415 of 416: the one failure is
 `loose.test.mjs` P25 ("under the closed wood the litter still puffs: 2"), which is FLAKY ON THE CLEAN COMMIT TOO (it
 failed 1 run in 5 there with none of this lane's changes): reported to the coordinator, not this lane's.
 
-**Next:** G3, the middle band (12 to 40 m): teeth sized by the screen, narrower touches, fewer past 25 m, the blades'
-colours.
+**Next:** step 5: `world/bloom.js` (the one map of where flowers grow), the flower kinds per place (`earth.js`
+`oil.flora.blooms`), heads as new touch shapes, the middle band's drift touches, ONE `bloomTint` call in `surface.js`;
+then the vista ring's drifts and the comb (A2-A3).
 
 
 Branch: `look-proto`, cut from `main` at `5e85754`. Nothing here is live. The plan, the owner's instructions, the sort of

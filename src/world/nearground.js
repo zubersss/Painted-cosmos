@@ -242,7 +242,10 @@ class Ring {
     }
     const u = this.material.uniforms;
     u.uCamLocal.value.copy(camLocal).sub(this.origin);
-    u.uNear.value.set(RANGE * 0.66, RANGE, this.now, pixel || 0.002);
+    // (G3, the flora lane: the middle ring's touches each have a range between 0.4 and 1 of the ring's, where they had
+    // 0.66 to 1, so past about 25 m the band thins toward its rim instead of standing in rows behind one another: its
+    // touches painted each pixel they covered 3.8 times at the autumn landing. The shader grows a touch as the band thins.)
+    u.uNear.value.set(RANGE * (FLORA.grass2 && cfg.name === 'mid' ? 0.40 : 0.66), RANGE, this.now, pixel || 0.002);
     // (the fade-in band is a tier's own where a ring says so: the vista ring is laid at two tiers whose reaches
     // differ by more than twice, and one band of metres cannot serve both -- at the middle tier it would fade in
     // where it is already fading out. The three rings above have one band each, as they had.)
@@ -648,16 +651,17 @@ class Ring {
     // the grass: clumps, each one touch of a fan brush; taller and gone to seed where it is rough
     if (st.blade > 0 && left > 0) {
       const ng = Math.min(left, Math.round(st.blade * per * this.meadow * (0.55 + 0.6 * this.rough) * (st.reed > 0 ? 0.3 + 0.7 * Math.min(1, this.reedy) : 1) + H(200) - 0.5));
-      const L = st.leaf;
+      // (G3, the flora lane, ?grass2=0 off: a touch in the blades' own greens, narrower, and more upright)
+      const L = st.leafB, g2 = FLORA.grass2, nw = g2 ? 0.6 : 1, nt = g2 ? 0.5 : 1;
       for (let q = 0; q < ng; q++, k++) {
         const q1 = H(201 + q), q2 = H(208 + q), q3 = H(215 + q), q4 = H(222 + q), q5 = H(229 + q), p = at(q1, q2);
         // the shaded side of a tuft, the sunlit one, the dry one: all near the ground's own value
-        const v = q5 < 0.36 ? 2 : q5 < 0.72 ? 1 : 0, c = L ? L[v] : null, gm = v === 2 ? st.gm - 0.02 : st.gm;
+        const v = q5 < 0.36 ? 2 : q5 < 0.72 ? 1 : 0, c = L ? L[v] : null, gm = v === 2 ? st.gmB - 0.02 : st.gmB;
         let cr = gr, cg = gg, cb = gb;
         if (c) { cr = lerp(c[0], gr, gm); cg = lerp(c[1], gg, gm); cb = lerp(c[2], gb, gm); }
         if (v === 0 && tall > 0.2) { const m = 0.55 * tall; cr = lerp(cr, SEED_HEAD[0], m); cg = lerp(cg, SEED_HEAD[1], m); cb = lerp(cb, SEED_HEAD[2], m); }
         const dk = v === 2 ? 1.10 : v === 1 ? 1.04 : 0.86;
-        this.put(p[0], p[1], 0, 0.12 * q4, q3 * 6.28, (0.15 + 0.24 * q3) * (1 + 1.1 * tall) * kh, (0.13 + 0.20 * q4) * kw, FAN, q3 * 0.61 + q1 * 0.39, born,
+        this.put(p[0], p[1], 0, 0.12 * q4 * nt, q3 * 6.28, (0.15 + 0.24 * q3) * (1 + 1.1 * tall) * kh, (0.13 + 0.20 * q4) * kw * nw, FAN, q3 * 0.61 + q1 * 0.39, born,
           dens(cr, dk), dens(cg, dk), dens(cb, dk), (q2 - 0.5) * 0.5, flex);
       }
     }
