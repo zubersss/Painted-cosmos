@@ -749,6 +749,9 @@ at a full storm (`?stormleaf=<0.3 to 1>` another share). OFF behind its own swit
 `?stormlight`, uLookS.x) is in look-proto (v39.4); then it follows that one switch (ON by default with F's).
 The address switch SEEN to work (a page opened with `&wx=storm&stormleaf=1`, before the value went from 0.6 to 0.5):
 the 38 tall-tree materials took the value, no other material, no program failed, no console error.
+FOR v39.4 (when tying to uLookS.x): take A1's ramp for the far crowns (trees-far c5ef26a, impostor.js stK =
+smoothstep(0.15, 0.6, uStorm) * uLookS.x * 0.5), so near and far crowns step down together at the hand-over in a
+middling storm (today's kSt = uStorm * 0.5 / 0.9 is 0.33 at uStorm 0.6 where A1's is 0.5; both 0.5 at a full storm).
 
 **MERGED look-proto v39.3 (87053ed, pull request 46, the pines live) into trees-near: f281556**, clean, nothing
 doubled; unit 328, world 124, physics 449 pass.
