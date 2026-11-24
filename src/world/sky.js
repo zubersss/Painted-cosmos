@@ -152,12 +152,14 @@ float pcAirGold(float sunE) {
   float moon = (1.0 - uAtmo.y) * (1.0 - uAtmo.x);
   return (1.0 - smoothstep(0.48, 0.86, sunE)) * uAtmo.y * (1.0 - moon) * (1.0 - uWxSky.x) * uOilG.w;
 }
-vec3 pcSkyAir(vec3 h, float sunE, float sd) {
+vec3 pcSkyAir(vec3 h, float sunE, float sd, float lk) {
   // (L5: from the air, the gold toward the sun and the blue-violet away from it, as the land's far air: chunks.js
-  // pcAtmosV. sd is dot(view, sun). On foot uLookN.w is 0 and this is the band as it was.)
+  // pcAtmosV. sd is dot(view, sun); lk how far it applies -- uLookN.w for the AIR the land ends in (the band under the
+  // horizon and the lowest band laid last), 0 for the sky's own bands above it: laid through them it flattened the
+  // painted sky from a mile up into one periwinkle (seen). On foot uLookN.w is 0 and this is the band as it was.)
   float side = smoothstep(-0.4, 0.7, sd);
-  vec3 warm = mix(pow(h, vec3(uOilC.x)), vec3(0.95, 0.85, 0.63), 0.75 * pcAirGold(sunE) * mix(1.0, 0.45 + 0.55 * side, uLookN.w));
-  return mix(warm, vec3(0.48, 0.50, 0.63), clamp(uOilS.x * mix(1.0, mix(1.5, 0.45, side) * 1.2, uLookN.w), 0.0, 1.0));
+  vec3 warm = mix(pow(h, vec3(uOilC.x)), vec3(0.95, 0.85, 0.63), 0.75 * pcAirGold(sunE) * mix(1.0, 0.45 + 0.55 * side, lk));
+  return mix(warm, vec3(0.48, 0.50, 0.63), clamp(uOilS.x * mix(1.0, mix(1.5, 0.45, side) * 1.2, lk), 0.0, 1.0));
 }
 
 // NOTHING IN THE SKY IS PAPER WHITE any more, the sun's own disc and the light close round it apart. Measured on the
@@ -257,8 +259,8 @@ void main() {
     // On its own this closes almost none of the seam - the sky's own density, warm band and ceiling are laid over
     // it afterwards - which is why the band at the very bottom is laid again, last of all, at the end of this
     // shader. This keeps the HUE of the two the same all the way up the lower sky.)
-    vec3 airO = pcSkyAir(uHaze, sunE, sd);        // what the far land ends in: chunks.js pcAtmos, on the same haze key
-    vec3 bandO = mix(mix(pcSkyFar(uSkyHorizon, uOilS.x * 1.35), uSkyHorizon, 0.18), pcSkyAir(uSkyHorizon, sunE, sd), uSkyAir.x);
+    vec3 airO = pcSkyAir(uHaze, sunE, sd, uLookN.w);        // what the far land ends in: chunks.js pcAtmos, on the same haze key
+    vec3 bandO = mix(mix(pcSkyFar(uSkyHorizon, uOilS.x * 1.35), uSkyHorizon, 0.18), pcSkyAir(uSkyHorizon, sunE, sd, 0.0), uSkyAir.x);
     vec3 midO = mix(zenO, bandO, 0.62);
     float tb = t * 6.0 + (n1.r - 0.5) * 1.7 + (n2.g - 0.5) * 0.35;
     float tbi = floor(tb), fwb = max(fwidth(tb), 1e-4);
