@@ -1,0 +1,14 @@
+import { createRequire } from 'node:module'; const { chromium } = createRequire(import.meta.url)('/opt/node-tools/node_modules/playwright/index.js');
+const { startServer } = await import(new URL('../../../../tools/serve.mjs', import.meta.url));
+import fs from 'node:fs';
+const srv = await startServer(0);
+const port = srv.port;
+const b = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
+const p = await b.newPage();
+p.on('console', (m) => console.log('console:', m.text()));
+p.on('pageerror', (e) => console.log('pageerror:', e.message));
+await p.route('**/__wx.html', (r) => r.fulfill({ body: fs.readFileSync(new URL('./page.html', import.meta.url)), contentType: 'text/html' }));
+await p.goto(`http://127.0.0.1:${port}/__wx.html`);
+await p.waitForFunction(() => document.title.startsWith('{'), null, { timeout: 120000 });
+console.log(await p.title());
+await b.close(); process.exit(0);
