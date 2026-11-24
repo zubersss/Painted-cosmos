@@ -912,9 +912,12 @@ export const FARWATER_VERT_MAIN = /* glsl */`
   #ifdef PC_FARWATER
     vFarW = mix(aFarW.xyz, aFarWP.xyz, m);
   #endif`;
+// (one uniform the speed test turns: 1 the line laid, 0 not -- the table's row asks it the other way from how the run started)
+export const FARWATER_U = { uFarWaterOn: { value: 1 } };
 export const FARWATER_FRAG = /* glsl */`
 #ifdef PC_FARWATER
 varying vec3 vFarW;
+uniform float uFarWaterOn;
 // how much of this pixel is river: 1 inside, 0 out, over the pixel's own share of the distance (a crisp edge of about a
 // pixel). Its width breathes: br along it, and the pools are in the packed half width already. Near the eye it does not
 // fade out but NARROWS to nothing, from 500 m to 250 m (the look director: by whole width, never a soft cross-fade)
@@ -933,6 +936,7 @@ float pcFarWater(vec3 fw, float aa, float dist, float br) {
 uniform vec3 uSkyZenith;
 uniform vec3 uSkyHorizon;
 vec3 pcFarWaterLay(vec3 c, float dist) {
+  if (uFarWaterOn < 0.5) return c;
   float br = 0.82 + 0.36 * texture(uNoise3D, vBody / 85.0).r;      // (riffles narrower, reaches wider, over about 100 m)
   float k = pcFarWater(vFarW, fwidth(vFarW.x) * 72.0, dist, br);
   if (k <= 0.0) return c;

@@ -235,6 +235,31 @@ build only where the look asks: 221040b).
   beside the explorer into the distance on the right, a riffle, the ship on the left, a meadow of yellow flowers): 8.5 %
   water-blue and 2.8 % white churn, against 6.4 % for v39.1; the three side by side `first-view-3.jpg`.
 
+### ?bench=water FOR v39.6's DECISION (24 Nov 20:45-, the coordinator: one phone run decides the water paint's default)
+
+- THREE WATER VIEWS now: the brook's BANK, the sea SHORE, and the landing's FIRST VIEW (core/bench.js WV.first: the spawn,
+  facing the oil look's own first view, read from the world's getSpawn: oil.face). Each with its own "as set" row.
+- THE NEW PAINT, ASKED THE OTHER WAY FROM HOW THE RUN STARTED (render/waterchunk.js benchWPaint, registered in the oil look
+  whatever ?wpaint says): started with the new paint (?wpaint=1 or 2): the row is "v37 water paint" (the uniform uWPaint to
+  0, as W3 made it). Started with v37's (?wpaint=0, the default): the row is "new water paint": it compiles PC_WPAINT into
+  every water material (WATER_MATS, from materials.js makeWaterMaterial) with uWPaint 1 and takes it out after; three.js keeps
+  both programs, so only the first swap compiles, and the row is timed after the table's own settling wait.
+- THE FAR WATER LINE FROM 1 KM: an "as set" 1 km up over the landing's river (800 m north of it, facing south into the lake,
+  48 degrees down), the row "no far water line" (started with the line, the default) or "far water line" (started with
+  ?farwater=0), by one uniform (render/farground.js FARWATER_U.uFarWaterOn: pcFarWaterLay returns at once when 0), then down
+  again. With ?bench=water the line's data is packed and its paint compiled in either way (data/mode.js farwaterBench), so a
+  run started with ?farwater=0 can ask it too; HONEST: that run's "as set" carries the packed data and the gated code.
+- RUN HERE (headless, software drawing, `/index.html?look=oil&fresh=1&save=0&bench=water`, 21:00-21:30): all 16 rows ran,
+  none failed, none drew nothing: 1 as set; 2-4 bank (as set, no water drawn, new water paint); 5-7 shore (the same);
+  8-10 first view (the same); 11-13 falls (as set, no water drawn, no falls); 14 as set 1 km up, 15 no far water line,
+  16 as set down from 1 km. After the table every water material was back to v37's program (PC_WPAINT unset on all 10)
+  and the line's uniform back to 1. THE TIMES MEAN NOTHING HERE (one 4-10 s frame each, NOT SETTLED): only the owner's
+  phone prices them. Off the speed test nothing is new: no ?bench=water, no packed line data with ?farwater=0, the water
+  materials' programs as before; with the line on (the default) its paint has one uniform test more, laid the same.
+- FOR W3: the row compiles the new paint at level 1 (the strokes, uWPaint 1). If v39.6's candidate is level 2, it is the
+  one number in `compileWPaint(1)` in benchWPaint. Once the default flips to 1 or 2, the same rows ask v37's paint instead,
+  with nothing to change.
+
 ### THE CONFLUENCE BY THE LANDING (24 Nov 19:20-19:55; the coordinator's PRIORITY, live in v39.3)
 
 Another lane's still from 10 m up at the landing (design-flora 8aa970d, a7-aw10-before-after-v39.3-merge.jpg) showed zig-zag
@@ -257,6 +282,9 @@ swirl and marble there, and a faint line of fine hatching remains along where th
   as v39.3's own frame shows on that bending reach. CAUSE of that (read in WATER_FRAG, v37's strokes, the default): a current
   turns the stroke chart at each pixel about the middle of a 26 m cell, so where a river bends a point 13 m from the middle
   shifts metres for a few degrees and the strokes bunch: ONE DIRECTION PER STROKE needs the paint (W3's), asked.
+- F PASSED it (20:07): ship it as the live fault's fix (14772ce). TO CHECK LATER: when W3's new river paint (one direction per
+  stroke, its own chart) becomes the default (planned v39.6), look again at this same view: the banding on bending reaches
+  should go with it.
 
 ### THE WATER FROM THE AIR (24 Nov 14:50-16:15, this session; the coordinator held the water out of v39.2 for it)
 

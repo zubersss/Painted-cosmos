@@ -37,14 +37,29 @@ export const WAKE_U = { uWWake: { value: WAKES2.buf }, uWWakeN: { get value() { 
 // 1: the new strokes, 2: and the new colour, 0: v37's. The same object in every water material, so one write switches them all.
 export const WPAINT = { uWPaint: { value: 1 } };
 
-// The speed test's rows for the new paint (WATER-DESIGN.md 6): at the bank and at the shore, v37's paint against the
-// new one, each against its own view's "as set" row. Registered once, and only when the new paint is compiled in.
+// The speed test's rows for the new paint (WATER-DESIGN.md 6; the coordinator, 24 Nov: the table that decides v39.6's
+// water paint): at the brook's bank, the sea shore and the landing's first view, each against its own view's "as set"
+// row, and each ASKING THE OTHER WAY FROM HOW THE RUN STARTED (as the trees' rows do). Started with the new paint
+// (?wpaint=1 or 2): the row lays v37's, by the uniform. Started with v37's (?wpaint=0, the default): the new paint is not
+// compiled in, so the row compiles it into every water material (WATER_MATS, from render/materials.js) and takes it out
+// again after; three.js keeps both programs, so only the first swap compiles, and the row is timed after the table's own
+// settling wait. Registered once, in the oil look.
+export const WATER_MATS = [];
 let benched = false;
+function compileWPaint(level) {
+  for (const m of WATER_MATS) {
+    if (level >= 1) { m.defines.PC_WPAINT = 1; m.uniforms.uWPaint = WPAINT.uWPaint; } else delete m.defines.PC_WPAINT;
+    m.needsUpdate = true;
+  }
+  WPAINT.uWPaint.value = level >= 1 ? level : 0;
+}
 export function benchWPaint() {
-  if (benched || !wpaintOn()) return;
+  if (benched || !MODE.oil || !MODE.water) return;
   benched = true;
-  for (const view of ['bank', 'shore']) {
-    WATER_BENCH.push({ name: 'v37 water paint', view, on: () => { WPAINT.uWPaint.value = 0; }, off: () => { WPAINT.uWPaint.value = Math.min(2, MODE.water.wpaint); } });
+  const start = Math.min(2, MODE.water.wpaint | 0);
+  for (const view of ['bank', 'shore', 'first']) {
+    if (start >= 1) WATER_BENCH.push({ name: 'v37 water paint', view, on: () => { WPAINT.uWPaint.value = 0; }, off: () => { WPAINT.uWPaint.value = start; } });
+    else WATER_BENCH.push({ name: 'new water paint', view, on: () => compileWPaint(1), off: () => compileWPaint(0) });
   }
 }
 

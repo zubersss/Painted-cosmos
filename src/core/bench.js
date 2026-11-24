@@ -539,10 +539,31 @@ export function attachBench(pc) {
         try { placed = surf ? r.place(surf) : null; } catch { placed = null; }
         if (placed && placed.dir) WV[r.view] = { place: r.place, placed };
       }
-      for (const view of ['bank', 'shore', ...Object.keys(WV).filter((k) => WV[k].place)]) {
+      // (THE LANDING'S FIRST VIEW, the third water view (the coordinator, 24 Nov: the table that decides v39.6's water paint):
+      //  the explorer where a fresh start puts it, facing the way the oil look's first view faces (looks/earth.js oil.face,
+      //  read from the world's own spawn): the landing's river beside it, the ship on the left)
+      const g0 = surf && surf.getSpawn ? surf.getSpawn() : null;
+      if (g0) {
+        WV.first = { dir: [g0.x, g0.y, g0.z], e: 0, n: 0, yaw: g0.yaw != null ? g0.yaw * 180 / Math.PI : 100, pitch: g0.pitch != null ? g0.pitch : -0.12 };
+        // (and the place the far water line is asked from: 800 m north of the landing, facing south over its river into the lake)
+        WV.air1k = { dir: [g0.x, g0.y, g0.z], e: 0, n: 800, yaw: 180, pitch: -0.12 };
+      }
+      for (const view of ['bank', 'shore', ...(WV.first ? ['first'] : []), ...Object.keys(WV).filter((k) => WV[k].place)]) {
         waterRows.push([AS + ', ' + view + ' view', () => goView(view), null, { alone: true }]);
         waterRows.push([view + ' view: no water drawn', () => show(/^pc-water/, false), () => show(/^pc-water/, true)]);
         for (const r of extra) if (r && r.view === view) waterRows.push([view + ' view: ' + r.name, r.on, r.off]);
+      }
+      // THE FAR WATER LINE FROM 1 KM (render/farground.js, the oil look's default since v39.5): its own "as set" 1 km up over
+      // the landing's river, facing south down it into the lake, and the line laid the other way from how the run started
+      // (?bench=water packs its data and compiles it in either way, behind one uniform; data/mode.js farwaterBench). Then
+      // down again, and the landing's own place kept for the end of the table.
+      let FW = null, M0 = null;
+      try { FW = (await import('../render/farground.js')).FARWATER_U; M0 = (await import('../data/mode.js')).MODE; } catch { FW = null; }
+      if (FW && M0 && M0.oil && M0.water && (M0.water.farwater || M0.water.farwaterBench) && WV.air1k) {
+        const on0 = FW.uFarWaterOn.value >= 0.5;
+        waterRows.push([AS + ', 1 km up over the river', async () => { foot = null; await goView('air1k'); await lift(1000, 48); }, null, { alone: true }]);
+        waterRows.push([(on0 ? 'no far water line' : 'far water line') + ' (1 km up)', () => { FW.uFarWaterOn.value = on0 ? 0 : 1; }, () => { FW.uFarWaterOn.value = on0 ? 1 : 0; }]);
+        waterRows.push([AS + ', down from 1 km', async () => { await land(); foot = null; }, null, { alone: true }]);
       }
     }
     // ---- IS THIS DEVICE HELD AT ITS REFRESH? (see MK at the top of this file) ----------------------------------
