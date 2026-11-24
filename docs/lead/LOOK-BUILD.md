@@ -49,7 +49,7 @@ its A).
 | L0 | DONE | see git log (`[painter] L0`) | 7 stills (S1-S6 + S3 at night) against v37: 6 identical to the pixel, 1 with 2 pixels off by 1 of 255 (the 275 m night still); the shader text of all 36 materials of the autumn wood (comments and spaces taken out) identical, the 9 plant shaders with `pcFogAmountV` included, so those 2 pixels are the software renderer's run-to-run noise, not the change. Suites 325 / 65 / 416 pass. |
 | T1 | DONE | see git log (`[painter] T1`) | see the T1 section below; stills in docs/shots/painter/look-director/build/T1 (A = `?skyceil=0`, B = on) |
 | L1 | DONE | see git log (`[painter] L1`) | see the L1 section below; stills in docs/shots/painter/look-director/build/L1 (_A off, _B on) |
-| L2 + L7 | DONE | see git log (`[painter] L2 + L7`) | see the L2 + L7 section below; stills in docs/shots/painter/look-director/build/L2-L7 |
+| L2 + L7 | DONE, REWORKED | see git log (`[painter] L2 + L7`, then `[painter] L2 + L7 reworked`) | see the L2 + L7 section below (and its REWORKED part); stills in docs/shots/painter/look-director/build/L2-L7 and L2-L7-rework |
 | L3 | DONE | see git log (`[painter] L3`) | see the L3 section below; stills in docs/shots/painter/look-director/build/L3 |
 
 ## T1, the sky ceiling: what was built and what was seen
@@ -135,6 +135,30 @@ its A).
   0.90 does not grow anywhere. By eye: the golden hour's shaded leaves and banks go from lurid red-brown and acid
   green to a deep, quieter red and olive (the approved picture moves: the owner should see S1 A/B); the crowns at
   275 m lose their maroon; Neptune's night is the same picture with the snow a breath less bright.
+
+### L2 + L7 REWORKED (the coordinator's S1 review: "S1 golden hour lost its fire")
+
+The coordinator held L2's leaf part from look-proto: in S1 B the crowns went dull brown-maroon and the bank murky.
+Measured on S1 in three states on one page (A0 both off, A1 L7 only, B both), warm crown pixels (hue under 50 or
+over 340, S over 0.35) in the top right of the frame:
+- the FIRST L2 did not touch the crowns at all once reworked (A1 and B crowns identical); the fire was lost in
+  L7: laying the S on the value dimmed every saturated middle value (crowns V 0.54 -> 0.49, S 0.73 -> 0.68),
+  because the old per-channel S is what lifted a red's top channel, and measuring the push by the real
+  saturation took most of the push off every saturated middle value.
+- `pcShadeLeaf` now keeps the recipe as it was (value down, saturation held or up) for every hue but the acid
+  greens: a green past hue ~70 that comes out over S 0.55 is pulled toward its own value in a breath of the cool
+  key's hue only as far as S 0.55, and lifted by 0.6 of that pull so it sits in the shaded grass's band and does
+  not sink into murk.
+- `post.js` L7 is now the darks' step only: under V 0.30 the S on the value, over 0.50 the old S exactly, a blend
+  between; the push measured as before and eased to 0.4 of itself under V 0.20, back in full by 0.40.
+- MEASURED S1 (A0 -> B): crowns warm S 0.73 -> 0.71, V 0.54 -> 0.54, share 61 -> 59 %; the far bank's greens
+  S 0.90 -> 0.56 at V 0.21 -> 0.21, the near bank's 0.91 -> 0.58 at 0.24 -> 0.24; whole frame S(V<.3) 0.51 ->
+  0.41, V over 0.90 0.6 -> 0.6 %. SEEN (opened): the crowns' reds and oranges as A0's; the banks a quieter sage
+  green under the same orange leaf litter, at the same value. S2 (green wood, noon): the lit grass keeps its colour
+  (satL 0.56 -> 0.55), the shaded hillside goes from a lurid dark green to a quieter sage (whole frame S 0.69 ->
+  0.52, S(V<.3) 0.39 -> 0.30), V over 0.90 3.4 -> 3.4 %. S5 (green wood, 23 h): the same picture, the bank a breath
+  greyer (S(V<.3) 0.45 -> 0.36), and the few cool lilac strokes along the grass tops (the coordinator's L1 note)
+  are still there. Stills (A0, A1, B, and S1 A0 over B): docs/shots/painter/look-director/build/L2-L7-rework.
 
 ## L3, one light: what was built
 

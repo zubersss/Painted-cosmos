@@ -801,8 +801,13 @@ void main() {
   if (uLookF.w > 0.5) {
     // (never above where the old S took the brightest channel: laid on the value alone, a bright saturated colour's
     // top channel rose further than it did, and the share of the picture over 0.90 grew, 4.1 to 4.8 per cent on S2)
+    // (REWORKED after the coordinator's S1 review: laid on the value everywhere it also dimmed the saturated MIDDLE
+    // values -- the autumn crowns at golden hour, measured on S1: their warm pixels' value 0.54 to 0.49 and saturation
+    // 0.73 to 0.68 -- because the old per-channel S is what lifted a red's top channel and gave it its fire. Now it is
+    // the darks' step only: under a value of 0.30 the value S, over 0.50 the old S exactly, between the two a blend.)
     float l0 = max(dot(col, W), 1e-4), vm0 = max(max(col.r, col.g), max(col.b, 1e-4));
-    col *= min(mix(l0, l0 * l0 * (3.0 - 2.0 * l0), 0.35) / l0, mix(vm0, vm0 * vm0 * (3.0 - 2.0 * vm0), 0.35) / vm0);
+    vec3 sv = col * min(mix(l0, l0 * l0 * (3.0 - 2.0 * l0), 0.35) / l0, mix(vm0, vm0 * vm0 * (3.0 - 2.0 * vm0), 0.35) / vm0);
+    col = mix(sv, mix(col, col * col * (3.0 - 2.0 * col), 0.35), smoothstep(0.30, 0.50, vm0));
   } else {
     vec3 s = col * col * (3.0 - 2.0 * col);
     col = mix(col, s, 0.35);
@@ -816,10 +821,12 @@ void main() {
   // ?farsat= sets it; 0.28 is the look as it was.)
   float lw = dot(col, W), sat = max(col.r, max(col.g, col.b)) - min(col.r, min(col.g, col.b));
   // (L7: "dull" was measured as max - min, which is small for EVERY dark colour, so every shadow got the whole push.
-  // With uLookF.w on it is the colour's real saturation, and the push fades out under a value of 0.30: the darks are
-  // left as painted, deep and quiet, and the lights and middle values still pop.)
+  // With uLookF.w on the push eases to four tenths of itself under a value of 0.20, fully back by 0.40: the darks are
+  // left nearer as painted, deep and quieter, and the lights and middle values pop exactly as before. (The first
+  // version also measured "dull" as the real saturation, which took most of the push off every saturated middle
+  // value too -- the crowns again -- and is dropped.))
   float pushK = 1.0;
-  if (uLookF.w > 0.5) { float vmx = max(col.r, max(col.g, col.b)); sat = sat / max(vmx, 1e-4); pushK = smoothstep(0.20, 0.42, vmx); }
+  if (uLookF.w > 0.5) pushK = mix(0.4, 1.0, smoothstep(0.20, 0.40, max(col.r, max(col.g, col.b))));
   col = clamp(mix(vec3(lw), col, 1.0 + mix(0.28, uFarC.z, far) * (1.0 - sat) * pushK), 0.0, 1.0);
   col = mix(vec3(0.07, 0.06, 0.09), col, smoothstep(0.0, 1.0, uLaid));
   // (2026-11-18, the owner: "It's kinda light".) THE SHOULDER: nothing clips to paper white any more.
