@@ -330,12 +330,12 @@ FV7 of `docs/lead/FARVIEW-DESIGN.md`. A second session (A2, branch `trees-near`)
 the same time: this lane touches only the far parts of `flora.js`, `florakit.js`, the plant material's far branch,
 `render/impostor.js`, `render/shadow.js` and new rows in `core/bench.js`.
 
-**State (update this line every step):** (24 Nov, about 17:45) CROWN MASS IS THE DEFAULT (F passed it; f230b40, bench row
-c7abccd; ?crownmass=0 the old way), taken by the coordinator for v39.3. F's follow-ups (1) the yellow kind into the stands
-and (2) small crowns not a sieve: BUILT and pushed (on with crown mass) but MEASURED small (150 m: near-black 0.99 -> 0.94
-percent, bright yellow 15.5 -> 15.4); FOUND the near-black is the impostors' bark on 10-30 px crowns (uMassK2.w 10; 30
-halves it but hides stems) and the yellow is whole yellow stands (the 4/4/2 split); asked F. NEXT: F's (3), the far spruce
-from a by-limb tree (A2's question). The gust crowns: accepted by F, dormant until the binding reaches look-proto.
+**State (update this line every step):** (24 Nov, about 18:15) CROWN MASS IS THE DEFAULT (f230b40, row c7abccd; in v39.3).
+F's decisions after it, on trees-far (fad660f): bark as shaded leaves up to 30 px (uMassK2.w), and a stand's place on the
+run weighted by the references' canopy (20 yellow, 50 amber, 25 orange, 5 red); MEASURED 150 m bright yellow 15.5 -> 11.2
+percent (25.2 without crown mass), near-black 0.99 -> 0.49; sent to F. Also on: the yellow kind borrows the wood's run,
+a tree strays 0.35 in its stand, gaps in crowns under 8 px filled. NEXT: F's (3), the far spruce baked from A2's by-limb
+tree: asked A2 for the tree (branch, kit, geometry) before building. The gust crowns: accepted, dormant until the binding.
 Tuning handles live in the page: uMassK (x cap drop, y/w one tone px, z crown mass px), uMassK2 (x stand share, y warm
 paint, z stray in a stand, w bark-as-leaf px). Before that: look-proto v39.2 (c7d8d9e: my small crowns and the
 shadow saving live) merged into trees-far (e85dabd), rendered, pushed. THE GUST ON THE FAR CROWNS ACCEPTED BY F at
