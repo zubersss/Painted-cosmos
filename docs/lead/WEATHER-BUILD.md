@@ -39,6 +39,7 @@ A separate session builds W1 CLOUDS once the look director's sky ceiling (touch 
 | `?rainshaft=1` | rain shafts under every raining storm 1 to 7 km off (`world/storms.js`; turns on `cloudmap`; oil look only) |
 | `?bolts=1` | lightning bolts, cloud to ground (`world/storms.js`; turns on `cloudmap`; oil look only) |
 | `?rainmap=1` | the rain box's drops placed by the rain map at its four corners (turns on `cloudmap`) |
+| `?gustbands=1` | the gust bands seen from the air (the physics side; a material shows them only with its `PC_GUST` hook and the `uPhysGust` binding) |
 | `?stormswing=0` | with `?stormland`: the land storms as W3.2 laid them (1 to 3 a day, the usual wind aloft); on by default |
 | `?clouds3d=1` | (the look director's switch for W1's clouds) also turns on `cloudmap` and `windmap` |
 
@@ -532,6 +533,53 @@ A separate session builds W1 CLOUDS once the look director's sky ceiling (touch 
   - CHECKED in the game: with no switches every switch is on but `rainmap`, the storms are loaded, the maps run, there
     are no errors and the picture draws. With `?weather=old` every switch is off and storms.js is never fetched.
   - NOT in it: the clouds lane's own switch (`?clouds3d`, the look director's and W1's) flips with their review.
+
+### W3.12: THE WIND SEEN FROM THE AIR (the coordinator, 24 Nov; `flora.js`, `flora.glsl.js`, `wx2.js`, `core/bench.js`)
+
+- **What the far land already took from the wind** (`?farwind`):
+  - The far trees' painted stand-ins (A1, trees-far `render/impostor.js`) lean at their foot with the far field
+    (pcPhysBendLite). From 150 m to 1 km a lean moves a crown's top about a pixel: no gusts can be seen in it.
+  - The ground reads only the push field (the trodden track, within 70 m). The near grass strokes read only its
+    flattening.
+  - The near plants carry travelling gust waves (`uPhysWave`), but these are 11 to 19 m long and their phases are kept
+    modulo one wave, so they cannot drive bands seen from far off.
+- **What a gust looks like from above:** not a bend but a SHEEN. Where it lays the grass and turns the leaves, their
+  paler side shows, and the pale patch runs downwind.
+- **Built (physics side, committed):** behind `?gustbands=1` (`WX2.gustbands`).
+  - `flora.js` hands the shaders `uPhysGust`: xyz the bands' direction (the near waves' own slowly turning direction,
+    in body axes) times their strength, which is 0 in a calm and full in a fresh breeze (`GUSTBAND.windLo` 0.4 and
+    `windHi` 2.2 m/s at the blades). w is how far they have run (1.5 times the blade wind), wrapped at the noise's
+    period so that they never jump.
+  - `flora.glsl.js pcGustBand(p)`: 0..1 at a body-local point (a stroke's centre). It is one read of the shared 3D noise,
+    stretched to bands about 40 m along the wind and 120 m across, lying on the world (no jump when the frame
+    re-anchors), with more and bolder bands the stronger the wind.
+  - **Compiled only where a material defines `PC_GUST`**, and that material must bind `uPhysGust` (the coordinator's
+    rule: no unbound uniform anywhere).
+  - Test: `gustband.test.mjs` (off by default; on in a breeze along the ground, running, wrapped, never jumping; the
+    function behind its define).
+- **The hooks, as patches for their owners (applied locally for the stills only, NOT committed):**
+  - `docs/shots/physics/weather-build/T_gust_render_shared_js.patch.txt`, for the look director: `uPhysGust` in
+    shared.js `PHYS`, one line. syncPhysFlora's loop then copies it.
+  - `docs/shots/physics/weather-build/T_gust_ground_materials_js.patch.txt`, for C, the far ground: in
+    `makeTerrainMaterial` `PC_GUST` with `?gustbands=1` or `?wx2=1` in the oil look. In `pcGroundPaint` a growth stroke
+    (green to lemon and straw: `k.g - k.b`; not rock, not snow) under a band is laid a pale, cooler step, by whole
+    strokes.
+  - For A1, the far crowns: the same, one `pcGustBand(tree foot)` a tree in the impostor's fragment stage, a pale
+    lift of the crown's leaves (they turn their paler side); `PC_GUST` and the same binding.
+- **Seen** (`W3.12_*`): the green wood from 150 m in a 5 m/s breeze, A off, B on at t and one second later, a 3x crop
+  stack and a x12 difference.
+  - B has patches of paler, cooler ground strokes between the trees, and one second later they have moved downwind.
+    2.3 % of the pixels differ from A; 1.3 % differ between B's two frames.
+  - **Said plainly: it is subtle over a wood.** The crowns cover most of the ground from the air, so over woods the
+    visible answer needs the crowns too (A1's impostors, and the middle trees). Over open grass it reads more.
+  - In a calm, which this game's near winds mostly are (0.3 to 2.5 m/s at 2 m), it is off.
+- **Phone cost, derived (uncertain: no device):** one 3D texture read and about fifteen operations per ground stroke
+  layer, in growth strokes, while there is a breeze. The ground's paint is 24 to 34 ns a pixel (v37) with many reads,
+  so this is about a tenth of it: about 0.3 to 0.5 ms from the air over grass.
+  - That is over the 0.3 ms a change. On the phone tier, read it once a pixel at the coarse layer's stroke: about a
+    third of that.
+  - Speed-test row: 'weather: no gust bands seen from the air' (live).
+- **Suites:** physics 443, world and looks 103, unit 328.
 
 ## NEXT
 

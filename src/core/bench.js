@@ -527,6 +527,11 @@ export function attachBench(pc) {
       ...((WX2.rainshaft || WX2.bolts) ? [
         ['storm: no rain shafts or bolts', () => show(/^pc-storm-/, false), () => show(/^pc-storm-/, true)],
       ] : []),
+      // (group D, ?gustbands=1: the gust bands seen from the air. Off, the physics hands the shaders a zero strength and
+      //  pcGustBand returns before its two noise reads: the gap is their cost, about two texture reads a ground stroke.)
+      ...(WX2.gustbands ? [
+        ['weather: no gust bands seen from the air', () => { WX2.gustbands = false; }, () => { WX2.gustbands = WX0.gustbands; }],
+      ] : []),
       // (TENTH FORM) THE AIR: no row had ever timed it. The same spot, from 150 m and 400 m up.
       ...airAt(150, 30, [T0.noFar, T0.blob, T0.imp]),
       ...airAt(400, 45, [T0.noFar, T0.imp]),
