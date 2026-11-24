@@ -48,7 +48,7 @@ import { SEASON } from '../data/season.js';
 let SW = null;
 export function bloomSwitches() {
   if (SW) return SW;
-  const f = { bloom: 1, air: 1, grass2: 1, year: 1, far: 0 };
+  const f = { bloom: 1, air: 1, grass2: 1, year: 1, far: 0, pool: 1 };
   try {
     const q = new URLSearchParams(location.search), on = (k) => !q.has(k) || (q.get(k) !== '0' && q.get(k) !== 'false');
     const isOld = q.get('flora') === 'old' || q.get('flora') === '0' || q.get('flora') === 'false';   // (the opt-out: nearground.js FLORA)
@@ -59,8 +59,10 @@ export function bloomSwitches() {
     // (FV6 with the far view, C: the drift's cover and colour go to the ground's far dabs as their own channel, aFar.z/w in
     // patchgen.js; 0 by default until C's half lands, then on together after stills at 150 m, 400 m and 1 km)
     f.far = f.air && q.get('bloomfar') === '1' ? 1 : 0;
+    // (audit 2, with the drift patch, nearground.js ?driftpatch: the ground under a drift's heart takes more of its colour)
+    f.pool = f.air && on('driftpatch') ? 1 : 0;
   } catch { /* no address to read (Node, the tests): everything on, if the look is */ }
-  if (!MODE.oil) { f.bloom = 0; f.air = 0; f.grass2 = 0; f.year = 0; f.far = 0; }
+  if (!MODE.oil) { f.bloom = 0; f.air = 0; f.grass2 = 0; f.year = 0; f.far = 0; f.pool = 0; }
   SW = f;
   return f;
 }
@@ -290,7 +292,11 @@ export function bloomTint(S, o, x, y, z, bi) {
   // the middle and far rings now lay as dots of their own colour; the ground takes a third as much of it. A white, cream or
   // yellow flower near the grass's own hue tints as before.)
   const near = hueNear(c, o.r, o.g, o.b);
-  const kn = cover * 0.4 * near, kf = Math.min(0.7, cover) * near;
+  // (audit 2, ?driftpatch: THE POOL. SEEN 24 Nov: with the paint of the heads they replace, a drift's patches cover about 3
+  // per cent of its cells, and from 10 m they were scattered dots, not pools; the ground, painted anyway, is what can carry
+  // a pool at no cost: in a drift's heart it takes up to 0.7 of the flower's colour instead of 0.4, a white, cream or yellow
+  // flower only, as before: `near` keeps a red or a violet off the green, which mixed is mud)
+  const kn = cover * (sw.pool ? 0.4 + 0.3 * r.heart : 0.4) * near, kf = Math.min(0.7, cover) * near;
   o.r += (c[0] - o.r) * kn; o.g += (c[1] - o.g) * kn; o.b += (c[2] - o.b) * kn;
   o.fd = Math.min(1, cover);
   // (the far dabs: a white or a near-white flower is held a step under the meadow's lightest grass -- the look director at
