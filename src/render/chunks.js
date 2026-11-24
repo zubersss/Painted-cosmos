@@ -195,6 +195,16 @@ vec3 pcShadeLeaf(vec3 c) {
   vec3 g = vec3(dot(d, vec3(0.3, 0.5, 0.2))) * mix(vec3(1.0), shC / max(dot(shC, vec3(0.3, 0.5, 0.2)), 1e-3), 0.5);
   return mix(d, g, 0.5) * 1.10;
 }
+// ONE LIGHT (L3, 2026-11-24; LOOK-AUDIT F3, LOOK-RULES R1.2a). The level for a stroke facing the sun by x (half-
+// Lambert, 0..1, with the stroke's own jitter already in it) that the sun reaches by sunny (1 lit .. 0 in cast shadow)
+// under a canopy of the given density. It is the GROUND's own formula, which was the reference: in cast shadow a
+// thing is in the shade step (level 1) whichever way it faces, under a closed canopy the deep one, and it is modelled
+// by the sun only where the sun reaches it. Each material used to make its own -- bark x * mix(0.55, 1, sunny), crown
+// dabs x * mix(0.62, 1, sunny), rock x * mix(0.45, 1, sunny), the explorer and the creatures no shadow at all -- so one
+// shadow came out at level 1 on the floor, 2 on a trunk, 2.4 on a crown and 3 on the figure. uLookF.z picks it.
+float pcLit(float x, float sunny, float canopy, float soft) {
+  return pcLevel(mix(min(x, 0.44) - 0.10 * canopy, x, sunny), soft);
+}
 // WHICH WAY A SURFACE FACES, FOR THE LIGHT THAT KNOWS UP FROM DOWN (2026-11-22). THE CONTRACT, so a material and
 // this chunk cannot drift apart:
 //   WHAT IT IS. pcUp is dot(normalize(vBody), n) -- the body's own up against the normal the surface is shaded by.
@@ -415,6 +425,23 @@ float pcFogAmount(float dist) {
 `;
 export const AIR_FN = (name) => (name === 'pcFogAmount' ? AIR_SRC : AIR_SRC.replace('float pcFogAmount(float dist) {', 'float ' + name + '(float dist) {'));
 
+// (the sun at a place in the eye's space, L3: a piece of its own, so the creatures' vertex shader can take it too,
+// beastmat.js, with its own declarations of uShV, uSunV, uShTex and uShK)
+export const SUN_VIEW_SRC = /* glsl */`
+// THE SUN AT A PLACE GIVEN IN THE EYE'S SPACE (L3, 2026-11-24): for what has no place on the body to hand -- the
+// explorer, the creatures -- the shadow map asked through uShV. The place is taken a little toward the sun (lift, m)
+// so a figure is not shadowed by itself (it is drawn into the map: shadow.js); outside the square, and with no map,
+// it is in the sun. 1 lit .. 0 shaded. Needs uShV, uSunV, uShTex, uShK.
+float pcSunAtView(vec3 viewPos, float lift) {
+  if (uShK.x < 0.004) return 1.0;
+  vec3 q = (uShV * vec4(viewPos + uSunV * lift, 1.0)).xyz;
+  vec2 a = abs(q.xy);
+  float inside = (1.0 - smoothstep(uShK.w, 0.97, max(a.x, a.y))) * uShK.x;
+  if (inside < 0.004) return 1.0;
+  return mix(1.0, step(q.z - uShK.y, textureLod(uShTex, q.xy * 0.5 + 0.5, 0.0).r), inside);
+}
+`;
+
 export const FRAG_PARS = /* glsl */`
 #include <common>
 #include <logdepthbuf_pars_fragment>
@@ -454,6 +481,8 @@ uniform vec4 uLookN;   // the night's two numbers for the world the eye is on (s
 uniform vec4 uOilL;    // x 1: the lighter paint (phones); y the speed test's flat modes (shared.js)
 uniform vec4 uOilPx;
 uniform mat4 uShM;
+uniform mat4 uShV;     // (the eye's space to the shadow map's square, shadow.js; L3: pcSunAtView)
+uniform vec3 uSunV;    // (the way to the sun in the eye's space, shadow.js)
 uniform highp sampler2D uShTex;
 uniform vec4 uShK;
 uniform sampler2D uShAir;
@@ -733,7 +762,7 @@ float pcSunAtSoft(vec3 bodyPos, float canopy, float lift, float w, float r) {
   }
   return pcDappleS(bodyPos, canopy, lift, w);
 }
-#endif
+${SUN_VIEW_SRC}#endif
 
 // The shade the explorer and the ship lay on the ground: a soft-edged glaze under and beside
 // them (0 none .. 1 full), so they stand on the land instead of floating over it. rag: any

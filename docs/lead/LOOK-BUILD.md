@@ -48,7 +48,7 @@ its A).
 | T1 | DONE | see git log (`[painter] T1`) | see the T1 section below; stills in docs/shots/painter/look-director/build/T1 (A = `?skyceil=0`, B = on) |
 | L1 | DONE | see git log (`[painter] L1`) | see the L1 section below; stills in docs/shots/painter/look-director/build/L1 (_A off, _B on) |
 | L2 + L7 | DONE | see git log (`[painter] L2 + L7`) | see the L2 + L7 section below; stills in docs/shots/painter/look-director/build/L2-L7 |
-| L3 | not started | | |
+| L3 | DONE | see git log (`[painter] L3`) | see the L3 section below; stills in docs/shots/painter/look-director/build/L3 |
 
 ## T1, the sky ceiling: what was built and what was seen
 
@@ -133,3 +133,27 @@ its A).
   0.90 does not grow anywhere. By eye: the golden hour's shaded leaves and banks go from lurid red-brown and acid
   green to a deep, quieter red and olive (the approved picture moves: the owner should see S1 A/B); the crowns at
   275 m lose their maroon; Neptune's night is the same picture with the snow a breath less bright.
+
+## L3, one light: what was built
+
+- `chunks.js`: `pcLit(x, sunny, canopy, soft)` in PAINT (the ground's own formula); `pcSunAtView(viewPos, lift)`
+  as its own piece `SUN_VIEW_SRC` (included in FRAG_PARS; the creatures' vertex shader takes it with its own
+  declarations); `uShV`, `uSunV` declared in FRAG_PARS. All behind `uLookF.z` (`?onelight=0`).
+- materials.js (lines at this commit, other groups' code, one-line swaps with the coordinator's leave): the bark's
+  base paint and its streaks, the crown dabs (with their floor kept as a level), the rock; FIG_FRAG (the explorer:
+  shadow read at its place lifted 0.8 m toward the sun, its rim the sun's). beastmat.js: the painted pieces (fragment)
+  and the flat pieces (vertex), lifted 1.4 m. The ground is the reference and is not touched; the leaves are not
+  swapped (in shade they already fall to the one foliage shade whatever their level).
+- Tests: 325 / 65 / 416; one run of the physics suite showed 1 failure while the browser was loading all four cores
+  and did not repeat in two reruns (416 / 416): a timing-sensitive test under load, not this change (physics reads
+  none of these files).
+
+**L3 SEEN (18 stills, A = `uLookF.z` 0, B = on, one page each; all opened).** The explorer in the gallery
+(`models=1`, the vista at 16.8) stands at the edge of a tree's shadow: A paints its cloak in full sun beside a shaded
+floor; B shades it with the floor (the cloak a deeper blue, still the strongest colour), and the ship's hull with
+it. The big trunks' sun sides in the floor's shadow come down to the floor's value (S1 and the vista: 25,000 to
+50,000 pixels change, the trunks only). The 275 m view, Mars' spires, the green wood at night and Neptune are the same
+to lookstats' two decimals. NOT SEEN: a creature in frame (`beasts=1` put none in view); their two changes compile
+and are the same call as the explorer's. Lines at this commit: materials.js 2134 (bark base), 2169 (bark streaks),
+2207 (crown dabs), 2347 (rock), 2705-2706 (FIG_FRAG); beastmat.js 536-537 (flat pieces, vertex), 609-610 (painted
+pieces).

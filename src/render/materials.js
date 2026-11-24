@@ -2129,8 +2129,9 @@ void main() {
     vec3 nvdx = dFdx(vNV), nvdy = dFdy(vNV), mvdx = dFdx(vMassV), mvdy = dFdy(vMassV);
     vec3 vwdx = dFdx(vView), vwdy = dFdy(vView), bdx = dFdx(vRelO), bdy = dFdy(vRelO);      // (the place's derivatives from a position measured from the eye: the body's own coordinates are too coarse to difference, chunks.js pcGroundChartD)
     float pale = smoothstep(0.55, 0.9, dot(barkA, vec3(0.333)));
-    float xb0 = (dot(nV, sunV) * 0.5 + 0.5) * mix(0.55 + 0.30 * pale, 1.0, pcSunAt(vBody, canopy * 0.8, 8.0 - vAbove, oc.x));
-    vec3 acc = isBark ? pcTone(mix(barkA, barkB, 0.16), pcLevel(xb0, 0.04)) : pcTone(pcDensity(leafC, 1.5), 0.7);
+    float xbF = dot(nV, sunV) * 0.5 + 0.5, xbS = pcSunAt(vBody, canopy * 0.8, 8.0 - vAbove, oc.x);      // (L3: one light)
+    float xb0 = xbF * mix(0.55 + 0.30 * pale, 1.0, xbS);
+    vec3 acc = isBark ? pcTone(mix(barkA, barkB, 0.16), uLookF.z > 0.5 ? pcLit(xbF, xbS, canopy * 0.8, 0.04) : pcLevel(xb0, 0.04)) : pcTone(pcDensity(leafC, 1.5), 0.7);
     float accA = isBark ? 1.0 : 0.0;
     for (int L = 1; L >= 0; L--) {
       float w = oc.x * (L == 1 ? 2.0 : 1.0);
@@ -2162,9 +2163,10 @@ void main() {
         k1 *= mix(vec3(1.0), mix(vec3(1.12, 0.96, 0.80), vec3(0.90, 0.90, 1.08), rnd.z), 0.7 * uOilB.z * fine);
         k2 *= mix(vec3(1.0), mix(vec3(1.12, 0.96, 0.80), vec3(0.90, 0.90, 1.08), rnd2.z), 0.7 * uOilB.z * fine);
         xs_ = dot(nVc, sunV) * 0.5 + 0.5;
-        xs_ *= mix(0.55 + 0.30 * pale, 1.0, pcSunAt(Bc, canopy * 0.8, 8.0 - vAbove, w));
+        float xsF = xs_ + (rnd.x - 0.5) * 0.10 * fine, xsS = pcSunAt(Bc, canopy * 0.8, 8.0 - vAbove, w);      // (L3: one light)
+        xs_ *= mix(0.55 + 0.30 * pale, 1.0, xsS);
         xs_ += (rnd.x - 0.5) * 0.10 * fine;
-        float lvl = pcLevel(xs_, 0.03), pk = pale * 0.45 * max(uDayness, uMoon);
+        float lvl = uLookF.z > 0.5 ? pcLit(xsF, xsS, canopy * 0.8, 0.03) : pcLevel(xs_, 0.03), pk = pale * 0.45 * max(uDayness, uMoon);
         vec3 l1 = mix(pcTone(k1, lvl), pcTone(k1, max(lvl, 1.0) * 0.5 + 1.0), pk), l2 = mix(pcTone(k2, lvl), pcTone(k2, max(lvl, 1.0) * 0.5 + 1.0), pk);
         l1 = pcLamp(l1, k1, Bc, rnd.y); l2 = pcLamp(l2, k2, Bc, rnd2.y);
         #ifdef PC_FIRE
@@ -2198,10 +2200,11 @@ void main() {
         // (the sun behind a crown comes through its leaves: those glow)
         float through = pow(max(dot(-Vc, sunV), 0.0), 1.5);
         xs_ = max(xs_, through * (0.55 + 0.45 * rnd.x));
-        xs_ *= mix(0.62, 1.0, pcSunAt(Bc, canopy * 0.6, 8.0 - vAbove, w));
-        xs_ += (vData.w - 0.5) * 0.22 + (rnd.y - 0.5) * 0.20;
-        xs_ = max(xs_, 0.30 + 0.18 * rnd.x + (vData.w - 0.5) * 0.14);
-        float lvl = pcLevel(xs_, 0.03);
+        float xcJ = (vData.w - 0.5) * 0.22 + (rnd.y - 0.5) * 0.20, xcF = xs_ + xcJ, xcS = pcSunAt(Bc, canopy * 0.6, 8.0 - vAbove, w), xcFl = 0.30 + 0.18 * rnd.x + (vData.w - 0.5) * 0.14;      // (L3: one light)
+        xs_ *= mix(0.62, 1.0, xcS);
+        xs_ += xcJ;
+        xs_ = max(xs_, xcFl);
+        float lvl = uLookF.z > 0.5 ? max(pcLit(xcF, xcS, canopy * 0.6, 0.03), pcLevel(xcFl, 0.03)) : pcLevel(xs_, 0.03);
         // (a crown's shade is its own colour laid heavier with half the cool key over it: the key alone over an orange
         // crown is mud; light comes through leaves)
         vec3 deepF = pcShadeLeaf(cs);      // (L2: the one foliage shade, chunks.js)
@@ -2339,8 +2342,9 @@ void main() {
       float upF = dot(nV, upV);
       float snowR = max(pcSnowCover(upF * 0.5 + 0.5, fh, 0.0), uGroundK.x * step(0.55, upF));
       c = mix(c, vec3(0.92, 0.95, 0.98), snowR);
-      x = (dot(nV, sunV) * 0.5 + 0.5) * mix(0.45, 1.0, pcSunAt(vBody, canopy, 8.0 - vAbove, 0.3));
-      float lvlR = floor(pcLevel(x, 0.04) * 2.0 + 0.5) * 0.5;
+      float xrF = dot(nV, sunV) * 0.5 + 0.5, xrS = pcSunAt(vBody, canopy, 8.0 - vAbove, 0.3);      // (L3: one light)
+      x = xrF * mix(0.45, 1.0, xrS);
+      float lvlR = floor((uLookF.z > 0.5 ? pcLit(xrF, xrS, canopy, 0.04) : pcLevel(x, 0.04)) * 2.0 + 0.5) * 0.5;
       if (uGem > 0.5) lvlR = max(lvlR, 1.5);      // (a crystal is lit through: none of its faces goes to the deep step)
       vec3 kR = c;                                // (its own wash, kept: the lantern and the fire mix their light from it)
       c = pcLamp(pcTone(c, lvlR), kR, vBody, fh);
@@ -2696,7 +2700,10 @@ void main() {
     pcThinLayer(fch, fdx, fdy, foc.x, 5.0, vObj, 40.0, 2.0, fr1, fds, fown, fr2);
     vec3 co = pcWetWash(pcDensity(vCol, 1.0 + (smoothstep(0.42, 0.62, fold) - 0.45) * 0.30 * (1.0 - max(vMat.z, 0.0))), 0.7);
     float sunF = dot(nV, sunV);
-    float lvo = pcLevel(sunF * 0.5 + 0.5, 0.05) + 0.9 * smoothstep(0.50, 0.85, rim) * smoothstep(0.0, 0.5, sunF) * uDayness;
+    // (L3, one light: the figure stands in the same shadow as everything else, read at its own place lifted 0.8 m
+    // toward the sun so it is not shadowed by itself; its rim is the sun's, so it goes with the sun)
+    float sunFg = uLookF.z > 0.5 ? pcSunAtView(vView, 0.8) : 1.0;
+    float lvo = (uLookF.z > 0.5 ? pcLit(sunF * 0.5 + 0.5, sunFg, 0.0, 0.05) : pcLevel(sunF * 0.5 + 0.5, 0.05)) + 0.9 * smoothstep(0.50, 0.85, rim) * smoothstep(0.0, 0.5, sunF) * uDayness * sunFg;
     // (the light in flat steps, half a tone each, with clean edges between them: a limb shaded smoothly from light to
     // dark was a rendered cylinder, the one soft gradient on the figure)
     lvo = floor(lvo * 2.0 + 0.5) * 0.5;
