@@ -200,7 +200,9 @@ export const OIL = {
   //   x how strong the moonlit paint is against the sunlit (a look's oil.night.v; 0.60, or 0.85 where the world has a
   //     night key of its own, as Neptune's, which the owner liked as it was)
   //   y how far a colour goes toward its own value in the night key's hue (oil.night.c; 0.45, or 0.20 likewise)
-  uLookN: { value: new THREE.Vector4(0.60, 0.45, 0, 0) },
+  //   z THE SHADE FOLLOWS THE BODY (L6, LOOK-AUDIT F8; chunks.js pcTone): how far a green or grey thing's shade turns
+  //     from the plum of the clip's orange floor toward the key with its green kept. ?shadehue=0 is the shade as it was.
+  uLookN: { value: new THREE.Vector4(0.60, 0.45, _qn('shadehue', 1), 0) },
 };
 
 // WHERE THE FIRE HAS BEEN, FOR THE GROUND'S OWN PAINT (the powers, fire; the paint itself is materials.js TERRAIN_FRAG).

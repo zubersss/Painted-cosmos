@@ -217,3 +217,15 @@ to lookstats' two decimals. NOT SEEN: a creature in frame (`beasts=1` put none i
 and are the same call as the explorer's. Lines at this commit: materials.js 2134 (bark base), 2169 (bark streaks),
 2207 (crown dabs), 2347 (rock), 2705-2706 (FIG_FRAG); beastmat.js 536-537 (flat pieces, vertex), 609-610 (painted
 pieces).
+
+## PROPOSED, NOT BUILT: the bark lit the right way round (found by A2, 24 Nov)
+
+Every tube in the plant kits (kitbuild.js tube: every trunk and bough) is wound with its front facing INWARD (A2
+counted in Node: 953 of 954 wood triangles of a roundmaple, 1912 of 1924 of a birch). The trees are drawn
+DoubleSide in the oil look, so the eye sees a back face, and PROP_FRAG's bark branch turns the normal round
+(`if (!gl_FrontFacing) nV = -nV`): TODAY'S BARK IS LIT WITH ITS NORMALS POINTING INTO THE TRUNK, the sun side
+painted as the side away. A2 saw it the right way round by accident (its BackSide wood program: birches cream on the
+sun side at noon where today's are an even lilac) and put the old facing back (PC_WOOD_FLIP) so its A/B stays the
+same picture. Flipping it is one line in PROP_FRAG and dropping that define, in one commit, but it changes every
+trunk in the approved picture: it wants A/B stills (S1, S2 at noon, the 275 m view) in front of the coordinator and
+the owner first. Not started.

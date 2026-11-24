@@ -270,6 +270,20 @@ vec3 pcTone(vec3 c, float level) {
   // (the violet is the cool key's own hue, its green drawn down: a plum by a day's violet key, a deep blue by a night's
   // teal one; a fixed violet turned a teal night's shadows purple)
   vec3 shH = shC / max(dot(shC, vec3(0.3, 0.5, 0.2)), 1e-3) * vec3(1.12, 0.84, 0.84);      // (by day about (1.12, 0.73, 1.12): a plum, red and blue level; with more blue the trunks' shade stood indigo)
+  // THE SHADE FOLLOWS THE BODY (L6, 2026-11-24; LOOK-AUDIT F8). That plum is the clip's shadow on an ORANGE leaf floor,
+  // and it was laid on everything: a green alpine slope turned from the sun went to a dark violet mass, its own colour
+  // gone (V median 0.13-0.16), and a grey rock face to a purple one. A painter's shade on a green field is a deeper,
+  // cooler green, on grey stone a blue-grey. So the key's hue is kept as it is for warm bodies (the orange floor keeps
+  // its plum: S1 must not move) and turned, by how green the body is, toward the same key with its green kept and a
+  // breath of blue, and by how grey it is, part of the way there. uLookN.z is the switch (shared.js, ?shadehue=);
+  // 0 is the shade exactly as it was.
+  {
+    float bmx = max(b.r, max(b.g, b.b)), bch = bmx - min(b.r, min(b.g, b.b)), bs = bch / max(bmx, 1e-4);
+    float bgr = b.g >= bmx ? clamp((b.g - b.r) / max(bch, 1e-4), 0.0, 1.0) : 0.0;
+    float hw = max(smoothstep(0.10, 0.35, bgr) * smoothstep(0.12, 0.30, bs), (1.0 - smoothstep(0.08, 0.22, bs)) * 0.6) * uLookN.z;
+    vec3 shG = shC / max(dot(shC, vec3(0.3, 0.5, 0.2)), 1e-3) * vec3(0.86, 1.02, 1.08);
+    shH = mix(shH, shG, hw);
+  }
   // (the sky's fill, and now by HOW MUCH OF THE SKY THE SURFACE CAN SEE: pcUp above. 0.52 + 0.96 * pcUp is 1.0 at
   // pcUp 0.5, which is what a material that does not set pcUp gets, so nothing moves until one does; flat ground
   // looking up takes 1.48 of it and a trunk 0.52, and the max keeps an underside from taking a negative fill.)
