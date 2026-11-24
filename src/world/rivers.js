@@ -70,6 +70,10 @@ export const RIVER_DEF = {
   mountSink: 0.5,  //   and how far its water stands under the mountain's large-scale height (metres), and the deepest gorge
   mountCut: 10,    //   it cuts through a rise across it (metres; past that it runs dry over it)
   runnel: 2,       // ?runoff=1: a runnel's bed and water this many times narrower than the twig it replaces (F: 1-2 m in a storm)
+  blend: 8,        // metres: where two rivers meet, their levels are blended over the segments this close to the nearest, by
+                   // distance (exp(-extra / blend)), so they meet in a ramp of a few per cent (0: off)
+  blendDir: 1.5,   // metres: and their currents over this, so each river's strokes stay straight to where they meet (the look
+                   // director: blended over 8 m they swirled like marbled paper)
   edgeThin: 90,    // metres: a river that ends at the edge of the wood (a marsh, a dry biome) thins away over this
   springs: null,   // [{ near: [x, y, z], up, acc, ramp }]: catchment added so a stream runs past a place (a look's oil.springs)
   keep: null,      // [{ near: [x, y, z], r }]: places a river bends round, its water's edge kept r metres off (a look's oil.keep)
@@ -586,6 +590,7 @@ class RiverNet {
     this.ms = { reaches: 0, index: 0, lakes: 0, total: 0 };
     this.mouths = []; this.lakes = [];
     this._hit = { d: 1e9, sd: 1e9, i: -1, t: 0 };
+    this._bl = { P: 0, bx: 0, by: 0, bz: 0, n: 0 };      // (the blend where rivers meet: _blend)
   }
 
   bytes() {
@@ -723,6 +728,29 @@ class RiverNet {
     return h;
   }
 
+  // the level of the segments within 3 lam of the nearest (dmin), weighted exp(-(d - dmin) / lam), and their way within 3 lamD,
+  // weighted by lamD: this._bl { P, bx, by, bz (the summed unit ways), n (how many ways) }
+  _blend(px, py, pz, i0, i1, dmin, lam, lamD) {
+    const b = this._bl, sA = this.sA, sB = this.sB, sP = this.sP, items = this.items, cut = dmin + 3 * lam, cutD = dmin + 3 * lamD;
+    let sw = 0, sp = 0, bx = 0, by = 0, bz = 0, n = 0;
+    for (let k = i0; k < i1; k++) {
+      const s = items[k], a = s * 3;
+      const ax = sA[a], ay = sA[a + 1], az = sA[a + 2];
+      const ex = sB[a] - ax, ey = sB[a + 1] - ay, ez = sB[a + 2] - az;
+      const qx = px - ax, qy = py - ay, qz = pz - az;
+      const ee = ex * ex + ey * ey + ez * ez;
+      let t = ee > 0 ? (qx * ex + qy * ey + qz * ez) / ee : 0;
+      t = t < 0 ? 0 : t > 1 ? 1 : t;
+      const d = len3(qx - ex * t, qy - ey * t, qz - ez * t);
+      if (d > cut) continue;
+      const w = Math.exp(-(d - dmin) / lam), el = Math.sqrt(ee) || 1;
+      sw += w; sp += w * (sP[s * 2] + (sP[s * 2 + 1] - sP[s * 2]) * t);
+      if (d <= cutD) { const wd = Math.exp(-(d - dmin) / lamD); bx += wd * ex / el; by += wd * ey / el; bz += wd * ez / el; n++; }
+    }
+    b.P = sw > 0 ? sp / sw : 0; b.bx = bx; b.by = by; b.bz = bz; b.n = n;
+    return b;
+  }
+
   // the basins the field fills, as a list (for world/hydro.js)
   _lakes(dir) {
     const t0 = now();
@@ -769,8 +797,16 @@ class RiverNet {
         hw = this.sW[si * 2] + (this.sW[si * 2 + 1] - this.sW[si * 2]) * st;
         Pr = this.sP[si * 2] + (this.sP[si * 2 + 1] - this.sP[si * 2]) * st;
         acc = this.sQ[si];
-      }
-    }
+        // (WHERE TWO RIVERS MEET the nearest segment switches along a line between them, and with it the level and the
+        //  current: at the confluence by the landing the water stepped 0.35 to 0.45 m within half a metre and the current
+        //  flipped -- drawn as a staircase across the water and painted as a band of white water (another lane's still from 10 m
+        //  up, 24 Nov, live in v39.3). So in a river and on its banks (its half width and 3 blend) they are blended over the segments a few metres from the
+        //  nearest, by distance: the rivers meet in a ramp of a few per cent and their currents turn into each other. Along
+        //  one river the segments beside the nearest carry the same level and way, so nothing else changes)
+        if (o.blend > 0 && h.d < hw + 3 * o.blend) { this._blend(px, py, pz, i0, i1, h.d, o.blend, o.blendDir); Pr = this._bl.P; }
+        else this._bl.n = 0;
+      } else this._bl.n = 0;
+    } else this._bl.n = 0;
     // (past `near` the coarse field answers, and the two must MEET there: the distance never under `near` (the coarse field
     //  undercut it at 1 % of such samples, by up to 37 m, measured 24 Nov, which would dip the hills along a line a hundred
     //  metres from every river), and the river's level eased from the exact one to the coarse one over the last 25 m)
@@ -863,7 +899,8 @@ class RiverNet {
     c.fu = 0; c.fv = 0;
     if (best < W + 3) {
       if (win === 0 && si >= 0) {
-        const a = si * 3, bx = this.sB[a] - this.sA[a], by = this.sB[a + 1] - this.sA[a + 1], bz = this.sB[a + 2] - this.sA[a + 2];
+        const a = si * 3, bl = this._bl, one = bl.n < 2;
+        const bx = one ? this.sB[a] - this.sA[a] : bl.bx, by = one ? this.sB[a + 1] - this.sA[a + 1] : bl.by, bz = one ? this.sB[a + 2] - this.sA[a + 2] : bl.bz;
         const fu = bx * ux + by * uy + bz * uz, fv = bx * vx + by * vy + bz * vz, fl = Math.hypot(fu, fv);
         if (fl > 1e-9) { c.fu = fu / fl; c.fv = fv / fl; }
       } else if (win === 2) {

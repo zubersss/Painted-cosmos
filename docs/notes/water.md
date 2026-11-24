@@ -235,6 +235,29 @@ build only where the look asks: 221040b).
   beside the explorer into the distance on the right, a riffle, the ship on the left, a meadow of yellow flowers): 8.5 %
   water-blue and 2.8 % white churn, against 6.4 % for v39.1; the three side by side `first-view-3.jpg`.
 
+### THE CONFLUENCE BY THE LANDING (24 Nov 19:20-19:55; the coordinator's PRIORITY, live in v39.3)
+
+Another lane's still from 10 m up at the landing (design-flora 8aa970d, a7-aw10-before-after-v39.3-merge.jpg) showed zig-zag
+staircase seams and straight polygon lines across the water and a broad white band. CAUSE (measured; mine, not the paint): the
+landing's river and a tributary meet just south of the landing, and each point took the level and the current of its NEAREST
+segment, which switches along a line between the two: the water stepped 0.35 to 0.45 m within half a metre there (22.65 against
+22.30) and the current flipped by more than 60 degrees at 17 points of a 60 x 40 m map. The mesh drew the step as a staircase;
+patchgen's churn read the fall as white water. FIX (rivers.js RIVER_DEF.blend = 8 m, `_blend`): in a river and on its banks
+(its half width and 3 blend) the level and the current are blended over the segments within 3 blend of the nearest, weighted
+exp(-extra / blend). MEASURED there: the largest level step 3 cm a metre (under the churn's 3.5 %), no step over 5 cm, the
+current's jumps 17 to 2; over a 6 km box random water pairs 1 m apart are unchanged elsewhere (13 steps over 5 cm, before and
+after: they are not confluences). The sample costs about 9 % more near the landing (1.57 to 1.71 us). SEEN
+(`docs/shots/painter/water-default/confluence-step-before-after.jpg`, B's view and near the first view): the white band, the
+staircase and the straight lines GONE; HONEST: the strokes now follow a current that curves through the confluence, so they
+swirl and marble there, and a faint line of fine hatching remains along where the seam was: for the look director.
+- F (19:52): keep the level blend; the swirl NOT acceptable (marbled paper). MADE (14772ce): the current blended over 1.5 m only
+  (RIVER_DEF.blendDir), the level still over 8 m (the step stays gone: 3 cm a metre at most). SEEN (`confluence-current-short-
+  turn.jpg`: v39.3 | both over 8 m | current over 1.5 m, B's view and near the first view): the tributary's strokes long and
+  nearly straight again to where the rivers meet; some curved banding and fine hatching remain on the main river by the meeting,
+  as v39.3's own frame shows on that bending reach. CAUSE of that (read in WATER_FRAG, v37's strokes, the default): a current
+  turns the stroke chart at each pixel about the middle of a 26 m cell, so where a river bends a point 13 m from the middle
+  shifts metres for a few degrees and the strokes bunch: ONE DIRECTION PER STROKE needs the paint (W3's), asked.
+
 ### THE WATER FROM THE AIR (24 Nov 14:50-16:15, this session; the coordinator held the water out of v39.2 for it)
 
 The gate's high frame (gallery cam=high at the landing, 420 m up, looking north-north-east and down 29 degrees, 936x372)
