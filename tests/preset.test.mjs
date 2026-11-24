@@ -96,8 +96,10 @@ test('main.js sizes the buffer by the preset and starts the controller at its ti
   assert.match(m, /const LADDER_OFF = params\.get\('sharpen'\) === '0' \|\| DPR_PIN > 0/, 'the ladder must stand aside for ?dpr= and ?sharpen=0');
   // (?dpr=: the pin may only be what the address asked for, between 0 and 4, and 0 means "leave the preset alone")
   assert.match(m, /const DPR_PIN = Math\.max\(0, Math\.min\(4, \+params\.get\('dpr'\) \|\| \(BEST_PIN \? window\.devicePixelRatio \|\| 0 : 0\)\)\)/);
-  // the tier still comes from the preset unless the address asks otherwise (?quality=, or ?best=1 for the top one)
-  assert.match(m, /quality: params\.has\('quality'\) \? Number\(params\.get\('quality'\)\) : BEST_PIN \? 2 : PRESET\.tier/);
+  // the tier still comes from the preset unless the address asks otherwise (?quality=, or ?best=1 for the top one; and,
+  // v39.7, a touch device's speed test, which starts at tier 2, the tier such a device reaches in play: core/bench.js)
+  assert.match(m, /quality: params\.has\('quality'\) \? Number\(params\.get\('quality'\)\) : BEST_PIN \|\| \(TOUCH_OIL && params\.has\('bench'\)\) \? 2 : PRESET\.tier/);
+  assert.match(m, /const TOUCH_OIL = params\.get\('look'\) === 'oil' && \(PRESET\.id === 'phone' \|\| PRESET\.id === 'tablet'\)/, 'only a touch device in the oil look starts its test at tier 2');
   assert.match(m, /const BEST_PIN = !!\(params\.get\('best'\) && params\.get\('best'\) !== '0'\)/);
   assert.ok(!/Math\.min\(window\.devicePixelRatio \|\| 1, 1\.5/.test(m), 'no second, fixed cap');
 });
