@@ -337,3 +337,16 @@ the owner first. Not started.
   nothing dark left to keep (the air is the smaller part). The darks have to come from the things: A1's crown masses
   (passed for v39.3) and its next steps (the small crowns' gaps in their shaded tone, the far spruce by limb), and C's
   mountains' shade plane. To be re-measured at 1 km once those are in.
+
+## The golden hour in the water (cbf7f41, 24 Nov): SEEN, a small first step
+
+- materials.js WATER_FRAG, oil look, under the golden-hour sky switch (uLookG.x; `?goldsky=0` as before): the
+  water's mirror fallback (skyc) takes the sky's own gold wash, strongest low, by pcGold, and the warm glow by the
+  reflected ray's angle to the sun, as sky.js lays them on the sky.
+- SEEN (look-director, autumn stream on foot at 16.8, 8 and 12, coast 16.8; uLookG.x 1 then 0 in one page): the
+  stream's water mean (0.368, 0.434, 0.464) to (0.381, 0.436, 0.446) at 16.8 and (0.440, 0.547, 0.533) to (0.456,
+  0.546, 0.508) at 8; noon 0.5 per cent of the picture (the sun's glow, which the sky has at noon too); coast
+  (0.346, 0.495, 0.597) to (0.353, 0.493, 0.580). Stills build/watergold/.
+- SAID PLAINLY: right direction, too small to see by eye. The water's own paint (WATER_FRAG's oil block: 55 per cent
+  of its own blue wash laid over everything, the sun's path a narrow pow 56) covers the mirror. The bigger half is
+  W3's: at a golden hour lay less of the blue wash and widen the sun's path in the sun's colour (asked of W3, 24 Nov).
