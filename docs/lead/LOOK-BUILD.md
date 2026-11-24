@@ -350,3 +350,19 @@ the owner first. Not started.
 - SAID PLAINLY: right direction, too small to see by eye. The water's own paint (WATER_FRAG's oil block: 55 per cent
   of its own blue wash laid over everything, the sun's path a narrow pow 56) covers the mirror. The bigger half is
   W3's: at a golden hour lay less of the blue wash and widen the sun's path in the sun's colour (asked of W3, 24 Nov).
+
+## State at 16:55, 24 Nov (for whoever picks up group F)
+
+- v39.3 in its gate (16:51): A2's pines and A1's crown mass as defaults, look-director to dbd646c (uPhysGust
+  binding, skylimb, olive darks, airdark). v39.4 (after about 17:55): C's mountains (?rockfield default, ON THE
+  CONDITION that the peaks' snow survives over the rock), W1's anvil and mountain cloud (weather-clouds c4b612e),
+  look-director 5a65e9d (water gold).
+- Waiting on, to review: C's mountains with snow and a warmer/cooler noon split (uRockM3 warm lean, 1.25 blue cool
+  lean; aim rock S 0.15-0.22); A1's next crown steps (yellow kind into the stands, small crowns' gaps in their shaded
+  tone, the far spruce by limb); W3's like-for-like river on foot (v37 against theirs at 12 and 16.8, with the water's
+  blue wash eased and the sun's path widened at a golden hour); E-W2's full sea sheet after W3's pointed ends; B's
+  round drift patches (1.8 m, 10 m, 150 m at both tiers); A2's ?nearleaf (leaves shrink within about 3.5 m); D's
+  gust ground step (no lift over V 0.80, more blue-grey).
+- My open lanes (the coordinator, 24 Nov): the light's design (a dark frame round a bright warm middle distance, the
+  far wood stepping back into pale gold at 16.8) and the storm-lit land (the weather key takes the land down under a
+  storm). Neither started.
