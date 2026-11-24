@@ -642,16 +642,19 @@ void main() {
     col = mix(col, vec3(0.93, 0.87, 0.72), pow(max(sd, 0.0), 3.0) * 0.60 * uAtmo.y * (1.0 - uAtmo.x) * (1.0 - uWxSky.x));
     // (the golden hours, as chunks.js pcGold: the whole sky warms, most of all low down, where it meets the air's pale gold)
     float gold = (1.0 - smoothstep(0.48, 0.86, sunE)) * uAtmo.y * (1.0 - uAtmo.x) * (1.0 - uWxSky.x) * uOilG.w;
-    if (uLookG.x < 0.5) {
-      col = mix(col, vec3(0.92, 0.80, 0.58), gold * mix(0.80, 0.45, smoothstep(0.0, 0.7, e)));
+    vec3 colW = mix(col, vec3(0.92, 0.80, 0.58), gold * mix(0.80, 0.45, smoothstep(0.0, 0.7, e)));      // (the wash as it was)
+    if (uLookG.x < 0.5 || uSkyAir.w <= 0.0) {
+      col = colW;
     } else {
+      // (ON THE GROUND THE WASH HOLDS: the coordinator's ruling, the owner chose S1 for its warm golden mood. The rings
+      // below come in with the eye's height, uSkyAir.w, a dip of 10 to 17 degrees -- Earth 62 m to 180 m -- as the
+      // sky's remap to the true horizon does, so the view from the air gets them and every view on foot is the wash.)
       // THE GOLDEN HOUR'S SKY, PAINTED (24 Nov; the coordinator: from the air and from the ground at 16.8 the sky was one
       // flat ochre wash). The wash above laid the same gold all round the sky, 0.80 of it low down and 0.45 high, so
       // every direction came out the same ochre and the bands and strokes under it were lost. A painter's golden hour
       // keeps the gold where the light is: warm and strongest low toward the sun, cooling round the sky and deepening
-      // overhead and away from it, where the zenith key's blue shows and the low sky goes a cool lilac. Laid in four
-      // steps round the sky (by the angle to the sun, its edges a pixel wide and wandering with the sky's own noise)
-      // and on the sky's own height bands (tq), so it is painted, not a glow. ?goldsky=0 is the wash as it was.
+      // overhead and away from it, where the zenith key's blue shows and the low sky goes a cool lilac. ?goldsky=0 is
+      // the wash as it was everywhere.
       // (rings round the sun, five steps by the angle to it, their edges a pixel wide and wandering with the sky's noise:
       // pale gold close to the sun, gold, a warm peach, a cool lilac, and away from the sun the sky's own blue a step
       // deeper. Each ring is laid as a glaze that keeps the value of what is under it -- the sky's height bands, the
@@ -667,14 +670,15 @@ void main() {
               : mix(vec3(0.93, 0.77, 0.52), vec3(0.96, 0.88, 0.66), clamp(ring - 3.5, 0.0, 1.0));
       vec3 rv = mix(rc, clamp(rc * (cl / max(dot(rc, vec3(0.3, 0.5, 0.2)), 1e-3)), 0.0, 1.0), 0.55);   // (the ring keeping the value under it)
       float amt = gold * mix(0.30, 0.88, low) * mix(0.75, 1.0, ring / 5.0);
-      col = ring < 0.5 ? mix(col, dens(col, 1.30) * vec3(0.86, 0.95, 1.14), gold * mix(0.55, 0.30, low))      // (away: the blue deeper)
+      vec3 cR = ring < 0.5 ? mix(col, dens(col, 1.30) * vec3(0.86, 0.95, 1.14), gold * mix(0.55, 0.30, low))      // (away: the blue deeper)
                        : mix(col, rv, amt);
       // (and all round the sky, low down, the golden hour's warm air: away from the sun a rose band over the far land,
       // a step under the ring's own colour, so a view with its back to the sun still has its warm horizon and the blue
       // only above it)
       vec3 rose = vec3(0.92, 0.76, 0.68);
       vec3 rosev = mix(rose, clamp(rose * (cl / 0.80), 0.0, 1.0), 0.55);
-      col = mix(col, rosev, gold * smoothstep(0.55, 0.95, low) * (1.0 - smoothstep(1.5, 3.0, ring)) * 0.55);
+      cR = mix(cR, rosev, gold * smoothstep(0.55, 0.95, low) * (1.0 - smoothstep(1.5, 3.0, ring)) * 0.55);
+          col = mix(colW, cR, uSkyAir.w);
     }
     {
       // THE NIGHT SKY'S STREAKS (the owner, 2026-11-16: "make the lines on the sky at night time near the northern lights
@@ -778,6 +782,7 @@ export function makeSkyUniforms() {
     // to show the owner). y: how high that band stands, as dot(view, up) -- 0.075 is about four degrees over the
     // horizon, which is a painter's band low down and not a wall of one colour (?skyairtop=). z: where the TRUE
     // horizon stands from the air, as dot(view, up), set each frame by world/index.js (AIRTOP); 0 on the ground.
+    // w: how far the eye is up for the sky's air-only paint (the golden hour's rings), 0 on the ground, 1 from 180 m.
     uSkyAir: { value: new THREE.Vector4(_qn('skyair', 1), _qn('skyairtop', 0.075), 0, 0) },
     ...OIL,
   };
