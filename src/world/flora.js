@@ -516,7 +516,7 @@ export class Flora {
     // (the oil look's cast shadows, render/shadow.js: trees, bushes and stones cast; blades and flowers do not)
     if ((Array.isArray(mat) ? mat[0] : mat).userData.pcCasts) {
       mesh.layers.enable(SHADOW_LAYER);
-      if (Array.isArray(mat)) SHADOW_WHOLE.add(mesh);      // (a split tree: one draw in the shadow pass with ?shwhole=1)
+      if (Array.isArray(mat)) SHADOW_WHOLE.add(mesh);      // (a split tree: one draw in the shadow pass, unless ?shwhole=0)
     }
     if (Array.isArray(mat) && mat.depthMats) { mesh.userData.pcDepthMats = mat.depthMats; TREE_DEPTH.meshes.add(mesh); }      // (?treedepth=1)
     mesh.count = 0;
@@ -991,9 +991,10 @@ export class Flora {
     if (on === now) return now;
     return this.setFarForm(on ? (FAR_BLOB ? 'blob' : 'cards') : 'lump') !== 'lump';
   }
-  // The split trees drawn whole in the shadow pass (render/shadow.js SHADOW_WHOLE; ?shwhole=1), for the speed test's
-  // row: returns the setting before.
+  // The split trees drawn whole in the shadow pass (render/shadow.js SHADOW_WHOLE; the default, ?shwhole=0 the old way),
+  // for the speed test's row: returns the setting before.
   setShadowWhole(on) { const was = SHADOW_OPTS.whole; SHADOW_OPTS.whole = !!on; return was; }
+  get shadowWhole() { return SHADOW_OPTS.whole; }
   // THE FAR TREES' FORM, swapped while the game runs (the speed test, core/bench.js; 2026-11-24, trees lane T0):
   // 'cards' the tree of flat pieces that ships (138 triangles), 'blob' two crossed six-cornered cards (?fartree=blob:
   // 10 triangles, which prices on the phone what a quad's fragments cost against a mesh's triangles), 'lump' the old
