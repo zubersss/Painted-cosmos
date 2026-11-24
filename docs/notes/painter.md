@@ -13,7 +13,9 @@ the same time: this lane touches only the far parts of `flora.js`, `florakit.js`
 `render/impostor.js`, `render/shadow.js` and new rows in `core/bench.js`.
 
 **State (update this line every step):** T0 committed (rows built and run in software: they work; their timings mean
-nothing here, only the owner's phone can time them). T1 (impostors) being built. Nothing merged.
+nothing here, only the owner's phone can time them). T1 (impostors) committed behind `?fartree=impostor`, SEEN in A/B
+stills at the phone's and the desktop's settings (`docs/shots/painter/trees-far/`); not yet the default (waits for the
+owner's phone: `&bench=trees` has the row). Next: T4 (hand-over distances), then T6. Nothing merged.
 
 **T0, the speed test's tenth form (`src/core/bench.js`).** `?bench=1` the whole table with the new rows; `?bench=trees`
 the tree questions alone, on foot and from the air (24 rows); `?bench=air` or `?bench=air,<m>` the air table (FV7: 400 m
@@ -26,7 +28,8 @@ row now prints its triangles. SEEN in software at 936x372: leaves only 972k tria
 1,026k (so near wood about 152k triangles, near leaves about 98k, both passes).
 **Found on the way:** the far material's tables were 8 long and Earth has 13 kinds in the oil look: the far trees of
 the poplar, oak, birch, willow and sapling read past the end (drawn with another kind's colours, taper and family).
-To be fixed with T1 (it changes the default far wood, so A/B stills first). And the flat test of the far branch caught
+FIXED with T1 (`PC_NFAR`, the tables sized to the kinds; `?farfix=0` keeps eight): A/B at 150 m changes 5 % of the
+picture, the poplars taking their own taper and colours (`A1_farfix_air150_*`). And the flat test of the far branch caught
 rows 5 and 6 (a leaf in its own colour, no air on the plants) too, so those two v37 rows also flattened every far tree:
 fixed in T0 (the far flat now only for 2 and 3).
 
@@ -91,6 +94,41 @@ the phone prices both in one run.
 **Next:** A/B stills (5/10/18/30/45 m, autumn and green wood, phone and desktop) -> commit T2 split -> stills of cards
 and T5 (pixel-identical check) -> commit -> T3 (the middle tree) -> report each step to the coordinator and the look
 director (session_01R5Brhzz2JPPF6Ecz6XRQHx).
+**T1, far trees as painted impostors (`src/render/impostor.js`; `?fartree=impostor`).** For every kind drawn far off as
+leaves (`CAN_CARD`), its lod-0 tree (one variant; `?impvar=2` two) is baked once per world, in a frame hook the first
+time an impostor is drawn (the painter's hooks run outside a render; the renderer is handed over by the first impostor
+mesh's `onBeforeRender`), into one atlas: 8 x 8 hemi-octahedral views from the horizon to nearly straight down, 96
+texels each (`?impres=`), 6 levels each BAKED again at half the size (no averaging, no blur), read back and uploaded as
+a DataTexture with its own mip chain (NEAREST_MIPMAP_NEAREST). Earth: 13 kinds, 3072 x 3072, 48 MB with levels; the bake
+took 8.5 s in software here (the phone's graphics card: not measured; a second or so of script is the guess).
+A texel holds a stroke's number, the normal, the inner shade, what it is (wood, leaf, snow leaf, core) and where its
+centre lies along the line of sight. What the bake does to make a far crown read (each SEEN to be needed, in order):
+leaves drawn larger until each kind's crown is equally dense (`?impdens=` 3.0; Earth's kinds run from 0.13, the spruce,
+to 1.3, the round maple, so one factor left conifers bare poles), never under 2 texels; leaves gathered into strokes of
+3.4 texels (a grid through the crown that nests from level to level); each stroke lit by the crown's FRONT surface along
+the line of sight (an ellipsoid round the leaves: a crown reads as a round lit mass with a shaded side, the references'
+"round crowns"; with each leaf's own normal the canopy was a speckle), with how deep behind that surface it lies as its
+inner shade; half the near leaf's light jitter (`?impjit=`); the trunk thickened by a third of a texel, the limbs only at
+the finest level. Drawn as two triangles a tree with the near tree's own matrix (size, lean, a felled tree's fall), the
+quad framed on the tree's upright cylinder as seen from the chosen view, stood 0.35 of its radius toward the eye; the
+fragment does one fetch and the leaf's steps of `PROP_VERT` with `pcTone` (not the private deep-shade recipe, R1.2b),
+the crown's lit side by the far rule, inside the shadow square the map as well (min of the two: impostors cast nothing).
+FROM THE AIR their reach is hypot(height, 1.5 km), held to the horizon (`?farreach=`; FV2-T): 1 km up on the phone a
+forest is drawn where today nothing is.
+COUNTED (gallery, autumn wood, 15.4 h, summer dress; frame = every pass): phone 936x372 tier 1, on foot 1,247k -> 651k
+triangles (far tier 816k -> 12k, 5,915 trees), 194 calls both; 150 m 2,942k -> 221k (far 5.88M -> 130k before the
+frustum's cut; 42,631 -> 64,816 trees as the reach grows to 1,050 m), calls 137 -> 162; 400 m 3,545k -> 221k, 128 ->
+188 calls (83,520 trees to 1.5 km); 1 km 96k (no trees) -> 171k, 62 -> 166 calls. Desktop 1280x720 tier 2: on foot
+3,220k -> 2,751k; 150 m 2,867k -> 385k; 400 m 3,354k -> 301k.
+DERIVED phone cost (T1 design's rate, 0.026 ms per 1000 far triangles from the v37 lumps row; the paint per pixel is
+not known): on foot about -20 ms of far geometry, plus 1 to 3 ms of impostor paint (design's figure, not measured);
+from the air the far tier from about 150 ms (5.9M triangles) to about 3 ms of geometry plus its paint. The extra draw
+calls from the air (+25 to +60) cost the script about 0.5 to 1.2 ms. Confirm with `&bench=trees`: rows 'far trees as
+impostors' on foot and at 150 m and 400 m.
+STILL WRONG / NOT KNOWN: the view switches (about 13 degrees apart, nearest, no blend) and the level switches are not
+seen in motion; the hard edge where the trees end 1 km up (the far-view lane's painted canopy, FV2, is meant for it);
+the darkest conifer strokes are V 0.13 (R1.2c asks 0.18 for conifers); the hand-over at 57 m to the middle tree (T4);
+the bake is one long step at the first far draw (could be spread over frames).
 
 ## Hand-over of THE OIL LOOK, prototype on branch `look-proto` (READ THIS FIRST; kept current)
 

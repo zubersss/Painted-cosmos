@@ -319,7 +319,7 @@ export function attachBench(pc) {
       await wait(400);
       if (pc.settle) await Promise.race([pc.settle(12), wait(30000)]);
     };
-    const form0 = (() => { const f = flora(); return f ? (f.farForm || (cards0 ? 'cards' : 'lump')) : 'cards'; })();
+    const form0 = (() => { const f = flora(); return f ? (f.farForm || (f.impOn ? 'impostor' : cards0 ? 'cards' : 'lump')) : 'cards'; })();
     // the rows themselves: [label, on, off]
     const T0 = {
       leaves: ['near trees: leaves only', nearPart('leaves'), nearPart(null)],
@@ -330,6 +330,9 @@ export function attachBench(pc) {
       order: ['near trees after the ground', () => tallMeshes((o) => { o.renderOrder = 6; }), () => tallMeshes((o) => { o.renderOrder = 0; })],
       a2c: ['plants without alpha-to-cov', () => a2c(false), () => a2c(true)],
       blob: ['far trees as crossed cards', () => farForm('blob'), () => farForm(form0)],
+      // (T1: the far trees as painted impostors, two triangles a tree, swapped in the same minute; render/impostor.js.
+      //  If the run was started with ?fartree=impostor this row asks the other way: the tree of flat pieces.)
+      imp: form0 === 'impostor' ? ['far trees of flat pieces', () => farForm('cards'), () => farForm(form0)] : ['far trees as impostors', () => farForm('impostor'), () => farForm(form0)],
       noFar: ['no far trees', () => show(/^pc-prop-far/, false), () => show(/^pc-prop-far/, true)],
       farFlat: ['far trees one flat colour', () => B({ flat: 3 }), () => B({ flat: 0 })],
       noNear: ['no near trees', () => show(/^pc-prop-tall/, false), () => show(/^pc-prop-tall/, true)],
@@ -393,7 +396,7 @@ export function attachBench(pc) {
         const g = sm({ x: d[0], y: d[1], z: d[2] }), r = Math.max(g.radius, g.liquidRadius || 0);
         const G = frameAt(d), cy = Math.cos(yaw * Math.PI / 180), sy = Math.sin(yaw * Math.PI / 180);
         const f = { x: G.n[0] * cy + G.e[0] * sy, y: G.n[1] * cy + G.e[1] * sy, z: G.n[2] * cy + G.e[2] * sy };
-        pin = { t: landing.t, p: { x: d[0] * r, y: d[1] * r, z: d[2] * r }, v: { x: 0, y: 0, z: 0 }, fwd: { ...f }, view: { ...f }, pitch: v.pitch, boom: landing.boom };
+        pin = { t: landing.t, p: { x: d[0] * r, y: d[1] * r, z: d[2] * r }, v: { x: 0, y: 0, z: 0 }, fwd: { ...f }, view: { ...f }, pitch: v.pitch, boom: landing.boom, flying: false };
       }
       putBack();
       await wait(600);
@@ -471,7 +474,7 @@ export function attachBench(pc) {
       // (TENTH FORM, 2026-11-24: the near trees' 51.8 ms split six ways, and the depth questions; see the top)
       T0.leaves, T0.wood, T0.bark, T0.wind, T0.side, T0.order, T0.a2c,
       [AS, null, null],
-      T0.blob,
+      T0.blob, T0.imp,
       // (2026-11-23, after speed test 9: the near trees are 62.7 ms of a 101 ms frame and NOTHING in that table says
       //  why. These three rows split it. "hand over at half the distance" is not a diagnostic -- it IS the change
       //  that would be made, so the device measures the fix and not a guess. "half their leaves" drives the leaf
@@ -525,15 +528,13 @@ export function attachBench(pc) {
         ['storm: no rain shafts or bolts', () => show(/^pc-storm-/, false), () => show(/^pc-storm-/, true)],
       ] : []),
       // (TENTH FORM) THE AIR: no row had ever timed it. The same spot, from 150 m and 400 m up.
-      ...airAt(150, 30, [T0.noFar, T0.blob]),
-      ...airAt(400, 45, [T0.noFar]),
+      ...airAt(150, 30, [T0.noFar, T0.blob, T0.imp]),
+      ...airAt(400, 45, [T0.noFar, T0.imp]),
       onFoot,
-      // (the water's rows, at the bank and at the shore: see THE WATER VIEWS above)
-      ...waterRows,
+      // (the water's rows come LAST, after the final as-set row: see THE WATER'S ROWS LAST below)
       // (back to the size the device really draws, so the four rows below are measured from IT and not from
-      //  whatever sharper size the questions above had to be asked at: see MK at the top of this file; and back at the
-      //  landing, if the water's rows took the explorer away)
-      [AS, async () => { if (waterRows.length) await goView(null); await sharpen(1); }, null],
+      //  whatever sharper size the questions above had to be asked at: see MK at the top of this file)
+      [AS, () => sharpen(1), null],
       // (EIGHTH FORM, 2026-11-18) ROWS THAT MAKE THE GAME WORK HARDER, not easier. The owner's first believable table
       // read 16.7 ms = 60.0 a second on eleven rows running: that is the phone's own screen refusing to go faster, not
       // the game's speed, and under such a cap no row can be told from another. These rows raise the picture's
@@ -544,6 +545,11 @@ export function attachBench(pc) {
       ['every pixel the screen has', () => sharpen(kWhole), () => sharpen(1)],
       ['every pixel, full paint', async () => { await sharpen(kWhole); B({ lite: !lite0 }); }, async () => { B({ lite: lite0 }); await sharpen(1); }],
       [AS + ', last', null, null],
+      // (THE WATER'S ROWS LAST, at the device's own size: they move the explorer two kilometres, and the world must build
+      //  round it there, so everything above is in the table whatever happens at the shore. Each wait has its own limit --
+      //  the world settled in 30 s, the arrival veil in 40 s, a steady picture in 8 s (40 s while nothing is drawn) -- so a
+      //  view costs at most about two minutes and the test cannot hang on it.)
+      ...waterRows,
     ];
     // ?bench=trees: the tree questions alone, on foot and from the air (a shorter run: each row on a cooler phone)
     const treeSteps = [
@@ -554,9 +560,9 @@ export function attachBench(pc) {
       [AS, null, null],
       ...T2ROWS,
       [AS, null, null],
-      T0.blob, T0.noFar, T0.farFlat,
-      ...airAt(150, 30, [T0.noFar, T0.blob, T0.farFlat, T0.a2c]),
-      ...airAt(400, 45, [T0.noFar, T0.blob]),
+      T0.blob, T0.imp, T0.noFar, T0.farFlat,
+      ...airAt(150, 30, [T0.noFar, T0.blob, T0.imp, T0.farFlat, T0.a2c]),
+      ...airAt(400, 45, [T0.noFar, T0.blob, T0.imp]),
       onFoot,
       [AS + ', last', null, null],
     ];
@@ -569,12 +575,12 @@ export function attachBench(pc) {
       ...airAt(airH, 45, [
         ['no ground drawn', () => ground(false), () => ground(true)],
         ['ground one flat colour', () => B({ flat: 1 }), () => B({ flat: 0 })],
-        T0.noFar, T0.farFlat, T0.blob,
+        T0.noFar, T0.farFlat, T0.blob, T0.imp,
         ['no water drawn', () => show(/^pc-water/, false), () => show(/^pc-water/, true)],
         T0.a2c,
         ['no shadows at all', () => B({ shadow: false }), () => B({ shadow: true })],
       ]),
-      ...(airH < 1000 ? airAt(1000, 45, [T0.noFar]) : []),
+      ...(airH < 1000 ? airAt(1000, 45, [T0.noFar, T0.imp]) : []),
       onFoot,
       [AS + ', last', null, null],
     ];
@@ -617,6 +623,8 @@ export function attachBench(pc) {
         + ' they cannot be trusted. Run it again without touching the phone, and wait for the wood to finish'
         + ' building before you start.';
     }
+    // the explorer back at the landing, if the water's rows or the air's took it away
+    if (waterRows.length) await goView(null);
     if (foot && pin !== foot) await land();
     // the picture is the phone's own again (it was held through the run: see sharpen above)
     if (pc.game && typeof pc.game.holdPictureSize === 'function') pc.game.holdPictureSize(0, 0);
