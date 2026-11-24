@@ -22,7 +22,7 @@ import { makePropMaterial } from '../render/materials.js';
 import { ImpostorAtlas, makeImpostorMaterial, impostorQuadGeometry, IMP } from '../render/impostor.js';
 import { treeCell, underCell, hasCell, TREE_LEVEL, UNDER_LEVEL } from './obstacles.js';
 import { QUALITY, G, LOOK, SCREEN, SHADOW } from '../render/shared.js';
-import { SHADOW_LAYER } from '../render/shadow.js';
+import { SHADOW_LAYER, SHADOW_TIERS } from '../render/shadow.js';
 import { FELLED, FELL, felledAt, fallingOn, felledOn, fallTurn } from '../data/felled.js';
 
 // tier ranges in metres at quality 2; scaled by RANGE_SCALE at lower tiers
@@ -62,6 +62,20 @@ const FAR_CARDS = !FAR_LUMP;
 // are not trees in leaf (CAN_CARD below) keep the form they had. ?fartree=impostor; the default stays the tree of
 // flat pieces until the owner's phone and the stills say otherwise.
 const FAR_IMP = typeof location !== 'undefined' && /[?&]fartree=impostor\b/.test(location.search || '');
+// THE HAND-OVER DISTANCES (T4 of docs/lead/TREES-DESIGN.md, 2026-11-24): with the impostors on, the middle tree hands
+// over to the impostor at 45 m (the design's full tree to middle tree at 18 m waits for the near lane's new middle
+// tree: see setHandover), at the phone's picture (372 lines, where a
+// tree's ranges are scaled by 0.30: 90 and 190 m before scaling become 60 and 150), and both scale with the picture as
+// before. The owner's own rows say moving the hand-over in pays even with today's far tree ('hand over at half'
+// -28.7 ms, 'at a third' -38.1). ?treenear= and ?treemid= set them in metres at the phone's scale (?treenear=27&
+// treemid=57 is the hand-over as it was); without the impostors nothing changes unless they are given.
+const PHONE_TS = 0.30;
+const HAND = (() => {
+  try {
+    const q = new URLSearchParams(location.search), num = (k) => { const v = q.get(k); const n = v == null ? NaN : +v; return isFinite(n) && n > 1 && n < 400 ? n : null; };
+    return { near: num('treenear'), mid: num('treemid') };
+  } catch { return { near: null, mid: null }; }
+})();
 const FAR_REACH = (() => { try { const q = new URLSearchParams(location.search).get('farreach'); const n = q == null ? NaN : +q; return isFinite(n) && n >= 0 && n <= 4000 ? n : 1500; } catch { return 1500; } })();
 const RANGE_SCALE = [0.28, 0.6, 1.0];                    // (the lower tiers keep the ranges they had)
 const TRIM = [1, 1];          // (was [0.82, 0.88] to pay for a triangle budget; the owner withdrew the budget: trees hand over where they read best)
@@ -176,6 +190,8 @@ export class Flora {
     // (the speed test's handle on the near trees' index, core/bench.js: 'leaves' draws a tall mesh from its first leaf
     //  card on, 'wood' only what comes before it -- sortLeafCards puts every piece of wood first. null: the whole tree.)
     this.benchNear = null;
+    // (the full tree's and the middle tree's reach before the picture's scale: T0 and T1, or the hand-over above)
+    this.t0 = T0; this.t1 = T1;
     this.lastLaid = -10; this.washNow = 1; this._washWall = 0;
     this.lastRelease = -10;
     this.held = [];                    // cells that are built and wait for their ground (see update)
@@ -269,6 +285,22 @@ export class Flora {
     };
     this.impOn = false;
     if (LOOK.oil && FAR_IMP && this.mats.far) this._impostors(true);
+    this.setHandover(HAND.near, HAND.mid);
+  }
+
+  // The hand-over distances in metres at the phone's scale (null: the default for whether the impostors are on). Taken
+  // in on the next update; the speed test sets them for a row (core/bench.js).
+  setHandover(near, mid) {
+    const on = LOOK.oil && !TREES_FULL;
+    // (the near hand-over stays where it was by default: SEEN at 18 m with today's middle tree, a tree 15 to 20 m off
+    //  became an umbrella of big kites -- that hand-over waits for the near lane's new middle tree. The middle tree
+    //  hands to the impostor at 45 m.)
+    const n = near != null ? near : null, m = mid != null ? mid : on && this.impOn ? 45 : null;
+    this.t0 = n != null && on ? n / PHONE_TS : T0;
+    this.t1 = m != null && on ? Math.max(this.t0 * 1.2, m / PHONE_TS) : T1;
+    SHADOW_TIERS.mid = this.t1 * 1.15;
+    this.lastScale = -1;
+    return [this.t0 * PHONE_TS, this.t1 * PHONE_TS];
   }
 
   // The far impostors made (once) and switched on or off. Every kind drawn far off as leaves gets two layers of the
@@ -435,7 +467,7 @@ export class Flora {
         // eye has moved since).
         const L = mesh.userData.leafLod, lf = geometry.userData.leaf;
         if (L) {
-          const d0 = L[0] * flora.treeScale;
+          const d0 = L[0] * flora.t0 * flora.treeScale;
           u.uLeafLod.value.set(d0, L[1], 0, 0);
           if (lf) {
             const dn = Math.max(0.01, (mesh.userData.dNear || 0) - (chunk.tierPos ? chunk.tierPos.distanceTo(flora.camLocal) : 1e9));
@@ -634,8 +666,8 @@ export class Flora {
       const j = (1 + (seed - 0.5) * JIT) * k;
       const jf = kf === k ? j : (1 + (seed - 0.5) * JIT) * kf;      // (the far trees' own scale in the oil look; the same number as j without it)
       let t;
-      if (dist < T0 * j * trim0) t = lowQ ? 1 : 0;      // the low tier draws no full trees
-      else if (dist < T1 * j * trim1) t = 1;
+      if (dist < this.t0 * j * trim0) t = lowQ ? 1 : 0;      // the low tier draws no full trees
+      else if (dist < this.t1 * j * trim1) t = 1;
       else if (dist < thinR * jf) t = 2;
       else if (!fill && dist < T_FAR * jf && (seed * 13.37) % 1 < 0.34) t = 3;   // thinned: one in three, drawn larger
       else t = -1;
@@ -661,7 +693,8 @@ export class Flora {
         g.mesh = this._instanced(chunk, g.geo, g.mat, list.length, g.far ? [0, T_FAR, JIT, 0.88] : [0, 1e7, 0, 0.999], g.far);
         // (the oil look's leaves by distance: a full tree keeps every leaf within about a quarter of its range and a fifth
         // of them at its end, where the middle tree, of fewer and larger leaves, takes over; the middle tree thins on from there)
-        if (LOOK.oil && !g.far && !TREES_FULL) g.mesh.userData.leafLod = g.tierKey === '0' ? [0.24 * T0, 0.2] : [T0, 0.35];
+        // (in units of the full tree's reach, flora.t0, read as it is drawn: the hand-over may move while the game runs)
+        if (LOOK.oil && !g.far && !TREES_FULL) g.mesh.userData.leafLod = g.tierKey === '0' ? [0.24, 0.2] : [1, 0.35];
         // (2026-11-18) THE FAR TREES ARE NOT THINNED BY DISTANCE, AND HERE IS THE MEASUREMENT THAT SAYS SO, because
         // on paper it is the biggest saving left in the game and the next session will want to try it again.
         // A study counted the far tier at 7,326,558 triangles of an 8,191,481-triangle frame from the air and
@@ -817,6 +850,7 @@ export class Flora {
     // (the impostors stand in front of whatever far form the cards would be: the cards stay the tree of flat pieces)
     if (form === 'impostor') { if (!this._impostors(true)) return now; this.farForm = form; this._dropFar(); return form; }
     this._impostors(false);
+    // (the hand-over stays where it was for the speed test's swap: only the far form is the question there)
     // (ordered for thinning here too, or the speed test's swap loses it)
     // (each form made once and kept: its buffers stay on the graphics card while the meshes come and go)
     const fg = this._farGeo || (this._farGeo = {});
@@ -1048,7 +1082,7 @@ export class Flora {
     if (this.lastTreeEval.distanceTo(camLocal) > 20) {
       this.lastTreeEval.copy(camLocal);
       if (this.species.length) {
-        this._wanted(TREE_LEVEL, this.treeSize, T1 * kt * (1 + JIT * 0.5) + this.treeSize * 0.75, this.treeChunks, 'near');
+        this._wanted(TREE_LEVEL, this.treeSize, this.t1 * kt * (1 + JIT * 0.5) + this.treeSize * 0.75, this.treeChunks, 'near');
         this._wanted(TREE_LEVEL - this.farShift, this.farSize, T_FAR * this.farScale * (1 + JIT * 0.5) + this.farSize * 0.75, this.farChunks, 'far');
       }
       this.treeList = Array.from(this.treeChunks.values()).concat(Array.from(this.farChunks.values()));
@@ -1129,7 +1163,7 @@ export class Flora {
     // re-tier: chunks near a tier boundary react to a few metres of travel, far ones to more
     if (!spent) {
       const list = this.treeList, n = list.length;
-      const nearR = T1 * kt * (1 + JIT * 0.5) + this.treeSize;
+      const nearR = this.t1 * kt * (1 + JIT * 0.5) + this.treeSize;
       for (let c = 0; c < n; c++) {
         const ch = list[(this.retierCursor + c) % n];
         if (!ch.built || !ch.n || ch.held) continue;

@@ -40,7 +40,11 @@ export const IMP = {
   stroke: _qn('impstroke', 3.4, 1, 8),                   // a stroke's size in texels at every level (?impstroke=)
   jit: _qn('impjit', 0.5, 0, 1),                         // how much of a near leaf's own light jitter a stroke keeps (?impjit=)
   cols: 4,                                               // tree variants laid side by side in the atlas
-  push: 0.35,                                            // the quad stands this far (of the crown's radius) toward the eye
+  // (the quad stands at the tree's middle. It stood 0.35 of the tree's radius toward the eye, and then a big tree's quad
+  //  came out nearer than a small tree's standing just in front of it: SEEN, a young oak at 50 m drawn as a bare stump,
+  //  its crown behind its neighbour's. At the middle, the nearer tree is laid over the farther one whole, as a painter
+  //  lays them. ?imppush= to try others.)
+  push: _qn('imppush', 0, 0, 0.5),
   dens: _qn('impdens', 3.0, 0.5, 6),                     // each kind's leaves drawn larger until its crown is this dense (?impdens=)
   leafLo: 1.4, leafHi: 4.0,                              // (never less, never more, than this much larger)
   variants: Math.round(_qn('impvar', 1, 1, 2)),          // trees baked of each kind (?impvar=2: two, at twice the memory)
@@ -106,11 +110,12 @@ void main() {
   vec3 n, ctr;
   vInner = 0.0;
   if (part < 0.5) {
-    // wood: the TRUNK (aBranchId -1) thickened by a part of a texel of this level, so a far trunk is a line and not a
+    // wood: the TRUNK (aBranchId -1) thickened by a fifth of a texel of this level, so a far trunk is a line and not a
     // row of dots; the limbs are left as they are and go as the tree gets small, as a painter would leave them out
     cls = 0.0; if (aBranchId < 0.0) p += normal * uPad; n = normal; ctr = p; id = aData.w;
-    // (the limbs only at the finest level: below it they were dark specks among the leaves, SEEN from 150 m)
-    if (aBranchId >= 0.0 && uCellK > 1.5) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); return; }
+    // (the limbs down to the third level, and then left out: below that they were dark specks among the leaves, SEEN
+    //  from 150 m; left out from the second level, a small tree's crown floated over its trunk, SEEN at 50 m)
+    if (aBranchId >= 0.0 && uCellK > 4.5) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); return; }
   } else {
     // A LEAF DRAWN LARGER, about its own centre: the game itself draws a far tree's leaves larger as it drops some
     // (PROP_VERT, leaves by distance), and a tree's real leaves at 64 texels are single texels -- a crown of specks,
@@ -282,10 +287,10 @@ export class ImpostorAtlas {
         mesh.geometry = g;
         C.set(cr.x, cr.y, cr.z);
         // (a texel of this level, taken on the tree's larger side: the stroke grid is IMP.stroke of them, doubled at
-        //  each coarser level so the grids nest; the trunk is thickened by a third of one; a leaf is never smaller
+        //  each coarser level so the grids nest; the trunk is thickened by a fifth of one; a leaf is never smaller
         //  than IMP.minLeaf of them)
         const texel0 = (2 * Math.max(rc, hh)) / IMP.tile, texel = texel0 * (1 << lv);
-        U.uC.value.copy(C); U.uR.value = R; U.uCell.value = IMP.stroke * texel0 * (1 << lv); U.uCellK.value = 1 << lv; U.uPad.value = texel * 0.35;
+        U.uC.value.copy(C); U.uR.value = R; U.uCell.value = IMP.stroke * texel0 * (1 << lv); U.uCellK.value = 1 << lv; U.uPad.value = texel * 0.2;
         U.uLeafK.value.set(this.leafK[L], IMP.minLeaf * 0.5 * texel);
         U.uCC.value.copy(this.ce[L][0]); U.uCRad.value.copy(this.ce[L][1]);
         const col = L % IMP.cols, row = Math.floor(L / IMP.cols);
@@ -498,6 +503,12 @@ void main() {
   vec3 n = vec3(o, 1.0 - abs(o.x) - abs(o.y));
   if (n.z < 0.0) n.xy = (1.0 - abs(n.yx)) * vec2(n.x >= 0.0 ? 1.0 : -1.0, n.y >= 0.0 ? 1.0 : -1.0);
   n = normalize(n);
+  #ifdef PC_IMP_DEBUG
+    // (?impdebug=1: what an impostor reads, flat: wood brown, leaves by the level read (0 green, 1 cyan, 2 yellow,
+    //  3 magenta, 4 red, 5 white), the core grey)
+    vec3 lvc = vLod < 0.5 ? vec3(0.2, 0.8, 0.2) : vLod < 1.5 ? vec3(0.2, 0.8, 0.9) : vLod < 2.5 ? vec3(0.95, 0.9, 0.2) : vLod < 3.5 ? vec3(0.9, 0.2, 0.9) : vLod < 4.5 ? vec3(0.9, 0.2, 0.1) : vec3(1.0);
+    pcWrite(cls < 0.5 ? vec3(0.45, 0.3, 0.15) : cls > 2.5 ? vec3(0.4) : lvc, 0.0, vec3(0.0, 0.0, 1.0), -vView.z, 3.0); return;
+  #endif
   // (the speed test's flat plants, 2 and 3: every far tree one flat colour, its outline kept)
   if (uOilL.y > 1.5 && uOilL.y < 3.5) { pcWrite(cls < 0.5 ? vBB : vLA * 0.7, 0.0, vec3(0.0, 0.0, 1.0), -vView.z, 3.0); return; }
   // the stroke's centre on the body: the quad's point moved along the line of sight to where the stroke lies
@@ -566,7 +577,7 @@ export function makeImpostorMaterial(bodyU, atlas, farMat, farcrown = FARCROWN) 
   const fc = (+farcrown).toFixed(4);
   const m = new THREE.ShaderMaterial({
     name: 'pc-prop-far-impostor',
-    defines: { PC_IMPOSTOR: 1, PC_IMP_NV: Math.max(1, atlas.n), PC_NFAR: fu.uFarA.value.length },
+    defines: Object.assign({ PC_IMPOSTOR: 1, PC_IMP_NV: Math.max(1, atlas.n), PC_NFAR: fu.uFarA.value.length }, _q && _q.get('impdebug') === '1' ? { PC_IMP_DEBUG: 1 } : null),
     uniforms: makePaintUniforms(bodyU, own),
     vertexShader: IMP_VERT,
     fragmentShader: IMP_FRAG.split('${FARCROWN}').join(fc).split('${IMPJIT}').join((+IMP.jit).toFixed(4)),

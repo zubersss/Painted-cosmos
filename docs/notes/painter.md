@@ -15,7 +15,8 @@ the same time: this lane touches only the far parts of `flora.js`, `florakit.js`
 **State (update this line every step):** T0 committed (rows built and run in software: they work; their timings mean
 nothing here, only the owner's phone can time them). T1 (impostors) committed behind `?fartree=impostor`, SEEN in A/B
 stills at the phone's and the desktop's settings (`docs/shots/painter/trees-far/`); not yet the default (waits for the
-owner's phone: `&bench=trees` has the row). Next: T4 (hand-over distances), then T6. Nothing merged.
+owner's phone: `&bench=trees` has the row). T4 committed: with the impostors on, the middle tree hands to the impostor
+at 45 m (was 57); the near hand-over stays at 27 m (18 m waits for A2's middle tree). Next: T6. Nothing merged.
 
 **T0, the speed test's tenth form (`src/core/bench.js`).** `?bench=1` the whole table with the new rows; `?bench=trees`
 the tree questions alone, on foot and from the air (24 rows); `?bench=air` or `?bench=air,<m>` the air table (FV7: 400 m
@@ -68,6 +69,24 @@ STILL WRONG / NOT KNOWN: the view switches (about 13 degrees apart, nearest, no 
 seen in motion; the hard edge where the trees end 1 km up (the far-view lane's painted canopy, FV2, is meant for it);
 the darkest conifer strokes are V 0.13 (R1.2c asks 0.18 for conifers); the hand-over at 57 m to the middle tree (T4);
 the bake is one long step at the first far draw (could be spread over frames).
+
+**T4, the hand-over distances (`flora.js` `setHandover`, `?treenear=` / `?treemid=` in metres at the phone's scale).**
+The full tree's and the middle tree's reach (T0 90 m, T1 190 m before the picture's scale) are per world now
+(`flora.t0`, `flora.t1`; the leaves-by-distance schedule reads `t0` as it is drawn, so they can move while the game runs;
+`shadow.js` `SHADOW_TIERS.mid` follows). With the impostors on, the middle tree stops at 45 m at the phone's picture
+(was 57) and the impostor takes over there; without them nothing changes unless the address says so. The design's full
+tree to 18 m is NOT taken by default: SEEN, with today's middle tree a tree 15 to 20 m off turns into an umbrella of
+big kites (`A1_handover_near18_phone.jpg`); it waits for the near lane's new middle tree (`?treenear=18` tries it).
+SEEN at 45 m (`A1_handover_stream_15h_{A,B}_phone.jpg`, `A1_handover_bank_3x.jpg`): the 40 to 57 m band of the far bank
+becomes impostors that match the ones behind them. Found and fixed on the way: a young oak at 50 m drew as a bare stump
+-- each quad stood 0.35 of its radius toward the eye, so a big neighbour's quad came out nearer and hid the small
+tree's crown; quads now stand at the tree's middle (`IMP.push` 0, `?imppush=`), and the limbs are kept to the third
+level (left out from the second, a small tree's crown floated over its trunk); `A1_impostor_stumpfix_4x.jpg`.
+COUNTED (phone, gallery, on foot, impostors on): middle tree to 57 m 651k triangles, 194 calls; to 45 m 609k, 178 calls.
+DERIVED: the middle trees from 45 to 57 m, about 42k triangles a frame at 0.043 to 0.124 ms per 1000 (the skeptic's
+range) and their pixels painted by the impostor instead: about -2 to -6 ms. Rows: 'middle trees only to 45 m',
+'trees hand over at 18 / 45 m', 'impostors from 45 m' (the package as `?fartree=impostor` ships it).
+Debug: `?impdebug=1` paints each impostor texel flat by what it is and the level it was read from.
 
 ## Hand-over of THE OIL LOOK, prototype on branch `look-proto` (READ THIS FIRST; kept current)
 
