@@ -532,7 +532,17 @@ FV7 of `docs/lead/FARVIEW-DESIGN.md`. A second session (A2, branch `trees-near`)
 the same time: this lane touches only the far parts of `flora.js`, `florakit.js`, the plant material's far branch,
 `render/impostor.js`, `render/shadow.js` and new rows in `core/bench.js`.
 
-**State (update this line every step):** (24 Nov, about 18:40) THE FAR SPRUCE BUILT AND SEEN, OFF BY DEFAULT, waiting for
+**State (update this line every step):** (24 Nov, about 19:00) look-proto v39.3 (87053ed) merged into trees-far (a6e46ca,
+given to the coordinator for v39.4: it carries fad660f, F's passed weighted stands and bark at 30 px, default). THE CROWNS
+UNDER A STORM (F's storm light, look-director ce1701f): BUILT, SEEN in a scratch merge of trees-far + look-director
+cb6267b, DORMANT on trees-far (PC_IMP_STORM is defined only when FRAG_PARS declares uLookS; 0 pixels change here,
+checked). Under uStorm the crowns lit in whole steps (small crowns, crown mass) step their cap down by
+smoothstep(0.15, 0.6, uStorm) * uLookS.x * uImpStorm levels, and a level under 1.2 is painted by that much in pcTone's
+glazes rather than the foliage shade (the shade was the floor: the step alone moved the warm crowns V 0.450 to 0.445).
+uImpStorm 0.5 (?impstorm=): a full step made the wood one violet-maroon mass. MEASURED wx=storm 150 m, warm crowns V/S:
+stormlight=0 0.450/0.40, F's land step alone 0.445/0.39, half 0.421/0.32, full 0.385/0.22. Sheets
+A1_stormcrowns_150m_ACEB (+ _zoom). Sent to F.
+Before: THE FAR SPRUCE BUILT AND SEEN, OFF BY DEFAULT, waiting for
 F's ruling between two ways (flora.js FAR_SPRUCE; both act only with A2's ?pines, which is on trees-near and reaches
 trees-far with v39.3): `?farspruce=near` (today's near-tree bake, its crown floored at V 0.24: SEEN, the clean dense cones
 kept, deep green not near-black; MY RECOMMENDATION) or `?farspruce=bough` (F's order: the by-bough middle tree; at A2's 2.2
