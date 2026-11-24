@@ -109,7 +109,24 @@ Branch `water-bodies` = lane 0 + look-proto v37.1 + `origin/design-water` (W1's 
 - Maps (Node, data drawn top down, not the renderer): `docs/shots/painter/water-w2/` (A today | B with the parts).
 - Scratch tools (not committed, in the session's scratchpad): `map.mjs` (top-down PNG of sample()), `cutprof.mjs` (a cut's
   long profile and cross sections against the bare surface), `lakes2.mjs`, `ponds.mjs`, `puddles.mjs`, `mouths.mjs`.
-- NEXT: step 3, `src/world/falls.js` + `src/render/fallmat.js` (the sheet, the plunge pool, the spray); then the look keys.
+- **STEP 3 (built 24 Nov, commit 0aa7cb7): THE WATERFALL.** `src/world/falls.js` draws `S.hydro.falls` within 1.5 km: the
+  sheet along the jet's real path (leaves the lip at sqrt(g d) over the hard lip, 2.7 m/s at the main mouth, a parabola;
+  its top edge follows the wall's line, which hydro.js measures across the cut), the plunge pool (a disc of milk and lace
+  on the sea), the spray (dabs from the foot and off the lower sheet). Detail by distance; two draws. `src/render/fallmat.js`
+  paints the sheet in pcThinLayer strokes on its own chart (down the fall in time of flight), whole strokes left out
+  where it thins; the pool's strokes run out from the foot; spray dabs never under 3 px. SEEN (A ?rivers=tree | B
+  +falls=1, gallery): from the sea at 68 m, 150 m up and 400 m up the fall reads as a white fall at the end of the cut;
+  phone and top tier alike (`falls-AB-grid.jpg`). MEASURED: the layer is 5.9 % of the picture at 68 m, 1.2 % at 150 m;
+  DERIVED 0.29 ms and 0.06 ms on the phone (1.2 ms close under it; budget 1.5). Test `src/world/falls.test.mjs`.
+- **STEP 4 (commit f832ff2):** Earth's look keys `oil.lakeK 0.78`, `oil.ponds 0.25` (82 ponds), `oil.puddles 1`,
+  `oil.fjords { every: 2, len, width, depth, minW: 8 }` (mouth 8 drowned, the main mouth stays a fall). `fallsView(S)` on
+  the WATER_BENCH row as `place` for a falls view in core/bench.js (asked of its owner, exact lines sent).
+- **OPEN ASKS (sent to the coordinator):** lane 0's `c.turbW`/`c.fspdW` in sample() (else the cut paints white); W3's
+  mesher must skip a water cell whose corners' levels differ by more than 2 m and half the cell (else a flat blue
+  curtain stands behind every fall); bench.js's falls view; C: the berm's ruled, striped wall and the cut's banks in leaf
+  paint (o.bank is written for whoever paints it).
+- Camera places for the falls views: `fallsView(S)` and the scratch `fallcams.mjs` (sea60, sea150, air400, bank, E7).
+- NEXT: lake stills at E4/E5 (A/B), ponds from 150 m, the fjord; then what the review asks.
 
 ## Stations and tools
 
