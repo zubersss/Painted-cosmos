@@ -797,6 +797,9 @@ void main() {
   float dabPx = 0.50 * uOilS.w * uOilA.x * uOilPx.y / 720.0;
   gVar = max(gMid, ${FLOORVAR} * smoothstep(2.6, 4.2, dabPx));
   float lw = max(length(gBdx), length(gBdy));
+  #ifdef PC_ROCKF
+    gRockLw = lw;
+  #endif
   // (a dab's own place: where its centre's chart lies on the sphere, at the ground's height carried there)
   float rB = length(vBody);
   vec3 upB = vBody / rB;
@@ -904,7 +907,7 @@ void main() {
     #ifdef PC_ROCKF
       // (on a cliff the ground between the dabs is the cliff's rock at the pixel's own place, render/farground.js)
       float clP = smoothstep(0.66, 0.50, gFaceP.x) * smoothstep(0.05, 0.20, 1.0 - vCol.a) * gFaceOn;
-      if (clP > 0.0) { bareC = mix(bareC, pcCliffC(vBody, rB - uBodyR, vec3(0.5), bareC, o4.x), clP); lvl0 = mix(lvl0, min(lvl0, 0.9), gGully * clP); }
+      if (clP > 0.0) { bareC = mix(bareC, pcCliffC(vBody, rB - uBodyR, vec3(0.5), bareC, lw), clP); lvl0 = mix(lvl0, min(lvl0, 0.9), gGully * clP); }
     #endif
     vec3 bare = pcTone(bareC, lvl0);
     #ifdef PC_ROCKDEBUG

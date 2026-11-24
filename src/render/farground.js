@@ -398,6 +398,7 @@ uniform vec4 uRockB;      // x a bed's mean height (m), y the gullies' spacing (
 float gRock = 0.0;        // how much this dab is a rock face (set in pcGroundAt, read in pcGroundPaint)
 float gCliff = 0.0;       // this dab is a cliff's rock (0 or 1: whole dabs), set with gRock
 float gGully = 0.0;       // how far into a gully the cliff dab lies: its light goes down (pcGroundAt)
+float gRockLw = 1.0;      // (main) the surface's metres per pixel here (lw): how many pixels a bed spans
 float gFaceOn = 0.0;      // (main) this pixel is steep enough that the upright charts may lay its dabs
 float gFaceD = 0.0;       // (main) the dab being painted lies on an upright chart
 #ifdef PC_ROCKDEBUG
@@ -507,10 +508,13 @@ vec3 pcCliffC(vec3 Bc, float hB, vec3 rnd, vec3 c, float w) {
   vec3 hp = Bc * (uBodyR / max(length(Bc), 1.0));
   vec4 nG = textureLod(uNoise3D, hp / uRockB.y + 0.31, 0.0);
   vec4 nS = textureLod(uNoise3D, hp / (uRockB.y * 4.3) + 0.67, 0.0);
-  // (a gully and a bed are told apart only while a dab is smaller than they are: a far dab bigger than a bed drew a
-  // random bed's tone, and the far slopes were a confetti of cream, umber and slate, SEEN at 400 m and 1 km. Past that
-  // they go to the rock's mean, lit and shaded by the face's own facing alone.)
-  float kB = smoothstep(0.45, 0.95, w / uRockB.x), kG = smoothstep(0.25, 0.55, w / uRockB.y);      // (from 0.18 of a bed the beds were faint from the sea at 68 m already, SEEN)
+  // (a gully and a bed are told apart only while they span enough pixels for several dabs: where a bed is under a few
+  // dabs tall each dab drew a random bed's tone, and the far slopes were a confetti of cream, umber and slate, SEEN at
+  // 400 m and 1 km. There they go to the rock's mean, lit and shaded by the face's own facing alone. w here is the
+  // surface's metres per pixel (main's lw): a bed is kept whole over 14 px tall, gone under 7; a gully (about a quarter
+  // of its spacing wide) over 9 px, gone under 4. Measured by the dab's own size in metres instead, the beds were faint
+  // from the sea at 68 m and gone at 150 m: a face seen across is far larger on the screen than its distance says.)
+  float kB = 1.0 - smoothstep(7.0, 14.0, uRockB.x / max(w, 1e-4)), kG = 1.0 - smoothstep(4.0, 9.0, 0.25 * uRockB.y / max(w, 1e-4));
   gGully = smoothstep(0.55, 0.70, nG.r + 0.25 * (nS.g - 0.5)) * (1.0 - 0.7 * kG);
   float hb = hB + 9.0 * (nS.b - 0.5) + 0.8 * (nG.a - 0.5);
   float q = hb / uRockB.x + 0.38 * sin(hb / (uRockB.x * 2.7));
@@ -545,7 +549,7 @@ vec3 pcRockWash(vec3 c, float up, vec3 Bc, float strata, float dist, vec3 rnd, f
   gRock = max(far * uRockK, gCliff);
   gGully = 0.0;
   if (gRock <= 0.0) return c;
-  if (gCliff > 0.5) return pcCliffC(Bc, hB, rnd, c, w);
+  if (gCliff > 0.5) return pcCliffC(Bc, hB, rnd, c, gRockLw);
   float l = dot(c, vec3(0.3, 0.5, 0.2));
   vec3 rk = mix(vec3(l), c, 0.5);
   if (strata > 0.004) {
