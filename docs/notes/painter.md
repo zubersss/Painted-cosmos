@@ -763,7 +763,77 @@ ruling: the spruce budgeted by bough ONLY in its middle form (the near spruce as
 the 3 px floor, the needle mass held at V >= 0.24 from 20 m (median 0.231 against 0.169 at 20 m, seen); 3.0 refused.
 Stills `A2_pines2_*`. +2,934 triangles at the landing. A denser far spruce (baked from a by-bough tree) is for A1, after
 A1's crown masses; F raises it. Both needle blocks of PROP_VERT sit inside `#ifdef PC_OIL`: the watercolour game is
-untouched.
+untouched. (24 Nov, late: A1 asked what that bake needs; told: the middle form spruceGeometry(seed, 1, needleTop) with
+its needles grown 2.2 and floored at V 0.24, as the middle spruce is at 30 m.)
+
+**NEAR LEAVES AS SHARDS (`?nearleaf=1`, OFF by default; the look director's audit 2, R3.6, `crop_leafcards_foot.jpg`).**
+BUILT on F's terms: a tall tree's leaf within 3.5 m of the eye shrinks about its own centre, to 0.55 at 1.0 m on a
+smoothstep from 3.5 m, whole and crisp, no fade; from 3.5 m out nothing changes (materials.js PROP_VERT `uNearLeaf`,
+flora.js `NEARLEAF`, set on the tall materials only; the uniform can be flipped live). In motion a leaf shrinks as the
+eye comes near: to be watched on the owner's device. SEEN (phone settings 1024 x 480 and 936 x 372): to the eye the
+pairs are the same; under a maple's crown from 1.5, 3 and 6 m the switch changes 490, 114 and 33 pixels (a handful of
+dark leaves nearest the eye), and in the stream views, autumn and summer, nothing beyond the frame-to-frame motion of
+the water (stills `A2_nearleaf_*`). WHY SO LITTLE: F's crop is the TOP LEFT OF THE SUMMER STILL `sum_foot_12.jpg`
+(300 x 140 at x2: matched to 4 of 255), a maple whose trunk is some 11 m off and whose crown reaches over the eye; F's
+build had design-water in it, which moved the river, and in this branch's world no tree stands within 11.5 m of that
+camera, so the view cannot be made again here. From the leaves' size in F's still (a maple's near leaf is built
+0.33 x 0.22 m, x 1.2 for the kind, x 0.7 to 1.3; fov 55 at 480 lines is 461 px to the radian): the few biggest pieces,
+50-85 px, are leaves 3 to 4.5 m off; most, 20-30 px, are leaves 7 to 15 m off that the THINNING has grown. The leaf
+thinning's start follows the picture's height (flora.js: ts = range scale x picture height / 1080, never under half):
+at 480 lines, the audit's size, a near tree thins from 6.5 m (0.24 x 90 x 0.3) and grows each kept leaf 1.3 times at
+10 m and 1.65 at 15 m; on a picture 720 to 1440 lines tall it would thin from about 8.6 to 13 m (worked out from the
+code, not rendered). So the audit's near leaves at 7-15 m are larger than a phone at full size shows them. The maple's
+near leaves already have six corners (kitbuild.js leafCards `round`): F's option (2) is in place for it.
+F'S RULING (24 Nov, late): the owner's phone DRAWS 1028 x 480 or 936 x 372 in the oil look (LOOK-AUDIT.md), so the
+480-line picture, thinning growth included, IS what the owner sees and approved ("crisp flat leaf pieces"); the shards
+finding is F's, not the owner's, and is not pushed over the owner's word. Done on that ruling (9b778fd): (B) ?nearleaf
+reaches 5 m (0.55 at 1.0 m, smoothstep to 1.0 at 5 m); (C) `?leafgrow=1`, AN OPTION FOR THE OWNER: a thinned
+broadleaf's kept leaf grows at most 1.15 times within 15 m of the eye (today up to 1.65 at 15 m), back to today's by
+25 m, before the near tree hands over at 27 m (`uLeafGrow`; the needle kinds untouched; `?leafgrow=<1 to 2.4>` another
+most). SEEN, the shader compiles (103 tree materials, no program failed), one page, the switches flipped live, a maple
+from 8 m with its crown over the eye, summer noon, 1024 x 480 (`A2_nearleaf_leafgrow_maple8m_*`, A none, B nearleaf,
+C leafgrow): C clearly smaller leaves with more sky and branches between them across the crowns 6 to 12 m off
+(114,140 pixels, mean 7.6 of 255); B close to A, the nearest overhead pieces a little smaller (13,227 pixels, mean
+0.85, within the 64,382 / 2.1 that two grabs of the same state differ by as the leaves move in the wind). Neither
+goes default without the owner; the coordinator can put C to the owner on a phone check. F'S VERDICT (24 Nov):
+B no visible gain, keep it off and stop there; C a clear gain ("small separate dabs with the sky between them"), F
+recommends it to the coordinator, who sends it to the owner for a side-by-side phone check; OFF until the owner says.
+
+**THE CROWNS UNDER A STORM (`?stormleaf=1`, OFF; the coordinator after F's storm light, look-director e2b9c14, which
+steps the land a level down under a storm and leaves the crowns glowing).** MEASURED in the gallery under `wx=storm`
+(autumn stream, 1024 x 480): uStorm 0.9, overcast (uWx.x) 1.0, the light curve (uOilAir.z) 1. A FIRST TRY (the
+leaf's level taken a whole step down, 758824a) changed 10,204 pixels by at most 24 of 255, nothing to the eye: under
+that storm a lit leaf's level is already about 1.4, so it is painted almost wholly in the foliage shade
+(`pcShadeLeaf`), and that shade is the fair-weather one, a saturated red for an autumn leaf that does not know the
+weather; the land at the same levels takes pcTone's glaze and deep wash, a cool grey. (The first commit's reason,
+"a lit leaf stays at the local level", was wrong.) NOW: under a storm a crown is painted as the land is, a leaf's
+level held to the glaze (1) at a full storm and its shade the land's glaze and deep wash at its level instead of the
+foliage shade (`materials.js PROP_VERT uStormLeaf`, `flora.js STORMLEAF`); no storm, the same picture to the bit.
+The bark already goes through the land's paint (pcLit, pcLevel, pcTone). Its own switch, so it does not hang on F's
+uLookS (not in look-proto yet). SEEN on the merged branch (f281556; the shader compiles, 85 tree materials, no
+program failed), one page under `wx=storm`, autumn noon, 1024 x 480, the switch flipped live, two grabs of one state
+identical: a maple from 9 m (`A2_stormleaf_maple9m_storm_A_over_B.jpg`): the crowns from glowing red and orange to a
+muted plum-maroon in the storm's light, 31.9 per cent of the picture, the changed pixels' V median 0.32 to 0.28 and S
+0.53 to 0.34 (mean colour 0.33, 0.19, 0.18 to 0.28, 0.20, 0.23); the stream view (the merge moved the river: only far
+trees in it) 0.8 per cent. Stills of the first try kept (`A2_stormleaf_first-try_*`). Fair weather NOT rendered on this
+build: unchanged by construction (uStorm 0 skips the step). OFF until F passes it. A HALF STRENGTH (`uStormLeaf` 0.5,
+not yet a switch of its own) for F to compare: the reds kept but quieter, 25.5 per cent changed, V 0.34 to 0.32, S
+0.46 to 0.43 (`A2_stormleaf_maple9m_storm_A_half_full.jpg`: today, half, full). On the same crown pixels: today S 0.53,
+half 0.45 (warm hue p90 18 deg: the oranges kept), full 0.34 (3 deg: gone). PASSED BY F AT HALF (24 Nov): half keeps the
+reds and the rust and amber told apart, quieter and in the storm's light. `?stormleaf=1` is now 0.5 of the land's paint
+at a full storm (`?stormleaf=<0.3 to 1>` another share). OFF behind its own switch until look-director e2b9c14 (F's
+`?stormlight`, uLookS.x) is in look-proto (v39.4); then it follows that one switch (ON by default with F's).
+The address switch SEEN to work (a page opened with `&wx=storm&stormleaf=1`, before the value went from 0.6 to 0.5):
+the 38 tall-tree materials took the value, no other material, no program failed, no console error.
+FOR v39.4 (when tying to uLookS.x): take A1's ramp for the far crowns (trees-far c5ef26a, impostor.js stK =
+smoothstep(0.15, 0.6, uStorm) * uLookS.x * 0.5), so near and far crowns step down together at the hand-over in a
+middling storm (today's kSt = uStorm * 0.5 / 0.9 is 0.33 at uStorm 0.6 where A1's is 0.5; both 0.5 at a full storm). A1
+AGREED (24 Nov); A1's far side has ?impstorm= (0 to 1, default 0.5) and A1 will say if F moves it, so ours follows.
+THE FAR SPRUCE: F chose A1's D, the NEAR spruce baked with the V 0.24 floor (default on trees-far 2729f6a); spruce.js
+needs no needleTop: 2.
+
+**MERGED look-proto v39.3 (87053ed, pull request 46, the pines live) into trees-near: f281556**, clean, nothing
+doubled; unit 328, world 124, physics 449 pass.
 
 **THE PINES AS POLES (24 Nov, the coordinator's urgent check and the first cure, `?pines=1`).**
 Not the split: on v39.1 the poles are the same with the one program (0.2 of 255; stills `A2_pines-v391_*`), and every

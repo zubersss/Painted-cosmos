@@ -1982,6 +1982,9 @@ uniform vec4 uOilB;
 uniform vec4 uOilD;
 uniform vec4 uOilG;
 uniform float uNeedle;    // (?pines: a conifer's needles never narrower on the screen than this many pixels; 0 off, as before)
+uniform float uNearLeaf;  // (?nearleaf: 1 the leaves within arm's length shrink about their centres; 0 off, as before)
+uniform float uLeafGrow;  // (?leafgrow: the most a thinned broadleaf's kept leaf grows within 15 m of the eye, e.g. 1.15; 0 off, as before)
+uniform float uStormLeaf; // (?stormleaf: the share of the land's storm paint a crown takes at a full storm, 0.5 with the switch; 0 off, as before)
 uniform vec4 uOilPx;      // (x: the angle one pixel of the scene pass takes, radians: shared.js)
 uniform mat4 uShM;
 uniform highp sampler2D uShTex;
@@ -2079,7 +2082,14 @@ void main() {
     if (uLeafLod.x > 0.0 && aData.y > 4.5 && aData.y < 7.5) {
       float keep = clamp(pow(uLeafLod.x / max(di, 0.01), 1.2), uLeafLod.y, 1.0);
       float e = (1.0 - keep) * 1.06 - 0.03;
-      cardG = smoothstep(e - 0.03, e + 0.03, aData.w) * min(inversesqrt(keep), 2.4);
+      // (?leafgrow, 24 Nov, AN OPTION FOR THE OWNER, the look director's (C): on the phone's picture a near tree thins
+      //  its leaves from about 6.5 m, and each kept leaf grows to keep the crown as full, 1.3 times at 10 m and 1.65 at
+      //  15 m: the near crown's leaves read as hand-sized pieces. With the switch a broadleaf's kept leaf grows at most
+      //  uLeafGrow times within 15 m of the eye, back to today's growth by 25 m (before the near tree hands over at
+      //  27 m): the same leaves, smaller, the sky between them. The needle kinds are left alone (?pines). 0: as before.)
+      float gMax = 2.4;
+      if (uLeafGrow > 0.0 && uNeedle <= 0.0) gMax = mix(uLeafGrow, 2.4, smoothstep(15.0, 25.0, di));
+      cardG = smoothstep(e - 0.03, e + 0.03, aData.w) * min(inversesqrt(keep), gMax);
       cardO *= cardG;
       lp = aCard + cardO;
     }
@@ -2094,6 +2104,19 @@ void main() {
       float dN = max(distance((im * vec4(aCard, 1.0)).xyz, uCamLocal), 0.1);
       cardO *= mix(1.0, ${NEEDLE_FILL.toFixed(2)}, smoothstep(10.0, 30.0, dN));
       if (abs(uv.y) > 0.5) cardO *= clamp(0.5 * uNeedle * dN * uOilPx.x / max(length(mat3(im) * cardO), 1e-4), 1.0, 5.0);
+      lp = aCard + cardO;
+    }
+    // NO SHARDS UNDER THE NOSE (?nearleaf, 24 Nov; the look director's audit 2, R3.6 'nothing reads as a polygon'): a
+    // leaf a metre or two from the eye is a hand-sized flat kite filling a tenth of the picture, straight-edged, where
+    // the references' near leaves are small dabs with the sky between them. So within 5 m of the eye each leaf shrinks
+    // about its own centre, to 0.55 of its size at 1.0 m, on a gentle ramp (smoothstep from 5 m: the look director's
+    // terms, 24 Nov; first 3.5 m, which missed the audit's biggest pieces, leaves 3 to 4.5 m off; so the change lies
+    // mostly where the leaf would fill the frame and a leaf does not visibly shy away as the player walks into a low
+    // bough -- the thing to watch on the owner's device); from 5 m out nothing changes (the owner approved the near
+    // trees at 5 to 15 m as they are). Whole and crisp: no fade, its place and its paint its own (inside 5 m a leaf is
+    // tens of pixels across, so the 3 px floor never binds here). 0: as before.
+    if (uNearLeaf > 0.0 && aData.y > 4.5 && aData.y < 6.5) {
+      cardO *= mix(0.55, 1.0, smoothstep(1.0, 5.0, distance((im * vec4(aCard, 1.0)).xyz, uCamLocal)));
       lp = aCard + cardO;
     }
   #endif
@@ -2325,6 +2348,23 @@ void main() {
       if (aData.z > 1.5) xl = 0.2;
       float lvL = pcLevel(xl, 0.03);
       vec3 deepL = pcShadeLeaf(cs);      // (L2: the one foliage shade, chunks.js)
+      // THE CROWNS UNDER A STORM (?stormleaf, 24 Nov, the coordinator after the look director's storm light, LOOK-BUILD.md
+      // 'The land under a storm'). MEASURED in the gallery under wx=storm (uStorm 0.9, overcast 1.0): a lit leaf's level
+      // is already about 1.4 there, so it is painted almost wholly in the foliage shade above -- and that shade is the
+      // fair-weather one, a deep SATURATED red for an autumn leaf, which does not know the weather. The land at the same
+      // levels takes pcTone's glaze (level 1: half way to the shade's grey, plus the sky's fill) and the deep wash under
+      // it: a cool grey-green. So the red crowns glowed under the storm sky whatever the level did (a first try, the
+      // level taken down a whole step, changed 10,204 pixels by at most 24 of 255). Here, under a storm, a crown is
+      // painted as the land is: nothing lit (a leaf's level held to the glaze, 1, at a full storm) and the shade the
+      // land's own glaze and deep wash at the leaf's level instead of the foliage shade. A level and the land's own
+      // paint, never a darkening multiplied on (R1.3b); with no storm (uStorm 0) the same picture to the bit. 0: as before.
+      // (uStormLeaf is the share of it at a full storm: 0.5, PASSED by the look director at half, so the reds deepen and
+      //  the oranges dull but the colour families stay told apart; all of it made every crown one plum-maroon)
+      float kSt = clamp(uStorm * uStormLeaf / 0.9, 0.0, 1.0);      // (uStorm is at most 0.9 by day: world/index.js)
+      if (kSt > 0.0) {
+        lvL = mix(lvL, min(lvL, 1.0), kSt);
+        deepL = mix(deepL, pcTone(cs, lvL), kSt);
+      }
       vLeafC.rgb = mix(deepL, pcTone(cs, lvL), smoothstep(1.2, 2.0, lvL));
       // (?pines: a conifer's needle mass from 20 m out sits at the references' deep green, about V 0.26 (#39432e), not
       //  near-black: the look director's ruling. A needle darker than that is lifted to it, its hue kept, from 12 m to
@@ -3276,6 +3316,9 @@ export function makePropMaterial(bodyU, opts = {}) {
     uLeafFam: { value: new THREE.Vector4().fromArray(opts.oilFam || [0, 0, 0, 0]) },
     uOilDark: { value: new THREE.Vector4(opts.oilDark ? opts.oilDark[0] : 0, 0, 0, 0) },
     uNeedle: { value: opts.needle || 0 },      // (?pines: flora.js; 0 for every plant but a conifer with the switch on)
+    uNearLeaf: { value: opts.nearLeaf || 0 },  // (?nearleaf: flora.js; 0 for every plant but a tree with the switch on)
+    uLeafGrow: { value: opts.leafGrow || 0 },  // (?leafgrow: flora.js; 0 for every plant but a tree with the switch on)
+    uStormLeaf: { value: opts.stormLeaf || 0 },  // (?stormleaf: flora.js; 0 for every plant but a tree with the switch on)
     uOilDarkA: v3(opts.oilDark && opts.oilDark[1], [0.5, 0.4, 0.4]), uOilDarkB: v3(opts.oilDark && opts.oilDark[2], [0.2, 0.15, 0.2]),
   };
   const defines = {};
