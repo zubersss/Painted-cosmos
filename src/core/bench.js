@@ -544,6 +544,9 @@ export function attachBench(pc) {
         [AS, null, null],
         ['weather: no clouds drawn (fair)', () => show(/^pc-cloud/, false), () => show(/^pc-cloud/, true)],
         ['weather: clouds as before', () => clouds3d(false), () => clouds3d(true)],
+        // (the unseen 3D field laid into the cloud shadow map from the ground in the hybrid: its cost is this row's gap)
+        ['weather: no unseen cloud shadow field (fair)', () => { const c = pc.world && pc.world.clouds; if (c) c.shadowField = false; },
+          () => { const c = pc.world && pc.world.clouds; if (c) c.shadowField = true; }],
         ...(WX2.cloudmap ? [
           ['storm: no clouds drawn', () => { holdStorm(true); show(/^pc-cloud/, false); }, () => { show(/^pc-cloud/, true); holdStorm(false); }],
           ['storm: no cloud shadows', () => { holdStorm(true); const c = pc.world && pc.world.clouds; if (c) c.shadowK = 0; },
