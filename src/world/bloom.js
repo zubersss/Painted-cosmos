@@ -242,9 +242,28 @@ const _fc = [0, 0, 0];
 //   o.fc  0..1   the same colour packed RGB565, (r5 << 11 | g6 << 5 | b5) / 65535, for a reader with 16 bits
 // Both are 0 on a sample that is not full (bloomTint is not called) only if the reader resets them: patchgen reads them
 // from FULL samples, where this always runs first.
+// THE SLOPE'S KIND, for the far dabs only (FV6, ?bloomfar=1; SEEN 24 Nov: from 420 m and 1 km every far dab took its own
+// drift's kind, which changes every 9-60 m, so a mountainside was a confetti of every flower colour). Of the kinds that
+// can grow here and are in flower, the one whose own coarse field (cells of about 600 m) is strongest: a slope seen from a
+// mile reads in one flower colour, the next slope perhaps in another. Returns an index into the biome's blooms, or -1.
+function slopeKind(S, x, y, z, s, bi) {
+  const B = bloomsOf(S, bi);
+  if (!B) return -1;
+  const R = S.R, n3 = S.nC.n3, X = x * R / 600, Y = y * R / 600, Z = z * R / 600, sw = bloomSwitches();
+  const te = !sw.year ? null : (SEASON.held ? SEASON.t : null);
+  let best = -1, bv = -1e9;
+  for (let k = 0; k < B.length; k++) {
+    const b = B[k], yf = te == null ? 1 : inFlower(b.season, te);
+    if (yf <= 0.001 || habitat(b.hab, s) <= 0.001) continue;
+    const o = 29.1 * (k + 1), v = n3(X + o, Y - 0.6 * o, Z + 1.7 * o) + 0.5 * (b.share == null ? 1 : b.share);
+    if (v > bv) { bv = v; best = k; }
+  }
+  return best;
+}
+
 export function bloomTint(S, o, x, y, z, bi) {
   const sw = bloomSwitches();
-  o.fd = 0; o.fc = 0; o.fi = 0;
+  o.fd = 0; o.fc = 0; o.fi = 0; o.fi2 = 0;
   if (!sw.air && !sw.grass2) return;
   if (sw.grass2) {
     const g = swardOf(S, bi);
@@ -280,6 +299,9 @@ export function bloomTint(S, o, x, y, z, bi) {
   if (cmx - cmn < 0.25 * cmx && cmx > 0.80) { const f = 0.80 / cmx; _fc[0] = c[0] * f; _fc[1] = c[1] * f; _fc[2] = c[2] * f; o.fc = packRGB565(_fc); }
   else o.fc = packRGB565(c);
   o.fi = bloomPalette(S).index.get(b) || 0;
+  // (o.fi2: the slope's kind, for the far dabs to take beyond a distance of the ground's choosing, so that near the eye the
+  // ground under the flowers keeps their own colour; only with the channel on)
+  if (sw.far) { const k2 = slopeKind(S, x, y, z, o, bi); o.fi2 = k2 >= 0 ? (bloomPalette(S).index.get(bloomsOf(S, bi)[k2]) || 0) : o.fi; }
   // (with the channel on, the far dabs carry the drift in its own colour, so the far colour does not carry it as well)
   if (!sw.far) { o.r2 += (c[0] - o.r2) * kf; o.g2 += (c[1] - o.g2) * kf; o.b2 += (c[2] - o.b2) * kf; }
 }
