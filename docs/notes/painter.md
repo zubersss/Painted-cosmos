@@ -277,6 +277,13 @@ still of the set inside C6 but the landing at 10 m in autumn, 4.2 % (4.9 % in th
 the old: its cliffs and sea). A2 (trees near) counted the lane at the landing: 26,928 marks against 12,967, 357k fragments
 against 272k (the rebuilt middle band halves today's 176k to 92k); its rows in ?bench=foot price it on the phone. A2's hooks
 (NEAR_VERT uNearCut, NEAR_FRAG flat mode 8) are to be kept when they reach look-proto.
+**THE FINAL SET PASSED** (24 Nov): batch 1 ACCEPTED by the coordinator and PASS by the look director (live in v39.1); batch 2
+PASS by the look director after its three data notes (ceb7f3a: the green wood's darkest blades olive, the thrift grey-green
+with its flowers on top, the near rings' stones light). The coast's and wetland's S(V<.3) rose only because their darks
+all but went (the share under V 0.30, 0.87 -> 0.52 % and 2.97 -> 1.28 %); the remainder, cushions in shade, is taken by the
+look director in the shared shade (pcShadeLeaf now also quiets dark saturated yellow-greens, on look-director): it reaches
+this lane through look-proto. NEXT: FV6 with C (the interface proposed: bloomTint writes o.fr/fg/fb/fd into the sample;
+waiting for C to name a free ground-sample slot, the coordinator having warned the sample is at 25 floats in v39.2).
 A lesson recorded: af83f25 copied data/looks/earth.js from a scratch copy older than a merge and dropped the look director's
 `airTop` (found by the 420 m proof, fixed in 2f779d8); never copy a whole shared file over a merge, apply the lane's diff. ASKED OF THE FAR-VIEW LANE through the coordinator: a ground dab that takes a drift's colour WHOLE
 (pointillist) from `bloomAt`, the one thing that would make drifts read from 150 m and a mile.
