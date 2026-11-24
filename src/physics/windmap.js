@@ -82,8 +82,8 @@ export const WINDMAP = Object.freeze({
   aloftGain: 1.2,        // (air.js AIR.aloftGain)
   aloftLand: 0.1,
   // the world's convection sites
-  sitesMax: 40,
-  siteSpacing: 500,      // m between two sites at least
+  sitesMax: 128,         // (W3.2: 64, the great peaks only; the range's front over the wood had none: weather.js stormswing)
+  siteSpacing: 450,      // m between two sites at least
   siteMin: 0.12,         // a site scores at least this
 });
 
@@ -389,7 +389,9 @@ export class WindMap {
     for (let k = 0; k < T; k++) {
       if (L.water[k] > 0.5) continue;
       const slope = Math.hypot(L.gradE[k], L.gradN[k]);
-      const peak = smoothstep(20, 650, L.relief[k]) * L.heat[k] * (0.6 + 0.4 * smoothstep(0.04, 0.3, slope));
+      // (a lesser hill grows lesser storms, and fewer of them, but it grows them: the range's great peaks do not take every
+      //  site, so a wood under a line of low hills sees storms born over its own hills too)
+      const peak = Math.sqrt(smoothstep(20, 650, L.relief[k])) * L.heat[k] * (0.6 + 0.4 * smoothstep(0.04, 0.3, slope));
       const basin = smoothstep(30, 120, -L.relief[k]) * smoothstep(0.85, 1.05, L.heat[k]) * (1 - smoothstep(0.3, 0.8, L.moist[k]));
       score[k] = Math.max(peak, basin * 0.8);
     }

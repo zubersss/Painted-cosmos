@@ -10,6 +10,12 @@
 //   ?nearmap=1    the near wind grid (air.js) takes its large-scale wind from the map instead of windLarge
 //   ?farwind=1    the plants beyond the near field read the map (flora.js FloraField.far, flora.glsl.js)
 //   ?cloudmap=1   the cloud and rain map of the whole world, and the rain field for the water group (cloudfield.js)
+//   ?stormland=1  storms born from the land: afternoon storms at the wind map's convection sites (weather.js STORMLAND),
+//                 the weather living under its own cloud top, more rain windward and less in the lee
+//   ?rainlook=1   a downpour reads as one: more of the box's drops drawn the harder it rains, nearer the eye, longer
+//   ?rainshaft=1  rain shafts hanging under every raining storm in view (world/storms.js; needs the cloud map)
+//   ?bolts=1      lightning bolts, cloud to ground (world/storms.js; needs the cloud map)
+//   ?stormswing=0 (with ?stormland) the land storms as W3.2 laid them: 1 to 3 a day, drifting with the usual wind aloft
 const Q = (typeof location !== 'undefined' && location && location.search) ? new URLSearchParams(location.search) : null;
 const flag = (k, d) => (Q && Q.has(k) ? Q.get(k) !== '0' && Q.get(k) !== 'false' : d);
 const ALL = flag('wx2', false);
@@ -20,8 +26,20 @@ export const WX2 = {
   nearmap: flag('nearmap', ALL),
   farwind: flag('farwind', ALL),
   cloudmap: flag('cloudmap', ALL),
+  stormland: flag('stormland', ALL),
+  rainlook: flag('rainlook', ALL),
+  rainshaft: flag('rainshaft', ALL),
+  bolts: flag('bolts', ALL),
+  // (with ?stormland: every site its own chance, and the wind aloft swinging from day to day; ?stormswing=0 is W3.2's)
+  stormswing: flag('stormswing', true),
   // (the speed test's row 'weather: wind map frozen': the map stops refreshing, so the script's change is its cost)
   freeze: false,
 };
 // (the near grid and the far plants need the map: asking for either asks for it)
 if (WX2.nearmap || WX2.farwind) WX2.windmap = true;
+// (storms born from the land need the map's sites, and the weather's own top needs the cloud map)
+if (WX2.stormland) { WX2.windmap = true; WX2.cloudmap = true; }
+if (WX2.rainshaft || WX2.bolts) WX2.cloudmap = true;
+// (the clouds lane, W1: the look director's ?clouds3d=1 draws the 3D clouds, which read the cloud map and the wind map,
+//  so the owner needs one switch, not three. Any value over 0 turns both maps on.)
+if (Q && Q.has('clouds3d') && +Q.get('clouds3d') > 0) { WX2.cloudmap = true; WX2.windmap = true; }

@@ -19,13 +19,25 @@
 //   What the cells do not carry: the place's moisture and its share of snow (the CPU functions do). With the map's
 //   texture (world/wxfield.js, lane CLOUDS, later) the GPU will have the whole planet's rate as well.
 import { BODIES } from '../data/bodies.js';
-import { liveCells, gatherFrom, gather1, REGIMES, WEATHER, KINDS, DEFAULT_SEED } from './weather.js';
+import { liveCells, gatherFrom, gather1, flashOf, REGIMES, WEATHER, KINDS, DEFAULT_SEED } from './weather.js';
+import { WX2 } from './wx2.js';
+import { heatBuilt, sunHourAt } from './windmap.js';
+import { noise3, hash3 } from './util.js';
 import { airTemperature } from './atmosphere.js';
 import { faceToDir, dirToFace } from './windmap.js';
 import { clamp, clamp01, smoothstep } from './util.js';
 
 export const CLOUDMAP = Object.freeze({
   N: 32,                // texels a face edge (the wind map's grid)
+  // (?stormland=1) what the land does to the cloud and the rain, from the wind map's lift and trigger:
+  cuMax: 0.7,           // fair cumulus over a fully triggered texel covers this much of its sky ...
+  cuBase: [300, 380],   // ... with its base this far over the land at the morning's start and through the afternoon (m) ...
+  cuThick: [150, 750],  // ... and this thick, from just triggered to fully
+  rainWind: 0.8,        // rain x (1 + this x lift) on the windward side (lift in m/s, up to 1.5) ...
+  rainLee: 0.5,         // ... and x (1 - this x sinking) in the lee (up to 1 m/s)
+  cirrus: 0.35,         // the most high cloud the slow cirrus field lays
+  anvil: 1.6,           // a storm's anvil spreads this many core radii, downwind of it
+  flashReach: 4000,     // m: the lightning of every storm cell this near the focus is listed
   period: 0.5,          // s for a full refresh
   cells: 8,             // rain cells handed to the shaders
   cellReach: 4500,      // m: a raining system further than this from the focus (to its edge) is not handed on
@@ -65,8 +77,21 @@ export function rainAt(bodyId, ux, uy, uz, t, seed = DEFAULT_SEED, env = null, o
   const a = gather1(bodyId, ux, uy, uz, t, seed);
   const alt = env && env.altitude != null ? env.altitude : 0;
   const T = airTemperature(bodyId, alt, uy, env && env.sun01 != null ? env.sun01 : null) + (env && env.dT ? env.dT : 0);
-  return split(bodyId, a, env && env.moist != null ? env.moist : 1, T, alt, out);
+  // (?stormland=1: the land's windward and lee factor from the wind map the physics is running, as the map applies it)
+  if (WX2.stormland && RAINLAND.map && RAINLAND.map.ready && RAINLAND.map.bodyId === bodyId && !(env && env.rainK != null)) {
+    const lift = RAINLAND.map.at(ux, uy, uz, _rlo).lift, rk = 1 + CLOUDMAP.rainWind * clamp(lift, 0, 1.5) - CLOUDMAP.rainLee * clamp(-lift, 0, 1);
+    a.rate *= rk; a.rateIce *= rk; a.rateFrost *= rk;
+  } else if (env && env.rainK != null) { a.rate *= env.rainK; a.rateIce *= env.rainK; a.rateFrost *= env.rainK; }
+  split(bodyId, a, env && env.moist != null ? env.moist : 1, T, alt, out);
+  // (the weather's ceiling as weatherAt lays it: without ?stormland it lives under half the atmosphere above the DATUM, so
+  //  ground higher than that gets none; with it the weather lives under its own top, which stands over any land)
+  if (!WX2.stormland) { const b = ceilingBelow(bodyId, alt); out.rate *= b; out.snow *= b; }
+  return out;
 }
+function ceilingBelow(bodyId, alt) { const top = BODIES[bodyId].atmosphereHeight || 0; return top > 0 ? 1 - smoothstep(top * 0.5, top * 0.62, alt) : 0; }
+// the wind map rainAt reads the land's windward and lee factor from (physics/index.js sets it while ?stormland is on)
+export const RAINLAND = { map: null };
+const _rlo = {};
 // WHAT FELL between game times t0 and t1 (mm of water at the ground; the weather's own clock, WEATHER.timeScale: a game
 // second of a 6 mm/h rain lays 6 x 60 / 3600 = 0.1 mm). Midpoint steps of at most `step` game seconds (the systems change
 // over tens of seconds). Returns out { mm, mmSnow }.
@@ -102,7 +127,7 @@ float pcRainCells(vec2 en) {
 `;
 
 // ---- the map ---------------------------------------------------------------------------------------------------------
-const _d3 = [0, 0, 0], _sp = {}, _wo = {};
+const _d3 = [0, 0, 0], _sp = {}, _wo = {}, _hp = { x: 0, y: 1, z: 0 }, _li = { last: { t: -1e9, x: 0, y: 1, z: 0, distance: 1e9 } }, _ab = {};
 
 export class CloudField {
   constructor(seed = DEFAULT_SEED) {
@@ -117,8 +142,9 @@ export class CloudField {
     const F = () => new Float32Array(T);
     this.low = F(); this.conv = F(); this.base = F(); this.top = F(); this.mid = F(); this.high = F(); this.valley = F();
     this.rain = F(); this.snow = F(); this.storm = F();
+    this.cu = F();                                // (?stormland=1) the fair cumulus share of `low`, grown by the land's lift
     this.cells = []; this.cells.n = 0;           // weather.js liveCells of the last frame (reused objects)
-    this.flashes = [];                           // (W3.2) recent and next flashes of every mature cell near the focus
+    this.flashes = []; this.flashes.n = 0;       // the last flash of every storm cell near the focus (flashesFor)
     this.bodyId = null; this.version = 0; this.t = 0; this.ready = false;
     this._cursor = 0;
     // the rain field for the water group (see the top of this file)
@@ -130,7 +156,7 @@ export class CloudField {
 
   _reset(bodyId) {
     this.bodyId = bodyId; this.version = 0; this.ready = false; this._cursor = 0;
-    for (const A of [this.low, this.conv, this.base, this.top, this.mid, this.high, this.valley, this.rain, this.snow, this.storm]) A.fill(0);
+    for (const A of [this.low, this.conv, this.base, this.top, this.mid, this.high, this.valley, this.rain, this.snow, this.storm, this.cu]) A.fill(0);
   }
 
   // One frame's slice. windMap: the wind map (its land's heights and moisture), or null (the datum and moist 1).
@@ -151,30 +177,123 @@ export class CloudField {
 
   _run(bodyId, t, sunDir, windMap, n) {
     const L = windMap && windMap.land && windMap.land.ready && windMap.bodyId === bodyId ? windMap.land : null;
+    const M = L && windMap.ready ? windMap : null;
+    this._anvils(t);
     for (let q = 0; q < n; q++) {
       const k = this._cursor;
-      this._texel(bodyId, k, sunDir, L);
+      this._texel(bodyId, k, sunDir, L, M, t);
       if (++this._cursor >= this.count) { this._cursor = 0; this.version++; this.t = t; this.ready = true; }
     }
   }
 
-  _texel(bodyId, k, sunDir, L) {
+  // the anvils of this frame's storm cells: [x, y, z, radius, weight] (downwind of each core, where its top spreads)
+  _anvils(t) {
+    const C = this.cells, A = this._anv || (this._anv = []);
+    A.length = 0;
+    const R = this.bodyId ? BODIES[this.bodyId].radius : 4000;
+    for (let i = 0; i < C.n; i++) {
+      const c = C[i];
+      if (c.kindId !== 'storm' || !(c.w > 0.25)) continue;
+      const sp = Math.hypot(c.ve, c.vn);
+      let x = c.x, y = c.y, z = c.z;
+      if (sp > 0.1) {
+        // 0.8 of a core radius downwind along the cell's own drift
+        let ex = z, ez = -x; const el = Math.hypot(ex, ez) || 1; ex /= el; ez /= el;
+        const nx = y * ez, ny = z * ex - x * ez, nz = -y * ex, a = 0.8 * c.r / R, de = c.ve / sp, dn = c.vn / sp;
+        x += a * (de * ex + dn * nx); y += a * dn * ny; z += a * (de * ez + dn * nz);
+        const l = Math.hypot(x, y, z); x /= l; y /= l; z /= l;
+      }
+      const ar = c.r * CLOUDMAP.anvil / R;
+      A.push(x, y, z, 1 - 0.5 * ar * ar, c.w);
+    }
+  }
+
+  _texel(bodyId, k, sunDir, L, M, t) {
     const ux = this.cx[k], uy = this.cy[k], uz = this.cz[k];
     const a = gatherFrom(this.cells, bodyId, ux, uy, uz);
     const land = L ? L.H2[k] : 0, h = L ? L.h[k] : 0, moist = L ? L.moist[k] : 1;
-    this.low[k] = a.cloud;
+    const landStorms = WX2.stormland && M;
+    // (?stormland=1) the land's own: more rain on the windward side, less in the lee
+    if (landStorms) {
+      const lift = M.lift[k];
+      const rk = 1 + CLOUDMAP.rainWind * clamp(lift, 0, 1.5) - CLOUDMAP.rainLee * clamp(-lift, 0, 1);
+      a.rate *= rk; a.rateIce *= rk; a.rateFrost *= rk;
+    }
+    let low = a.cloud, conv = 0, base = land + 320, top = land + 320, wsum = a.coverSum;
+    if (wsum > 1e-6) { conv = a.conv / wsum; base = land + a.baseW / wsum; top = land + a.topH / wsum; }
+    // (?stormland=1) fair cumulus where the land lifts the air and the afternoon has heated it: flat-based, its base
+    // rising through the day, thicker the more strongly triggered
+    let cu = 0;
+    const hour = sunDir ? sunHourAt(sunDir, (_hp.x = ux, _hp.y = uy, _hp.z = uz, _hp)) : 12;
+    if (landStorms) {
+      cu = CLOUDMAP.cuMax * smoothstep(0.05, 0.85, M.trigger[k]);
+      if (cu > 0) {
+        const cb = land + CLOUDMAP.cuBase[0] + (CLOUDMAP.cuBase[1] - CLOUDMAP.cuBase[0]) * heatBuilt(hour);
+        const ct = cb + CLOUDMAP.cuThick[0] + (CLOUDMAP.cuThick[1] - CLOUDMAP.cuThick[0]) * M.trigger[k];
+        const wc = cu;
+        if (wsum > 1e-6) { base = (base * wsum + cb * wc) / (wsum + wc); top = (top * wsum + ct * wc) / (wsum + wc); conv = (conv * wsum + wc) / (wsum + wc); }
+        else { base = cb; top = ct; conv = 1; }
+        low = 1 - (1 - low) * (1 - cu);
+      }
+    }
+    this.low[k] = low; this.conv[k] = conv; this.base[k] = base; this.top[k] = top; this.cu[k] = cu;
     this.storm[k] = a.storm;
-    if (a.coverSum > 1e-6) {
-      this.conv[k] = a.conv / a.coverSum;
-      this.base[k] = land + a.baseW / a.coverSum;
-      this.top[k] = land + a.topH / a.coverSum;
-    } else { this.conv[k] = 0; this.base[k] = land + 320; this.top[k] = land + 320; }
+    // high cloud: the anvils of the storms near by, and (?stormland=1) a slow field of cirrus
+    let high = 0;
+    const A = this._anv;
+    for (let q = 0; q < A.length; q += 5) {
+      const d = ux * A[q] + uy * A[q + 1] + uz * A[q + 2];
+      if (d > A[q + 3]) { const x = (1 - d) / (1 - A[q + 3]); high = 1 - (1 - high) * (1 - A[q + 4] * (1 - smoothstep(0.35, 1, x))); }
+    }
+    if (landStorms) {
+      const nc = noise3(ux * 2.3 + t * 0.0011, uy * 2.3, uz * 2.3 - t * 0.0007, 7177);
+      high = 1 - (1 - high) * (1 - CLOUDMAP.cirrus * smoothstep(0.15, 0.6, nc));
+    }
+    this.high[k] = high;
+    // valley cloud (?stormland=1): radiation mist lying in the hollows, gathered through the night, gone by mid-morning,
+    // only where the air is calm
+    if (landStorms && L) {
+      const hh = (hour + 12) % 24;      // 12 at midnight
+      const dawn = smoothstep(7.5, 14, hh) * (1 - smoothstep(18.5, 21.5, hh));
+      const calm = 1 - smoothstep(2, 6, Math.hypot(M.e10[k], M.n10[k]));
+      this.valley[k] = smoothstep(-12, -70, L.relief[k]) * dawn * calm * clamp01(moist) * (1 - L.water[k]);
+    } else this.valley[k] = 0;
     if (a.rate > 0) {
       const sun01 = sunDir ? ux * sunDir.x + uy * sunDir.y + uz * sunDir.z : null;
       const T = airTemperature(bodyId, h, uy, sun01);
       split(bodyId, a, moist, T, h, _sp);
-      this.rain[k] = _sp.rate; this.snow[k] = _sp.snow;
+      const cb = WX2.stormland ? 1 : ceilingBelow(bodyId, h);     // (weatherAt's ceiling, as rainAt above)
+      this.rain[k] = _sp.rate * cb; this.snow[k] = _sp.snow * cb;
     } else { this.rain[k] = 0; this.snow[k] = 0; }
+  }
+
+  // THE LIGHTNING OF EVERY STORM NEAR THE FOCUS (not only the one overhead, as here.weather.lightning): for each storm
+  // cell within CLOUDMAP.flashReach of the focus, its last flash (time, ground point, how long ago, a seed for its shape,
+  // cloud-to-ground or in the cloud) and when the next comes. The list is reused; .n entries are live.
+  flashesFor(bodyId, t, fx, fy, fz) {
+    const R = BODIES[bodyId].radius, C = this.cells, out = this.flashes;
+    out.n = 0;
+    const fl = Math.hypot(fx, fy, fz) || 1, ux = fx / fl, uy = fy / fl, uz = fz / fl;
+    for (let i = 0; i < C.n; i++) {
+      const c = C[i];
+      if (c.kindId !== 'storm' || !(c.w > 0.2)) continue;
+      const dc = R * Math.sqrt(Math.max(0, 2 - 2 * (ux * c.x + uy * c.y + uz * c.z)));
+      if (dc - c.r > CLOUDMAP.flashReach) continue;
+      flashOf(bodyId, this.seed, c, t, _li);
+      if (!(_li.last.t > -1e8)) continue;
+      const f = out[out.n] || (out[out.n] = {});
+      const L = _li.last, age = t - L.t;
+      f.t = L.t; f.age = age; f.x = L.x; f.y = L.y; f.z = L.z; f.nextIn = _li.nextIn;
+      f.distance = R * Math.sqrt(Math.max(0, 2 - 2 * (ux * L.x + uy * L.y + uz * L.z)));
+      f.cell = c.i; f.gen = c.gen;
+      f.seed = hash3(c.i, Math.floor(L.t * 10), c.gen, 4049);
+      f.kind = f.seed < 0.38 ? 'cg' : 'ic';              // about a third reach the ground
+      f.base = this.at(L.x, L.y, L.z, _ab).base;          // (the cloud's base over the land there, m above the datum)
+      // the flash's own brightness by its age alone (weather.js lightningFor's strokes, not dimmed by distance)
+      f.flash01 = age < 0.7 ? clamp01(Math.exp(-age / 0.16) * (0.62 + 0.38 * Math.cos(age * 118))) : 0;
+      out.n++;
+    }
+    return out;
   }
 
   // THE RAIN CELLS for the shaders: the raining systems nearest the focus, about the physics frame's anchor. frame: the
@@ -212,7 +331,7 @@ export class CloudField {
     const w00 = (1 - fx) * (1 - fy), w10 = fx * (1 - fy), w01 = (1 - fx) * fy, w11 = fx * fy;
     const B = (A) => A[k00] * w00 + A[k10] * w10 + A[k01] * w01 + A[k11] * w11;
     out.low = B(this.low); out.conv = B(this.conv); out.base = B(this.base); out.top = B(this.top); out.mid = B(this.mid);
-    out.high = B(this.high); out.valley = B(this.valley); out.rain = B(this.rain); out.snow = B(this.snow); out.storm = B(this.storm);
+    out.high = B(this.high); out.valley = B(this.valley); out.rain = B(this.rain); out.snow = B(this.snow); out.storm = B(this.storm); out.cu = B(this.cu);
     return out;
   }
 }

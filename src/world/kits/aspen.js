@@ -45,6 +45,7 @@ import { mulberry32 } from '../noise.js';
 // It is registered nowhere: the coordinator wires it into TALL_KITS.
 export function aspenGeometry(seed, lod, spec) {
   const rnd = mulberry32(seed), B = new Builder();
+  B.axis = !!(spec && spec.trees2);      // (?trees2=: kitbuild.js tube, the wood's pinch at the lens)
   const near = lod === 0;
   const sl = !!(spec && spec.slender);
   // three to seven stems: a clone puts up as many as it likes, and the stands in the references are never twins
