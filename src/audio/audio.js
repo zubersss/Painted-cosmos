@@ -6,6 +6,59 @@
 const PAD_ROOT = { mercury: 98, venus: 110, earth: 130.8, moon: 146.8, mars: 116.5, jupiter: 87.3, saturn: 103.8, uranus: 155.6, neptune: 138.6, pluto: 164.8 };
 const PAD_CHORD = { mercury: [1, 1.5, 2.25], venus: [1, 1.26, 1.5], earth: [1, 1.25, 1.5, 1.875], moon: [1, 1.5, 2], mars: [1, 1.2, 1.5], jupiter: [1, 1.335, 1.5], saturn: [1, 1.25, 1.682], uranus: [1, 1.122, 1.5], neptune: [1, 1.189, 1.782], pluto: [1, 1.5, 1.782] };
 
+// (group D, the weather, behind ?stormland=1 or ?wx2=1 -- read from the address here and not imported, so this file never
+//  needs the weather's modules: the coordinator's ruling of 24 Nov gave group D this one piece of PILOT's file. THUNDER
+//  BY DISTANCE: a near bolt CRACKS -- a split-second rip of high noise, then the boom -- and a far one only ROLLS, low,
+//  long and in several waves, as the sound comes back from the length of the channel; under leaves a little quieter, in
+//  the ship or under its hull muffled and quieter. The delay after the flash is the physics' (weather.js lightningFor:
+//  distance over the speed of sound of the air); the bang plays when its count-down crosses zero, as before. Without
+//  the switch the thunder is exactly what it was.)
+const STORM_AUDIO = (() => {
+  if (typeof location === 'undefined' || !location || !location.search) return false;
+  const q = new URLSearchParams(location.search), on = (k) => q.has(k) && q.get(k) !== '0' && q.get(k) !== 'false';
+  return on('stormland') || on('wx2');
+})();
+export const THUNDER = Object.freeze({
+  near: 450,        // m: within this a bolt cracks
+  far: 1600,        // m: beyond this it only rolls
+  sound: 340,       // m/s: the speed of sound the physics uses near the ground (for the plan's own length only)
+});
+// The distance of a flash from the loudness its thunder arrives with (weather.js lightningFor: thunder01 = 1 / (1 + d / 900)
+// at the moment of arrival, then falling over seconds): the game hands the audio thunderIn and thunder01, not the distance.
+export function thunderDistance(thunder01) { return 900 * (1 / Math.max(0.02, Math.min(1, thunder01)) - 1); }
+// What one thunderclap is, as layers of filtered noise: [{ at (s after the bang), type, freq, q, level, decay, attack }].
+// dist: m; cover01: leaves overhead; roof: in the ship or under its hull; seed: 0..1, so no two are alike.
+export function thunderPlan(dist, cover01 = 0, roof = false, seed = 0.5) {
+  const near = 1 - Math.min(1, Math.max(0, (dist - THUNDER.near * 0.5) / (THUNDER.far - THUNDER.near * 0.5)));   // 1 near .. 0 far
+  const loud = 1 / (1 + dist / 900);
+  const k = (1 - 0.25 * Math.min(1, cover01)) * (roof ? 0.55 : 1);
+  const L = [];
+  const h = (i) => { const x = Math.sin((seed * 97.13 + i * 13.7) * 12.9898) * 43758.5453; return x - Math.floor(x); };
+  if (dist < THUNDER.near && !roof) {
+    // the crack: a rip of high noise, the channel overhead tearing, then a slap
+    L.push({ at: 0, type: 'highpass', freq: 1800 + 900 * h(1), q: 0.4, level: 0.22 * loud * k, decay: 0.16, attack: 0.004 });
+    L.push({ at: 0.02, type: 'bandpass', freq: 520 + 260 * h(2), q: 0.7, level: 0.2 * loud * k, decay: 0.45, attack: 0.006 });
+  } else if (dist < THUNDER.far) {
+    // a clap, already softened by the air between
+    L.push({ at: 0, type: 'bandpass', freq: (roof ? 180 : 300) + 120 * h(3), q: 0.6, level: 0.12 * loud * k * near, decay: 0.7, attack: 0.02 });
+  }
+  // the boom and the roll: low, longer and slower to swell the further off; two to four waves
+  const waves = 2 + Math.round(2 * (1 - near) * h(4) + (1 - near));
+  let at = near > 0.5 ? 0.03 : 0.1 + 0.3 * h(5);
+  for (let i = 0; i < waves; i++) {
+    const lp = (roof ? 70 : 85 + 70 * near) * (0.85 + 0.3 * h(10 + i));
+    L.push({ at, type: 'lowpass', freq: lp, q: 0.4, level: (i === 0 ? 0.5 : 0.34 * (1 - 0.25 * i)) * loud * k, decay: 1.6 + 2.6 * (1 - near) + 0.8 * h(20 + i), attack: 0.03 + 0.5 * (1 - near) });
+    at += 0.5 + 1.1 * (1 - near) * (0.6 + 0.8 * h(30 + i));
+  }
+  return L;
+}
+// Whether the bang is due this frame: the count-down crossed zero since the last frame (or, first seen, has just passed).
+// maxLate (s, the storm switch: 0.5): a crossing found later than this is not a bang (a jump of the count-down from one
+// storm's to another's), and is not played late.
+export function thunderDue(prevThunderIn, thunderIn, maxLate = Infinity) {
+  return thunderIn != null && thunderIn <= 0 && (prevThunderIn == null ? thunderIn > -0.3 : prevThunderIn > 0 && thunderIn > -maxLate);
+}
+
 // createAudio({ enabled, context }): `context` (optional) is an AudioContext to build the graph
 // in, e.g. an OfflineAudioContext: tests/audiocheck.mjs renders each situation through this
 // very graph and measures it (levels, clipping, DC, spectrum, steadiness, clicks).
@@ -41,6 +94,17 @@ export function createAudio({ enabled = true, context = null } = {}) {
     const gain = ctx.createGain(); gain.gain.value = 0;
     src.connect(filt).connect(gain).connect(master); src.start();
     return { src, filt, gain };
+  }
+  // (group D) a burst `at` seconds from now with its own swell (thunder's layers)
+  function burstAt(at, freq, q, level, decay, type, attack) {
+    if (!ready || !(level > 0.0005)) return;
+    const src = ctx.createBufferSource(); src.buffer = node.white;
+    src.playbackRate.value = 0.8 + Math.random() * 0.4;
+    const filt = ctx.createBiquadFilter(); filt.type = type; filt.frequency.value = freq; filt.Q.value = q;
+    const g = ctx.createGain(); const t = ctx.currentTime + Math.max(0, at);
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(level, t + attack); g.gain.exponentialRampToValueAtTime(0.0001, t + attack + decay);
+    src.connect(filt).connect(g).connect(master);
+    src.start(t, Math.random() * 2); src.stop(t + attack + decay + 0.05);
   }
   function burst(freq, q, level, decay, type = 'bandpass') {
     if (!ready) return;
@@ -196,9 +260,15 @@ export function createAudio({ enabled = true, context = null } = {}) {
     // Thunder, when it arrives.
     // (The count-down crossing zero is the bang, whatever the frame rate; its loudness falls
     // with distance: thunder01.)
-    const due = s.thunderIn != null && s.thunderIn <= 0 && (prevThunderIn == null ? s.thunderIn > -0.3 : prevThunderIn > 0);
+    const due = thunderDue(prevThunderIn, s.thunderIn, STORM_AUDIO ? 0.5 : Infinity);
     prevThunderIn = s.thunderIn == null ? null : s.thunderIn;
-    if (due && ctx.currentTime - lastThunder > 1.5) {
+    if (due && STORM_AUDIO && air > 0 && ctx.currentTime - lastThunder > 0.6) {
+      // (group D, with the storm switch) by distance: a crack near, a long low roll far; quieter under leaves, muffled
+      // in the ship or under its hull
+      lastThunder = ctx.currentTime;
+      const dist = thunderDistance(s.thunder01 == null ? 0.5 : s.thunder01);
+      for (const l of thunderPlan(dist, s.canopy01 || 0, !!roof, Math.random())) burstAt(l.at, l.freq, l.q, l.level * air, l.decay, l.type, l.attack);
+    } else if (due && !STORM_AUDIO && ctx.currentTime - lastThunder > 1.5) {
       lastThunder = ctx.currentTime;
       const loud = air * (0.25 + 0.75 * (s.thunder01 == null ? 0.7 : Math.min(1, s.thunder01))) * (roof ? 0.6 : 1);
       burst(90, 0.4, 0.5 * loud, 4.5, 'lowpass');

@@ -461,6 +461,58 @@ A separate session builds W1 CLOUDS once the look director's sky ceiling (touch 
      `thunder01`; PILOT's audio would need to play them.
 - **Suites:** physics 441, world and looks 103, unit 325, 0 failing.
 
+### W3.10: THE GUST FRONT, THE PACE, AND THUNDER (the coordinator's rulings after W3.9; `weather.js`, `audio.js`)
+
+- **A correction of my own W3.9 report.** I wrote "the gust front is weak, 9 m/s at most". That was the wind at the
+  explorer's 2 m, not the standard 10 m.
+  - Measured properly, the 10 m wind (as the near grid composes it) under the OLD storms was already 8 to 25 m/s at
+    the leading edge.
+  - What was wrong was WHERE it blew: strongest inside the rain and on the REAR side (13 to 39 m/s behind), and only 1
+    to 4 m/s at 1.2 radii ahead.
+  - My first attempt (a stronger outflow) pushed the edge to 20 to 37 m/s and was too much. It was replaced before any
+    commit.
+- **The gust front at the leading edge** (`weather.js`, behind `?stormland`):
+  - A storm's outflow now peaks at its edge (0.95 to 1.1 radii), on the side it moves toward.
+  - It carries 0.8 of the storm's own speed there and 0.12 of its outflow behind, capped at 16.5 m/s (`STORMGUST`).
+  - MEASURED, six mature land storms, at 10 m:
+
+    | where | before | now |
+    | --- | --- | --- |
+    | 1.2 radii ahead | 1 to 4 m/s | 3 to 10 m/s |
+    | the leading edge (0.8 to 1 radius) | 8 to 25 m/s | 12 to 26 m/s |
+    | behind | 13 to 39 m/s | 12 to 22 m/s (the storm's own wind; its outflow there under a third of ahead's) |
+
+  - **In the game** (`W3.10_game_storm_pass_log.json`): the explorer's 2 m wind rises from 1.3 to 9 m/s about 18 s
+    BEFORE the first drizzle (5 s before), peaks at 11.5 m/s in the first heavy rain (about 15 to 16 m/s at 10 m over
+    open grass), and falls to 3 to 4 m/s behind.
+- **The pace:** no land storm drifts faster than 10 m/s times the dial (`STORMLAND.driftMax`).
+  - In the game the same storm now passes over the spawn in 157 s of cloud and 106 s of rain (was 105 and 70).
+  - The dial's table, measured again over 200 days, in `src/data/looks/earth.js`: dial 1 over the wood 22 % and in sight
+    62 %; 0.5 gives 11 / 42; 1.5 gives 27 / 68.
+  - `?stormswing=0` is still W3.2's exactly (hashed).
+- **Thunder** (`src/audio/audio.js`, PILOT's file, given to group D for this one piece; behind `?stormland` or `?wx2`,
+  read from the address; without them exactly as before):
+  - `thunderPlan(dist, cover, roof, seed)`: a near bolt (under 450 m) CRACKS, a rip of high noise then a slap, then the
+    boom and a roll. Up to 1.6 km it is a softened clap and rolls. Beyond, only two to four low rolls, slow to swell,
+    over up to about 10 s.
+  - Under leaves a quarter quieter; in the ship or under its hull no crack, muffled, and at most 0.55 of the loudness.
+  - The distance is read back from the loudness the thunder arrives with (`thunderDistance`), so `core/game.js` is
+    untouched.
+  - The bang plays when the count-down crosses zero, as before. With the switch, a crossing found more than 0.5 s late
+    is not played (`thunderDue(prev, now, 0.5)`).
+  - The physics now hands the count-down of the NEXT thunder among the storms here, so a switch between storms never
+    makes a late or double bang. In the first game run one late quiet roll had been read as 32 km off.
+  - **In the game:** 6 thunderclaps, each 0.9 to 1.8 s after its flash, within one frame of the distance over 340 m/s.
+    Near ones crack, ones 465 to 590 m off clap and roll.
+  - `tests/audiocheck.mjs`, which renders the graph in an OfflineAudioContext and fails on clipping, clicks or DC,
+    PASSES with and without the switch. Its click measure in the thunderstorm case goes from 1.2 to 2.3 with the
+    switch (the crack's 4 ms attack), within its limits.
+  - **Nobody has heard it**: there is no sound in a cloud session. The owner's ears decide.
+- **Tests:** `tests/thunder.test.mjs` (3: the bang due once at any frame rate and never late with the switch; the delay
+  as distance over the speed of sound with the distance read back; crack near, roll far, quieter under cover).
+  `stormland.test.mjs` gained the gust front and the drift cap.
+- **Suites:** physics 442, world and looks 103, unit 328, 0 failing. Switches off: bit-identical, 162,000 numbers.
+
 ## NEXT
 
 1. **The look director's second review** of the veils (W3.6), and their decision on region (a glaze keeping the region
