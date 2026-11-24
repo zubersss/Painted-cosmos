@@ -69,7 +69,19 @@ the distance (56 near, 22 from a kilometre: a path of broken light); the haze on
 water-only factor on `pcAtmosV`'s amount: TO BE AGREED with the look director); the waterline's dark band let go beyond
 20 to 80 m (it was an outline). `waterchunk.js` gained `WATERCHUNK_FAR_GLSL` (`pcWaterFar`, `pcWaterFarC`,
 `pcWaterShine`) for group C's far ground: interface sent to C, the byte for `frac` asked of C, not wired yet.
-SEEN and MEASURED: see the step 3 commit and `docs/shots/painter/water-paint/s3-*`.
+SEEN and MEASURED (phone settings; `s3-E3/E4/E5-phone-ab.jpg`, median of the water's pixels): E4 saturation 0.21 to
+0.60, value 0.68 to 0.58 (the band 0.45-0.70); E3 the pond a step darker than the river (0.69 against 0.75 for the whole
+water), the river still a little over the band; E5 0.12 to 0.37 saturation, value 0.56. After the look director's step-1
+note still water is the calmest thing: a step deeper, less mirror, strokes 10:1 and in close values, white only on the sun's
+path. NIGHT (F's ask): the light strokes keep a step of light over the pulled body, the moon's marks are left out of the
+pull (`s2-E1-night-23h-wpaint2-crest-ab.jpg`: water V 0.45, land 0.22).
+**THE DEFAULT since 24 Nov** (the owner's leave, the coordinator's word, F passed step 1): `?wpaint=1` -- the strokes of
+step 1 -- is the default; `?wpaint=2` adds the colour of step 3 (under review); `?wpaint=0` is v37's water, PROVEN: by day
+at the bank view (936 x 372, `&t=5`) 0 pixels differ from the build before steps 2 and 3. `uWPaint` holds the level.
+**E-W2's blue curtain** (the coordinator's request): patchgen's water index loop drops a cell whose four corners hold
+liquid but whose levels spread over 2 m and over half the cell (a face steeper than 1 in 2), only with a water world
+switch (`MODE.water.on`). MEASURED over all 30,720 patches of levels 5 and 6 and 800 of 7 and 8: 0 dropped in today's
+world, with or without the drainage.
 NOT done of FV5: shore-tangent dashes (they would bring the whorl back; the design lays still water along the wind)
 and the shore hairline (the owner's rule: no outlines) -- both said to C; the current made visible from 400 m.
 

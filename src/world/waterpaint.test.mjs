@@ -32,8 +32,8 @@ function stillAt(d, level = 7) {
   return P.water.turb[(j * V + i) * 4 + 3];
 }
 
-test('without ?wpaint=2 the still byte is 0 everywhere, as before', () => {
-  waterFromSearch('?look=oil');
+test('with ?wpaint=0 the still byte is 0 everywhere, as before', () => {
+  waterFromSearch('?look=oil&wpaint=0');
   for (const p of [[0, 100], [100, 330], [-1720, -1240]]) {
     const v = stillAt(off(P0, p[0], p[1]));
     assert.ok(v === null || v === 0, 'still ' + v + ' at ' + p);

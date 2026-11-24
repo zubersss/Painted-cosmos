@@ -13,10 +13,15 @@
 import { MODE } from '../data/mode.js';
 import { WATER_BENCH } from '../world/waterhooks.js';
 
-// The new paint is compiled in only with the oil look and ?wpaint=2 (read at use: MODE is set after this module runs).
-export function wpaintOn() { return !!(MODE.oil && MODE.water && MODE.water.wpaint >= 2); }
+// The new paint is compiled in with the oil look unless ?wpaint=0 (read at use: MODE is set after this module runs). Its
+// level is the uniform: 1 the new strokes (the default since 24 Nov), 2 and the new colour (steps 2-3, under review).
+export function wpaintOn() {
+  const on = !!(MODE.oil && MODE.water && MODE.water.wpaint >= 1);
+  if (on) WPAINT.uWPaint.value = Math.min(2, MODE.water.wpaint);
+  return on;
+}
 
-// 1: the new paint, 0: v37's. The same object in every water material, so one write switches them all.
+// 1: the new strokes, 2: and the new colour, 0: v37's. The same object in every water material, so one write switches them all.
 export const WPAINT = { uWPaint: { value: 1 } };
 
 // The speed test's rows for the new paint (WATER-DESIGN.md 6): at the bank and at the shore, v37's paint against the
@@ -26,7 +31,7 @@ export function benchWPaint() {
   if (benched || !wpaintOn()) return;
   benched = true;
   for (const view of ['bank', 'shore']) {
-    WATER_BENCH.push({ name: 'v37 water paint', view, on: () => { WPAINT.uWPaint.value = 0; }, off: () => { WPAINT.uWPaint.value = 1; } });
+    WATER_BENCH.push({ name: 'v37 water paint', view, on: () => { WPAINT.uWPaint.value = 0; }, off: () => { WPAINT.uWPaint.value = Math.min(2, MODE.water.wpaint); } });
   }
 }
 

@@ -1187,7 +1187,7 @@ void main() {
   // (THE WATER'S NEW PAINT, lane W3, ?wpaint=2: the sky as it is, not mixed with three tenths of white. From the air
   // the reflected ray points at the zenith, and the white made every water seen from above a pale grey: the design's
   // w06, w09, w15, w16. Until the look director's sky as painted (LOOK-AUDIT L9, pcSkyAt) is in, the keys' own sky.)
-  if (uWPaint > 0.5) skyc = skyT;
+  if (uWPaint > 1.5) skyc = skyT;
   #endif
   vec3 dark = pcDensity(uReflDark, 1.0 + (r3.g - 0.5) * 0.9);
   vec3 c = mix(dark, skyc, skyAmt);
@@ -1259,7 +1259,7 @@ void main() {
   // grey-beige. Now two metres of water from straight above shows a twentieth of its bed, half a metre two fifths, so
   // a brook and the shallows stay light and a river's middle and a lake go deep. And the shallows' own band (under
   // 0.42 m) is let go with the distance: round a submerged bump it is a ring, and from afar a thin pale line.)
-  if (uWPaint > 0.5) bedK = clamp((1.0 - fres) * 0.42 * exp(-vDep / 0.6) + shallow * 0.7 * (1.0 - 0.92 * smoothstep(30.0, 150.0, dist)), 0.0, 0.9);
+  if (uWPaint > 1.5) bedK = clamp((1.0 - fres) * 0.42 * exp(-vDep / 0.6) + shallow * 0.7 * (1.0 - 0.92 * smoothstep(30.0, 150.0, dist)), 0.0, 0.9);
   #endif
   c = mix(c, bed * mix(vec3(1.0), c, 0.45), bedK * (1.0 - vLiqP.y) * (1.0 - vLiqP.x * 0.8));
   // pigment pools at the water's edge
@@ -1267,7 +1267,7 @@ void main() {
   #ifdef PC_WPAINT
   // (the new paint: the pigment's band at the waterline is nine centimetres wide; beyond a few tens of metres it is
   // under a pixel, and it drew every shore and every submerged bump as a dark hairline, an outline)
-  if (uWPaint > 0.5) edgeK *= 1.0 - smoothstep(20.0, 80.0, dist);
+  if (uWPaint > 1.5) edgeK *= 1.0 - smoothstep(20.0, 80.0, dist);
   #endif
   c = pcDensity(c, 1.0 + edgeK);
   // bare-paper glints: broken dashes where ripples catch the light
@@ -1404,6 +1404,7 @@ void main() {
   // swallow the far water whole, strokes and all, and a storm sea painted as a pale blank is
   // no sea; the painter keeps it darker than the sky to the horizon and lets the stacks go pale)
   // (and what glows is seen through the haze: lava keeps its fire into the distance)
+  float wLitN = 0.0, wMarkN = 0.0;      // (the night's pull, below: the light strokes and the sun's or moon's marks)
   #ifdef PC_OIL
   {
     // water in strokes: short thin dashes lying along the water (the world's own chart, so they stay where they are),
@@ -1414,6 +1415,7 @@ void main() {
     vec2 wch = pcGroundChart(vBody, uBodyR);
     vec2 wdx = pcGroundChartD(vBody, -dFdx(vToCam), uBodyR), wdy = pcGroundChartD(vBody, -dFdy(vToCam), uBodyR);
     vec3 wr1, wr2; vec2 wds; float wown;
+    float wStill = 0.0;      // (how still the water is here, for the new colour below: the new paint's own, 0 in v37's)
     // (and the churn's own chart, below: it is turned to the current on a far lower floor than the dashes are,
     // because white water must MOVE even in an eddy, where the body of the water is rightly laid still)
     vec2 ach = wch, adx = wdx, ady = wdy;
@@ -1436,6 +1438,7 @@ void main() {
       vec2 kc = pcGroundChartD(vBody, cross(up, pcPhysWaterDir(sdir)), uBodyR);
       kc = dot(kc, kc) > 1e-12 ? normalize(kc) : vec2(1.0, 0.0);
       float still = max(vStill, 1.0 - smoothstep(0.30, 0.56, coh));
+      wStill = still;
       vec2 dS = mix(fc, dot(kc, fc) < 0.0 ? -kc : kc, still);
       dS = dot(dS, dS) > 1e-6 ? normalize(dS) : kc;
       float v0 = ${FLOW_V0};
@@ -1452,7 +1455,8 @@ void main() {
       float graze = 1.0 / max(rowF, 0.333);
       vec4 wo4 = pcStrokeOct4(dist * graze * 1.1, uOilPx.z * 1.1);
       vec3 woc3 = vec3(wo4.w - wo4.z, dFdx(wo4.w), dFdy(wo4.w));
-      pcWStrokes(wch, wdx, wdy, dS, v0 * (1.0 - still), wo4.x, 6.0, woc3, wr1, wr2, wown);
+      // (with the new colour, still water's strokes are longer, as calm water is laid: the look director, on E3)
+      pcWStrokes(wch, wdx, wdy, dS, v0 * (1.0 - still), wo4.x, uWPaint > 1.5 && still > 0.5 ? 10.0 : 6.0, woc3, wr1, wr2, wown);
       // (the lace: along the current wherever there is one, at the water's own pace, on its own octaves)
       aDir = coh > 0.02 ? fc : kc; aSpd = coh > 0.02 ? v0 : 0.0;
       ao4 = pcStrokeOct4(dist * graze * 1.1, uOilPx.z * 0.40);
@@ -1507,7 +1511,7 @@ void main() {
     float wBodyD = 1.9, wBodyK = 0.55, wSunE = 56.0, wSunK = 0.6;
     vec3 wLightC = mix(skyc, vec3(1.0), 0.25);
     #ifdef PC_WPAINT
-    if (uWPaint > 0.5) {
+    if (uWPaint > 1.5) {
       // THE WATER'S BODY BY ITS DEPTH (the new paint): its own wash laid heavier the deeper it is -- a brook and the
       // shallows a lighter blue, a river's middle and a lake deep (the owner's aerial river sheets: deep blue in the
       // middle, lighter at the edges); the light strokes carry the sky as it is, not whitened; and THE SUN'S PATH
@@ -1529,7 +1533,7 @@ void main() {
     vec3 cdeep = pcDensity(c, 2.1) * vec3(0.90, 0.92, 1.0), clight = mix(c, wLightC, 0.45);
     float wThL = 0.62, wThD = 0.30;
     #ifdef PC_WPAINT
-    if (uWPaint > 0.5) {
+    if (uWPaint > 1.5) {
       // BROKEN COLOUR, NOT A MIXTURE (the new paint). v37 mixed the water's blue body into what it mirrors, pixel by
       // pixel, and laid its strokes a step lighter and darker than that mixture: under a golden sky a blue body and a
       // cream sky mixed make GREY, and from the air every water was grey (the design's w06, w09, w15, w16). Now the
@@ -1543,10 +1547,17 @@ void main() {
       vec3 body = pcDensity(vLiq.rgb, wBodyD) * vec3(0.80, 0.95, 1.06);
       // (the mirror's share held under three fifths, and the light strokes a quarter the body's: with more, the water
       // from the air went LIGHTER than the land, median value 0.80 at E3, where the look rules hold it inside the land's)
-      float fr = clamp(0.12 + 0.45 * fres, 0.0, 0.60), bk = smoothstep(40.0, 220.0, dist) * liq;
-      vec3 cN = mix(body, cRef, fr), dN = pcDensity(body, 1.3) * vec3(0.90, 0.92, 1.0), lN = mix(body, mix(cRef, skyc, 0.35), 0.75);
+      // STILL WATER IS THE CALMEST THING ON THE MAP (the look director on the step-1 stills, E3: the pond read as crumpled
+      // foil, paler and busier than the river). So where it is still: its body a step deeper than the river's chop,
+      // less of the mirror in it, its strokes in two or three close values (few light ones, few deep ones), and white
+      // only where the sun's path crosses it. And all far water inside the look rules' water band (value 0.45 to 0.70,
+      // the water group's lead and the look director: it stood at 0.77 to 0.80 from 150 m).
+      body = pcDensity(vLiq.rgb, wBodyD + 0.45 * wStill) * vec3(0.80, 0.95, 1.06);
+      float fr = clamp(0.10 + 0.40 * fres, 0.0, 0.50) * (1.0 - 0.4 * wStill), bk = smoothstep(40.0, 220.0, dist) * liq;
+      vec3 cN = mix(body, cRef, fr), dN = pcDensity(body, mix(1.3, 1.12, wStill)) * vec3(0.90, 0.92, 1.0);
+      vec3 lN = mix(body, mix(cRef, skyc, 0.35), mix(0.62, 0.30, wStill));
       c = mix(c, cN, bk); cdeep = mix(cdeep, dN, bk); clight = mix(clight, lN, bk);
-      wThL = mix(0.62, mix(0.72, 0.50, fres), bk); wThD = mix(0.30, mix(0.36, 0.22, fres), bk);
+      wThL = mix(0.62, mix(mix(0.72, 0.50, fres), 0.86, wStill), bk); wThD = mix(0.30, mix(mix(0.36, 0.22, fres), 0.16, wStill), bk);
     }
     #endif
     float wsp = pow(max(dot(reflect(-normalize(vToCam), up), uSunDirL), 0.0), wSunE) * wSunK * max(uDayness, uMoon) * (1.0 - uWx.x);
@@ -1556,6 +1567,9 @@ void main() {
     w1 = wr1.z < 0.34 * wau ? mix(vec3(0.10, 0.74, 0.60), vec3(0.24, 0.96, 0.56), step(0.5, fract(wr1.z * 31.7))) : w1;
     w2 = wr2.z < 0.34 * wau ? mix(vec3(0.10, 0.74, 0.60), vec3(0.24, 0.96, 0.56), step(0.5, fract(wr2.z * 31.7))) : w2;
     w1 = wr1.y < wsp * 1.2 ? wsun : w1; w2 = wr2.y < wsp * 1.2 ? wsun : w2;
+    // (for the night's pull, at the end: which of the pixel's strokes are light ones, and which the sun's or the moon's marks)
+    wLitN = mix(wr2.x > wThL ? 1.0 : 0.0, wr1.x > wThL ? 1.0 : 0.0, wown);
+    wMarkN = mix(wr2.y < wsp * 1.2 ? 1.0 : 0.0, wr1.y < wsp * 1.2 ? 1.0 : 0.0, wown);
     c = mix(w2, w1, wown);
     // AERATED WATER, AS PAINT (the owner, 2026-11-23: "airration" -- the white of a rapid, the lace below a fall,
     // the stirred edge where water meets rock). The foam above this is the SEA's, raised by the wind, and the game
@@ -1598,14 +1612,16 @@ void main() {
   // night water as it was.
   {
     float nkW = uMoon * uLookF.x;
-    if (nkW > 0.0) c = mix(c, pcNight(c) * mix(1.0, uLookN.x, nkW), liq);
+    // (the look director, on the night stills: the strokes that catch the sky keep a step of light over the pulled body,
+    // so the river still reads as moving water, and the moon's own path is left out of the pull)
+    if (nkW > 0.0) c = mix(c, pcNight(c) * mix(1.0, uLookN.x, nkW * (1.0 - 0.45 * wLitN)), liq * (1.0 - wMarkN));
   }
   #endif
   float f = pcFogAmount(dist) * (1.0 - 0.45 * farSea) * (1.0 - 0.6 * vLiqP.x);
   #ifdef PC_WPAINT
   // (the new paint: water is a glossy surface and reads darker than the land's haze at a distance in every one of the
   // owner's aerial references; from 60 m the air takes less of it, a third less from 450 m. To be agreed with the look director.)
-  if (uWPaint > 0.5) f *= 1.0 - 0.35 * smoothstep(60.0, 450.0, dist) * liq;
+  if (uWPaint > 1.5) f *= 1.0 - 0.35 * smoothstep(60.0, 450.0, dist) * liq;
   #endif
   c = pcAtmosV(c, f, vView);
   pcWrite(c, mix(mix(0.7, 0.22, white), 1.0, vLiqP.y), normalize(normalMatrix * up), -vView.z, 2.0);

@@ -284,7 +284,7 @@ export function stepPatch(job, deadline) {
         wturb[q + 1] = aer <= 0 ? 0 : aer >= 1 ? 255 : Math.round(255 * aer);
       } }
     }
-    // HOW STILL THE WATER IS (the water's new paint, ?wpaint=2: lane W3, docs/lead/WATER-DESIGN.md 3.4), into the spare
+    // HOW STILL THE WATER IS (the water's new paint, ?wpaint=1, the default: lane W3, docs/lead/WATER-DESIGN.md 3.4), into the spare
     // byte aTurb.w: 0 water with a current .. 1 a pond, a lake, the sea. The paint lays still water's strokes along the
     // wind's crests, long and level, and never runs them; a current's along it, running. Three things say still:
     //  - the surface says so (s.still: the lakes, ponds and puddles of the bodies-of-water lane, when it is attached);
@@ -300,7 +300,7 @@ export function stepPatch(job, deadline) {
     //    BOTH sides across the current is a pool. Asked of the surface itself (two samples), on a grid of about 6 m over
     //    the patch and laid between, so a patch at any level gives about the same answer.
     // (Only with the switch: without it the byte stays 0, as it was, and nothing reads it.)
-    if (wturb && MODE.water && MODE.water.wpaint >= 2) {
+    if (wturb && MODE.water && MODE.water.wpaint >= 1) {
       const st = (_stillSamp && _stillSamp.w.length >= S.nB) ? _stillSamp : (_stillSamp = makeSample(S.nB));
       const gs = Math.max(1, Math.round(6 / cellM)), G = Math.ceil((V - 1) / gs) + 1;
       if (_stillGrid.length < G * G) _stillGrid = new Float32Array(G * G);
@@ -344,10 +344,27 @@ export function stepPatch(job, deadline) {
       }
     }
     const widx = [];
+    // (NO BLUE CURTAIN AT A FALL, for the bodies-of-water lane's waterfalls, E-W2: a cell with one wet corner is kept, so a
+    // cell across a lip -- the river cut at 19.6 m, the sea at 0 -- was one water quad as tall as the cliff, painted with
+    // the water's dashes: a flat blue curtain behind every fall. A cell whose four corners all hold liquid but whose
+    // levels spread over 2 m AND over half the cell's width (a face steeper than 1 in 2) is a fall, and the falls' own
+    // sheet draws it. Today's staircase lips, about 0.17 m a metre, are kept. MEASURED, all 30,720 patches of levels 5
+    // and 6 and 800 of 7 and 8 over Earth: today's oil world 0 cells dropped; with the drainage (?flow=1) 32, which is
+    // why it waits for a water part's switch.)
+    // (Only with a water part that changes the world, MODE.water.on: rivers=tree, lakes, falls, fjord ...; without one
+    // nothing is dropped and the mesh is as it was.)
+    let dropped = 0;
+    const fallCut = !!(MODE.water && MODE.water.on);
     for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
       const a = j * V + i, b = a + 1, c = a + V, d = c + 1;
+      const k0 = (j + 1) * E + (i + 1), l0 = _lq[k0], l1 = _lq[k0 + 1], l2 = _lq[k0 + E], l3 = _lq[k0 + E + 1];
+      if (fallCut && l0 > -1e5 && l1 > -1e5 && l2 > -1e5 && l3 > -1e5) {
+        const sp = Math.max(l0, l1, l2, l3) - Math.min(l0, l1, l2, l3);
+        if (sp > 2.0 && sp > 0.5 * cellM) { dropped++; continue; }
+      }
       if (wdep[a] > -0.45 || wdep[b] > -0.45 || wdep[c] > -0.45 || wdep[d] > -0.45) widx.push(a, b, d, a, d, c);
     }
+    stepPatch.fallCells = (stepPatch.fallCells || 0) + dropped;      // (counted for the test that proves none drop where nothing falls)
     // thin water (a brook) is left to the terrain's far colour on coarse patches
     if (widx.length && (level >= 5 || widx.length > N * N * 6 * 0.08)) water = { positions: wpos, depth: wdep, liq: wliq, liqP: wlp, turb: wturb, indices: new Uint16Array(widx) };
   }
