@@ -3471,6 +3471,13 @@ void main() {
         float fk = max(1.0, wPx * hf * grow / max(dw, 1e-5));
         dl *= fk * yrS; dw *= fk * yrS;     // (yrS: a head about to go out of flower shrinks first, the year above)
       }
+      // (audit 2, nearground.js PATCH: a drift's patch in the middle and far rings comes in only past 11-16 m, where the
+      // near ring's flowers end; nearer than that it would be a blob of colour over the flowers themselves)
+      if (kind > 5.35 && kind < 5.45) {
+        float pk = smoothstep(11.0, 16.0, di) * yrS;
+        if (pk < 0.02) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); return; }
+        dl *= pk; dw *= pk;
+      }
       #endif
       rel = ax * (iCol.a * (len / max(iAxis.w, 1e-4)) + max(dl, wPx * 1.3 * grow) * t) + sd * (side * max(dw, wPx * 1.3) * grow);
       #ifdef PC_OIL
