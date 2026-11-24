@@ -34,6 +34,18 @@ export function wakesOn() {
 }
 export const WAKE_U = { uWWake: { value: WAKES2.buf }, uWWakeN: { get value() { return WAKES2.live; }, set value(v) { /* (physics owns it) */ } } };
 
+// THE WATER THAT COMES AND GOES WITH THE RAIN (?runoff=1, the water group's lead's contract): the world's wetness now, the
+// streams' rise and the brown, from world/waterstate.js (fetched only with the switch; its hydrograph is stepped by the
+// water's frame), read every frame into uRunoff = (wet, rise m, mud, 0).
+let _ws = null, _wsP = null;
+const _ro = new Float32Array(4);
+export function runoffOn() {
+  if (!(MODE.oil && MODE.water && MODE.water.runoff)) return false;
+  if (!_wsP) _wsP = import('../world/waterstate.js').then((m) => { _ws = m.WATERSTATE; }).catch(() => {});
+  return true;
+}
+export const RUNOFF_U = { uRunoff: { get value() { if (_ws) { _ro[0] = _ws.wet; _ro[1] = _ws.rise; _ro[2] = _ws.mud; } return _ro; }, set value(v) { /* (the world's) */ } } };
+
 // 1: the new strokes, 2: and the new colour, 0: v37's. The same object in every water material, so one write switches them all.
 export const WPAINT = { uWPaint: { value: 1 } };
 
@@ -147,6 +159,38 @@ float pcWStrokes(vec2 ch, vec2 wdx, vec2 wdy, vec2 d, float spd, float w0, float
     if (best >= 0.0) return 1.0;            // (a stroke of the finer octave lies over every coarser one)
   }
   return 0.0;
+}
+// RAIN ON WATER (lane W3, ?wpaint=2 step 5): rings, each a thin crisp broken circle, growing and fading in about a third
+// of a second, from three grids of hashed cells in the water's own chart (no texture). How many by the rain rate AT THIS
+// POINT (mm/h: the weather's rain cells, pcRainCells, or the rate at the eye where there are none), so the edge of a
+// shower can be seen crossing a lake. Returns 0..1, how much of a ring's stroke covers the pixel.
+float pcRainRings(vec2 ch, float rate, float t, float pxM) {
+  if (rate < 0.2) return 0.0;
+  float share = clamp(rate / 15.0, 0.0, 1.0);          // (a downpour of 15 mm/h rings every cell's drop)
+  float cov = 0.0;
+  for (int g = 0; g < 3; g++) {
+    float C = 0.9 + 0.55 * float(g);                     // cell (m)
+    vec2 q = ch / C + vec2(17.3, 5.1) * float(g);
+    vec2 cell = floor(q), f = q - cell;
+    vec3 h = pcHash3(cell + 0.37 * float(g));
+    float per = 0.9 + 0.8 * h.z;                          // s between drops in this cell
+    float ph = fract(t / per + h.x);
+    if (h.y > share) continue;
+    float life = 0.33 / per;
+    if (ph > life) continue;
+    float a = ph / life;                                  // 0..1 through the ring's life
+    vec2 c = vec2(0.25 + 0.5 * h.x, 0.25 + 0.5 * h.y);
+    float r = (0.04 + 0.28 * a) * (0.7 + 0.6 * h.z) / C;  // radius in cells
+    float d = abs(length(f - c) - r) * C;                 // m from the ring's line
+    float w = max(0.02, 2.2 * pxM);                        // two pixels wide at least: a ring finer than that was lost
+    float ring = 1.0 - smoothstep(w * 0.5, w, d);
+    // broken: a ring is three or four arcs
+    vec2 dv = f - c; float an = atan(dv.y, dv.x);
+    // (a small young ring is whole: broken into arcs it was a ring of dots)
+    ring *= mix(1.0, step(0.35, fract(an * 0.6366 + h.z * 3.0)), smoothstep(0.10, 0.22, r * C));
+    cov = max(cov, ring * (1.0 - a));
+  }
+  return cov;
 }
 `;
 

@@ -150,8 +150,11 @@ water), the river still a little over the band; E5 0.12 to 0.37 saturation, valu
 note still water is the calmest thing: a step deeper, less mirror, strokes 10:1 and in close values, white only on the sun's
 path. NIGHT (F's ask): the light strokes keep a step of light over the pulled body, the moon's marks are left out of the
 pull (`s2-E1-night-23h-wpaint2-crest-ab.jpg`: water V 0.45, land 0.22).
-**THE DEFAULT since 24 Nov** (the owner's leave, the coordinator's word, F passed step 1): `?wpaint=1` -- the strokes of
-step 1 -- is the default; `?wpaint=2` adds the colour of step 3 (under review); `?wpaint=0` is v37's water, PROVEN: by day
+**THE DEFAULT went back to `?wpaint=0` (v37's water) on 24 Nov, afternoon** (the coordinator's ruling: the look director
+found the open sea from 150 m a checker of pale stair-stepped blocks at `?wpaint=1` and an electric blue, S 0.78, at
+`?wpaint=2`; E-W2's branch water-sea 9525b16 has a first fix). Next: tell rivers and ponds from the sea and wide open water
+so the strokes can be the default there. Before that it was: `?wpaint=1` -- the strokes of
+step 1 -- the default; `?wpaint=2` adds the colour of step 3 (under review); `?wpaint=0` is v37's water, PROVEN: by day
 at the bank view (936 x 372, `&t=5`) 0 pixels differ from the build before steps 2 and 3. `uWPaint` holds the level.
 **E-W2's blue curtain** (the coordinator's request): patchgen's water index loop drops a cell whose four corners hold
 liquid but whose levels spread over 2 m and over half the cell (a face steeper than 1 in 2), only with a water world
@@ -174,6 +177,29 @@ low flight's furrow, the gust and tornado. The script is in the scratch (lab: op
 { near, submerged, wet01, splash, speed, fallD, fallDrop, rainOn } -- the audio's voices; the figure's paint can read
 `wet01`. Phone cost DERIVED (not measured): the ring sum is about 30 instructions a source a pixel, only within 30 m
 and only while a ring lives; a wader keeps 10 to 16 alive.
+
+**Step 5 (24 Nov): rain on the water, and the runoff's paint (after merging origin/look-proto, 46b7657).** Behind
+`?wpaint=2`: under a closed sky the water takes the storm's grey and goes darker (`uWx.x`); RAIN RINGS in
+`waterchunk.js pcRainRings`: thin circles, small ones whole and larger ones broken into arcs, growing and fading in a third
+of a second, from three hashed grids in the water's own chart, as many as the veil of rain at the eye (`uWx.w`, 25 mm/h at
+its full) to 60 m (the kits' own ripples lie over them near the eye in the game). SEEN under the forced rain sky (`&wx=rain`):
+`s5-E1-forced-rain-bank-ab.jpg` (water median value 0.71 to about 0.6, still above the dark storm land), `s5-E1-forced-rain-
+4m-down-ab.jpg` (rings of all sizes on the darkened stream). NOT YET: the rate PER POINT from the weather's rain cells
+(`physics.fields.rain.cells` / `RAIN_GLSL` with `?cloudmap=1`): it needs a per-frame binding (a WATER_PART, which only runs
+with a water world switch) -- the rule is to bind in the same commit as the shader reads it, so it waits.
+RUNOFF (the water lead's contract, `?runoff=1` with `?rivers=tree`): patchgen packs `o.cap` (a byte of 0.6 m) and
+`o.swell` into a new attribute `aWater2` only with the switch (terrain.js binds it: one line); `WATER_FRAG` (`PC_RUNOFF`)
+shows water that exists only in the wet as deep as `WATERSTATE.wet` fills it (the gully bare in the dry), lifts the rest
+by `rise x swell`, and lays the brown of a swollen stream by `mud x swell` over its strokes. `uRunoff` reads
+`world/waterstate.js` every frame (fetched only with the switch). SEEN: `s5-runoff-runnel-dry-wet.jpg` (a runnel 24 m from
+the landing: a dry gully, then running after rain; 3 % of the picture changed).
+WHITE WATER (E's mountain streams, F's three points), behind `?wpaint=2`: no milk wash; the churn's strokes down the current
+in three steps -- a few of bare foam (V about 0.9), more of a pale grey-blue milk, the rest left out so the water and its
+wet bed show; and a thin stream far off takes the water's tone, not its pale bed (the bed-by-depth term fades from 80 to
+400 m). SEEN at E2's lip with `&aer=3` (`s6-E2-lip-white-water-ab.jpg`, `-crop-ab.jpg`; A = `?wpaint=1`): A a flat white
+band, B broken foam and milk with the blue between. Not seen on E's mountain streams (`?mount=1` is on design-water, not
+merged here).
+STILL TO DO: Neptune's aurora path on the lake (F agreed; where the aurora hangs asked of F); the far water byte for C.
 
 NOT done of FV5: shore-tangent dashes (they would bring the whorl back; the design lays still water along the wind)
 and the shore hairline (the owner's rule: no outlines) -- both said to C; the current made visible from 400 m.

@@ -13,7 +13,7 @@ import { FLORA_GLSL } from '../physics/flora.glsl.js';
 import { WATER_GLSL } from '../physics/water.js';
 import { VERT_PARS, VERT_END, FRAG_PARS, FOG_BANK, PAINT, AIR_FN } from './chunks.js';
 import { SPRAY_GLSL } from './dabtex.js';
-import { WATERCHUNK_GLSL, WPAINT, wpaintOn, benchWPaint, wakesOn, WAKE_U } from './waterchunk.js';      // (the water's new paint, ?wpaint=2, and the player's rings, ?wakes=2: lanes W3, W4)
+import { WATERCHUNK_GLSL, WPAINT, wpaintOn, benchWPaint, wakesOn, WAKE_U, runoffOn, RUNOFF_U } from './waterchunk.js';      // (the water's new paint, ?wpaint=2, and the player's rings, ?wakes=2: lanes W3, W4)
 import { WAKE2_GLSL } from '../physics/water.js';
 
 // THE LOOK AT THREE HUNDRED YARDS (the owner, 2026-11-22: "better lighting ... i want things to look high quality and
@@ -1084,6 +1084,14 @@ varying vec2 vTurb;
 // as the mesher measured it: world/patchgen.js. A byte of 0 everywhere without the switch, and nothing reads it)
 varying float vStill;
 #endif
+#ifdef PC_RUNOFF
+// (the water that comes and goes with the rain, ?runoff=1: x the depth that exists only in the wet, a byte of 0.6 m; y how
+// much this water rises after rain. uRunoff: the world's wetness now (x 0..1), the streams' rise (y, m), the brown (z):
+// world/waterstate.js)
+attribute vec4 aWater2;
+uniform vec4 uRunoff;
+varying float vCap, vSwell;
+#endif
 #endif
 varying vec3 vWake;
 #ifdef PC_POWERS
@@ -1120,6 +1128,13 @@ void main() {
   p += normalize(vBody) * 0.06 * (1.0 - smoothstep(0.05, 0.40, aDepth));
   vBody = p + uOrigin;
   vDepth = aDepth;
+  #if defined(PC_OIL) && defined(PC_RUNOFF)
+    // (the streams rise after rain by their own share of the world's rise; the mesh holds cells 0.45 m over the still level)
+    p += normalize(vBody) * uRunoff.y * aWater2.y;
+    vBody = p + uOrigin;
+    vDepth = aDepth + uRunoff.y * aWater2.y;
+    vCap = aWater2.x * 0.6; vSwell = aWater2.y;
+  #endif
   #ifdef PC_POWERS
     // MOVE WATER: in the parted channel the water's face is pressed down to its bed and cut away, and heaped a
     // hand's breadth along the two walls. (Measured from the eye, exactly: a planet-sized coordinate is too coarse.
@@ -1180,6 +1195,10 @@ varying vec2 vTurb;      // x the water's own speed (0: the mesher gave none), y
 uniform float uWPaint;   // the water's new paint (?wpaint=2): 1 on, 0 v37's (the speed test's row); render/waterchunk.js
 varying float vStill;    // how still the water is here, 0 a current .. 1 a pond, a lake, the sea (world/patchgen.js)
 #endif
+#ifdef PC_RUNOFF
+uniform vec4 uRunoff;    // the world's wetness now, the streams' rise (m), the brown (world/waterstate.js)
+varying float vCap, vSwell;      // the depth of water here that exists only in the wet (m); how much it rises after rain
+#endif
 #endif
 varying vec3 vWake;
 #define PC_PHYS_NO_WAKE
@@ -1221,6 +1240,11 @@ void main() {
   // (and the swash reaches 0.4 m above the still waterline at most, to a ragged line: the
   // mesh ends in straight cell edges a little higher, and a sheet of foam ended there as a white slab)
   float vDep = vDepth + pcPhysWaterRunup(vBody, 0.07);
+  #if defined(PC_OIL) && defined(PC_RUNOFF)
+  // THE RUNNELS COME AND GO WITH THE RAIN (?runoff=1, the water group's lead's contract): water that exists only in the wet
+  // is shown only as deep as the world's wetness fills it; in the dry the carved gully is bare
+  vDep -= (1.0 - uRunoff.x) * vCap;
+  #endif
   if (vDep < 0.0 || vDepth < -0.38 + (texture(uNoise3D, vBody / 2.1).g - 0.5) * 0.14) discard;
   vec3 up = normalize(vBody);
   vec3 Vd = normalize(vToCam);
@@ -1341,7 +1365,7 @@ void main() {
   // grey-beige. Now two metres of water from straight above shows a twentieth of its bed, half a metre two fifths, so
   // a brook and the shallows stay light and a river's middle and a lake go deep. And the shallows' own band (under
   // 0.42 m) is let go with the distance: round a submerged bump it is a ring, and from afar a thin pale line.)
-  if (uWPaint > 1.5) bedK = clamp((1.0 - fres) * 0.42 * exp(-vDep / 0.6) + shallow * 0.7 * (1.0 - 0.92 * smoothstep(30.0, 150.0, dist)), 0.0, 0.9);
+  if (uWPaint > 1.5) bedK = clamp((1.0 - fres) * 0.42 * exp(-vDep / 0.6) * (1.0 - 0.75 * smoothstep(80.0, 400.0, dist)) + shallow * 0.7 * (1.0 - 0.92 * smoothstep(30.0, 150.0, dist)), 0.0, 0.9);      // (and a thin stream far off takes the water's tone, not its pale bed: the look director)
   #endif
   c = mix(c, bed * mix(vec3(1.0), c, 0.45), bedK * (1.0 - vLiqP.y) * (1.0 - vLiqP.x * 0.8));
   // pigment pools at the water's edge
@@ -1675,6 +1699,23 @@ void main() {
     wLitN = mix(wr2.x > wThL ? 1.0 : 0.0, wr1.x > wThL ? 1.0 : 0.0, wown);
     wMarkN = mix(wr2.y < wsp * 1.2 ? 1.0 : 0.0, wr1.y < wsp * 1.2 ? 1.0 : 0.0, wown);
     c = mix(w2, w1, wown);
+    #ifdef PC_WPAINT
+    if (uWPaint > 1.5) {
+      // THE WEATHER ON THE WATER (the new colour, design 3.4 and 3.7). Under a closed sky the water takes the storm's grey
+      // and goes darker than the land (v37 laid half its own blue over the storm glaze "whatever the sky gives it", and
+      // the river stayed the brightest thing under a thunderhead: the design's w14). And RAIN RINGS: thin broken circles,
+      // growing and fading in a third of a second, as many as the rain is hard (the veil of rain in the air at the eye,
+      // uWx.w, as 25 mm/h at its full), to sixty metres; the kits' own ripples lie over them nearer the eye in the game.
+      c = mix(c, pcDensity(c * mix(vec3(1.0), skyc, 0.6), 1.7), 0.75 * uWx.x * liq);
+      float rainR = 25.0 * uWx.w * (1.0 - smoothstep(35.0, 60.0, dist));
+      if (rainR > 0.2) c = mix(c, mix(skyc, vec3(0.93), 0.55), pcRainRings(wch, rainR, uTime, max(dist * uOilPx.x, 1e-3)) * 0.9 * liq);
+    }
+    #endif
+    #ifdef PC_RUNOFF
+    // (a swollen stream carries the land's brown, as much as it has risen, laid over its strokes: ?runoff=1,
+    // world/waterstate.js mud)
+    c = mix(c, pcDensity(vec3(0.55, 0.44, 0.30), 1.3) * (0.85 + 0.3 * wr1.x), uRunoff.z * vSwell * 0.55 * liq);
+    #endif
     #ifdef PC_WWAKE
     // (the player's own rings, painted: where a ring's face is steep the stroke there takes the light step, in a line
     // as thin as the ring's own crest; ?wakes=2, physics/splash.js)
@@ -1691,6 +1732,7 @@ void main() {
     if (aer > 0.012) {
       // the body first: churned water carries so much air that the bed and the mirror stop showing through it, and
       // its colour goes to a pale MILK of its own wash. Not to white: a flat white area is not water, it is paper.
+      vec3 cUnder = c;      // (the water and its bed under the churn: the new paint's broken white leaves it showing)
       c = mix(c, mix(vec3(0.90, 0.94, 0.95), pcDensity(vLiq.rgb, 1.25), 0.30), aer * 0.66);
       // then the lace: a share of the fine strokes is bare white, the share growing with the churn, and the milk
       // shows between them. A smaller base width in pcStrokeOct gives finer strokes NEAR and exactly the same ones
@@ -1706,8 +1748,23 @@ void main() {
       }
       // (at full churn four strokes in five break, and they break to bare paper; a faintly stirred reach breaks a
       // few and breaks them only part of the way, or the first whisper of churn would be a sparkle of white specks)
+      #ifdef PC_WPAINT
+      if (uWPaint > 1.5) {
+        // WHITE WATER IN BROKEN STROKES (the new colour; the water group's lead and the look director on the mountain
+        // streams and the lips: at full churn v37's milk wash and four white strokes in five were one flat white, a
+        // paper ribbon down a slope). Now no wash: the churn's strokes, running down the current, in three steps --
+        // a few of bare foam (value about 0.9), more of a pale grey-blue milk, and the rest left out, so the water and
+        // the wet bed under it show between them; the more the churn, the more foam and milk.
+        vec3 foamC = vec3(0.89, 0.92, 0.94), milkC = mix(cUnder, vec3(0.72, 0.80, 0.86), 0.80);
+        float tF = 1.0 - 0.24 * aer, tM = 1.0 - 0.66 * aer;
+        vec3 a1 = ar1.x > tF ? foamC : (ar1.x > tM ? milkC : cUnder), a2 = ar2.x > tF ? foamC : (ar2.x > tM ? milkC : cUnder);
+        c = mix(a2, a1, aown);
+      } else
+      #endif
+      {
       float ath = 1.0 - aer * 0.78;
       c = mix(c, vec3(1.0), mix(step(ath, ar2.x), step(ath, ar1.x), aown) * (0.30 + 0.70 * aer));
+      }
     }
   }
   #endif
@@ -1758,6 +1815,8 @@ export function makeWaterMaterial(bodyU, skyU) {
   if (MODE.powers) { m.defines.PC_POWERS = 1; m.uniforms.uPwChanA = G.uPwChanA; m.uniforms.uPwChanB = G.uPwChanB; }
   // (the player's own small waves, ?wakes=2 with the oil look: render/waterchunk.js turns physics' set on)
   if (wakesOn()) { m.defines.PC_WWAKE = 1; m.uniforms.uWWake = WAKE_U.uWWake; m.uniforms.uWWakeN = WAKE_U.uWWakeN; }
+  // (the water that comes and goes with the rain, ?runoff=1: the mesh's aWater2 and the world's wetness now)
+  if (runoffOn()) { m.defines.PC_RUNOFF = 1; m.uniforms.uRunoff = RUNOFF_U.uRunoff; }
   // (the water's new paint, ?wpaint=2 with the oil look: compiled in behind one uniform the speed test can turn off;
   // without the switch the program is v37's, to the letter. render/waterchunk.js)
   if (wpaintOn()) { m.defines.PC_WPAINT = 1; m.uniforms.uWPaint = WPAINT.uWPaint; benchWPaint(); }
