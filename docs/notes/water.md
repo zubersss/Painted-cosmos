@@ -95,7 +95,7 @@ This session is the water group's lead: it answers their questions on the design
   sea everywhere on Earth); grey from the air (W3); basins flood only along channels (W2's lake beds).
 - TRIED AND REFUSED: the index built from a full window of the grid round each chunk (face arithmetic, no walk): 200 ms
   against the walk's 65; the walk stays.
-- NEXT for W1, if the review asks: stronger meanders on the big rivers (references: long S-bends); the main river by the
+- NEXT for W1: (done: the S-bends, below); the main river by the
   landing is now a brook (a spring with a larger catchment would bring a wider one past it: one number in Earth's look).
 
 ### RUNOFF (data side built 24 Nov, this session; ?runoff=1 with ?rivers=tree): the owner's own ask
@@ -121,6 +121,53 @@ DRAWING the water-paint lane's (E-W3/W4): the contract below was sent to it befo
   runnels (cyan) running at full wet and gone in the dry.
 - Test: `src/world/runoff.test.mjs` (the switch; the hydrograph's timings; the part reading the rain field when there is
   one, the wetness when not, not every frame; the data: runnels carry cap, rivers swell, the landing dry).
+
+### S-BENDS ON THE BIG RIVERS (built 24 Nov, this session; part of ?rivers=tree, ?bends=0 for the A side)
+
+The coordinator's order (3a): the references' long S-bends on the big rivers. All in `src/world/rivers.js` (and one switch,
+`?bends=0`, in `src/data/mode.js`).
+- A RIVER IS NOW ONE CURVE through its junctions: the STEMS (from a source down through every junction where it drains the
+  most, to where it joins a bigger river, the sea, the wood's edge or an outlet), drawn rivers first, tributaries after.
+  Before, each reach was a curve of its own held still at every junction, so no bend could run through one. `net.reaches`
+  is kept as before (the tests' and the hydro lane's account; each reach now says `thin` if the thinning at a wood's edge
+  reached back into it).
+- THE BENDS: wide rivers (full width 8 to 16 m and over, `bendW`) swing in the SINE-GENERATED CURVE of real meanders
+  (Langbein and Leopold; tabled once in `sbTable`, `sbend(phase, omega)`), wavelength `bendLam` = 16 widths (the field ratio is
+  10-14; at 12 the maps read as a wiggle from the air), swing angle `bendOmega` 1.25 rad varied 0.8-1.35x along the river,
+  bends early or late by `bendJit`; the bend's radius is about 0.2 of the wavelength (3 widths); the swing about a quarter
+  wavelength each way (+-100 m on a 26 m river). The phase runs along the whole stem. Streams keep W1's wander (now a noise
+  along the stem's own phase, so it too runs through junctions). The wide rivers' nodes are smoothed 6 passes more
+  (`bendSmooth`), so the bends are theirs and not the grid's turns.
+- A TRIBUTARY meets the bent river at the NEAREST point of its curve to the old junction (searched 60 points either way),
+  its last stretch carried there over max(60 m, 2.5x the carry); carried to where the junction itself went, short ones
+  folded back on themselves (turns of 120-133 degrees, found by a scan of every joined pair of segments; now none over 45).
+  A tributary keeps its OWN width to the junction (it used to flare to the main river's width over its last 98 m).
+- POINT BARS: every segment carries the turn at both ends (`sK`, widths over the bend's radius, signed; smoothed over 50 m);
+  on rivers of the bars (kM >= 2.2) a bar of sand lies on the inside of each bend, `2.2 hw` wide at a bend of radius
+  3 widths, standing a bank up from the water and flat (s 4.5-7: 0.2-0.6 m over the water), with a short scarp behind it
+  back to the land's own lie (so two rivers' grounds still meet: without it the ground behind a bar stepped where the nearest
+  river changed). The noise bars stay where they are wider.
+- THE CURVE is sampled at 6 m along the S-bends (12 m elsewhere) and THINNED to what it needs: no point further than `sag`
+  (0.25 m) from a segment, none longer than `segMax` (24 m), every node and change of reach kept. 10,423 segments (A side
+  8,284; before today 10,383). Before the thinning, 12 m samples stretched to 60 m segments across the bends (sags to 3.5 m).
+- FIXED ON THE WAY (a W1 fault, there since the first push): the index walked CHUNKS of eight consecutive segments, and a chunk
+  could run from one river's end into the next river anywhere on the world; the walk round its middle missed the far ones.
+  Measured by brute force on 4,000 points within 90 m of a river: 128 of 3,761 (3.4 %) had their nearest segment missing from
+  their node's list, by up to 65 m (a river's water or channel missing there). Now a chunk is segments that join, end to
+  start: 0 of 3,787.
+- BUILD (cold, fresh processes, same machine, same hour, against HEAD): HEAD drainage 57-60 + rivers 100-112 = 159-171 ms;
+  now drainage 56-60 + rivers 98-125 = 157-167 ms (one outlier 201). The S-bends cost about 25 ms; paid for by `len3` in place
+  of `Math.hypot` in the build and the index (the index 47-54 ms, was 64-73), the slow noises asked on a coarse grid, the turn
+  asked once a point. The machine is slower this hour than when W1's 143-147 ms was measured: HEAD itself reads 159-171 now.
+- SEEN (Node maps of the surface): the river south of the landing winds in S-bends with bars inside them; tributaries meet
+  it; the contours run through the bars without steps (`docs/shots/painter/water-sbends/map-ab-*.jpg`). SEEN (the gallery,
+  A `?bends=0` | B, `ab-*.jpg` there): 150 m over the river south of the landing (A straight, B one long S with its
+  tributary meeting it); 1 km (B winds into the distance in S-bends); 35 m over a bend (B's bar a pale crescent between the
+  trees and the water); on the bar at 1.7 m (pale ground, pebbles and thin grass, the river beside: it reads as a pebbly
+  bank more than as sand). The bars do not show from 150 m (the water's paint and the trees hide them).
+- Test changes (`src/world/rivers.test.mjs`): test 3 skips reaches the edge thinning reached into (`thin`); test 4 takes its
+  river inland (a reach ending in a junction, not thinned: at the sea the mouth is W2's, and the widest segment there was a
+  river thinning into a meadow).
 
 ### W2 THE BODIES OF WATER (branch `water-bodies`, session_01R5Bri2xowNiwS1SnP3VG3f; READ THIS to pick W2 up)
 

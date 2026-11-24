@@ -45,15 +45,18 @@ test('the water never rises downstream, and the rivers widen downstream', () => 
   // widths: along each reach the width at its last segment is at least the first's (save the thinning at a wood's edge)
   const first = new Map(), last = new Map();
   for (let s = 0; s < nSeg; s++) { if (!first.has(sR[s])) first.set(sR[s], sW[s * 2]); last.set(sR[s], sW[s * 2 + 1]); }
-  for (const [r, w0] of first) if (net.reaches[r].end !== 'edge' && last.get(r) < w0 - 1e-3) narrows++;
+  // (a river is one curve through its junctions, so the thinning over a wood's edge's last 90 m may reach back past a junction
+  //  into the reach above it: net.reaches[r].thin says so)
+  for (const [r, w0] of first) if (net.reaches[r].end !== 'edge' && !net.reaches[r].thin && last.get(r) < w0 - 1e-3) narrows++;
   assert.equal(narrows, 0, 'no reach ends narrower than it starts');
 });
 
 test('a sample on a river: the water there, a current running downstream, a level that falls with it', () => {
   const o = makeSample(S.nB), R = S.R;
-  // the middle of a long segment of a wide river
+  // the middle of a long segment of a wide river, inland (a reach that ends in a junction: at the sea the mouth is lane W2's
+  // to cut, and at a wood's edge the river thins away into ground that is not the wood's)
   let best = -1;
-  for (let s = 0; s < net.nSeg; s++) if (net.sW[s * 2] > 4 && (best < 0 || net.sQ[s] > net.sQ[best])) best = s;
+  for (let s = 0; s < net.nSeg; s++) if (net.sW[s * 2] > 4 && net.reaches[net.sR[s]].end === 'join' && !net.reaches[net.sR[s]].thin && (best < 0 || net.sQ[s] > net.sQ[best])) best = s;
   assert.ok(best >= 0);
   const a = best * 3;
   const mid = [0, 1, 2].map((i) => (net.sA[a + i] + net.sB[a + i]) * 0.5 / R);

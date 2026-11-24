@@ -15,10 +15,12 @@
 //   2. the LEVEL each river node's water stands at: the filled level, never more than `cutMax` under the base field, and
 //      never above any node upstream of it (a running minimum down the tree), so the water runs DOWNHILL ALL THE WAY;
 //   3. the REACHES: chains of nodes from a source or a junction to the next junction, the sea, or the wood's edge;
-//   4. each reach as a SMOOTH CURVE through its nodes (Catmull-Rom; at a junction the curve arrives along the river it joins,
-//      so a tributary meets it at a slant, as a real one does), BENT into meanders (a noise across the curve, wavelength
-//      eleven times the width, the field ratio of meanders; held to nothing at the reach's ends so the joins stay joined),
-//      cut into segments of `seg` metres with the width and the level at each end;
+//   4. each river as ONE SMOOTH CURVE through its nodes, on through every junction where it is the main stream (Catmull-Rom;
+//      a tributary arrives along the river it joins, so it meets it at a slant, as a real one does), BENT: a stream wanders
+//      (a noise across the curve, wavelength eleven times the width), a wide river swings in S-BENDS (the sine-generated
+//      curve of real meanders, wavelength sixteen widths, a bend's radius about three widths, with a sand bar inside each);
+//      held to nothing at its ends, and a tributary carried to where the river it joins was bent to; cut into segments of
+//      `seg` metres with the width, the level and the turn at each;
 //   5. an INDEX: every field node lists the segments within reach of it (exact distances near water), and a coarse field of
 //      the distance to the nearest river and that river's level at every node (for the land far from water).
 // WHAT A SAMPLE ASKS (net.sample, called from surface.js _base): the distance to the nearest water in the terms _riversOil
@@ -44,11 +46,21 @@ export const RIVER_DEF = {
   wMin: 1.4,       // metres of full width: a stream at its source ...
   wK: 2.2,         // ... growing as the root of what drains through it, w = wMin + wK sqrt(acc / 10) ...
   wMax: 26,        // ... to at most this
-  seg: 12,         // metres a segment (a 12 m chord of a bend 50 m round is 0.36 m off the curve)
+  seg: 12,         // metres the curve is sampled at (a third of it along S-bends) ...
+  sag: 0.25,       // ... and then thinned: no point of it further than this from a segment ...
+  segMax: 24,      // ... and no segment longer than this (metres)
   lam: 11,         // the meander's wavelength in widths (the field ratio of meanders), never under lamMin metres ...
   lamMin: 70,
   meander: 0.2,    // ... and how far it swings, a share of its wavelength
   wander: 26,      // metres: a slower wander on top (350 m), so a stream on an even slope is not a ruled line
+  bends: 1,        // the wide rivers' S-BENDS (?bends=0: the streams' wander on them too, as W1 first had it)
+  bendW: [8, 16],  // metres of full width over which a river's wander gives way to the S-bends
+  bendLam: 16,     // the S-bends' wavelength in widths: longer than the field ratio (10 to 14), for the LONG bends of the owner's
+                   // sheets (at 12 they read as a wiggle from the air: the maps of 24 Nov); a bend's radius is about 0.2 of it
+  bendOmega: 1.25, // radians: how far the river swings from the valley's line where it crosses it (the sine-generated curve's
+                   // omega, varied from 0.8 to 1.35 of this along the river): the swing is about a quarter wavelength each way
+  bendJit: 0.3,    // wavelengths: how far a bend may run early or late, so they are not a ruled wave
+  bendSmooth: 6,   // passes of smoothing more for the wide rivers' nodes (their bends their own, not the grid's turns)
   smooth: 3,       // passes of smoothing over the nodes (the grid's 45-degree zigzag out of the curve)
   edgeThin: 90,    // metres: a river that ends at the edge of the wood (a marsh, a dry biome) thins away over this
   springs: null,   // [{ near: [x, y, z], up, acc }]: catchment added so a stream runs past a place (a look's oil.springs)
@@ -140,104 +152,295 @@ export function buildRivers(S, D, opts) {
     if (pts.length < 2 && end !== 'sea') continue;
     reaches.push({ pts, end, endNode, before: par[p0] >= 2 ? main[p0] : -1 });
   }
+  // ... and the STEMS the curves are drawn along: from a source down through every junction where it is the river that drains
+  //     the most there (the main parent), to where it joins a bigger river, the sea, the wood's edge or an outlet. A river is
+  //     ONE curve through all its junctions, so its bends run on through them (the owner's sheets: one main river winding
+  //     down the whole picture in long S-bends); a stem that joins a bigger one is drawn after it, and arrives where that
+  //     river's bends have carried the junction.
+  const pieceR = new Int32Array(len).fill(-1);                  // the reach each node's piece of curve (to the next) is in
+  for (let ri = 0; ri < reaches.length; ri++) { const ps = reaches[ri].pts; for (let k = 0; k + 1 < ps.length; k++) pieceR[ps[k]] = ri; }
+  const rank = new Int32Array(len).fill(len);
+  for (let t = 0; t < ord.length; t++) rank[ord[t]] = t;
+  const stems = [];
+  for (let p0 = 0; p0 < len; p0++) {
+    if (!isR[p0] || par[p0] !== 0) continue;                    // (every stem starts at a source: a junction continues its main parent's)
+    const pts = [p0];
+    let p = p0, end = 'outlet', endNode = -1, join = -1;
+    for (let guard = 0; guard < 20000; guard++) {
+      const q = to[p];
+      if (q < 0) break;
+      if (!isR[q]) { kind(q); end = sea[q] >= o.seaMin ? 'sea' : 'edge'; endNode = q; break; }
+      if (main[q] !== p) { end = 'join'; join = q; break; }
+      pts.push(q); p = q;
+    }
+    if (pts.length < 2 && end !== 'sea' && end !== 'join') continue;
+    stems.push({ pts, end, endNode, join });
+  }
+  // (the routing order puts every node before everything upstream of it: by their last node, the rivers come before their
+  //  tributaries)
+  stems.sort((a, b) => rank[a.pts[a.pts.length - 1]] - rank[b.pts[b.pts.length - 1]]);
+  const tStems = now();
   // 4. the curves and their segments
-  const SA = [], SB = [], SW = [], SP = [], SQ = [], SR = [];   // (built as plain arrays, packed below)
-  const pt = new Float64Array(3), tmp = new Float64Array(12);
+  const SA = [], SB = [], SW = [], SP = [], SQ = [], SR = [], SK = [];   // (built as plain arrays, packed below)
+  const pt = new Float64Array(3);
   const width = (a) => Math.min(o.wMax, o.wMin + o.wK * Math.sqrt(a / 10));
+  const bendOf = (w) => (o.bends ? smoothstep(o.bendW[0], o.bendW[1], w) : 0);   // 0..1: how much a river of S-bends this is
   const nC = S.nC.n3;
-  for (let ri = 0; ri < reaches.length; ri++) {
-    const rc = reaches[ri], nodes = rc.pts, m = nodes.length;
-    // the control points: the nodes, with one more at each end for the curve's tangent there
-    const ctl = [];
-    const push = (q) => ctl.push([dir[q * 3], dir[q * 3 + 1], dir[q * 3 + 2]]);
-    if (rc.before >= 0) push(rc.before); else ctl.push(null);
-    for (const q of nodes) push(q);
-    const last = nodes[m - 1];
-    if (rc.end === 'join' && to[last] >= 0) push(to[last]);
-    else if ((rc.end === 'sea' || rc.end === 'edge') && rc.endNode >= 0) push(rc.endNode);
+  // (a) the nodes smoothed along their stems, the stem's two ends held (the grid's stair of 45-degree steps is taken out;
+  //     the wide rivers smoothed further, so their bends are their own and not the grid's turns)
+  const spos = Float64Array.from(dir);
+  for (const st of stems) {
+    const cn = st.end === 'join' ? st.pts.concat([st.join]) : st.pts, m = cn.length;
+    if (m < 3) continue;
+    const ps = new Float64Array(m * 3), pv = new Float64Array(m * 3), f2 = new Float32Array(m);
+    for (let k = 0; k < m; k++) { const q = cn[k]; ps[k * 3] = spos[q * 3]; ps[k * 3 + 1] = spos[q * 3 + 1]; ps[k * 3 + 2] = spos[q * 3 + 2]; f2[k] = bendOf(width(accF[q])); }
+    const passes = o.smooth + (o.bends ? o.bendSmooth : 0);
+    for (let it = 0; it < passes; it++) {
+      pv.set(ps);
+      for (let k = 1; k < m - 1; k++) {
+        const f = it < o.smooth ? 1 : f2[k];
+        if (f <= 0) continue;
+        for (let i = 0; i < 3; i++) ps[k * 3 + i] = pv[k * 3 + i] + f * 0.25 * (pv[(k - 1) * 3 + i] + pv[(k + 1) * 3 + i] - 2 * pv[k * 3 + i]);
+      }
+    }
+    for (let k = 1; k < m - 1; k++) { const q = cn[k]; spos[q * 3] = ps[k * 3]; spos[q * 3 + 1] = ps[k * 3 + 1]; spos[q * 3 + 2] = ps[k * 3 + 2]; }
+  }
+  const tSmooth = now();
+  // (b) each stem's curve, bent, cut into segments
+  const outOf = new Int32Array(len).fill(-1), idxOf = new Int32Array(len), stemOut = [];   // each node's point on its river's curve
+  const thinned = new Set();                                              // the reaches the thinning at a wood's edge reaches into
+  const P3 = (q) => [spos[q * 3], spos[q * 3 + 1], spos[q * 3 + 2]];
+  for (let si = 0; si < stems.length; si++) {
+    const st = stems[si], join = st.end === 'join';
+    const cn = join ? st.pts.concat([st.join]) : st.pts, m = cn.length, own = join ? m - 1 : m;
+    const last = st.pts[st.pts.length - 1];
+    // the control points: the nodes, with one more at each end for the curve's tangent there (at a junction the curve
+    // arrives along the river it joins, so a tributary meets it at a slant, as a real one does)
+    const ctl = [null];
+    for (const q of cn) ctl.push(P3(q));
+    if (join && to[st.join] >= 0) ctl.push(P3(to[st.join]));
+    else if ((st.end === 'sea' || st.end === 'edge') && st.endNode >= 0) ctl.push(P3(st.endNode));
     else ctl.push(null);
     if (m < 2) {      // a mouth right at a source: a stub toward the sea
-      if (rc.end === 'sea') mouths.push({ end: ctl[1].slice(), lip: ctl[2] ? ctl[2].slice() : ctl[1].slice(), width: width(accF[last]), levelTop: P[last], levelSea: S.sea == null ? 0 : S.sea, dir: null });
+      mouths.push({ end: ctl[1].slice(), lip: ctl[2] ? ctl[2].slice() : ctl[1].slice(), width: width(accF[last]), levelTop: P[last], levelSea: S.sea == null ? 0 : S.sea, dir: null, reach: pieceR[last] });
       continue;
-    }
-    // (the nodes smoothed toward their neighbours, the reach's own two ends held: the grid's stair of 45-degree steps is
-    //  taken out, and the joins stay where they were)
-    for (let it = 0; it < o.smooth && m > 2; it++) {
-      const prev = ctl.map((q) => (q ? q.slice() : q));
-      for (let k = 2; k < m; k++) for (let i = 0; i < 3; i++) ctl[k][i] = 0.25 * prev[k - 1][i] + 0.5 * prev[k][i] + 0.25 * prev[k + 1][i];
     }
     if (!ctl[0]) ctl[0] = [2 * ctl[1][0] - ctl[2][0], 2 * ctl[1][1] - ctl[2][1], 2 * ctl[1][2] - ctl[2][2]];
     const L1 = ctl.length - 1;
     if (!ctl[L1]) ctl[L1] = [2 * ctl[L1 - 1][0] - ctl[L1 - 2][0], 2 * ctl[L1 - 1][1] - ctl[L1 - 2][1], 2 * ctl[L1 - 1][2] - ctl[L1 - 2][2]];
-    // the curve sampled every `seg` metres, before the meander
-    const raw = [];
-    let arc = 0;
+    // the curve sampled every `seg` metres, before the bends (a tributary keeps its own width and catchment to the junction;
+    // its level falls to the river's there). A stretch of S-bends is sampled twice as finely: the bends stretch it three times
+    // where they cross the valley, where it runs straight; the curve is thinned to what it needs below.
+    const at = new Int32Array(m), stp = new Int32Array(m);
+    let nR = 1;
     for (let k = 0; k < m - 1; k++) {
-      const a = ctl[k], b = ctl[k + 1], c = ctl[k + 2], d = ctl[k + 3];
-      const chord = Math.hypot(c[0] - b[0], c[1] - b[1], c[2] - b[2]) * R;
-      const steps = Math.max(1, Math.ceil(chord / o.seg));
-      const wa = width(accF[nodes[k]]), wb = width(accF[nodes[k + 1]]), pa = P[nodes[k]], pb = P[nodes[k + 1]];
-      for (let s = 0; s < steps; s++) {
+      const b = ctl[k + 1], c = ctl[k + 2];
+      const chord = len3(c[0] - b[0], c[1] - b[1], c[2] - b[2]) * R;
+      const qa = accF[cn[k]], qb = join && k === m - 2 ? qa : accF[cn[k + 1]];
+      stp[k] = Math.max(1, Math.ceil(chord / (bendOf(Math.max(width(qa), width(qb))) > 0 ? o.seg / 2 : o.seg)));
+      nR += stp[k];
+    }
+    const X = new Float64Array(nR), Y = new Float64Array(nR), Z = new Float64Array(nR), RW = new Float64Array(nR);
+    const RP = new Float64Array(nR), RQ = new Float64Array(nR), RR = new Int32Array(nR);
+    let nk = 0;
+    for (let k = 0; k < m - 1; k++) {
+      const a = ctl[k], b = ctl[k + 1], c = ctl[k + 2], d = ctl[k + 3], steps = stp[k];
+      const qa = accF[cn[k]], qb = join && k === m - 2 ? qa : accF[cn[k + 1]];
+      const wa = width(qa), wb = width(qb), pa = P[cn[k]], pb = P[cn[k + 1]], r = pieceR[cn[k]];
+      at[k] = nk;
+      for (let s = 0; s < steps; s++, nk++) {
         const u = s / steps;
         catmull(a, b, c, d, u, pt);
-        const l = Math.hypot(pt[0], pt[1], pt[2]);
-        raw.push({ x: pt[0] / l, y: pt[1] / l, z: pt[2] / l, w: wa + (wb - wa) * u, P: pa + (pb - pa) * u, acc: accF[nodes[k]] + (accF[nodes[k + 1]] - accF[nodes[k]]) * u });
+        const l = len3(pt[0], pt[1], pt[2]);
+        X[nk] = pt[0] / l; Y[nk] = pt[1] / l; Z[nk] = pt[2] / l; RW[nk] = wa + (wb - wa) * u; RP[nk] = pa + (pb - pa) * u; RQ[nk] = qa + (qb - qa) * u; RR[nk] = r;
       }
     }
     {
-      const b = ctl[m], l = Math.hypot(b[0], b[1], b[2]);
-      raw.push({ x: b[0] / l, y: b[1] / l, z: b[2] / l, w: width(accF[last]), P: P[last], acc: accF[last] });
+      const b = ctl[m], l = len3(b[0], b[1], b[2]), qe = join ? accF[cn[m - 2]] : accF[cn[m - 1]];
+      at[m - 1] = nk;
+      X[nk] = b[0] / l; Y[nk] = b[1] / l; Z[nk] = b[2] / l; RW[nk] = width(qe); RP[nk] = P[cn[m - 1]]; RQ[nk] = qe; RR[nk] = pieceR[cn[m - 2]];
     }
-    for (let k = 1; k < raw.length; k++) arc += Math.hypot(raw[k].x - raw[k - 1].x, raw[k].y - raw[k - 1].y, raw[k].z - raw[k - 1].z) * R;
-    // the meander: a push across the curve, held to nothing at both ends so the joins stay joined
-    let wSum = 0; for (const q of raw) wSum += q.w;
-    const wMean = wSum / raw.length, lam = Math.max(o.lamMin, o.lam * wMean), taper = Math.min(lam, arc / 3);
-    const thinEnd = rc.end === 'edge' ? o.edgeThin : 0;
-    const out = [];
-    let sGo = 0;
-    for (let k = 0; k < raw.length; k++) {
-      const q = raw[k], qa = raw[Math.max(0, k - 1)], qb = raw[Math.min(raw.length - 1, k + 1)];
-      if (k > 0) sGo += Math.hypot(q.x - raw[k - 1].x, q.y - raw[k - 1].y, q.z - raw[k - 1].z) * R;
-      let tx = qb.x - qa.x, ty = qb.y - qa.y, tz = qb.z - qa.z;
+    const sArr = new Float64Array(nR);
+    for (let k = 1; k < nR; k++) sArr[k] = sArr[k - 1] + len3(X[k] - X[k - 1], Y[k] - Y[k - 1], Z[k] - Z[k - 1]) * R;
+    const arc = sArr[nR - 1];
+    // THE BENDS: a push across the curve. A stream wanders (a noise along it, wavelength eleven times its width); a wide river
+    // swings in S-BENDS, the sine-generated curve of real meanders (wavelength `bendLam` widths, the swing's angle `bendOmega`
+    // varied along it, so one stretch runs in tight loops and the next nearly straight). The phase is carried along the
+    // whole stem, so the bends run on through its junctions; both are held to nothing at the stem's ends.
+    const sx = (cn[0] % 997) * 1.37 + 31.7, sy = (cn[0] % 389) * 2.11 - 8.3, sz = 55.1;
+    const lamN0 = Math.max(o.lamMin, o.lam * RW[0]), lamN1 = Math.max(o.lamMin, o.lam * RW[nR - 1]);
+    const b0 = bendOf(RW[0]), b1 = bendOf(RW[nR - 1]);
+    const lamB0 = Math.max(o.lamMin, o.bendLam * RW[0]), lamB1 = Math.max(o.lamMin, o.bendLam * RW[nR - 1]);
+    const tA = Math.min(lamN0 + (lamB0 - lamN0) * b0, arc / 3), tB = Math.min(lamN1 + (lamB1 - lamN1) * b1, arc / 3);
+    // (a tributary's last stretch carried onto the river it joins, now that river is bent: to the NEAREST point of its curve
+    //  to the junction, which the bends never carry far, and over a length that grows with the carry; carried to where the
+    //  junction itself went, a short tributary folded back on itself, 24 Nov)
+    let dx0 = 0, dy0 = 0, dz0 = 0, Ls = 1;
+    if (join && outOf[st.join] >= 0) {
+      const J = st.join, po = stemOut[outOf[J]], j0 = idxOf[J], bx = spos[J * 3] * R, by = spos[J * 3 + 1] * R, bz = spos[J * 3 + 2] * R;
+      let bd2 = Infinity, bi = j0;
+      for (let k = Math.max(0, j0 - 60); k <= Math.min(po.n - 1, j0 + 60); k++) {
+        const ex = po.x[k] - bx, ey = po.y[k] - by, ez = po.z[k] - bz, d2 = ex * ex + ey * ey + ez * ez;
+        if (d2 < bd2) { bd2 = d2; bi = k; }
+      }
+      dx0 = (po.x[bi] - bx) / R; dy0 = (po.y[bi] - by) / R; dz0 = (po.z[bi] - bz) / R;
+      const dd = Math.sqrt(bd2);
+      Ls = dd > 0.01 ? (2.5 * dd > arc * 0.6 ? arc : Math.max(Math.min(60, arc * 0.6), 2.5 * dd)) : 1;
+    }
+    const thinEnd = st.end === 'edge' ? o.edgeThin : 0;
+    const OX = new Float64Array(nR), OY = new Float64Array(nR), OZ = new Float64Array(nR), OH = new Float64Array(nR);
+    let phN = 0, phB = 0;
+    // (the slow noises -- how tight the bends, how early or late, the 350 m wander -- asked on a coarse grid along the river
+    //  and eased between: they change over hundreds of metres, and asking them at every point of a river sampled every 6 m was
+    //  most of the build's time)
+    const GB = 0.0625, GS = 24, k1 = R / 350;
+    let gB = -1, om0 = 0, om1 = 0, jt0 = 0, jt1 = 0, gS = -1, wd0 = 0, wd1 = 0, wk0 = 0, wk1 = 0;
+    const omAt = (g) => Math.max(0.15, Math.min(SB_WMAX, o.bendOmega * (0.8 + 0.55 * nC(g * GB * 0.29 + sy, sz - 3.1, sx + 7.7))));
+    const jtAt = (g) => o.bendJit * nC(g * GB * 0.23 - sz, sx + 1.9, sy - 4.4);
+    const wdAt = (k) => o.wander * nC(X[k] * k1 - 17.2, Y[k] * k1 + 40.4, Z[k] * k1 - 3.3);
+    for (let k = 0; k < nR; k++) {
+      const ka = k > 0 ? k - 1 : 0, kb = k < nR - 1 ? k + 1 : nR - 1, sGo = sArr[k], w = RW[k];
+      if (k > 0) { const ds = sGo - sArr[k - 1], wm = (w + RW[k - 1]) * 0.5; phN += ds / Math.max(o.lamMin, o.lam * wm); phB += ds / Math.max(o.lamMin, o.bendLam * wm); }
+      const qx = X[k], qy = Y[k], qz = Z[k], tx = X[kb] - X[ka], ty = Y[kb] - Y[ka], tz = Z[kb] - Z[ka];
       // across: up x along
-      let ax = q.y * tz - q.z * ty, ay = q.z * tx - q.x * tz, az = q.x * ty - q.y * tx;
-      const al = Math.hypot(ax, ay, az) || 1; ax /= al; ay /= al; az /= al;
-      const k0 = R / lam, k1 = R / 350;
-      const hold = smoothstep(0, taper, sGo) * smoothstep(0, taper, arc - sGo);
-      const swing = o.meander * lam * nC(q.x * k0 + 31.7, q.y * k0 - 8.3, q.z * k0 + 55.1) + o.wander * nC(q.x * k1 - 17.2, q.y * k1 + 40.4, q.z * k1 - 3.3);
+      let ax = qy * tz - qz * ty, ay = qz * tx - qx * tz, az = qx * ty - qy * tx;
+      const al = len3(ax, ay, az) || 1; ax /= al; ay /= al; az /= al;
+      const bd = bendOf(w);
+      const hold = smoothstep(0, tA, sGo) * smoothstep(0, tB, arc - sGo);
+      let swing = bd < 1 ? (1 - bd) * o.meander * Math.max(o.lamMin, o.lam * w) * nC(phN + sx, sy, sz) : 0;
+      if (bd > 0) {
+        const gf = phB / GB, g = Math.floor(gf), u = gf - g;
+        if (g !== gB) { gB = g; om0 = omAt(g); om1 = omAt(g + 1); jt0 = jtAt(g); jt1 = jtAt(g + 1); }
+        swing += bd * Math.max(o.lamMin, o.bendLam * w) * sbend(phB + jt0 + (jt1 - jt0) * u, om0 + (om1 - om0) * u);
+      }
+      // (the wander asked at the raw points every GS metres, eased between them)
+      const gs = Math.floor(sGo / GS);
+      if (gs !== gS) {
+        gS = gs;
+        let a0 = k; while (a0 > 0 && sArr[a0] > gs * GS) a0--;
+        let a1 = k; while (a1 < nR - 1 && sArr[a1] < (gs + 1) * GS) a1++;
+        wk0 = a0; wk1 = a1; wd0 = wdAt(a0); wd1 = a1 !== a0 ? wdAt(a1) : wd0;
+      }
+      const sp = sArr[wk1] - sArr[wk0];
+      swing += sp > 0 ? wd0 + (wd1 - wd0) * Math.max(0, Math.min(1, (sGo - sArr[wk0]) / sp)) : wd0;
       const push2 = hold * swing / R;
-      let x = q.x + ax * push2, y = q.y + ay * push2, z = q.z + az * push2;
-      const l = Math.hypot(x, y, z); x /= l; y /= l; z /= l;
+      let x = qx + ax * push2, y = qy + ay * push2, z = qz + az * push2;
+      if (Ls > 1) { const f = 1 - smoothstep(0, Ls, arc - sGo); x += dx0 * f; y += dy0 * f; z += dz0 * f; }
+      const l = R / len3(x, y, z);
       const thin = thinEnd > 0 ? 0.12 + 0.88 * smoothstep(0, thinEnd, arc - sGo) : 1;
-      out.push([x * R, y * R, z * R, q.w * 0.5 * thin, q.P, q.acc]);
+      if (thin < 1 && RR[k] >= 0) thinned.add(RR[k]);
+      OX[k] = x * l; OY[k] = y * l; OZ[k] = z * l; OH[k] = w * 0.5 * thin;
     }
-    for (let k = 0; k < out.length - 1; k++) {
-      const a = out[k], b = out[k + 1];
-      SA.push(a[0], a[1], a[2]); SB.push(b[0], b[1], b[2]); SW.push(a[3], b[3]); SP.push(a[4], b[4]); SQ.push(a[5]); SR.push(ri);
+    stemOut.push({ x: OX, y: OY, z: OZ, n: nR });
+    for (let k = 0; k < own; k++) { outOf[cn[k]] = stemOut.length - 1; idxOf[cn[k]] = at[k]; }
+    // how the curve turns, in widths over the radius of the bend, signed (positive: turning left, the bend's inside on the
+    // left), smoothed over about 50 m of river either way so a bar lies along the whole bend: the sand bars lie on the inside
+    // of the bends. (Asked only at the points kept below.)
+    const kap = new Float32Array(nR);
+    const kapAt = (k) => {
+      if (k <= 0 || k >= nR - 1) return 0;
+      const t1x = OX[k] - OX[k - 1], t1y = OY[k] - OY[k - 1], t1z = OZ[k] - OZ[k - 1], t2x = OX[k + 1] - OX[k], t2y = OY[k + 1] - OY[k], t2z = OZ[k + 1] - OZ[k];
+      const l1 = len3(t1x, t1y, t1z), l2 = len3(t2x, t2y, t2z);
+      if (l1 < 1e-6 || l2 < 1e-6) return 0;
+      const cx = t1y * t2z - t1z * t2y, cy = t1z * t2x - t1x * t2z, cz = t1x * t2y - t1y * t2x;
+      const turn = Math.asin(Math.max(-1, Math.min(1, (cx * OX[k] + cy * OY[k] + cz * OZ[k]) / (R * l1 * l2))));
+      return turn / (0.5 * (l1 + l2)) * OH[k] * 2;
+    };
+    for (let k = 1; k < nR - 1; k++) kap[k] = kapAt(k);
+    const kSAt = (k) => {
+      let ks = 0, kw = 0;
+      for (let j = k; j >= 0 && sArr[k] - sArr[j] < 50; j--) { const wgt = 1 - (sArr[k] - sArr[j]) / 50; ks += kap[j] * wgt; kw += wgt; }
+      for (let j = k + 1; j < nR && sArr[j] - sArr[k] < 50; j++) { const wgt = 1 - (sArr[j] - sArr[k]) / 50; ks += kap[j] * wgt; kw += wgt; }
+      return kw > 0 ? ks / kw : 0;
+    };
+    // the curve thinned to the points it needs: none further than `sag` from the chord between two kept points, none more than
+    // `segMax` apart, and every node and every change of reach kept (so a junction is a segment's end)
+    const keep = new Uint8Array(nR);
+    keep[0] = 1; keep[nR - 1] = 1;
+    for (let k = 0; k < m; k++) keep[at[k]] = 1;
+    for (let k = 1; k < nR; k++) if (RR[k] !== RR[k - 1]) keep[k] = 1;
+    const sag2 = o.sag * o.sag, sm2 = o.segMax * o.segMax;
+    let i0 = 0, kS0 = kSAt(0);
+    while (i0 < nR - 1) {
+      let j = i0 + 1;
+      while (j < nR - 1 && !keep[j]) {
+        const c = j + 1, ux2 = OX[c] - OX[i0], uy2 = OY[c] - OY[i0], uz2 = OZ[c] - OZ[i0], uu = ux2 * ux2 + uy2 * uy2 + uz2 * uz2;
+        if (uu > sm2) break;
+        let ok = true;
+        for (let t = i0 + 1; t < c && ok; t++) {
+          const qx = OX[t] - OX[i0], qy = OY[t] - OY[i0], qz = OZ[t] - OZ[i0];
+          const tt = uu > 0 ? Math.max(0, Math.min(1, (qx * ux2 + qy * uy2 + qz * uz2) / uu)) : 0;
+          const ex = qx - ux2 * tt, ey = qy - uy2 * tt, ez = qz - uz2 * tt;
+          if (ex * ex + ey * ey + ez * ez > sag2) ok = false;
+        }
+        if (!ok) break;
+        j = c;
+      }
+      const kS1 = kSAt(j);
+      SA.push(OX[i0], OY[i0], OZ[i0]); SB.push(OX[j], OY[j], OZ[j]); SW.push(OH[i0], OH[j]); SP.push(RP[i0], RP[j]); SQ.push(RQ[i0]); SR.push(RR[i0]); SK.push(kS0, kS1);
+      i0 = j; kS0 = kS1;
     }
-    if (rc.end === 'sea' || rc.end === 'edge') {
-      const a = out[out.length - 1], b = rc.endNode >= 0 ? [dir[rc.endNode * 3], dir[rc.endNode * 3 + 1], dir[rc.endNode * 3 + 2]] : null;
-      const pb = out[out.length - 2];
-      if (rc.end === 'sea' || (rc.endNode >= 0 && sea[rc.endNode] > 0.15)) {
-        const dx = a[0] - pb[0], dy = a[1] - pb[1], dz = a[2] - pb[2], dl = Math.hypot(dx, dy, dz) || 1;
-        mouths.push({ end: [a[0] / R, a[1] / R, a[2] / R], lip: b, width: a[3] * 2, levelTop: a[4], levelSea: S.sea == null ? 0 : S.sea, dir: [dx / dl, dy / dl, dz / dl], reach: ri });
+    if (st.end === 'sea' || st.end === 'edge') {
+      const e = nR - 1, b = st.endNode >= 0 ? [dir[st.endNode * 3], dir[st.endNode * 3 + 1], dir[st.endNode * 3 + 2]] : null;
+      if (st.end === 'sea' || (st.endNode >= 0 && sea[st.endNode] > 0.15)) {
+        const dx = OX[e] - OX[e - 1], dy = OY[e] - OY[e - 1], dz = OZ[e] - OZ[e - 1], dl = len3(dx, dy, dz) || 1;
+        mouths.push({ end: [OX[e] / R, OY[e] / R, OZ[e] / R], lip: b, width: OH[e] * 2, levelTop: RP[e], levelSea: S.sea == null ? 0 : S.sea, dir: [dx / dl, dy / dl, dz / dl], reach: RR[e] });
       }
     }
-    void tmp;
   }
   const nS = SR.length;
   const net = new RiverNet(S, D, o);
   net.sA = Float64Array.from(SA); net.sB = Float64Array.from(SB); net.sW = Float32Array.from(SW); net.sP = Float32Array.from(SP);
-  net.sQ = Float32Array.from(SQ); net.sR = Int32Array.from(SR); net.nSeg = nS;
-  net.reaches = reaches.map((r) => ({ end: r.end, n: r.pts.length }));
+  net.sQ = Float32Array.from(SQ); net.sR = Int32Array.from(SR); net.sK = Float32Array.from(SK); net.nSeg = nS;
+  net.stems = stems.length;
+  net.reaches = reaches.map((r, i) => ({ end: r.end, n: r.pts.length, thin: thinned.has(i) }));
   net.mouths = mouths;
   net.riverNodes = 0; for (let p = 0; p < len; p++) if (isR[p]) net.riverNodes++;
-  net.ms.reaches = now() - t0;
+  net.ms.reaches = now() - t0; net.ms.stems = tStems - t0; net.ms.smooth = tSmooth - tStems;
   // 5. the index and the coarse field
   net._index(dir);
   net._lakes(dir);
   net.ms.total = now() - t0;
   return net;
+}
+
+// THE SINE-GENERATED CURVE (Langbein and Leopold, 1966): a river whose direction swings as theta = omega sin(2 pi t) along its
+// own length bends with the least work, and it is the shape real meanders take. Tabled once as the push across the valley
+// over one wavelength along it, in wavelengths, for omegas from 0 to SB_WMAX (past a right angle the loops fold back over
+// themselves, which a push across cannot draw)
+const SB_NW = 16, SB_NX = 64, SB_WMAX = 1.45;
+let SB = null;
+function sbTable() {
+  if (SB) return SB;
+  const T = new Float32Array(SB_NW * SB_NX), N = 2048, xs = new Float64Array(N + 1), ys = new Float64Array(N + 1);
+  for (let a = 0; a < SB_NW; a++) {
+    const om = SB_WMAX * a / (SB_NW - 1);
+    let lo = Infinity, hi = -Infinity;
+    for (let i = 0; i < N; i++) {
+      const th = om * Math.sin(2 * Math.PI * (i + 0.5) / N);
+      xs[i + 1] = xs[i] + Math.cos(th) / N; ys[i + 1] = ys[i] + Math.sin(th) / N;
+    }
+    for (let i = 0; i <= N; i++) { lo = Math.min(lo, ys[i]); hi = Math.max(hi, ys[i]); }
+    const X = xs[N], mid = (lo + hi) / 2;
+    let i = 0;
+    for (let k = 0; k < SB_NX; k++) {
+      const xt = k / SB_NX * X;
+      while (i < N - 1 && xs[i + 1] < xt) i++;
+      const u = (xt - xs[i]) / ((xs[i + 1] - xs[i]) || 1);
+      T[a * SB_NX + k] = (ys[i] + (ys[i + 1] - ys[i]) * u - mid) / X;
+    }
+  }
+  SB = T;
+  return T;
+}
+// the push across at `ph` wavelengths along (any number: one wave repeats), for a swing of `om` radians
+export function sbend(ph, om) {
+  const T = sbTable();
+  const fa = Math.max(0, Math.min(SB_NW - 1.0001, om / SB_WMAX * (SB_NW - 1))), a = fa | 0, ua = fa - a;
+  const fx = (ph - Math.floor(ph)) * SB_NX, x0 = Math.min(SB_NX - 1, fx | 0), ux = fx - x0, x1 = (x0 + 1) % SB_NX;
+  const i0 = a * SB_NX, i1 = i0 + SB_NX;
+  const r0 = T[i0 + x0] + (T[i0 + x1] - T[i0 + x0]) * ux, r1 = T[i1 + x0] + (T[i1 + x1] - T[i1 + x0]) * ux;
+  return r0 + (r1 - r0) * ua;
 }
 
 function catmull(a, b, c, d, u, out) {
@@ -274,7 +477,7 @@ class RiverNet {
   }
 
   bytes() {
-    let b = this.sA.byteLength + this.sB.byteLength + this.sW.byteLength + this.sP.byteLength + this.sQ.byteLength + this.sR.byteLength;
+    let b = this.sA.byteLength + this.sB.byteLength + this.sW.byteLength + this.sP.byteLength + this.sQ.byteLength + this.sR.byteLength + this.sK.byteLength;
     b += this.off.byteLength + this.items.byteLength + this.dn.byteLength + this.pn.byteLength;
     return b;
   }
@@ -295,11 +498,16 @@ class RiverNet {
     const sA = this.sA, sB = this.sB;
     // segments in chunks of eight: one walk of the grid round each chunk's middle, every segment of the chunk tested
     // against every node it reaches
-    const CH = 8, depth = Math.ceil((reach + CH * o.seg * 0.5) / (D.cell * 0.57)) + 1;
+    const CH = 8;
     const seen = new Int32Array(len).fill(-1);
     let stamp = 0;
-    for (let c0 = 0; c0 < nS; c0 += CH) {
-      const c1 = Math.min(nS, c0 + CH), mid = (c0 + c1) >> 1;
+    // (a chunk is up to CH segments that JOIN, end to start: one stem's. Chunks of consecutive numbers once ran on from one
+    //  river's end into the next river, anywhere on the world, and a walk round their middle missed the nodes by the far
+    //  ones: a river's last few segments could be missing from its nodes' lists, 24 Nov)
+    for (let c0 = 0, c1 = 0; c0 < nS; c0 = c1) {
+      c1 = c0 + 1;
+      while (c1 < nS && c1 - c0 < CH && sA[c1 * 3] === sB[c1 * 3 - 3] && sA[c1 * 3 + 1] === sB[c1 * 3 - 2] && sA[c1 * 3 + 2] === sB[c1 * 3 - 1]) c1++;
+      const mid = (c0 + c1) >> 1;
       const mx = (sA[mid * 3] + sB[mid * 3]) * 0.5, my = (sA[mid * 3 + 1] + sB[mid * 3 + 1]) * 0.5, mz = (sA[mid * 3 + 2] + sB[mid * 3 + 2]) * 0.5;
       const start = g.idOf(mx, my, mz);
       // (the chunk's own reach: how far its segments' ends lie from its middle; a node farther than that and `reach` from the
@@ -307,16 +515,18 @@ class RiverNet {
       let cr = 0;
       for (let s2 = c0; s2 < c1; s2++) {
         const a = s2 * 3;
-        cr = Math.max(cr, Math.hypot(sA[a] - mx, sA[a + 1] - my, sA[a + 2] - mz), Math.hypot(sB[a] - mx, sB[a + 1] - my, sB[a + 2] - mz));
+        cr = Math.max(cr, len3(sA[a] - mx, sA[a + 1] - my, sA[a + 2] - mz), len3(sB[a] - mx, sB[a + 1] - my, sB[a + 2] - mz));
       }
       const lim = reach + cr, lim2 = lim + D.cell;
+      // (the walk as deep as the chunk's own reach asks: its segments are up to segMax long, and S-bends' up to that too)
+      const depth = Math.ceil(lim / (D.cell * 0.57)) + 1;
       stamp++;
       let front = [start]; seen[start] = stamp;
       for (let lev = 0; lev <= depth && front.length; lev++) {
         const next = [];
         for (const p of front) {
           const px = dir[p * 3] * R, py = dir[p * 3 + 1] * R, pz = dir[p * 3 + 2] * R;
-          const dm = Math.hypot(px - mx, py - my, pz - mz);
+          const dm = len3(px - mx, py - my, pz - mz);
           if (dm < lim) {
             for (let s = c0; s < c1; s++) {
               if (segDist(sA, sB, s, px, py, pz) < reach) addPair(p, s);
@@ -359,7 +569,7 @@ class RiverNet {
       const k = D._nbs(p, nb);
       for (let t = 0; t < k; t++) {
         const q = nb[t];
-        const e = Math.hypot(dir[p * 3] - dir[q * 3], dir[p * 3 + 1] - dir[q * 3 + 1], dir[p * 3 + 2] - dir[q * 3 + 2]) * R;
+        const e = len3(dir[p * 3] - dir[q * 3], dir[p * 3 + 1] - dir[q * 3 + 1], dir[p * 3 + 2] - dir[q * 3 + 2]) * R;
         if (dp + e < dn[q]) { dn[q] = dp + e; pn[q] = pn[p]; heap.push(dn[q], q); }
       }
     }
@@ -419,7 +629,7 @@ class RiverNet {
         for (let t = 0; t < k; t++) { const q = nb[t]; if (comp[q] < 0 && lvl[q] - ter[q] > D.lakeMin) { comp[q] = id; st.push(q); } }
       }
       for (const p of nodes) { const q = to[p]; if (q >= 0 && comp[q] !== id) { out = q; break; } }
-      const cl = Math.hypot(cx, cy, cz) || 1;
+      const cl = len3(cx, cy, cz) || 1;
       lakes.push({ level: lvl[p0], nodes: nodes.length, centre: [cx / cl, cy / cl, cz / cl], out: out >= 0 ? [dir[out * 3], dir[out * 3 + 1], dir[out * 3 + 2]] : null, sill: null });
     }
     this.lakes = lakes;
@@ -481,10 +691,20 @@ class RiverNet {
       const n1 = nC(x * fb + 71.3, y * fb - 9.1, z * fb + 4.7);
       const p2 = Math.max(0, -n1 - 0.18) * (30 + 4 * kM) * near;
       const ns = nA(x * fs - 19.4, y * fs + 7.1, z * fs + 88.2);
-      const barW = Math.max(0, Math.abs(ns) - 0.14) * 3.2 * hw * near;
+      let barW = Math.max(0, Math.abs(ns) - 0.14) * 3.2 * hw * near, side = ns > 0, pb = false;
+      // (a POINT BAR on the inside of every bend, wider the tighter the bend: the owner's sheets, pale sand bars lying inside
+      //  each bend. sK is the turn in widths over the bend's radius, positive with the inside on the left. It stands a little
+      //  higher than the stretches of bar, a hand's breadth to a knee over the water, so it is sand and not a shallow)
+      if (o.bends) {
+        const kb = this.sK[si * 2] + (this.sK[si * 2 + 1] - this.sK[si * 2]) * st, bb = smoothstep(0.08, 0.3, Math.abs(kb)) * 2.2 * hw * near;
+        if (bb > barW) { barW = bb; side = kb > 0; pb = true; }
+      }
       const sI = Math.abs(sd), w = kP * W;
-      if (barW > 0.5 && sI > w && (sd > 0) === (ns > 0)) {
-        const out = sI - w, d = W + Math.min(out, barW) * 0.2 + Math.max(0, out - barW);
+      if (barW > 0.5 && sI > w && (sd > 0) === side) {
+        // (a point bar: a bank up from the water, a flat of sand, and behind it a short scarp back up to the land's own lie, so
+        //  that beyond the bar the ground is what it would be without it and two rivers' grounds still meet)
+        const out = sI - w, d = pb ? Math.min(W + out, W + 2.0 + Math.min(out, barW) * 0.12 + Math.max(0, out - barW) * 3)
+          : W + Math.min(out, barW) * 0.2 + Math.max(0, out - barW);
         if (d < best) { best = d; win = 0; bar = (1 - smoothstep(barW * 0.75, barW, out)) * smoothstep(0, 1.2, out); }
       } else lay(sI, kP, 1);
       if (p2 > 0.5) lay(Math.abs(sd + p2), 0.8 + 0.1 * kM, 1);
@@ -559,8 +779,11 @@ function segDist(sA, sB, s, px, py, pz) {
   const bx = sB[a] - ax, by = sB[a + 1] - ay, bz = sB[a + 2] - az;
   const qx = px - ax, qy = py - ay, qz = pz - az, bb = bx * bx + by * by + bz * bz;
   let t = bb > 0 ? (qx * bx + qy * by + qz * bz) / bb : 0; t = t < 0 ? 0 : t > 1 ? 1 : t;
-  return Math.hypot(qx - bx * t, qy - by * t, qz - bz * t);
+  return len3(qx - bx * t, qy - by * t, qz - bz * t);
 }
+
+// (Math.hypot is several times slower than this in V8, and the build and the index ask it hundreds of thousands of times)
+function len3(x, y, z) { return Math.sqrt(x * x + y * y + z * z); }
 
 function now() { return (typeof performance !== 'undefined' && performance.now) ? performance.now() : Number(process.hrtime.bigint()) / 1e6; }
 
@@ -583,7 +806,10 @@ export function attachRivers(S, drain) {
       if (near) springs.push({ near, up: sp.up || 0, acc: sp.acc || 30 });
     }
   }
-  const net = buildRivers(S, drain, springs ? { springs } : undefined);
+  const opts = {};
+  if (springs) opts.springs = springs;
+  if (MODE.water && MODE.water.bends === 0) opts.bends = 0;
+  const net = buildRivers(S, drain, opts);
   if (!net) return null;
   S.rivers = net;
   return net;
