@@ -501,7 +501,8 @@ flat varying vec3 vUpK;
 flat varying vec3 vDepth;
 flat varying vec2 vKB;    // x the kind (twigs, snow), y the light of a crown seen against the sun
 #ifdef PC_GUST
-flat varying float vGust; // how far a gust band has turned this crown's leaves their paler side (0: not at all)
+flat varying vec3 vGust;  // x how far a gust band has turned this crown's leaves their paler side (0: not at all), y how far a
+                          // turned crown is laid in ONE tone (by its smallness on the screen), z the share of its seen face lit
 #endif
 void main() {
   mat4 im = instanceMatrix;
@@ -590,7 +591,13 @@ void main() {
     float gPx = 2.0 * hwv.x * length(ir[0]) / max(di * uOilPx.x, 1e-4);      // (the crown's width on the screen, px)
     float gK = smoothstep(4.0, 10.0, gPx);
     float gTh = 0.375 + (fract(inst.z * 4.37 + 0.11) - 0.5) * 0.45 * gK;
-    vGust = step(gTh, pcGustBand(io + uOrigin)) * 0.85 * mix(0.67, 1.0, gK) * uImpGust;
+    float gT = step(gTh, pcGustBand(io + uOrigin)) * uImpGust;
+    // (and, the look director's choice (a), 24 Nov: under a band a crown under about 4 to 6 px is laid in ONE pale tone,
+    //  its lit and shaded strokes pulled together, fading in over the same 4 to 10 px. The one tone is the crown's mean:
+    //  one level under its cap, raised by the share of its seen face that its own side toward the sun lights. Shaped so
+    //  that the band is one input of it: the look director's audit, finding 1, may ask the same of every small crown.)
+    vec3 gSun = transpose(mat3(normalize(ir[0]), normalize(ir[1]), normalize(ir[2]))) * uSunDirL;
+    vGust = vec3(gT * 0.85 * mix(0.67, 1.0, gK), gT * (1.0 - gK), clamp(0.5 + 0.5 * dot(gSun, dc), 0.0, 1.0));
   #endif
   // the sun, up and the line of sight in the kit's own space (the crown's mass normals are measured there)
   mat3 rot = mat3(normalize(ir[0]), normalize(ir[1]), normalize(ir[2]));
@@ -629,7 +636,7 @@ flat varying vec3 vUpK;
 flat varying vec3 vDepth;
 flat varying vec2 vKB;
 #ifdef PC_GUST
-flat varying float vGust;
+flat varying vec3 vGust;
 #endif
 void main() {
   #include <logdepthbuf_fragment>
@@ -723,7 +730,7 @@ void main() {
     cs = pcSummerTree(cs, fract(vInst.z * 9.73 + 0.37), uLookG.y);      // (each summer tree its own green, as PROP_VERT and PROP_FRAG: chunks.js; the look director)
     // (a crown a gust band has turned: the ground's own pale, cooler step, whole: GUST in the vertex shader)
     #ifdef PC_GUST
-      if (vGust > 0.0) cs = mix(cs, min(vec3(1.0), mix(cs, vec3(dot(cs, vec3(0.3, 0.5, 0.2))), 0.45) * 1.12 + vec3(0.01, 0.03, 0.06)), vGust);
+      if (vGust.x > 0.0) cs = mix(cs, min(vec3(1.0), mix(cs, vec3(dot(cs, vec3(0.3, 0.5, 0.2))), 0.45) * 1.12 + vec3(0.01, 0.03, 0.06)), vGust.x);
     #endif
     cs = pcWetWash(pcDabTint(pcDensity(cs, 1.0 + vInst.y * 0.4), r3, 1.0 - twig), 0.7);
     bool snow = cls > 1.5 && cls < 2.5;
@@ -747,6 +754,23 @@ void main() {
       float cap = step(mix(0.05, 0.585, canopy), 0.5 + 0.5 * ms);
       lv = cap > 0.5 ? lc : max(lc - 1.0, 0.0);
     }
+    #ifdef PC_GUST
+      // (ONE TONE for a small crown a gust band has turned, the look director's (a): its colour the tree's own, with no
+      //  stroke's hue, inner shade or tint, stepped paler as above; its light the crown's mean. vGust.y fades it in.)
+      if (vGust.y > 0.0 && cls < 2.5) {
+        vec3 rc1 = vec3(fract(vInst.z * 3.1), fract(vInst.z * 7.3), fract(vInst.z * 11.7));
+        vec3 c1 = mix(vLA, vLB, clamp(0.5 + vInst.x * 0.5, 0.0, 1.0));
+        c1 = pcSummerTree(c1, fract(vInst.z * 9.73 + 0.37), uLookG.y);
+        c1 = mix(c1, min(vec3(1.0), mix(c1, vec3(dot(c1, vec3(0.3, 0.5, 0.2))), 0.45) * 1.12 + vec3(0.01, 0.03, 0.06)), vGust.x);
+        c1 = pcWetWash(pcDabTint(pcDensity(c1, 1.0 + vInst.y * 0.4), rc1, 1.0 - twig), 0.7);
+        if (snow) c1 = mix(vec3(0.95, 0.97, 1.0), vec3(0.80, 0.87, 0.98), rc1.x * 0.7);
+        float xc1 = max(0.80, vKB.y * 0.8 * (1.0 - twig));
+        if (snow) xc1 = max(xc1, 0.68);
+        float lc1 = floor(pcLevel(xc1, 0.002) + 0.5);
+        float lv1 = max(lc1 - 1.0, 0.0) + vGust.z;
+        cs = mix(cs, c1, vGust.y); lv = mix(lv, lv1, vGust.y);
+      }
+    #endif
     // (the shade of a crown through the shared foliage shade where the build has it, chunks.js pcShadeLeaf, as a
     //  near leaf takes its own; otherwise pcTone alone)
     c = ${'${IMPSHADE}'};
