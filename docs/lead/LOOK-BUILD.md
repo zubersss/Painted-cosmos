@@ -47,7 +47,7 @@ its A).
 | step | state | commit | what was seen |
 | --- | --- | --- | --- |
 | L0 | DONE | see git log (`[painter] L0`) | 7 stills (S1-S6 + S3 at night) against v37: 6 identical to the pixel, 1 with 2 pixels off by 1 of 255 (the 275 m night still); the shader text of all 36 materials of the autumn wood (comments and spaces taken out) identical, the 9 plant shaders with `pcFogAmountV` included, so those 2 pixels are the software renderer's run-to-run noise, not the change. Suites 325 / 65 / 416 pass. |
-| T1 | DONE | see git log (`[painter] T1`) | see the T1 section below; stills in docs/shots/painter/look-director/build/T1 (A = `?skyceil=0`, B = on) |
+| T1 | DONE, REWORKED as THE AIR'S TOP (+ FV1) | see git log (`[painter] T1`, then `[painter] The air's top`) | see the T1 section below and its AIR'S TOP part; stills in build/T1 and build/airtop |
 | L1 | DONE | see git log (`[painter] L1`) | see the L1 section below; stills in docs/shots/painter/look-director/build/L1 (_A off, _B on) |
 | L2 + L7 | DONE, REWORKED | see git log (`[painter] L2 + L7`, then `[painter] L2 + L7 reworked`) | see the L2 + L7 section below (and its REWORKED part); stills in docs/shots/painter/look-director/build/L2-L7 and L2-L7-rework |
 | L3 | DONE | see git log (`[painter] L3`) | see the L3 section below; stills in docs/shots/painter/look-director/build/L3 |
@@ -84,6 +84,35 @@ its A).
   fades into the sky's band at the limb and does not read as a cut-out, but the far-view group and L5 should look at
   this pair together. The ball in a pale sky at 3.5 km is the in-between of the climb; the weather group's orbit shell
   (their A8) takes over above 2.8 km.
+
+### THE AIR'S TOP: T1 REWORKED, FV1 FOLDED IN (the coordinator's review of T1: the day sky from 1 to 3 km was one flat pale grey-blue)
+
+- WHY IT WAS FLAT: Earth is 4 km across, so from a mile up the horizon stands 44 degrees below level (the dip,
+  acos(R / (R + h))). The sky laid its bands from LEVEL, and everything between the true horizon and level was the
+  flat band of haze laid under the horizon -- which from the air is nearly all the sky one sees.
+- `world/index.js` `AIRTOP` (`?airtop=0` is T1 as committed): (1) the sky goes to space by the dip, a day sky to
+  52 degrees and space by 66 (Earth 2.5 and 6.0 km; at the mile the dip is 44); a world's `weather.ceiling` row and
+  `?skyceil=a,b` still name heights. (2) `uSkyAir.z`, the true horizon as dot(view, up), eased in from a dip of 20
+  to 36 degrees (Earth 257 m to 944 m): `sky.js` lays its bands, strokes and low air band from there; the cloud
+  sea, the aurora's and the rain's directions keep the true angle (`eR`). (3) FV1, where a look sets
+  `oil.airTop` (Earth only): the ground's air and `space01` by the dip 46 to 59 degrees (Earth 1.76 to 3.68 km,
+  FV1's four times), the cloud deck with the sky's own turn (52 to 66), the relief rounding from 0.6 radii, the
+  visibility growing 1.2 m a metre over 160 m to 1,640 m more.
+- DERIVED: at 160 m and below every number is what it was (dip under 20 degrees, the visibility term 0), so on
+  foot and over the wood nothing moves. At 420 m (the standard S4 still) the visibility grows by 312 m and the
+  bands are laid a fifth of the way from the true horizon: see the S4 pair.
+- SEEN (opened), Earth autumn wood, noon, A `?airtop=0` against B: at 1,620 m (the mile) A is one flat pale
+  grey-blue (S 0.10 looking level), B a sky that deepens to blue overhead in painted bands down to a pale band at
+  the limb (S 0.54 level, 0.36 looking down 29 degrees); at the golden hour A is flat beige, B a warm sky graded
+  in bands; at 2,420 m the same (A S 0.10, B 0.54); at 1,020 m B is the same painted blue; at 3,520 m B is the
+  turn begun, the sky deepening toward indigo (sky 0.38), the world a small ball below.
+- STILL WRONG, said plainly: under the thick air FV1 keeps to 1.76 km the land at the mile is pale and pastel
+  (L5's job: a share of far paint kept and the air's hue); at 1,020 m a thin pale arc and some lilac wisps stand
+  near the limb (the sky's own cloud layer seen from above and the low band's stepped edge; not yet traced); the
+  golden hour's sky is warm but still khaki-leaning (F6, L5). Only Earth was looked at; other worlds keep T1's
+  heights for the ground (no `airTop`) and take the dip for the sky.
+- Stills: docs/shots/painter/look-director/build/airtop (c<height>_<down|level|gold>_<A|B>.jpg, and two
+  side-by-sides).
 
 ## L1, the night key: what was built and what was seen
 
