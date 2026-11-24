@@ -1684,6 +1684,7 @@ uniform vec4 uOilD;
 uniform vec4 uOilG;
 uniform float uNeedle;    // (?pines: a conifer's needles never narrower on the screen than this many pixels; 0 off, as before)
 uniform float uNearLeaf;  // (?nearleaf: 1 the leaves within arm's length shrink about their centres; 0 off, as before)
+uniform float uLeafGrow;  // (?leafgrow: the most a thinned broadleaf's kept leaf grows within 15 m of the eye, e.g. 1.15; 0 off, as before)
 uniform vec4 uOilPx;      // (x: the angle one pixel of the scene pass takes, radians: shared.js)
 uniform mat4 uShM;
 uniform highp sampler2D uShTex;
@@ -1781,7 +1782,14 @@ void main() {
     if (uLeafLod.x > 0.0 && aData.y > 4.5 && aData.y < 7.5) {
       float keep = clamp(pow(uLeafLod.x / max(di, 0.01), 1.2), uLeafLod.y, 1.0);
       float e = (1.0 - keep) * 1.06 - 0.03;
-      cardG = smoothstep(e - 0.03, e + 0.03, aData.w) * min(inversesqrt(keep), 2.4);
+      // (?leafgrow, 24 Nov, AN OPTION FOR THE OWNER, the look director's (C): on the phone's picture a near tree thins
+      //  its leaves from about 6.5 m, and each kept leaf grows to keep the crown as full, 1.3 times at 10 m and 1.65 at
+      //  15 m: the near crown's leaves read as hand-sized pieces. With the switch a broadleaf's kept leaf grows at most
+      //  uLeafGrow times within 15 m of the eye, back to today's growth by 25 m (before the near tree hands over at
+      //  27 m): the same leaves, smaller, the sky between them. The needle kinds are left alone (?pines). 0: as before.)
+      float gMax = 2.4;
+      if (uLeafGrow > 0.0 && uNeedle <= 0.0) gMax = mix(uLeafGrow, 2.4, smoothstep(15.0, 25.0, di));
+      cardG = smoothstep(e - 0.03, e + 0.03, aData.w) * min(inversesqrt(keep), gMax);
       cardO *= cardG;
       lp = aCard + cardO;
     }
@@ -1800,14 +1808,15 @@ void main() {
     }
     // NO SHARDS UNDER THE NOSE (?nearleaf, 24 Nov; the look director's audit 2, R3.6 'nothing reads as a polygon'): a
     // leaf a metre or two from the eye is a hand-sized flat kite filling a tenth of the picture, straight-edged, where
-    // the references' near leaves are small dabs with the sky between them. So within 4 m of the eye each leaf shrinks
-    // about its own centre, to 0.55 of its size at 1.0 m, on a short gentle ramp (smoothstep from 3.5 m: the look
-    // director's terms, so the change lies mostly where the leaf would fill the frame and a leaf does not visibly shy
-    // away as the player walks into a low bough -- the thing to watch on the owner's device); from 3.5 m out nothing
-    // changes (the owner approved the near trees at 5 to 15 m as they are). Whole and crisp: no fade, its place and
-    // its paint its own (inside 3.5 m a leaf is tens of pixels across, so the 3 px floor never binds here). 0: as before.
+    // the references' near leaves are small dabs with the sky between them. So within 5 m of the eye each leaf shrinks
+    // about its own centre, to 0.55 of its size at 1.0 m, on a gentle ramp (smoothstep from 5 m: the look director's
+    // terms, 24 Nov; first 3.5 m, which missed the audit's biggest pieces, leaves 3 to 4.5 m off; so the change lies
+    // mostly where the leaf would fill the frame and a leaf does not visibly shy away as the player walks into a low
+    // bough -- the thing to watch on the owner's device); from 5 m out nothing changes (the owner approved the near
+    // trees at 5 to 15 m as they are). Whole and crisp: no fade, its place and its paint its own (inside 5 m a leaf is
+    // tens of pixels across, so the 3 px floor never binds here). 0: as before.
     if (uNearLeaf > 0.0 && aData.y > 4.5 && aData.y < 6.5) {
-      cardO *= mix(0.55, 1.0, smoothstep(1.0, 3.5, distance((im * vec4(aCard, 1.0)).xyz, uCamLocal)));
+      cardO *= mix(0.55, 1.0, smoothstep(1.0, 5.0, distance((im * vec4(aCard, 1.0)).xyz, uCamLocal)));
       lp = aCard + cardO;
     }
   #endif
@@ -2991,6 +3000,7 @@ export function makePropMaterial(bodyU, opts = {}) {
     uOilDark: { value: new THREE.Vector4(opts.oilDark ? opts.oilDark[0] : 0, 0, 0, 0) },
     uNeedle: { value: opts.needle || 0 },      // (?pines: flora.js; 0 for every plant but a conifer with the switch on)
     uNearLeaf: { value: opts.nearLeaf || 0 },  // (?nearleaf: flora.js; 0 for every plant but a tree with the switch on)
+    uLeafGrow: { value: opts.leafGrow || 0 },  // (?leafgrow: flora.js; 0 for every plant but a tree with the switch on)
     uOilDarkA: v3(opts.oilDark && opts.oilDark[1], [0.5, 0.4, 0.4]), uOilDarkB: v3(opts.oilDark && opts.oilDark[2], [0.2, 0.15, 0.2]),
   };
   const defines = {};
