@@ -175,6 +175,7 @@ class Hydro {
     this.want = want;
     this.lakes = !!want.lakes; this.ponds = false; this.puddles = false;
     this.cors = []; this.nCor = 0; this.falls = [];
+    this.cn = Math.max(4, Math.round((Math.PI * 0.5 * S.R) / o.pondCell));   // (the 120 m cells' count a face edge)
     this.ms = { cuts: 0, ponds: 0 };
     this._q = { x: NaN, y: NaN, z: NaN, i: -1, t: 0, d: 0, k: 0, f: 0 };
     this._lv = [NaN];
@@ -316,6 +317,7 @@ class Hydro {
       this.cors.push(cor);
     }
     this.nCor = this.cors.length;
+    if (this.nCor) this._markCuts();
     this.ms.cuts = now() - t0;
   }
 
@@ -519,14 +521,15 @@ class Hydro {
   // ---- the hooks ------------------------------------------------------------------------------------------------------
   forest(S, c, b, H) {
     if (this.lakes) { const dr = c.dr || S._drain(c); lakeCarve(c, b, H, dr.fill, this.D.lakeMin, this.o); }
-    if (this.ponds) this._pond(S, c, b, H);
+    const cell = this.ponds || this.nCor ? this._cell(c.x, c.y, c.z) : -1;
+    if (this.ponds) this._pond(S, c, b, cell);
     if (this.puddles) this._puddle(S, c, b, H);
-    if (this.nCor) this._cutForest(S, c, b, H);
+    if (this.nCor && this.cutMark[cell]) this._cutForest(S, c, b, H);
   }
 
   coast(S, c, hh) {
     c.lqC = NaN;
-    if (!this.nCor) return hh;
+    if (!this.nCor || !this.cutMark[this._cell(c.x, c.y, c.z)]) return hh;
     const q = this._near(c.x, c.y, c.z);
     if (q.i < 0) return hh;
     const C = this.cors[q.i];
@@ -599,7 +602,7 @@ class Hydro {
   _buildPonds() {
     const t0 = now();
     const S = this.S, R = this.R, o = this.o, D = this.D;
-    const n = Math.max(4, Math.round((Math.PI * 0.5 * R) / o.pondCell));
+    const n = this.cn;
     this.pn = n;
     const cellOf = new Int32Array(6 * n * n).fill(-1);
     const P = [];       // per pond: cx, cy, cz, e1(3), e2(3), a, b, level, dep, seed
@@ -678,8 +681,9 @@ class Hydro {
 
   _faces() { return this._F || (this._F = FACES_LOCAL); }
 
-  _pond(S, c, b) {
-    const x = c.x, y = c.y, z = c.z, n = this.pn, FACES = this._faces();
+  // which cell of the 120 m grid (gnomonic, a face at a time) a direction lies in: the ponds' cells and the cuts' marks
+  _cell(x, y, z) {
+    const n = this.cn, FACES = this._faces();
     const ax = Math.abs(x), ay = Math.abs(y), az = Math.abs(z);
     let f;
     if (ax >= ay && ax >= az) f = x > 0 ? 0 : 1; else if (ay >= az) f = y > 0 ? 2 : 3; else f = z > 0 ? 4 : 5;
@@ -689,7 +693,31 @@ class Hydro {
     let i = Math.floor((a + 1) * 0.5 * n), j = Math.floor((bb + 1) * 0.5 * n);
     if (i < 0) i = 0; else if (i >= n) i = n - 1;
     if (j < 0) j = 0; else if (j >= n) j = n - 1;
-    const id = this.pondCellOf[f * n * n + j * n + i];
+    return f * n * n + j * n + i;
+  }
+
+  // every cell within reach of a cut, marked once at load: a sample anywhere else asks nothing of the cuts
+  _markCuts() {
+    const R = this.R, n = this.cn, mark = new Uint8Array(6 * n * n);
+    const cellM = (Math.PI * 0.5 * R) / n;
+    for (const C of this.cors) {
+      const reach = (C.HW ? Math.max(...C.HW) : C.hw) + this.o.bankMax + 4;
+      const step = Math.min(cellM * 0.4, 30), rr = reach + 8;
+      for (let k = 0; k < C.n; k++) {
+        const p = [C.st[k * 3], C.st[k * 3 + 1], C.st[k * 3 + 2]], [u, v] = axes(p);
+        for (let a = -rr; a <= rr + 1e-6; a += step) for (let b = -rr; b <= rr + 1e-6; b += step) {
+          if (a * a + b * b > rr * rr * 1.2) continue;
+          const q = norm3([p[0] + (u[0] * a + v[0] * b) / R, p[1] + (u[1] * a + v[1] * b) / R, p[2] + (u[2] * a + v[2] * b) / R]);
+          mark[this._cell(q[0], q[1], q[2])] = 1;
+        }
+      }
+    }
+    this.cutMark = mark;
+  }
+
+  _pond(S, c, b, cell) {
+    const x = c.x, y = c.y, z = c.z;
+    const id = this.pondCellOf[cell];
     if (id < 0) return;
     const P = this.pondData, o = id * 14, R = this.R;
     const dx = x - P[o], dy = y - P[o + 1], dz = z - P[o + 2];
@@ -724,8 +752,10 @@ class Hydro {
     const R = this.R, x = c.x, y = c.y, z = c.z, e = 4 / R, nA = S.nA.n3;
     const [u, v] = axes([x, y, z]);
     const f0 = R / 1900;
-    const relief = (px, py, pz) => 12 * nA(px * f0 + 3.1, py * f0 - 1.7, pz * f0 + 8.2) + forestRelief(S, px, py, pz) * H.rise;
-    const r0 = relief(x, y, z), ru = relief(x + u[0] * e, y + u[1] * e, z + u[2] * e), rv = relief(x + v[0] * e, y + v[1] * e, z + v[2] * e);
+    const big = (px, py, pz) => 12 * nA(px * f0 + 3.1, py * f0 - 1.7, pz * f0 + 8.2);
+    const r0 = big(x, y, z) + H.hill * H.rise;                         // (H.hill is forestRelief at this very point)
+    const ux = x + u[0] * e, uy = y + u[1] * e, uz = z + u[2] * e, vx = x + v[0] * e, vy = y + v[1] * e, vz = z + v[2] * e;
+    const ru = big(ux, uy, uz) + forestRelief(S, ux, uy, uz) * H.rise, rv = big(vx, vy, vz) + forestRelief(S, vx, vy, vz) * H.rise;
     const slope = Math.hypot(ru - r0, rv - r0) / 4;
     c.cap = puddleCap(H.sm, H.mi, slope, this.o, this.puddleK);
   }
