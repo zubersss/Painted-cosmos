@@ -483,8 +483,29 @@ FV7 of `docs/lead/FARVIEW-DESIGN.md`. A second session (A2, branch `trees-near`)
 the same time: this lane touches only the far parts of `flora.js`, `florakit.js`, the plant material's far branch,
 `render/impostor.js`, `render/shadow.js` and new rows in `core/bench.js`.
 
-**State (update this line every step):** (24 Nov, about 14:35) SMALL CROWNS ARE THE DEFAULT (`?impsmall=0` the old
-way), after F passed them with its colour fixes; look-director at 64f1742 merged into trees-far on the coordinator's
+**State (update this line every step):** (24 Nov, about 17:45) look-proto v39.2 (c7d8d9e: my small crowns and the
+shadow saving live) merged into trees-far (e85dabd), rendered, pushed. THE GUST ON THE FAR CROWNS ACCEPTED BY F at
+150 m and 600 m (11738e6: a small turned crown's one tone at its cap, two-thirds step); dormant until F's binding
+(look-director 43540c5) reaches look-proto, with D's physics (design-weather d2f4277). READY, NOT BUILT: F's audit finding
+1 (the wood as confetti from the air). THE COORDINATOR'S PLAN, on F's ?canopy=0 verdict: if it names the impostors,
+build behind ONE switch (a) crowns under 4-6 px as one tone lit on the sunward side (the gust block without the band;
+vGust.z's lit share is there for it), (b) crowns of 15-30 px at 150 m with fewer, bigger strokes so each tree is one
+mass with a lit and a shaded side (first idea: read a coarser atlas level there, which doubles a stroke on the screen,
+with the two light steps; the silhouette stays smooth by its cover), (c) a glade or two where the stand thins; if it
+names C's canopy dabs, give C the one-tone rule. Scratch worktrees removed, lab closed. Before that: THE GUST BANDS ON THE FAR CROWNS: F accepted 150 m;
+for 600 m F picked (a): under a band a crown under about 4-6 px is ONE tone (the tree's colour stepped paler, at the
+crown's mean light), fading in over 4-10 px of crown width. BUILT and pushed (dormant until F's binding PHYS.uPhysGust,
+look-director 43540c5, is merged here). SEEN in the scratch merge `gw` (trees-far + design-weather d2f4277 + D's two
+patches, never pushed): 600 m patches quieter and unified, not paler on the mean (V 0.67 -> 0.66); asked F how far to
+raise the tone toward the cap. F's audit finding 1 (the whole wood confetti from the air: one tone for EVERY crown under
+4-6 px) is proposed to the coordinator; the code is shaped for it (the band is one input) but NOT built until the
+coordinator gives it a lane. Before that: THE FAR CROWNS IN D'S GUST BANDS built and pushed,
+DORMANT until F's binding (render/shared.js PHYS.uPhysGust): render/impostor.js GUST (per tree, read once at its foot,
+each tree at its own threshold 0.15 + 0.45 seed, the ground's pale cooler step; ?gustbands=1 or ?wx2=1 from the address),
+flora.setImpGust, row 'far crowns: no gust bands' at 150 m. SEEN in a scratch merge with design-weather d2f4277 and D's
+two patches (gust held at 1.0): about 9 percent of the picture changes at 150 m and 600 m, turned crowns V +0.04 S -0.15
+(`A1_gust_*`); sent to F and D; not judged in motion. Waiting: F on the step's strength; F's audit. Before that: SMALL CROWNS ARE THE DEFAULT (`?impsmall=0` the old
+way), after F passed them with its colour fixes, and F signed off the real-branch pair (ea41746); look-director at 64f1742 merged into trees-far on the coordinator's
 word (8f3848d; the impostor.js conflict kept my azL line and added F's pcSummerTree line). SEEN on the real branch,
 phone settings, autumn wood 15.4 h, roof on (`A1_small_default_*`): 1 km, the impostor zone hue 92 S 0.36 V 0.56 with
 ?impsmall=0, hue 85 S 0.46 V 0.68 by default, C's roof past the reach hue 77 S 0.46 V 0.74; 150 m V 0.48 -> 0.51,

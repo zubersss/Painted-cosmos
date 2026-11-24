@@ -58,6 +58,13 @@ export const IMP = {
   // body (IMP_FRAG)
   small: (() => { const v = _q && _q.get('impsmall'); if (v === '0') return 0; const n = v == null ? NaN : +v; return v == null || v === '' || v === '1' || !isFinite(n) ? 12 : Math.max(0, Math.min(96, n)); })(),
 };
+// (the weather group's gust bands seen from the air, ?gustbands=1, or ?wx2=1 without it: read from the address here,
+//  never imported, the contract for the weather's modules; IMP_VERT GUST)
+const GUSTBANDS = (() => {
+  if (!_q) return false;
+  const on = (k) => _q.has(k) && _q.get(k) !== '0' && _q.get(k) !== 'false';
+  return _q.has('gustbands') ? on('gustbands') : on('wx2');
+})();
 // (the levels: halving until a view is a single texel; 96 texels give 96, 48, 24, 12, 6, 3 and the last is cut at 1.5
 //  so it stops at 3 -- six levels)
 IMP.levels = (() => { let n = 1, t = IMP.tile; while (t % 2 === 0 && t > 2) { t /= 2; n++; } return n; })();
@@ -463,12 +470,18 @@ uniform vec4 uFarFam[PC_NFAR];
 uniform float uFarKind[PC_NFAR];
 uniform vec3 uFarBarkA[PC_NFAR];
 uniform vec3 uFarBarkB[PC_NFAR];
-#ifdef PC_PHYS
+#if defined(PC_PHYS) || defined(PC_GUST)
 // THE FAR WOOD LEANS WITH THE WIND (?farwind=1, the weather group's far wind field; the coordinator, 24 Nov). The same
 // bend every plant reads (physics flora.glsl.js pcPhysBendLite: the bend field near, the far field beyond it once it is
 // bound), taken once at the tree's foot, leans the quad over it as a stiff stem leans: the top moves, the foot does not.
+// (and with ?gustbands=1 the same file's pcGustBand: GUST below)
 ${FLORA_GLSL}
+#endif
+#ifdef PC_PHYS
 uniform float uPhysOn;
+#endif
+#ifdef PC_GUST
+uniform float uImpGust;   // 1: the crowns take the gust bands (0: the speed test's row, flora.setImpGust)
 #endif
 varying vec3 vBody;
 varying vec3 vView;
@@ -487,6 +500,10 @@ flat varying vec3 vSunK;
 flat varying vec3 vUpK;
 flat varying vec3 vDepth;
 flat varying vec2 vKB;    // x the kind (twigs, snow), y the light of a crown seen against the sun
+#ifdef PC_GUST
+flat varying vec3 vGust;  // x how far a gust band has turned this crown's leaves their paler side (0: not at all), y how far a
+                          // turned crown is laid in ONE tone (by its smallness on the screen), z the share of its seen face lit
+#endif
 void main() {
   mat4 im = instanceMatrix;
   vec4 inst = aInst;
@@ -556,6 +573,34 @@ void main() {
   }
   vLA = lA; vLB = lB; vLC = lC; vBA = uFarBarkA[sp]; vBB = uFarBarkB[sp];
   vInst = inst;
+  // THE GUST BANDS SEEN FROM THE AIR (?gustbands=1 or ?wx2=1, the weather group, 24 Nov: "seen from above a gust is a
+  // SHEEN: the leaves turn their paler side and the pale patch runs downwind"; physics flora.glsl.js pcGustBand, one read
+  // of the shared noise). Read ONCE A TREE at its foot, so a crown turns whole and each stroke stays one colour; and each
+  // tree turns at its own threshold (its seed), so a band is a ragged patch of turned crowns, not a stripe with a soft
+  // edge, and a weaker wind (lower band values) turns fewer of them. The colour step is the ground's own (materials.js
+  // pcGroundPaint, PC_GUST): paler, a little cooler, so a band crosses meadow and wood as one thing.
+  // (the look director, 24 Nov, from 600 m: "the turned crowns are 2 to 3 pixels and each tree turns at its own
+  //  threshold, so the band becomes a salt of pale specks over the whole wood ... grain". Asked: the spread of the trees'
+  //  thresholds narrows with the crown's width on the screen (gK: 0 at 4 px and under, 1 at 10 px and over), so under a
+  //  band small crowns turn together; and a small crown's step is two thirds as strong, so the far bands do not outshout
+  //  the near ones. From 10 px up (the near wood from 150 m) all is as it was, which the look director passed.
+  //  MEASURED at 600 m: neither this nor reading the band as a mean of five points round the foot (tried, taken out)
+  //  made fewer specks: the specks are the turned crowns' own lit strokes, a paler third colour in a wood of 2 to 5 px
+  //  crowns of lit and dark strokes. What the far bands should be is with the look director.)
+  #ifdef PC_GUST
+    float gPx = 2.0 * hwv.x * length(ir[0]) / max(di * uOilPx.x, 1e-4);      // (the crown's width on the screen, px)
+    float gK = smoothstep(4.0, 10.0, gPx);
+    float gTh = 0.375 + (fract(inst.z * 4.37 + 0.11) - 0.5) * 0.45 * gK;
+    float gT = step(gTh, pcGustBand(io + uOrigin)) * uImpGust;
+    // (and, the look director's choice (a), 24 Nov: under a band a crown under about 4 to 6 px is laid in ONE pale tone,
+    //  its lit and shaded strokes pulled together, fading in over the same 4 to 10 px. The one tone is the crown's mean:
+    //  one level under its cap, raised by the share of its seen face that its own side toward the sun lights. Shaped so
+    //  that the band is one input of it: the look director's audit, finding 1, may ask the same of every small crown.)
+    vec3 gSun = transpose(mat3(normalize(ir[0]), normalize(ir[1]), normalize(ir[2]))) * uSunDirL;
+    // (z, the lit share, is not read by the gust's one tone, which sits at the cap; it is kept for the one tone of every
+    //  small crown that the look director's audit, finding 1, may ask for: "lit by its own side toward the sun")
+    vGust = vec3(gT * 0.85 * mix(0.67, 1.0, gK), gT * (1.0 - gK), clamp(0.5 + 0.5 * dot(gSun, dc), 0.0, 1.0));
+  #endif
   // the sun, up and the line of sight in the kit's own space (the crown's mass normals are measured there)
   mat3 rot = mat3(normalize(ir[0]), normalize(ir[1]), normalize(ir[2]));
   vSunK = transpose(rot) * uSunDirL;
@@ -592,6 +637,9 @@ flat varying vec3 vSunK;
 flat varying vec3 vUpK;
 flat varying vec3 vDepth;
 flat varying vec2 vKB;
+#ifdef PC_GUST
+flat varying vec3 vGust;
+#endif
 void main() {
   #include <logdepthbuf_fragment>
   // (the speed test, shared.js uOilL.y = 4: written at once, before the atlas is read or anything is cut away; alpha 1,
@@ -682,6 +730,10 @@ void main() {
     vec3 cs = mix(vLA, vLB, clamp(0.5 + hue * 0.5, 0.0, 1.0));
     cs = mix(cs, vLC, clamp(azL * 0.55 + (r3.y - 0.5) * 0.6, 0.0, 1.0));
     cs = pcSummerTree(cs, fract(vInst.z * 9.73 + 0.37), uLookG.y);      // (each summer tree its own green, as PROP_VERT and PROP_FRAG: chunks.js; the look director)
+    // (a crown a gust band has turned: the ground's own pale, cooler step, whole: GUST in the vertex shader)
+    #ifdef PC_GUST
+      if (vGust.x > 0.0) cs = mix(cs, min(vec3(1.0), mix(cs, vec3(dot(cs, vec3(0.3, 0.5, 0.2))), 0.45) * 1.12 + vec3(0.01, 0.03, 0.06)), vGust.x);
+    #endif
     cs = pcWetWash(pcDabTint(pcDensity(cs, 1.0 + vInst.y * 0.4), r3, 1.0 - twig), 0.7);
     bool snow = cls > 1.5 && cls < 2.5;
     if (snow) cs = mix(vec3(0.95, 0.97, 1.0), vec3(0.80, 0.87, 0.98), r3.x * 0.7);
@@ -704,6 +756,28 @@ void main() {
       float cap = step(mix(0.05, 0.585, canopy), 0.5 + 0.5 * ms);
       lv = cap > 0.5 ? lc : max(lc - 1.0, 0.0);
     }
+    #ifdef PC_GUST
+      // (ONE TONE for a small crown a gust band has turned, the look director's (a): its colour the tree's own, with no
+      //  stroke's hue, inner shade or tint, stepped paler as above; its light the crown's cap. vGust.y fades it in.)
+      if (vGust.y > 0.0 && cls < 2.5) {
+        vec3 rc1 = vec3(fract(vInst.z * 3.1), fract(vInst.z * 7.3), fract(vInst.z * 11.7));
+        vec3 c1 = mix(vLA, vLB, clamp(0.5 + vInst.x * 0.5, 0.0, 1.0));
+        c1 = pcSummerTree(c1, fract(vInst.z * 9.73 + 0.37), uLookG.y);
+        c1 = mix(c1, min(vec3(1.0), mix(c1, vec3(dot(c1, vec3(0.3, 0.5, 0.2))), 0.45) * 1.12 + vec3(0.01, 0.03, 0.06)), vGust.x);
+        c1 = pcWetWash(pcDabTint(pcDensity(c1, 1.0 + vInst.y * 0.4), rc1, 1.0 - twig), 0.7);
+        if (snow) c1 = mix(vec3(0.95, 0.97, 1.0), vec3(0.80, 0.87, 0.98), rc1.x * 0.7);
+        float xc1 = max(0.80, vKB.y * 0.8 * (1.0 - twig));
+        if (snow) xc1 = max(xc1, 0.68);
+        float lc1 = floor(pcLevel(xc1, 0.002) + 0.5);
+        // (at the cap itself: at the crown's mean, one level under its cap raised by its lit share, the turned patch read
+        //  duller than the busy wood round it, not paler; MEASURED at 600 m on the changed pixels V -0.003 at the mean,
+        //  +0.011 halfway, +0.025 at the cap (the greyer step lowers a strong yellow's brightest channel, so the tone
+        //  alone goes no further). The look director took the cap, 24 Nov: the patches read as lighter, pale grey-green
+        //  zones that hold together.)
+        float lv1 = lc1;
+        cs = mix(cs, c1, vGust.y); lv = mix(lv, lv1, vGust.y);
+      }
+    #endif
     // (the shade of a crown through the shared foliage shade where the build has it, chunks.js pcShadeLeaf, as a
     //  near leaf takes its own; otherwise pcTone alone)
     c = ${'${IMPSHADE}'};
@@ -733,9 +807,13 @@ export function makeImpostorMaterial(bodyU, atlas, farMat, farcrown = FARCROWN) 
   // (the far wind: the plants' own physics uniforms, shared by reference; ?farwind=1)
   const wind = !!(_q && _q.get('farwind') === '1');
   if (wind) Object.assign(own, PHYS, { uStiff: { value: 1 }, uPlantHeight: { value: 12 } });
+  // (the gust bands: compiled in only where the shared binding exists, render/shared.js PHYS.uPhysGust -- no unbound
+  //  uniform anywhere -- and only with ?gustbands=1 or ?wx2=1, read from the address as the weather's contract asks)
+  const gust = GUSTBANDS && !!PHYS.uPhysGust;
+  if (gust) Object.assign(own, PHYS, { uImpGust: { value: 1 } });      // (the whole PHYS block by reference, as with the lean: FLORA_GLSL is compiled for the bands)
   const m = new THREE.ShaderMaterial({
     name: 'pc-prop-far-impostor',
-    defines: Object.assign({ PC_IMPOSTOR: 1, PC_IMP_NV: Math.max(1, atlas.n), PC_NFAR: fu.uFarA.value.length }, _q && _q.get('impdebug') === '1' ? { PC_IMP_DEBUG: 1 } : null, wind ? { PC_PHYS: 1 } : null,
+    defines: Object.assign({ PC_IMPOSTOR: 1, PC_IMP_NV: Math.max(1, atlas.n), PC_NFAR: fu.uFarA.value.length }, _q && _q.get('impdebug') === '1' ? { PC_IMP_DEBUG: 1 } : null, wind ? { PC_PHYS: 1 } : null, gust ? { PC_GUST: 1 } : null,
       IMP.small > 0 ? { PC_IMP_SMALL: 1, IMPS_T: IMP.small.toFixed(1) } : null),
     uniforms: makePaintUniforms(bodyU, own),
     vertexShader: IMP_VERT,
