@@ -46,7 +46,21 @@ the phone prices both in one run.
 - Hunks in files of other lanes, each small and said in the commit: `shadow.js` (a card's shadow through its spray;
   cards thinned as leaves), `core/bench.js` (the rows, and its helpers now see a mesh with two materials).
 
-**Seen / measured / not:** see the newest entry below this list as it lands. Nothing here has been timed on a device.
+**Seen / measured / not (2026-11-24):**
+- SEEN, phone settings (936 x 372, tier 1, lighter paint, fov 58), the autumn wood at 16.8 h, the same tree framed from
+  5, 10, 18, 30, 45 m (`docs/shots/painter/trees-near/`, `A2_today_*` A, `A2_split_*` B, `A2_cards_*` C):
+  `?trees2=1` is the same picture to the eye (leaves identical, bark streaks the same kind; mean difference 0.35-2.0 of
+  255; the look director's `lookstats.py` equal to the hundredth). `?trees2=cards` reads as crowns of separate crisp
+  leaves; at 18-45 m it looks at least as good as today (the middle tree of many small leaves in place of big kites);
+  at 5-10 m it is SPARSER than today and a little lighter and less saturated (more sky between leaves).
+- MEASURED in Node at the spawn wood, phone tier (`tools/overdraw.mjs`, a scratch copy taught material arrays and the
+  wood/leaf split): near wood 71,504 -> 36,792 triangles with `split` (fragments 81.6k -> 77.7k); leaves unchanged.
+  With `cards`: near leaves 47,110 -> 14,718 triangles but RASTERISED FRAGMENTS 127k -> 461k; middle leaves 34,356 ->
+  21,778 triangles but 105k -> 749k fragments. So cards trade about 45k triangles for about a million more fragments
+  run through the leaf lookup (most of them discarded): almost certainly a LOSS on the phone unless the depth pass
+  (T5) makes discarded fragments nearly free, and even then the depth pass runs the lookup on every one of them.
+- NOT KNOWN: what the two short programs save on the phone (the design's reading: the bark's long program in every
+  near-tree wave; only the bench can say), anything in motion, anything on a real graphics card.
 
 **Next:** A/B stills (5/10/18/30/45 m, autumn and green wood, phone and desktop) -> commit T2 split -> stills of cards
 and T5 (pixel-identical check) -> commit -> T3 (the middle tree) -> report each step to the coordinator and the look
