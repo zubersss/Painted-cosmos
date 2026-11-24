@@ -958,6 +958,8 @@ export class Flora {
       const im = mesh.instanceMatrix.array, ia = mesh.userData.inst.array;
       let x0 = 1e9, y0 = 1e9, z0 = 1e9, x1 = -1e9, y1 = -1e9, z1 = -1e9;
       const sink = STONE && LOOK.oil && list === lists.rock;      // (?stone: a boulder's foot in the ground)
+      // (?stone: and its paint, materials.js PROP_FRAG's boulder branch under PC_STONE, on the boulders' material only)
+      if (sink && mat.defines && !mat.defines.PC_STONE) { mat.defines.PC_STONE = 1; mat.needsUpdate = true; }
       for (let a = 0; a < list.length; a++) {
         const o = list[a] * INST_STRIDE;
         _p.set(d[o], d[o + 1], d[o + 2]);

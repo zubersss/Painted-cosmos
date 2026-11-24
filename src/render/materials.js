@@ -2966,6 +2966,23 @@ void main() {
       x = xrF * mix(0.45, 1.0, xrS);
       float lvlR = floor((uLookF.z > 0.5 ? pcLit(xrF, xrS, canopy, 0.04) : pcLevel(x, 0.04)) * 2.0 + 0.5) * 0.5;
       if (uGem > 0.5) lvlR = max(lvlR, 1.5);      // (a crystal is lit through: none of its faces goes to the deep step)
+      #ifdef PC_STONE
+        // THE STONE (?stone=1, the flora lane with the far view's C, after the look director's u2cells follow-up: set only on
+        // the undergrowth's boulder materials, world/flora.js; OFF until the look director passes its pair).
+        // a lit top: a face looking up and in the sun a half step lighter, so the stone reads as a block with a lit top
+        lvlR += 0.5 * smoothstep(0.55, 0.75, upF) * step(0.5, xrS);
+        // strokes: each face laid in a few whole touches, a value step each, no hue (cells about 14 cm, flat inside; the
+        // body position folded to tens of metres first, so the hash keeps its precision far from the world's centre)
+        float skS = fract(sin(dot(floor(mod(vBody, 61.0) * 7.0 + fh * 3.1), vec3(12.9898, 78.233, 37.719))) * 43758.5453);
+        c = pcDensity(c, 1.0 + (skS - 0.5) * 0.35);
+        // the mountains' warm-lit, cool-shade lean: lit faces toward the rock's warm grey, faces from the sun toward its violet
+        c *= mix(vec3(1.0), vec3(1.06, 1.00, 0.90), smoothstep(0.62, 0.80, xrF) * xrS * 0.6);
+        c *= mix(vec3(1.0), vec3(0.86, 0.84, 1.25), (1.0 - smoothstep(0.35, 0.55, xrF)) * 0.8);
+        // the foot settled into the grass: the lowest 16 cm damp, a step darker and a touch green, and a half step down
+        float footS = 1.0 - smoothstep(0.0, 0.16, vAbove);
+        c = mix(c, pcDensity(c, 1.5) * vec3(0.92, 0.98, 0.88), footS * 0.6);
+        lvlR -= 0.5 * footS;
+      #endif
       vec3 kR = c;                                // (its own wash, kept: the lantern and the fire mix their light from it)
       c = pcLamp(pcTone(c, lvlR), kR, vBody, fh);
       #ifdef PC_FIRE
