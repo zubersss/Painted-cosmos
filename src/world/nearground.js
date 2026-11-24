@@ -80,9 +80,10 @@ const VISTA = (() => {
 //   `?grass2=`   0 takes the whole grass package away (G2-G4): the oil look's near grass as it was on 24 Nov.
 //   `?nearcull=` 0 shades every mark again, in view or not (G1; the speed test's row does the same). On with ?flora=old too.
 //   `?bladegreen=` 0 gives the blades the undergrowth's greens again instead of their own (`oil.flora.sward.leaf`, F10)
+//   `?tuft=`     0 lets each blade pick its own colour again instead of its tuft's (the look director's audit 2)
 //   `?sheen=`    0 takes away the gusts' sheen on the blades (G4: needs PHYSICS' bend, so the game, or the gallery's &physics=1).
 const FLORA = (() => {
-  const f = { grass2: 1, cull: 1, sheen: 1, bloom: 0, blade: 1 };
+  const f = { grass2: 1, cull: 1, sheen: 1, bloom: 0, blade: 1, tuft: 1 };
   try {
     const q = new URLSearchParams(location.search), on = (k) => !q.has(k) || (q.get(k) !== '0' && q.get(k) !== 'false');
     // THE ONE OPT-OUT (the owner, 24 Nov, through the coordinator: "No do make it look different"): the lane is ON by
@@ -93,8 +94,9 @@ const FLORA = (() => {
     f.cull = on('nearcull') ? 1 : 0;
     f.sheen = f.grass2 && on('sheen') ? 1 : 0;
     f.blade = f.grass2 && on('bladegreen') ? 1 : 0;
+    f.tuft = f.grass2 && on('tuft') ? 1 : 0;
   } catch { /* no address to read */ }
-  if (!LOOK.oil) { f.grass2 = 0; f.cull = 0; f.sheen = 0; f.blade = 0; }
+  if (!LOOK.oil) { f.grass2 = 0; f.cull = 0; f.sheen = 0; f.blade = 0; f.tuft = 0; }
   // (F1-F3: the flowers from world/bloom.js's map, ?bloom=0 off; read there, where the ground's colour reads it too)
   f.bloom = LOOK.oil ? bloomSwitches().bloom : 0;
   return f;
@@ -139,6 +141,17 @@ function stoneC(c, gr, gg, gb, m, out) {
   out[0] = r; out[1] = g; out[2] = b; return out;
 }
 const _stc = [0, 0, 0];
+// A BLADE'S TONE (the look director's audit 2: "marks take their colour from the PIXEL, not the THING"; from 10 to 30 m
+// the sward was a speckle of three greens, blade by blade). With ?tuft on, a TUFT takes one of the three colours (or is a
+// dark accent tuft, one in seven) and its blades differ only by a value step; off, each blade picks its own as before.
+// Returns the colour's index (0 light, 1 mid, 2 the dark accent), whether it is the accent, and the density to lay it at.
+const _bt = { i: 0, acc: false, dk: 1 };
+function bladeTone(pv, th) {
+  if (!FLORA.tuft) { _bt.acc = pv < 0.14; _bt.i = _bt.acc ? 2 : pv < 0.55 ? 1 : 0; _bt.dk = _bt.acc ? 1.12 : pv < 0.36 ? 0.84 : 1.2; return _bt; }
+  _bt.acc = th < 0.14; _bt.i = _bt.acc ? 2 : th < 0.55 ? 1 : 0;
+  _bt.dk = (_bt.acc ? 1.12 : th < 0.36 ? 0.84 : 1.2) * (0.94 + 0.12 * pv);
+  return _bt;
+}
 const packTone = (c) => Math.min(262143, 1 + Math.round(Math.max(0, Math.min(1, c[0])) * 63) * 4096 + Math.round(Math.max(0, Math.min(1, c[1])) * 63) * 64 + Math.round(Math.max(0, Math.min(1, c[2])) * 63));
 // (the year, ?bloomyear=0 off) a kind's flowering window, `season: [from, to]` on SEASON.t (0 high summer, 1 deep autumn),
 // in sevenths, in the six bits above the colour: when it comes into flower times 8, plus how far before the end of the
@@ -536,15 +549,15 @@ class Ring {
       // (a flick: pressed on at the root, lifted off to a point, curved; most are short, the
       // tuft's leader is long; the outer ones lean far over)
       const lead = k < 2 && q3 > 0.45;
-      const pv = (q5 * 9.7) % 1, acc = pv < 0.14;
+      const pv = (q5 * 9.7) % 1, bt = bladeTone(pv, H(960 + tf)), acc = bt.acc;
       const len = (0.09 + 0.34 * q3 * q3) * tsz[tf] * (lead ? 1.5 : 1) * (acc ? 1.2 : 1), wid = 0.020 + 0.018 * q4;
       // most are close to the ground's own value (a little richer, or a little paler: the
       // sunlit and the dry); one in seven is a darker accent, and only those are left crisp
-      const L = st.leafB, c = L ? L[acc ? 2 : pv < 0.55 ? 1 : 0] : null, gm = acc ? Math.max(st.gmB, st.gm) * 0.73 : st.gmB;
+      const L = st.leafB, c = L ? L[bt.i] : null, gm = acc ? Math.max(st.gmB, st.gm) * 0.73 : st.gmB;
       let cr = gr, cg = gg, cb = gb;
       if (c) { cr = lerp(c[0], gr, gm); cg = lerp(c[1], gg, gm); cb = lerp(c[2], gb, gm); }
       if (lead && tall > 0.3 && !acc) { const m = 0.5 * tall; cr = lerp(cr, SEED_HEAD[0], m); cg = lerp(cg, SEED_HEAD[1], m); cb = lerp(cb, SEED_HEAD[2], m); }
-      const dk = acc ? 1.12 : pv < 0.36 ? 0.84 : 1.2;
+      const dk = bt.dk;
       this.put(Math.cos(ang) * rad + tu[tf], Math.sin(ang) * rad + tv[tf], 0, 0.08 + 0.85 * q4 * q4, (tf ? t3 : t4) * 6.2832 + (q2 - 0.5) * 1.5, len, wid, acc && (k < 2 || q2 < 0.3) ? 3 : 2, q3 * 0.61 + q1 * 0.39, born,
         dens(cr, dk), dens(cg, dk), dens(cb, dk), (q5 - 0.5) * 1.5 + (q1 - 0.5) * 0.5, 1);
     }
@@ -716,13 +729,13 @@ class Ring {
       const tf = k % nT;
       const ang = q1 * 6.2832, rad = 0.015 + 0.075 * q2;
       const lead = k < nT * 2 && q3 > 0.45;
-      const pv = (q5 * 9.7) % 1, acc = pv < 0.14;
+      const pv = (q5 * 9.7) % 1, bt = bladeTone(pv, H(970 + tf)), acc = bt.acc;
       const len = (0.09 + 0.34 * q3 * q3) * tsz[tf] * (lead ? 1.5 : 1) * (acc ? 1.2 : 1), wid = 0.020 + 0.018 * q4;
-      const L = st.leafB, c = L ? L[acc ? 2 : pv < 0.55 ? 1 : 0] : null, gm = acc ? Math.max(st.gmB, st.gm) * 0.73 : st.gmB;
+      const L = st.leafB, c = L ? L[bt.i] : null, gm = acc ? Math.max(st.gmB, st.gm) * 0.73 : st.gmB;
       let cr = gr, cg = gg, cb = gb;
       if (c) { cr = lerp(c[0], gr, gm); cg = lerp(c[1], gg, gm); cb = lerp(c[2], gb, gm); }
       if (lead && tall > 0.3 && !acc) { const m = 0.5 * tall; cr = lerp(cr, SEED_HEAD[0], m); cg = lerp(cg, SEED_HEAD[1], m); cb = lerp(cb, SEED_HEAD[2], m); }
-      const dk = acc ? 1.12 : pv < 0.36 ? 0.84 : 1.2;
+      const dk = bt.dk;
       this.put(Math.cos(ang) * rad + tu[tf], Math.sin(ang) * rad + tv[tf], 0, 0.08 + 0.85 * q4 * q4, tl[tf] + (q2 - 0.5) * 1.5, len, wid, acc && (k < 2 || q2 < 0.3) ? 3 : 2, q3 * 0.61 + q1 * 0.39, born,
         dens(cr, dk), dens(cg, dk), dens(cb, dk), (q5 - 0.5) * 1.5 + (q1 - 0.5) * 0.5, 1);
     }
