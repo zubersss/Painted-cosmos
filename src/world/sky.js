@@ -66,7 +66,7 @@ uniform vec4 uOilS;         // x: how far the far air leans to the blue-violet o
 uniform vec4 uSkyOil;       // x cloud shaping, y the ceiling on the sky's value, z the cloud's lit side (the dials above)
 uniform vec4 uSkyAir;       // x: how far the lowest band is the land's own air   y: how high that band stands (dot(view, up))
 uniform vec4 uLookN;        // w: the air from the air (L5; render/shared.js OIL.uLookN, set by world/index.js)
-uniform vec4 uLookG;        // x: the golden hour's sky painted by direction and in bands (render/shared.js OIL.uLookG)
+uniform vec4 uLookG;        // x: the golden hour's sky painted by direction and in bands, z: the cloud shell's limb from above thins away (render/shared.js OIL.uLookG)
 #endif
 
 vec3 dens(vec3 c, float d) { return clamp(c - (c - c * c) * (d - 1.0), 0.0, 1.0); }
@@ -469,6 +469,14 @@ void main() {
       float lane = sin(da * 2.2 + (c1 - 0.5) * 1.3) * 0.62 + sin(da * 5.4 + (c2 - 0.5) * 2.0) * 0.38;
       float laneK = uSkyOil.x * (1.0 - uBelt.z) * (1.0 - oc);
       float thO = th + (0.5 - smoothstep(-0.45, 0.35, lane)) * 0.30 * laneK;
+      // THE SHELL'S LIMB SEEN FROM ABOVE (fresh-eyes audit 2, docs/lead/LOOK-AUDIT-2.md: a broken white hairline arcs
+      // across the sky from about 1 km up). Above the shell (Earth: 440 m) the only cloud the sky can show is the band
+      // between the land's horizon and the shell's own limb, and the rays near the limb meet the shell edge-on, so the
+      // masses are squashed into hairlines there. The cosine of that meeting runs from 0 at the limb to about 0.43 at
+      // the land's horizon (for any height: a ray that grazes the ground meets the shell at that angle). Where it is
+      // small the masses SHRINK AWAY WHOLE (their threshold rises), so no edge goes soft: the clouds nearest the land's
+      // horizon stay. Only with the air's top on (uSkyAir.z < 0) and ?skylimb (uLookG.z), so ?light=old is as it was.
+      if (uLookG.z > 0.5 && rc > uCloud.x && uSkyAir.z < -1e-4) thO += 0.6 * (1.0 - smoothstep(0.05, 0.22, abs(dot(d, normalize(hp)))));
       // the lobes: rounded bumps about a hundred metres across, a fifth of a mass, their phase thrown out by the
       // mass's own field so they never read as a grid
       float la = q.x * 30.0 + c1 * 6.3, lb = q.y * 34.0 + c2 * 6.3, lc = q.z * 26.0 + c1 * 4.1;
