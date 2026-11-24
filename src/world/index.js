@@ -1006,6 +1006,9 @@ export function createWorld(scene) {
     get _near() { const st = state.get(lastActive || 'earth'); return st && st.near; },
     get _glaze() { return glazeWhy; },
     get _flora() { const st = state.get(lastActive || 'earth'); return st && st.flora; },
+    // (the animals, for a tool that sets one down to photograph it: the crowd, the lives, the routines' context
+    //  and the three modules. null unless ?beasts= is on and a crowd has been made. Read only by tools/lab.mjs.)
+    get _beasts() { const st = state.get(lastActive || 'earth'); return st && st.beasts ? { crowd: st.beasts, fauna: st.fauna, ctx: st.faunaCtx, mod: BEASTMOD } : null; },
     get _prof() { return Object.assign({}, prof, this._flora ? this._flora.prof : {}); },
     _profReset() { prof.terrain = 0; const fl = this._flora; if (fl) { const p = fl.prof; p.wanted = p.build = p.retier = 0; } },
     bodyUniforms(bodyId) { const st = state.get(bodyId); return st ? st.bu : null; },
