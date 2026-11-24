@@ -37,8 +37,10 @@ its A).
 
 - A side: a clean copy of the commit before the step (with the one-line `bareGeometry` fix until v37.1 is on
   look-proto, or Neptune does not load); B side: the working tree. Pixel identity is checked with numpy on the PNGs.
-- The Neptune fix (`bareGeometry(seed, lod, spec)`, florakit.js:76 and :804) is kept in the working tree UNCOMMITTED
-  (group B's file; the coordinator has it for v37.1). Commit by naming paths, never `git add -A`.
+- The Neptune fix (`bareGeometry(seed, lod, spec)`, florakit.js:76 and :804) is in look-proto as v37.1 (2bd8f85),
+  and look-proto (v38, f1bfcf6) is merged into this branch (a merge, not a rebase, because other lanes were told to
+  build on this branch's commit ids). After the merge: suites 325 / 70 / 416; the autumn wood at 16.8 and 23 with the
+  explorer and Neptune at 23 load and draw with no page error. Commit by naming paths, never `git add -A`.
 
 ## State
 
