@@ -34,6 +34,7 @@ A separate session builds W1 CLOUDS once the look director's sky ceiling (touch 
 | `?nearmap=1` | the near grid takes its base from the map |
 | `?farwind=1` | the far plants read the map |
 | `?cloudmap=1` | the cloud and rain map, the rain field for the water group, and the storm-held bench rows |
+| `?stormland=1` | storms born from the land (turns on `windmap` and `cloudmap` too) |
 
 ## Done
 
@@ -150,19 +151,59 @@ A separate session builds W1 CLOUDS once the look director's sky ceiling (touch 
   weather is round systems scattered at random, two storm cores, one at the spawn. **Nothing in the game's picture
   changes yet**: the clouds lane reads the map later.
 
+### W3.2: STORMS BORN FROM THE LAND (`src/physics/weather.js` STORMLAND, `cloudfield.js`, `windmap.js` sites, `index.js`)
+
+- **On a stormy afternoon, a few of the wind map's sites fire.** That is `stormDays` 0.667 of days, with 1 to 3
+  storms. Each fires at 12:30 to 16:00 LOCAL SOLAR time (the sun's hour angle, which runs evenly; the painted hour
+  does not at this latitude, and the first schedule laid on it came out in the morning).
+  - Each lives 4 to 6.5 game hours, standing over its slope for its first quarter, then drifting at half the wind
+    aloft.
+  - Each is two cells: a cloud from birth, and a storm from the towering stage, so nothing steps.
+  - Pure in (body, seed, t, the sites, the sun's reference). `setLandStorms` re-anchors only when the clock jumps by
+    1.5 h.
+- **Random thunderstorms become showers** after 1,900 s, with their rain kept and no lightning.
+- **Nothing land-born before 1,900 s**, so the first day and the tuned first storm at the spawn are untouched. A test
+  shows them identical.
+- **The weather lives under its own top.** `weatherAt` takes `env.cloudTop` from the cloud map over the land, with
+  `env.rainK` (windward more, lee less) and `env.cu` (fair cumulus).
+- **Sites:** 64, spaced 450 m, with the score's relief term square-rooted so lesser hills host lesser storms.
+- **The cloud map** gains:
+  - `cu`, fair cumulus from the trigger, with its base rising 300 to 380 m through the day;
+  - `high`, the anvils downwind of storms plus a slow cirrus field;
+  - `valley`, dawn mist in calm hollows;
+  - the windward and lee rain factor;
+  - `flashesFor`: the last flash of every storm cell within 4 km (ground point, cloud-to-ground or in-cloud, seed,
+    base, brightness by age, next).
+- **`rainAt`** reads the same windward and lee factor through `RAINLAND.map`, and applies the old ceiling when
+  `?stormland` is off, so it is what the game does.
+- **MEASURED** (60 game days, the real Earth, the game's own ephemeris, `stormland.test.mjs` on 50):
+
+  | what | result |
+  | --- | --- |
+  | days with a mature storm over the range | 72 % |
+  | first matured | 14:42 to 17:42 local solar time (p10 to p90), median 15:48 |
+  | a mature storm within sight of the spawn's wood (within 4.5 km) | 33 % of days |
+  | a land storm passing within 1.5 km of the spawn | **0 days of 60** |
+  | the upper alpine meadow (above 500 m) over 10 days | **0.0 mm of water without**; 3.9 mm rain + 15.7 mm snow with, against its valleys' 11.8 + 8.4 |
+  | windward against lee rain | at least 1.3 times (tested) |
+
+  - Why no storm passes over the wood: the spawn's nearest sites are 1.9 to 3 km off, and the wind aloft there
+    carries storms away. Raising `perDay` or `steer`, or adding a site on the wood's own hills, would change it.
+  - **The owner's default (the wood on 1 day in 3) is NOT met by the land as it is.** I did not force it.
+- **Seen:** `W3.2_A_alpine150_stormland_off.jpg` and `W3.2_B_..._on.jpg`, the alpine station from 150 m facing a
+  mature land storm 1.1 km away at game time 7,020 (anchored through the lab, because the gallery holds its sun).
+  - B is greyer: at the station, cloud 0.68 to 0.91 and snow 0.74 to 1.63 mm/h.
+  - **The storm itself cannot be seen yet**: nothing draws the cloud map. That needs lane W1 (clouds), and W3.4 for
+    shafts and bolts.
+- **Phone cost:** the land cells are at most 6 more cells in each gather (`moistureAt`'s 21 lags included), plus the
+  per-texel cumulus, cirrus noise and valley terms. That is under 0.05 ms a frame here: script only.
+- **Tests:** `stormland.test.mjs`, 5 new.
+- **Suites:** physics 438, world 65, unit 325, 0 failing.
+- **Bit-identical** with the switches off (162,000 numbers).
+
 ## NEXT
 
-1. **W3.2:** storms born from the land (`weather.js`), behind `?stormland=1`. Convective cells at `fields.wind.sites`
-   (`stormDays`: the range on 2 days in 3, the wood on 1 in 3) with four stages, drifting with the wind aloft. Then:
-   - the ceiling `below` from the map's cloud top;
-   - orographic rain;
-   - frozen at height;
-   - the lightning list for every mature cell within 4 km;
-   - the map's `mid`, `high` and `valley`;
-   - fair cumulus from lift and trigger.
-
-   Tests: the design's 6.4, items 1 to 8.
-2. **W3.3:** rain marks longer (`particles.js`, `three/kits.js`, the kitmat `rain` and `snow` strings), and the box's
+1. **W3.3:** rain marks longer (`particles.js`, `three/kits.js`, the kitmat `rain` and `snow` strings), and the box's
    rain from the map's four corners.
-3. **W3.4:** `world/storms.js`: rain shafts and bolts. Needs a hook in `world/index.js` (touch T2, the look
+2. **W3.4:** `world/storms.js`: rain shafts and bolts. Needs a hook in `world/index.js` (touch T2, the look
    director's).

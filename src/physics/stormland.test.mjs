@@ -1,0 +1,155 @@
+// Storms born from the land (weather.js STORMLAND, ?stormland=1; group D, the STORMS AND RAIN lane;
+// docs/lead/WEATHER-DESIGN.md 6.4). On PAINTER's real Earth in the oil look, with the game's own sun (core/orbits.js).
+// Each statistic below is about behaviour the code before this step did not have: Earth's storms were placed at random.
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { WindMap } from './windmap.js';
+import * as W from './weather.js';
+import { CloudField, rainBetween, RAINLAND } from './cloudfield.js';
+import { WX2 } from './wx2.js';
+
+let E = null;
+async function earth() {
+  if (E) return E;
+  let surf, eph, BODIES;
+  try {
+    const mode = await import('../data/mode.js'); mode.MODE.oil = true;
+    const looks = await import('../data/looks.js'); mode.overlayOil(looks.LOOKS);
+    surf = await import('../world/surface.js');
+    ({ BODIES } = await import('../data/bodies.js'));
+    const { Ephemeris } = await import('../core/orbits.js');
+    eph = new Ephemeris(BODIES);
+  } catch (e) { console.log('# (skipped: the real surface or the ephemeris did not load: ' + e.message + ')'); return null; }
+  const sp = surf.getSurface('earth').getSpawn(), spawn = { x: sp.x, y: sp.y, z: sp.z };
+  eph.setSunHour('earth', 0, spawn, 8);            // a new game: 8 in the morning at the spawn
+  const wm = new WindMap(18);
+  wm.readLand('earth', (d) => surf.sampleSurfacePure('earth', d.x, d.y, d.z), null, 0, 1e9);
+  const sunAt = (t) => eph.sunDirLocal('earth', t);
+  E = { surf, wm, spawn, sunAt };
+  return E;
+}
+const R = 4000, dist = (a, b) => R * Math.acos(Math.max(-1, Math.min(1, a.x * b.x + a.y * b.y + a.z * b.z)));
+function on(E) {
+  WX2.stormland = true;
+  W.setLandStorms('earth', E.wm.sites, E.sunAt(0), 0);
+  E.wm.refresh('earth', 1900, E.sunAt(1900));
+  RAINLAND.map = E.wm;
+}
+function off() { WX2.stormland = false; W.setLandStorms(null); RAINLAND.map = null; }
+
+test('land storms: a storm over the mountains on about two days in three, maturing in the afternoon', async () => {
+  const E0 = await earth(); if (!E0) return;
+  try {
+    on(E0);
+    const L = W.landStorms(), days = 50, T0 = W.STORMLAND.from;
+    const stormDay = new Set(), seen = new Set(), born = new Map(), hours = [];
+    for (let t = T0; t < T0 + days * L.solarDay; t += 15) {
+      for (const c of W.cellsAt('earth', t)) {
+        if (!c.land || c.kindId !== 'storm' || c.w < 0.3) continue;
+        stormDay.add(c.gen);
+        if (dist(c, E0.spawn) < 4500) seen.add(c.gen);
+        const key = c.i + ':' + c.gen;
+        if (!born.has(key)) {
+          born.set(key, c);
+          const s = E0.sunAt(t); let h = Math.atan2(c.x, c.z) - Math.atan2(s.x, s.z); h -= 2 * Math.PI * Math.round(h / (2 * Math.PI));
+          hours.push(12 + h * 12 / Math.PI);
+        }
+      }
+    }
+    const share = stormDay.size / days;
+    assert.ok(share > 0.5 && share < 0.85, `a mature storm on ${stormDay.size} of ${days} days`);
+    const afternoon = hours.filter((h) => h >= 14 && h <= 19).length / hours.length;
+    assert.ok(afternoon >= 0.7, `${(afternoon * 100).toFixed(0)} % first mature between 14:00 and 19:00 local solar time`);
+    // where they are born: the wind map's sites, each on high ground or in a hot dry basin
+    const sites = E0.wm.sites, onHigh = sites.filter((s) => s.kind === 'basin' || E0.wm.land.relief[s.k] > 40).length;
+    assert.ok(onHigh / sites.length >= 0.9, `${onHigh} of ${sites.length} sites stand on ground 40 m and more over its surroundings or in a hot basin`);
+    const alpine = sites.filter((s) => E0.surf.sampleSurfacePure('earth', s.x, s.y, s.z).biomeId === 'alpine_meadow').length;
+    assert.ok(alpine / sites.length >= 0.6, `${alpine} of ${sites.length} on the alpine range`);
+    // and seen from the wood where the game begins (a tower 2 km tall within 4.5 km)
+    assert.ok(seen.size / days >= 0.2, `a storm within sight of the spawn's wood on ${seen.size} of ${days} days`);
+  } finally { off(); }
+});
+
+test('land storms: the upper alpine meadow gets its weather (it got none above 496 m), as rain and snow', async () => {
+  const E0 = await earth(); if (!E0) return;
+  const { wm, surf } = E0;
+  const upper = [], valley = [];
+  for (let k = 0; k < wm.count; k++) {
+    if (wm.land.water[k] > 0.1) continue;
+    if (surf.sampleSurfacePure('earth', wm.cx[k], wm.cy[k], wm.cz[k]).biomeId !== 'alpine_meadow') continue;
+    const d = { x: wm.cx[k], y: wm.cy[k], z: wm.cz[k], h: wm.land.h[k] };
+    if (d.h > 500) upper.push(d); else if (d.h < 200) valley.push(d);
+  }
+  const pick = (a, n) => a.filter((_, i) => i % Math.max(1, Math.floor(a.length / n)) === 0).slice(0, n);
+  const up = pick(upper, 24), va = pick(valley, 24);
+  const total = (pts, T0, T1) => { let s = 0; for (const d of pts) { const r = rainBetween('earth', d.x, d.y, d.z, T0, T1, 18, { altitude: d.h }, {}, 20); s += r.mm + r.mmSnow; } return s / pts.length; };
+  try {
+    off();
+    const T0 = W.STORMLAND.from, T1 = T0 + 10 * 1674;
+    const u0 = total(up, T0, T1), v0 = total(va, T0, T1);
+    assert.equal(u0, 0, 'without it, nothing falls above the old ceiling');
+    on(E0);
+    const u1 = total(up, T0, T1), v1 = total(va, T0, T1);
+    assert.ok(u1 > 1 && u1 >= 0.8 * v1, `over ten days the upper meadow ${u1.toFixed(1)} mm of water, its valleys ${v1.toFixed(1)} mm`);
+  } finally { off(); }
+});
+
+test('land storms: the windward side of a raining range gets more than its lee; the map is continuous in time', async () => {
+  const E0 = await earth(); if (!E0) return;
+  try {
+    on(E0);
+    const cf = new CloudField(18);
+    // a time when a land storm is mature over the range
+    let t = W.STORMLAND.from;
+    for (; t < W.STORMLAND.from + 30 * 1674; t += 20) if (W.cellsAt('earth', t).some((c) => c.land && c.kindId === 'storm' && c.w > 0.6)) break;
+    E0.wm.refresh('earth', t, E0.sunAt(t));
+    cf.refresh('earth', t, E0.sunAt(t), E0.wm);
+    let ww = 0, nw = 0, lw = 0, nl = 0;
+    for (let k = 0; k < cf.count; k++) {
+      if (!(cf.rain[k] + cf.snow[k] > 0.5)) continue;
+      if (E0.wm.lift[k] > 0.3) { ww += cf.rain[k] + cf.snow[k]; nw++; } else if (E0.wm.lift[k] < -0.3) { lw += cf.rain[k] + cf.snow[k]; nl++; }
+    }
+    assert.ok(nw > 3 && nl > 3 && ww / nw >= 1.3 * (lw / nl), `windward ${(ww / nw).toFixed(1)} mm/h over ${nw} texels, lee ${(lw / nl).toFixed(1)} over ${nl}`);
+    // continuity: two refreshes half a second apart
+    const sum = () => { let s = 0; for (let k = 0; k < cf.count; k++) s += cf.rain[k] + cf.snow[k]; return s; };
+    const a = sum(); cf.refresh('earth', t + 0.5, E0.sunAt(t + 0.5), E0.wm); const b = sum();
+    assert.ok(Math.abs(a - b) <= 0.05 * Math.max(a, 1), `the planet's rain ${a.toFixed(1)} then ${b.toFixed(1)} half a second later`);
+    // the lightning of every storm near a place: each mature storm cell within reach is listed, with a ground point
+    const c = W.cellsAt('earth', t).find((q) => q.land && q.kindId === 'storm' && q.w > 0.6);
+    const f = { x: c.x * 4001.7, y: c.y * 4001.7, z: c.z * 4001.7 };
+    let listed = 0, flashes = new Set();
+    for (let q = 0; q < 120; q++) {
+      const tt = t + q * 0.5;
+      cf.step(0.5, 'earth', tt, E0.sunAt(tt), E0.wm);
+      const L = cf.flashesFor('earth', tt, f.x, f.y, f.z);
+      for (let i = 0; i < L.n; i++) { listed++; flashes.add(L[i].cell + ':' + L[i].t.toFixed(2)); assert.ok(L[i].distance < 6000 && Number.isFinite(L[i].base)); }
+    }
+    // a mature storm flashes about K.flash x w a minute (5 a minute at full strength): in 60 s, some
+    assert.ok(listed > 0 && flashes.size >= 2, `${flashes.size} distinct flashes listed in a minute under a mature storm`);
+  } finally { off(); }
+});
+
+test('land storms: none before STORMLAND.from, so the first day at the spawn stays as tuned', async () => {
+  const E0 = await earth(); if (!E0) return;
+  try {
+    on(E0);
+    for (let t = 0; t < W.STORMLAND.from; t += 30) assert.ok(!W.cellsAt('earth', t).some((c) => c.land), `no land storm at ${t} s`);
+    // and the body's own systems before then are exactly what they were
+    const a = W.cellsAt('earth', 1200).map((c) => c.kindId + c.x.toFixed(6)).join();
+    off();
+    const b = W.cellsAt('earth', 1200).map((c) => c.kindId + c.x.toFixed(6)).join();
+    assert.equal(a, b);
+  } finally { off(); }
+});
+
+test('land storms: the weather lives under its own top, not under half the atmosphere above the datum', () => {
+  // a place 700 m above the datum under a downpour: the old law gave it nothing; with a cloud top over it, it rains
+  const u = { x: 0.6, y: 0.48, z: 0.64 }, l = Math.hypot(u.x, u.y, u.z); u.x /= l; u.y /= l; u.z /= l;
+  W.setForcedCell({ kind: 'storm', x: u.x, y: u.y, z: u.z, r: 900, w: 1 });
+  try {
+    const old = W.weatherAt('earth', u.x, u.y, u.z, 700, 3000, 18, { moist: 1 }, {});
+    const now = W.weatherAt('earth', u.x, u.y, u.z, 700, 3000, 18, { moist: 1, cloudTop: 2600 }, {});
+    assert.equal(old.precipitation.rate, 0);
+    assert.ok(now.precipitation.rate > 10, `${now.precipitation.rate.toFixed(1)} mm/h at 700 m under its own top`);
+  } finally { W.setForcedCell(null); }
+});

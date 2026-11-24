@@ -15,6 +15,7 @@ import { BODIES } from '../data/bodies.js';
 import { ATMOSPHERES, SPECIES, terminalVelocity, meanFreePath, airDensity, airTemperature } from './atmosphere.js';
 import { prevailing, windLarge, WINDS } from './wind.js';
 import { hash3, hashString, noise3, clamp, clamp01, mix, smoothstep, TAU } from './util.js';
+import { WX2 } from './wx2.js';
 
 export const WEATHER = Object.freeze({
   timeScale: 60,           // game seconds of weather per real second (see above)
@@ -157,7 +158,10 @@ function cellAt(bodyId, R, regime, s, i, t, c) {
   if (i >= regime.cells) return spotAt(R, regime.spots[i - regime.cells], i, t, c);
   const life0 = mix(regime.life[0], regime.life[1], hash3(i, 1, 0, s));
   const phase = hash3(i, 2, 0, s) * life0;
-  const kid = pickKind(regime, hash3(i, 3, Math.floor((t + phase) / life0), s));
+  let kid = pickKind(regime, hash3(i, 3, Math.floor((t + phase) / life0), s));
+  // (group D, ?stormland=1) the body's random THUNDERSTORMS give way to the ones the land grows (landPart): a generation
+  // that begins after STORMLAND.from of a body with land storms registered is a shower instead (its rain kept, no lightning)
+  if (kid === 'storm' && LAND && WX2.stormland && LAND.bodyId === bodyId && Math.floor((t + phase) / life0) * life0 - phase - (regime.epoch || 0) > STORMLAND.from) kid = 'shower';
   const K = KINDS[kid];
   // the life of this generation depends on its kind, but generations must tile time: use the
   // base life for the schedule and let short-lived kinds spend the rest of the slot dormant
@@ -217,6 +221,161 @@ function pickKind(regime, h) {
   return ks[ks.length - 1][0];
 }
 
+// ---- (group D) STORMS BORN FROM THE LAND -----------------------------------------------------------------------------
+// docs/lead/WEATHER-DESIGN.md 6.2 C2. Behind wx2.js WX2.stormland, and only on a body whose convection sites have been
+// registered (setLandStorms: the wind map's `sites`, windmap.js, read from the land). On a stormy afternoon a few sites
+// FIRE: each grows a convective system at its local hour h, living STORMLAND.lifeH game hours through four stages --
+// cumulus, towering, a mature thunderstorm (heavy rain, hail in its core, lightning, a gust front), decay -- and drifting
+// with the wind aloft, so a storm born over the range crosses the wood or the coast. Each system is TWO cells gathered
+// like any other: its cloud (kind 'cloud', from its birth) and its storm (kind 'storm', from the towering stage), so
+// nothing steps from one stage to the next. Every one of them is a pure function of (body, seed, t, the sites, the sun's
+// reference): the same afternoon on every visit, and askable at any time.
+export const STORMLAND = Object.freeze({
+  from: 1900,              // game s: none before, so Earth's first day stays fair and its first storm is the tuned one
+  stormDays: 0.667,        // the share of days on which the range grows storms (the owner judges this one number)
+  perDay: [1, 3],          // how many sites fire on a stormy afternoon
+  hours: [12.5, 16.0],     // the local hour a site fires
+  lifeH: [4.0, 6.5],       // its life in game hours (cumulus at the start, gone by the evening)
+  r: [520, 950],           // m: the storm's core grown to this radius
+  cloudR: 1.3,             // the cloud's shield is this much wider than the core
+  steer: 0.5,              // it drifts at this share of the wind aloft over its site at its birth ...
+  anchor: 0.25,            // ... only after this share of its life: it stands over the slope that feeds it while it builds
+  aloft: 1.95,             // the wind aloft at the cloud's base over the 10 m wind (air.js aloftFactor at 350 m on Earth)
+});
+const LAND_BASE = 20000;   // cell numbers of the land storms (LAND_BASE + 2 k: the cloud, + 1: the storm)
+let LAND = null;           // { bodyId, sites, solarDay, t0, hour0 (each site's world hour at t0), days: Map }
+// Register (or keep) a body's convection sites and the sun's reference: sites [{x, y, z, w}] (windmap.js), sunDir its
+// body-local direction now (core/orbits.js), t the game time now. Cheap to call every frame: it re-anchors only on a new
+// body or site list, or when the hour it predicts is 1.5 h off the sun's (a jump of the clock: setHour, a teleport; the
+// painter's gallery, which holds its sun still, then keeps one schedule through a preroll of up to a game hour and a half).
+export function setLandStorms(bodyId, sites, sunDir, t) {
+  if (!bodyId || !sites || !sites.length || !sunDir) { LAND = null; return; }
+  const b = BODIES[bodyId];
+  const solarDay = b.orbitPeriod > 0 ? 1 / (1 / b.dayLength - 1 / b.orbitPeriod) : b.dayLength;
+  const fresh = !LAND || LAND.bodyId !== bodyId || LAND.sites !== sites;
+  if (!fresh) {
+    const want = hourAt(sunDir, sites[0]), have = (LAND.hour0[0] + 24 * (t - LAND.t0) / solarDay) % 24;
+    let dh = Math.abs(want - have); if (dh > 12) dh = 24 - dh;
+    if (dh < 1.5) return;
+  }
+  const hour0 = new Float64Array(sites.length);
+  for (let j = 0; j < sites.length; j++) hour0[j] = hourAt(sunDir, sites[j]);
+  LAND = { bodyId, sites, solarDay, t0: t, hour0, days: new Map() };
+}
+export function landStorms() { return LAND; }
+// the local SOLAR hour at body-local unit d for a sun at s: the hour angle (core/orbits.js localSolarTime), which runs evenly
+// with time -- the world's painted hour (sunHourAt) does not at high latitudes, and a schedule laid on it drifts
+function hourAt(s, d) {
+  let h = Math.atan2(d.x, d.z) - Math.atan2(s.x, s.z);
+  h -= TAU * Math.round(h / TAU);
+  h = 12 + h * 12 / Math.PI;
+  h %= 24; if (h < 0) h += 24;
+  return h;
+}
+// what fires on day D (counted from the reference's first site's midnight): [{ k, site, tf, life, s, r, ve, vn }]
+const _lw = new Float64Array(4);
+function landDay(bodyId, seed, D) {
+  const L = LAND;
+  let day = L.days.get(D);
+  if (day) return day;
+  day = [];
+  const sd = seedFor(bodyId, seed) + 31337, S = STORMLAND;
+  if (hash3(D, 1, 0, sd) < S.stormDays) {
+    const n = S.perDay[0] + Math.floor(hash3(D, 2, 0, sd) * (S.perDay[1] - S.perDay[0] + 1) * 0.9999);
+    let wsum = 0; for (const st of L.sites) wsum += st.w;
+    const taken = new Set();
+    for (let k = 0; k < n; k++) {
+      let j = -1;
+      for (let tries = 0; tries < 6 && j < 0; tries++) {
+        let a = hash3(D, 3 + k, tries, sd) * wsum;
+        for (let q = 0; q < L.sites.length; q++) { a -= L.sites[q].w; if (a <= 0) { if (!taken.has(q)) j = q; break; } }
+      }
+      if (j < 0) continue;
+      taken.add(j);
+      const site = L.sites[j];
+      const h = mix(S.hours[0], S.hours[1], hash3(D, 10 + k, 0, sd));
+      const tf = L.t0 + (24 * D + h - L.hour0[0] + (L.hour0[0] - L.hour0[j])) * L.solarDay / 24;
+      const life = mix(S.lifeH[0], S.lifeH[1], hash3(D, 20 + k, 0, sd)) * L.solarDay / 24;
+      // its drift: the large-scale wind over its site at its birth, made the wind aloft, along the site's east and north
+      windLarge(bodyId, site.x, site.y, site.z, tf, seed, _lw);
+      let ex = site.z, ez = -site.x; const el = Math.hypot(ex, ez) || 1; ex /= el; ez /= el;
+      const nx = site.y * ez, ny = site.z * ex - site.x * ez, nz = -site.y * ex;
+      const ve = (_lw[0] * ex + _lw[2] * ez) * S.aloft * S.steer, vn = (_lw[0] * nx + _lw[1] * ny + _lw[2] * nz) * S.aloft * S.steer;
+      day.push({ k, j, site, tf, life, s: mix(0.75, 1, hash3(D, 30 + k, 0, sd)), r: mix(S.r[0], S.r[1], hash3(D, 40 + k, 0, sd)), ve, vn, ex, ez, nx, ny, nz });
+    }
+  }
+  if (L.days.size > 64) L.days.clear();
+  L.days.set(D, day);
+  return day;
+}
+// (group D) THE LAST AND THE NEXT FLASH OF ONE STORM CELL c (liveCells' fields) at time t, whatever point asks: the cell's
+// own lightning as weatherAt would schedule it overhead (lightningFor, round its own centre). Fills li like
+// here.weather.lightning (last { t, x, y, z }, nextIn); its flash01 and thunder are for a place at the cell's centre.
+const _fl1 = { x: 0, y: 1, z: 0, r: 1 };
+export function flashOf(bodyId, seed, c, t, li) {
+  const regime = REGIMES[bodyId], atm = ATMOSPHERES[bodyId];
+  li.last = li.last || { t: -1e9, x: 0, y: 1, z: 0, distance: 1e9 };
+  li.flash01 = 0; li.nextIn = Infinity; li.last.t = -1e9;
+  const perMin = c.kind.flash * c.w;
+  if (!regime || !(perMin > 0.05)) return li;
+  _fl1.x = c.x; _fl1.y = c.y; _fl1.z = c.z; _fl1.r = c.r;
+  lightningFor(bodyId, regime, seed, c.i, c.gen, perMin, c.x, c.y, c.z, t, atm.c, li, _fl1);
+  return li;
+}
+export { LAND_BASE };
+
+// the day index of game time t for the land storms (from the first site's local midnight)
+function landDayOf(t) { return Math.floor((LAND.hour0[0] + 24 * (t - LAND.t0) / LAND.solarDay) / 24); }
+// One land storm's two cells at time t: part 0 its cloud, 1 its storm. Fills c with cellAt's fields (and stage, top,
+// anvilE, anvilN, site for the clouds lane); returns false when it is not alive or not yet grown into this part.
+function landPart(bodyId, f, D, part, t, c) {
+  const u = (t - f.tf) / f.life;
+  if (!(u > 0 && u < 1)) return false;
+  const R = BODIES[bodyId].radius;
+  const w = part === 0 ? smoothstep(0, 0.12, u) * (1 - smoothstep(0.85, 1, u)) : f.s * smoothstep(0.2, 0.45, u) * (1 - smoothstep(0.7, 1, u));
+  if (!(w > 0)) return false;
+  // where it has drifted to: the site turned along its drift by the distance run since it began to drift
+  const dt = t - f.tf, sp = Math.hypot(f.ve, f.vn), dd = Math.max(0, dt - STORMLAND.anchor * f.life);
+  let x = f.site.x, y = f.site.y, z = f.site.z;
+  if (sp > 1e-6) {
+    const a = sp * dd / R, de = f.ve / sp, dn = f.vn / sp;
+    const tx = de * f.ex + dn * f.nx, ty = dn * f.ny, tz = de * f.ez + dn * f.nz, ca = Math.cos(a), sa = Math.sin(a);
+    x = x * ca + tx * sa; y = y * ca + ty * sa; z = z * ca + tz * sa;
+  }
+  c.x = x; c.y = y; c.z = z;
+  const grow = part === 0 ? 0.45 + 0.55 * smoothstep(0, 0.5, u) : 0.6 + 0.4 * smoothstep(0.2, 0.6, u);
+  c.r = f.r * grow * (part === 0 ? STORMLAND.cloudR : 1);
+  c.w = w; c.s = part === 0 ? 1 : f.s; c.env = 1;
+  c.kindId = part === 0 ? 'cloud' : 'storm'; c.kind = KINDS[c.kindId];
+  c.age = dt; c.life = f.life; c.gen = D; c.i = LAND_BASE + 2 * f.k + part;
+  c.swirl = 0; c.spin = 0; c.ve = f.ve; c.vn = f.vn;
+  c.stage = u; c.site = f.j; c.anvilE = f.ve; c.anvilN = f.vn; c.land = true;
+  return true;
+}
+// every live land cell at time t into the reused list `out` from index out.n
+function landCellsInto(bodyId, t, seed, out) {
+  if (!LAND || !WX2.stormland || LAND.bodyId !== bodyId || t < STORMLAND.from) return;
+  const D = landDayOf(t);
+  for (let d = D - 1; d <= D; d++) {
+    for (const f of landDay(bodyId, seed, d)) for (let part = 0; part < 2; part++) {
+      const c = out[out.n] || (out[out.n] = {});
+      if (landPart(bodyId, f, d, part, t, c)) out.n++;
+    }
+  }
+}
+// the centre of land cell number i (generation D) at time t, for its lightning (lightningFor's `own`)
+const _lc = {}, _lown = { x: 0, y: 1, z: 0, r: 1 };
+function landCentre(bodyId, seed, i, D, t) {
+  if (!LAND) return null;
+  const k = (i - LAND_BASE) >> 1, part = (i - LAND_BASE) & 1;
+  for (const f of landDay(bodyId, seed, D)) if (f.k === k) {
+    if (!landPart(bodyId, f, D, part, t, _lc)) return null;
+    _lown.x = _lc.x; _lown.y = _lc.y; _lown.z = _lc.z; _lown.r = _lc.r;
+    return _lown;
+  }
+  return null;
+}
+
 // All live cells of a body at time t (for the lab's globe view and for tests).
 export function cellsAt(bodyId, t, seed = DEFAULT_SEED) {
   const regime = REGIMES[bodyId];
@@ -228,6 +387,8 @@ export function cellsAt(bodyId, t, seed = DEFAULT_SEED) {
     const c = {};
     if (cellAt(bodyId, R, regime, s, i, t, c)) out.push(c);
   }
+  const lc = []; lc.n = 0; landCellsInto(bodyId, t, seed, lc);
+  for (let i = 0; i < lc.n; i++) out.push(lc[i]);
   return out;
 }
 
@@ -350,10 +511,15 @@ function gather(bodyId, ux, uy, uz, t, seed) {
     if (!cellAt(bodyId, R, regime, s, i, t, _c)) continue;
     accumulate(a, _c, ux, uy, uz, R);
   }
+  if (LAND && WX2.stormland && LAND.bodyId === bodyId && t >= STORMLAND.from) {
+    _lcl.n = 0; landCellsInto(bodyId, t, seed, _lcl);
+    for (let i = 0; i < _lcl.n; i++) accumulate(a, _lcl[i], ux, uy, uz, R);
+  }
   if (_forced) accumulate(a, forcedInto(_c), ux, uy, uz, R);
   a.cloud = 1 - a.clear;
   return a;
 }
+const _lcl = []; _lcl.n = 0;
 
 // (group D) gather itself, for the rain field's pure functions (cloudfield.js rainAt): its accumulator, overwritten by
 // the next call to any of the weather's functions, so read what you need from it at once.
@@ -372,6 +538,7 @@ export function liveCells(bodyId, t, seed = DEFAULT_SEED, out = []) {
     const c = out[out.n] || (out[out.n] = {});
     if (cellAt(bodyId, R, regime, s, i, t, c)) out.n++;
   }
+  landCellsInto(bodyId, t, seed, out);
   if (_forced) { const c = out[out.n] || (out[out.n] = {}); forcedInto(c); out.n++; }
   // (how far each reaches, as the least dot product of a place's direction with its centre that it still touches: a
   //  place below it is skipped by gatherFrom without the square root, exactly where accumulate would return at once)
@@ -523,7 +690,14 @@ export function weatherAt(bodyId, ux, uy, uz, altitude, t, seed, env, o = {}) {
   // Weather lives in the lower half of the atmosphere (PAINTER's cloud deck sits at 55 % of its
   // height). Climb through it and you are above the rain, the fog and the cloud.
   const top = BODIES[bodyId].atmosphereHeight || 0;
-  const below = top > 0 ? 1 - smoothstep(top * 0.5, top * 0.62, altitude) : 0;
+  // (group D, ?stormland=1: the weather lives under ITS OWN TOP, which the caller says (env.cloudTop, m above the datum:
+  //  the cloud map's, over the land), not under half the atmosphere above the datum, which put a quarter of Earth's
+  //  alpine meadow above all weather. Without env.cloudTop it is exactly as it was.)
+  const below = env && env.cloudTop != null ? 1 - smoothstep(env.cloudTop, env.cloudTop + 150, altitude) : top > 0 ? 1 - smoothstep(top * 0.5, top * 0.62, altitude) : 0;
+  // (group D: the land's own weather at this place, when the caller has it: env.rainK multiplies what falls -- more on
+  //  the windward side of a range, less in its lee -- and env.cu is the fair cumulus the wind map's lift grows here)
+  if (env && env.rainK != null) { a.rate *= env.rainK; a.rateIce *= env.rainK; a.rateFrost *= env.rainK; }
+  if (env && env.cu > 0) a.cloud = 1 - (1 - a.cloud) * (1 - clamp01(env.cu));
 
   let rate = a.rate * moist * below;
   const melt = regime && regime.melt != null ? regime.melt : 1e9;
@@ -660,7 +834,7 @@ export function weatherAt(bodyId, ux, uy, uz, altitude, t, seed, env, o = {}) {
   li.flash01 = 0; li.nextIn = Infinity; li.thunderIn = Infinity; li.thunder01 = 0;
   li.last.t = -1e9; li.last.distance = 1e9;
   if (regime && regime.cells && a.topCell >= 0 && a.flash > 0.05) {
-    lightningFor(bodyId, regime, seed, a.topCell, a.topGen, a.flash, ux, uy, uz, t, atm.c, li, a.topCell === OWN_CELL ? _own : a.topCell === FORCED_CELL && _forced ? forcedCentre() : null);
+    lightningFor(bodyId, regime, seed, a.topCell, a.topGen, a.flash, ux, uy, uz, t, atm.c, li, a.topCell === OWN_CELL ? _own : a.topCell === FORCED_CELL && _forced ? forcedCentre() : a.topCell >= LAND_BASE ? landCentre(bodyId, seed, a.topCell, a.topGen, t) : null);
   }
 
   // ---- kind: one word for what a person would call it --------------------------------------------
@@ -716,7 +890,7 @@ function lightningFor(bodyId, regime, seed, cell, gen, perMin, ux, uy, uz, t, cS
   const p = clamp01(perMin * slot / 60);
   const n0 = Math.floor(t / slot);
   if (own) { _c.x = own.x; _c.y = own.y; _c.z = own.z; _c.r = own.r; }
-  else if (!cellAt(bodyId, R, regime, seedFor(bodyId, seed), cell, t, _c)) return;
+  else if (cell >= regime.cells + (regime.spots ? regime.spots.length : 0) || !cellAt(bodyId, R, regime, seedFor(bodyId, seed), cell, t, _c)) return;   // (a cell that is not the body's own, with no centre given: none)
   const cx = _c.x, cy = _c.y, cz = _c.z, cr = _c.r;
   let ex = cz, ez = -cx; const el = Math.hypot(ex, ez) || 1; ex /= el; ez /= el;
   const nx = cy * ez, ny = cz * ex - cx * ez, nz = -cy * ex;

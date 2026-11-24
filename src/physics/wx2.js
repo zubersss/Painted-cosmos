@@ -10,6 +10,8 @@
 //   ?nearmap=1    the near wind grid (air.js) takes its large-scale wind from the map instead of windLarge
 //   ?farwind=1    the plants beyond the near field read the map (flora.js FloraField.far, flora.glsl.js)
 //   ?cloudmap=1   the cloud and rain map of the whole world, and the rain field for the water group (cloudfield.js)
+//   ?stormland=1  storms born from the land: afternoon storms at the wind map's convection sites (weather.js STORMLAND),
+//                 the weather living under its own cloud top, more rain windward and less in the lee
 const Q = (typeof location !== 'undefined' && location && location.search) ? new URLSearchParams(location.search) : null;
 const flag = (k, d) => (Q && Q.has(k) ? Q.get(k) !== '0' && Q.get(k) !== 'false' : d);
 const ALL = flag('wx2', false);
@@ -20,8 +22,11 @@ export const WX2 = {
   nearmap: flag('nearmap', ALL),
   farwind: flag('farwind', ALL),
   cloudmap: flag('cloudmap', ALL),
+  stormland: flag('stormland', ALL),
   // (the speed test's row 'weather: wind map frozen': the map stops refreshing, so the script's change is its cost)
   freeze: false,
 };
 // (the near grid and the far plants need the map: asking for either asks for it)
 if (WX2.nearmap || WX2.farwind) WX2.windmap = true;
+// (storms born from the land need the map's sites, and the weather's own top needs the cloud map)
+if (WX2.stormland) { WX2.windmap = true; WX2.cloudmap = true; }

@@ -30,8 +30,8 @@ import { clamp01, smoothstep } from './util.js';
 // (group D, the second weather: docs/lead/WEATHER-DESIGN.md. Everything of it is behind wx2.js and off by default.)
 import { WX2 } from './wx2.js';
 import { WindMap, WINDMAP, setThermal } from './windmap.js';
-import { CloudField, CLOUDMAP, rainAt, rainBetween, throughfall, RAIN_GLSL } from './cloudfield.js';
-import { setForcedCell, forcedCell } from './weather.js';
+import { CloudField, CLOUDMAP, rainAt, rainBetween, throughfall, RAIN_GLSL, RAINLAND } from './cloudfield.js';
+import { setForcedCell, forcedCell, setLandStorms, landStorms } from './weather.js';
 import { WaterField, WATER_GLSL, WATER, windSea, seaGrown, fetchOf, wakeLength, foamCover, whiteWind, surf01, FetchGauge, FETCH_GAUGE, SEA_TEX } from './water.js';
 import { SeaMap, SEA_MAP, FetchRose } from './seamap.js';
 import { DeformField, DEFORM, MARK, MARK_STRIDE } from './deform.js';
@@ -166,7 +166,7 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
   const stats = { ms: 0, msAvg: 0, msMax: 0, msGround: 0, msAir: 0, msWind: 0, msCloud: 0, msWeather: 0, msFlora: 0, msParticles: 0, msFetch: 0, fetchSamples: 0, samples: 0, particles: 0, pushCells: 0, frames: 0, reanchors: 0 };
   const _dirv = { x: 0, y: 0, z: 0 };
   const _d3 = new Float64Array(3);
-  const _g = {}, _g2 = {}, _cov = {}, _menv = {}, _m2 = {}, _wenv = {};
+  const _g = {}, _g2 = {}, _cov = {}, _menv = {}, _m2 = {}, _wenv = {}, _cmo = {}, _wmo = {};
   const _splash = new Float32Array(MATERIAL_IDS.length);   // (P21) a raindrop's splash on each ground, as it is now
   let sampleBody = 'earth';
   const sampleActive = (dir) => sampleSurface(sampleBody, dir);
@@ -417,12 +417,28 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
     _wenv.sun01 = sun01; _wenv.sunEast = sunEastAt(bodyId, ux, uy, uz); _wenv.wind = windLarge(bodyId, ux, uy, uz, time, seed, _wl4)[3]; _wenv.fetch = cover.fetch || 0;
     // (group D) a system forced over the focus follows it (physics.forceWeather)
     if (forceSpec) setForcedCell({ kind: forceSpec.kind || 'storm', r: forceSpec.radius || 900, w: forceSpec.strength == null ? 1 : forceSpec.strength, x: ux, y: uy, z: uz });
+    // (group D, ?stormland=1) storms born from the land: the wind map's sites and the sun's reference handed to the weather;
+    // and at the focus the weather's own top (from the cloud map, over the land), the land's rain factor and its cumulus
+    if (WX2.stormland && windMap.land.ready && windMap.bodyId === bodyId && sunDir) {
+      setLandStorms(bodyId, windMap.sites, sunDir, time);
+      RAINLAND.map = windMap;
+      const cm = cloudMap.ready && cloudMap.bodyId === bodyId ? cloudMap.at(ux, uy, uz, _cmo) : null;
+      const wmo = windMap.ready ? windMap.at(ux, uy, uz, _wmo) : null;
+      _wenv.cloudTop = Math.max(here.groundHeight + 300, cm ? cm.top : here.groundHeight + 2400);
+      _wenv.rainK = wmo ? 1 + CLOUDMAP.rainWind * Math.min(1.5, Math.max(0, wmo.lift)) - CLOUDMAP.rainLee * Math.min(1, Math.max(0, -wmo.lift)) : 1;
+      _wenv.cu = cm ? cm.cu : 0;
+    } else {
+      if (landStorms()) setLandStorms(null);
+      RAINLAND.map = null;
+      _wenv.cloudTop = undefined; _wenv.rainK = undefined; _wenv.cu = 0;
+    }
     weatherAt(bodyId, ux, uy, uz, r - body.radius, time, seed, _wenv, here.weather);
     // (group D) the cloud and rain map: a slice a frame; and the rain cells nearest the focus for the water's shaders
     if (WX2.cloudmap) {
       const tc0 = now();
       cloudMap.step(dt, bodyId, time, sunDir, WX2.windmap ? windMap : null);
       cloudMap.rainCellsFor(bodyId, frame, fp.x, fp.y, fp.z);
+      cloudMap.flashesFor(bodyId, time, fp.x, fp.y, fp.z);
       cloudMap.rainNow = here.weather.precipitation.type === 'none' ? 0 : here.weather.precipitation.rate * (1 - (here.weather.precipitation.frozen01 || 0));
       stats.msCloud = now() - tc0;
     } else stats.msCloud = 0;
@@ -825,7 +841,9 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
     get wind() { return WX2.windmap ? windMap : null; },
     // (group D) THE CLOUD AND RAIN MAP, or null while WX2.cloudmap is off (docs/lead/WEATHER-DESIGN.md 9.2): N, version, t,
     // ready; per texel (the wind map's grid) low, conv, base, top (m above the datum), mid, high, valley, rain, snow (mm/h at
-    // the ground), storm; cells (weather.js liveCells, .n live); at(ux, uy, uz, out).
+    // the ground), storm, cu (the fair cumulus share of low); cells (weather.js liveCells, .n live: land storms carry stage,
+    // site, anvilE, anvilN, land); flashes (.n live: t, age, x, y, z, distance, kind 'cg' | 'ic', seed, base, flash01,
+    // nextIn, cell, gen: the last flash of every storm cell within 4 km of the focus); at(ux, uy, uz, out).
     get cloud() { return WX2.cloudmap ? cloudMap : null; },
     // (group D) THE RAIN FIELD for the water group, or null while WX2.cloudmap is off (9.3, reconciled with their 5.6):
     //   rate, snow: Float32Array per texel (mm/h); at(ux, uy, uz, out) -> out.rain, out.snow ...; now: mm/h liquid at the focus;
@@ -919,6 +937,8 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
     // the rain, the lightning, the cloud map. For the speed test's storm rows and for stills of a storm. null: as it was.
     forceWeather(spec) { forceSpec = spec && spec.kind ? spec : null; if (!forceSpec) setForcedCell(null); },
     get forcedWeather() { return forcedCell(); },
+    // (group D, for the lab and the stills) every live weather system of the body the physics is on, at game time t
+    cellsAt(t) { return active ? cellsAt(active, t == null ? time : t, seed) : []; },
     get time() { return time; },
     // THE ABILITY LIGHTS A FIRE (core/powers.js, behind ?powers=1). The list belongs to the game (fire.js makeFires)
     // and comes in on the frame; lighting one is here because only the physics can say what is underfoot there.
