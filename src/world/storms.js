@@ -28,6 +28,7 @@ import { makePaintUniforms, bindBodyUniforms } from '../render/materials.js';
 import { VERT_PARS, VERT_END, FRAG_PARS } from '../render/chunks.js';
 import { register, G } from '../render/shared.js';
 import { BODIES } from '../data/bodies.js';
+import { watchPrograms } from './wxguard.js';
 
 const MAX_SHAFTS = 12;
 const VEILS = 2;                        // veils hung under one storm (the look director: two wide beat four thin)
@@ -221,6 +222,8 @@ export function makeStorms(bodyUniforms, opts = {}) {
   register(bmat, 'glaze');
   const bolts = new THREE.Mesh(bg, bmat);
   bolts.name = 'pc-storm-bolt'; bolts.frustumCulled = false; bolts.matrixAutoUpdate = false; bolts.visible = false;
+  // (a program that does not compile on a device switches itself off, and the sky goes on without it: wxguard.js)
+  watchPrograms(shafts, 'storm veils'); watchPrograms(bolts, 'storm bolts');
 
   const _o = {}, shape = [], cache = new Map();
   let bound = bodyUniforms || null;
@@ -296,7 +299,7 @@ export function makeStorms(bodyUniforms, opts = {}) {
           }
         }
       }
-      g.instanceCount = n; shafts.visible = n > 0;
+      g.instanceCount = n; shafts.visible = n > 0 && !shafts.userData.pcGuardOff;
       if (n) { for (const at of aV) at.needsUpdate = true; place(shafts, cameraPos, root); }
       // THE FLASH'S LIGHT (every flash, cloud to ground or in the cloud): the brightest here
       flash.w = 0;
@@ -347,7 +350,7 @@ export function makeStorms(bodyUniforms, opts = {}) {
         }
       }
       for (let q = nbv; q < NV; q++) bo[q] = 0;
-      bolts.visible = nbv > 0;
+      bolts.visible = nbv > 0 && !bolts.userData.pcGuardOff;
       if (nbv) { aP.needsUpdate = true; aN.needsUpdate = true; aS.needsUpdate = true; aO.needsUpdate = true; bg.setDrawRange(0, (nbv / 4) * 6); place(bolts, cameraPos, root); }
     },
   };
