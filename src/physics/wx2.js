@@ -1,10 +1,14 @@
 // Painted Cosmos physics: the switches of the second weather (group D: the planet wind map, the cloud and rain map,
 // storms born from the land). OWNER: PHYSICS (group D). See docs/lead/WEATHER-DESIGN.md.
 //
-// EVERY SWITCH IS OFF BY DEFAULT: with none of them in the address the physics is what it was at v37, to the last digit.
-// The address is read only where there is one, guarded exactly as fauna.js reads its dials, so the Node tests see the
-// defaults; a test or a page may also set the fields directly (the object is not frozen for that reason).
-//   ?wx2=1        every piece of the second weather built so far (the owner's link); a piece's own switch wins
+// THE NEW WEATHER IS THE OIL LOOK'S DEFAULT (the coordinator's flip, applied once the clouds lane passed review): in a
+// page of the oil look (?look=oil, read exactly as render/shared.js LOOK.oil reads it) every switch below is on unless
+// the address turns it off, and ONE opt-out, ?weather=old, gives the weather as it was at v37, to the last digit. The
+// watercolour game keeps the old weather (the coordinator: the watercolour game identical) unless a switch is named.
+// Where there is no page (the Node tests) every switch is off, as before, so a test sees the old weather unless it sets
+// a field itself (the object is not frozen for that reason).
+//   ?weather=old  the old weather: every switch below off (a piece's own switch still wins)
+//   ?wx2=0        the same, as the switches' own master
 //   ?windmap=1    the planet wind map (windmap.js): the land read once, wind, lift and the convection trigger each second
 //   ?thermal=0    ... without the thermal winds (up the sunny slopes by day, down them at night, the lake and sea breeze)
 //   ?nearmap=1    the near wind grid (air.js) takes its large-scale wind from the map instead of windLarge
@@ -22,7 +26,10 @@
 //   ?stormswing=0 (with ?stormland) the land storms as W3.2 laid them: 1 to 3 a day, drifting with the usual wind aloft
 const Q = (typeof location !== 'undefined' && location && location.search) ? new URLSearchParams(location.search) : null;
 const flag = (k, d) => (Q && Q.has(k) ? Q.get(k) !== '0' && Q.get(k) !== 'false' : d);
-const ALL = flag('wx2', false);
+const PAGE = typeof location !== 'undefined' && !!location;
+const OLD = !!(Q && Q.get('weather') === 'old');
+const OIL = !!(Q && Q.get('look') === 'oil');          // (as render/shared.js LOOK.oil; read here, never imported)
+const ALL = flag('wx2', PAGE && OIL && !OLD);
 
 export const WX2 = {
   windmap: flag('windmap', ALL),
@@ -35,7 +42,7 @@ export const WX2 = {
   rainshaft: flag('rainshaft', ALL),
   bolts: flag('bolts', ALL),
   // (W3.3's last part: the rain box's drops placed by the rain map read at the box's four corners, not one rate for all)
-  rainmap: flag('rainmap', ALL),
+  rainmap: flag('rainmap', false),            // (off even in the new weather: its effect is too small to see, W3.7)
   // (gusts seen from the air: bands travelling across the grass and the crowns, flora.js GUSTBAND, flora.glsl.js pcGustBand;
   //  its own switch only, never ?wx2=1 nor the flip, until the look director passes it)
   gustbands: flag('gustbands', false),

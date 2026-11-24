@@ -14,9 +14,11 @@ const PAD_CHORD = { mercury: [1, 1.5, 2.25], venus: [1, 1.26, 1.5], earth: [1, 1
 //  distance over the speed of sound of the air); the bang plays when its count-down crosses zero, as before. Without
 //  the switch the thunder is exactly what it was.)
 const STORM_AUDIO = (() => {
-  if (typeof location === 'undefined' || !location || !location.search) return false;
-  const q = new URLSearchParams(location.search), on = (k) => q.has(k) && q.get(k) !== '0' && q.get(k) !== 'false';
-  return on('stormland') || on('wx2');
+  if (typeof location === 'undefined' || !location) return false;
+  const q = new URLSearchParams(location.search || ''), on = (k) => q.has(k) && q.get(k) !== '0' && q.get(k) !== 'false';
+  if (q.has('stormland')) return on('stormland');
+  if (q.get('weather') === 'old') return false;
+  return q.has('wx2') ? on('wx2') : q.get('look') === 'oil';   // (the new weather is the oil look's default: physics/wx2.js)
 })();
 export const THUNDER = Object.freeze({
   near: 450,        // m: within this a bolt cracks

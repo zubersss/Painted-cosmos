@@ -511,6 +511,7 @@ export function attachBench(pc) {
       ['near grass one flat colour', () => B({ flat: 8 }), () => B({ flat: 0 })],
     ];
     const WX0 = { ...WX2 };      // (group D: its switches as the address set them, put back after each of its rows)
+    const WX_ALL = ['windmap', 'nearmap', 'farwind', 'cloudmap', 'stormland', 'rainlook', 'rainshaft', 'bolts', 'rainmap'];   // (group D, the flip: the new weather's switches, for the row 'the old weather')
     // (lane W1 CLOUDS: whether the 3D clouds are on, and a switch that puts the sky's own flat cloud back in their place)
     const CLOUDS3D = (() => { try { return +(new URLSearchParams(location.search).get('clouds3d') || 0) > 0; } catch { return false; } })();
     const clouds3d = (on) => { const c = pc.world && pc.world.clouds; if (c) c.enabled = on; };
@@ -612,6 +613,13 @@ export function attachBench(pc) {
       //  pcGustBand returns before its noise read: the gap is its cost, one texture read a pixel of growth ground.)
       ...(WX2.gustbands ? [
         ['weather: no gust bands seen from the air', () => { WX2.gustbands = false; }, () => { WX2.gustbands = WX0.gustbands; }],
+      ] : []),
+      // (group D, the flip: THE NEW WEATHER AS A WHOLE against the old one (?weather=old), switched live -- the physics
+      //  reads its switches every frame; the 3D clouds go too, the sky taking its own flat cloud back (W1's switch). What
+      //  is fixed when the page is made stays: the rain streak's pale (kitmat.js) and the thunder's shape (audio.js),
+      //  neither of which costs anything measurable.)
+      ...(WX2.windmap ? [
+        ['weather: the old weather (?weather=old)', () => { for (const k of WX_ALL) WX2[k] = false; show(/^pc-storm-/, false); clouds3d(false); }, () => { for (const k of WX_ALL) WX2[k] = WX0[k]; show(/^pc-storm-/, true); clouds3d(CLOUDS3D); }],
       ] : []),
       // (TENTH FORM) THE AIR: no row had ever timed it. The same spot, from 150 m and 400 m up.
       ...airAt(150, 30, [T0.noFar, T0.blob, T0.imp]),

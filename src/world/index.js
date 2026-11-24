@@ -98,7 +98,9 @@ export function createWorld(scene) {
   //  for, and the game without the switches loads nothing new. D's patch imported wx2.js at the top, which would have
   //  stopped the world loading wherever wx2.js is not yet merged: the look director's one change to it.)
   let storms = null;
-  if (LOOK.oil && typeof location !== 'undefined' && /[?&](wx2|rainshaft|bolts)=/.test(location.search || '')) {
+  // (the new weather is the default: fetched in the oil look unless the address says ?weather=old; physics/wx2.js says
+  //  whether the shafts and the bolts are on, and a program that does not compile switches itself off: wxguard.js)
+  if (LOOK.oil && typeof location !== 'undefined' && !/[?&]weather=old(&|$)/.test(location.search || '')) {
     import('../physics/wx2.js').then(({ WX2 }) => (WX2.rainshaft || WX2.bolts ? import('./storms.js').then((m) => {
       storms = m.makeStorms(null, { shafts: WX2.rainshaft, bolts: WX2.bolts }); scene.add(storms.shafts); scene.add(storms.bolts);
     }) : null)).catch((e) => console.warn('storms.js: ' + e.message));

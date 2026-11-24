@@ -18,9 +18,11 @@ import { VERT_PARS, VERT_END, FRAG_PARS } from './chunks.js';
 //  W3.3: a downpour's streaks were laid near paper white; with the switch they are laid at the sky's own pale value,
 //  never over V 0.85, so in front of dark trees they read as rain and not as scratches.)
 const RAINLOOK = (() => {
-  if (typeof location === 'undefined' || !location || !location.search) return 0;
-  const q = new URLSearchParams(location.search), on = (k) => q.has(k) && q.get(k) !== '0' && q.get(k) !== 'false';
-  return q.has('rainlook') ? (on('rainlook') ? 1 : 0) : (on('wx2') ? 1 : 0);
+  if (typeof location === 'undefined' || !location) return 0;
+  const q = new URLSearchParams(location.search || ''), on = (k) => q.has(k) && q.get(k) !== '0' && q.get(k) !== 'false';
+  if (q.has('rainlook')) return on('rainlook') ? 1 : 0;
+  if (q.get('weather') === 'old') return 0;
+  return q.has('wx2') ? (on('wx2') ? 1 : 0) : (q.get('look') === 'oil' ? 1 : 0);   // (the new weather is the oil look's default: physics/wx2.js)
 })();
 
 // what a kind is drawn with when it did not come from the ground (updated by the world: rain
