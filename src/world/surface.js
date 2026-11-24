@@ -17,9 +17,10 @@ import { dirToFace } from './cubesphere.js';
 import { EASELS, STANDS } from '../art/easels.js';
 import { bloomTint } from './bloom.js';
 
-// ?glades=1 (FV, the far view, the look director's second audit finding 1, C's part; OFF by default): the oil look's woods
-// open in WHOLE GLADES of grass between the stands, with a short ragged edge, instead of thinning softly (forest recipe).
-const GLADES = (() => { try { return new URLSearchParams(location.search).get('glades') === '1'; } catch (e) { return false; } })();
+// THE GLADES (FV, the far view, the look director's second audit finding 1, C's part; PASSED and ON by default, ?glades=0 the
+// old woods): the oil look's woods open in WHOLE GLADES of grass between the stands, with a short ragged edge, instead of
+// thinning softly, the stands a little closer, never by the landing (forest recipe). Off in Node (no address: the tests).
+const GLADES = (() => { try { const v = new URLSearchParams(location.search).get('glades'); return v !== '0' && v !== 'false'; } catch (e) { return false; } })();
 
 const _cf = {};
 
@@ -534,8 +535,9 @@ class Surface {
     const bz = this.rivers ? c.barZone || 0 : 0;
     // (and THE STANDS CLOSE UP outside the glades, the look director: trees gathered into stands overlap, so the wood lost a
     // sixth of its darks from the air though it lost few trees (under V 0.3, 51.5 to 45.1 per cent at 150 m); a share up to
-    // 1.25 there (the placer's and the far stand's keep both scale by it), glades mode only, never by the landing)
-    const tW = gWhole ? 0.82 + 0.18 * kS : 0.82, tS = gWhole ? 1 + 0.25 * kS : 1;
+    // 1.12 there, about count-neutral (the placer's and the far stand's keep both scale by it; 1.25 gave back the darks but a
+    // fifth more far trees, the phone's largest cost: the look director chose 1.12), glades mode only, never by the landing)
+    const tW = gWhole ? 0.82 + 0.18 * kS : 0.82, tS = gWhole ? 1 + 0.12 * kS : 1;
     b.trees = clamp((1 - tW * glade) * tS * (1 - rk) * open * (1 - Math.max(bar, bz)), 0, 1.25);
     b.canopy = clamp(b.trees * 1.05 + (1 - open) * 0.35, 0, 1);
     b.birch = clamp(0.74 - pz * 0.72 + 0.3 * (1 - smoothstep(6, 18, s)), 0.06, 1);
