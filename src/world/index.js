@@ -870,6 +870,9 @@ export function createWorld(scene) {
       const air01 = body.atmosphereHeight > 0 ? (fv1 ? THREE.MathUtils.smoothstep(dip, 46, 59) : MTN_AIR ? THREE.MathUtils.smoothstep(alt, atmH * 0.55, atmH * 1.15) : space01)
         : THREE.MathUtils.smoothstep(alt, 250, 2500);
       const vis = (v0 * mist + (v1 - v0 * mist) * THREE.MathUtils.smoothstep(alt, 6, 160) + (fv1 ? Math.min(1640, Math.max(0, alt - 160) * 1.2) : 0)) * (hazeK + (1 - hazeK) * air01) + 40000 * air01;
+      // (L5, the air from the air: 0 on foot, 1 once the air's reach is the air's -- the same reach the shaders read as
+      // pcHigh, (vis - 200) / 2400, taken from 0.25 to 0.80 of it, so the views on foot do not move; chunks.js)
+      OIL.uLookN.value.w = LOOK.oil ? (LOOK.airFar || 0) * THREE.MathUtils.smoothstep(Math.min(1, Math.max(0, (vis - AIR_HIGH_0) / AIR_HIGH_W)), 0.25, 0.80) : 0;
       bu.uFog.value.set(1 / vis, LOOK.oil ? LOOK.oilBands : 6, 1 - air01 * 0.9, space01 * st.limbK);      // (the oil look lays the air in ten bands, not six: shared.js LOOK.oilBands, `?bands=`. The watercolour's six are untouched.)
       if (bu.uFogBank) bu.uFogBank.value.set(bank * (1 - air01), look.bankSize || 150);
       // sky
@@ -957,6 +960,7 @@ export function createWorld(scene) {
       // deep space: no atmosphere anywhere
       skyU.uAtmo.value.set(1, 1, 0.03, 1);
       if (skyU.uSkyAir) skyU.uSkyAir.value.z = 0;      // (no world under the eye: no horizon to lay the bands from)
+      OIL.uLookN.value.w = 0;
       skyU.uCloud.value.y = 0; skyU.uWxSky.value.set(0, 0, 0, 0); WX.key = 0; WX.flash = 0;
       sun.getWorldPosition(_v2);
       skyU.uSunDirL.value.copy(_v2.sub(cameraPos)).normalize();
@@ -997,7 +1001,8 @@ export function createWorld(scene) {
     // air the light's own colour, gold through the look's golden hours; by the sun only, and strongest when it is low)
     {
       const fx = active.bu.uFog.value.x, reach = 1 / Math.max(fx, 1e-6), k4 = OIL.uOilC.value.w;
-      SHADOW.air = fx * (k4 + (2.4 - k4) * Math.min(1, Math.max(0, (reach - AIR_HIGH_0) / AIR_HIGH_W)));      // (the twin of chunks.js:336; see AIR_HIGH_* at the top of this file)
+      const hiA = Math.min(1, Math.max(0, (reach - AIR_HIGH_0) / AIR_HIGH_W)), lw = OIL.uLookN.value.w;      // (lw: L5's air from the air)
+      SHADOW.air = fx * (k4 + ((2.4 - k4) * (1 - lw) + (1.4 - k4) * lw) * hiA);      // (the twin of chunks.js pcFogAmount; see AIR_HIGH_* at the top of this file)
       const se = active.bu.uSunDirW.value.dot(active.bu.uUpW.value);
       const lowSun = 1 - THREE.MathUtils.smoothstep(se, 0.48, 0.86);
       // (how far this world takes the golden hours: a look's oil.gold; all the way on Earth, a third elsewhere)

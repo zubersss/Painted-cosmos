@@ -276,8 +276,11 @@ vec3 pcTone(vec3 c, float level) {
   // cooler green, on grey stone a blue-grey. So the key's hue is kept as it is for warm bodies (the orange floor keeps
   // its plum: S1 must not move) and turned, by how green the body is (its hue from the olives to the blue-greens),
   // toward the same key with its green kept and a breath of blue, and by how grey it is, part of the way there. uLookN.z is the switch (shared.js, ?shadehue=);
-  // 0 is the shade exactly as it was.
-  {
+  // 0 is the shade exactly as it was, AND THE DEFAULT: seen on 24 Nov it moves almost nothing (alpine vista 0.14 % of
+  // the pixels, S1 2.2 %, the green wood 0.5 %, the coast 0.34 %): the alpine slopes' violet is the look's own
+  // pigments (cobaltViolet, neutralTint, rawUmber) in deep shade, a data matter for the ground's owner, not this
+  // shade's plum. Kept behind a uniform branch, so it costs nothing while it is off.
+  if (uLookN.z > 0.0) {
     float bmx = max(b.r, max(b.g, b.b)), bch = bmx - min(b.r, min(b.g, b.b)), bs = bch / max(bmx, 1e-4);
     // (the body's hue in degrees: green from the olives at about 52 -- the meadow's yellow-green, which the ground's
     // own green exception, k.g over k.r, never caught -- to the blue-greens; the autumn floor's golds sit under 48)
@@ -407,7 +410,14 @@ float pcFogAmount(float dist) {
     // steady 19-25 % all the way up and at most 0.013 of haze different on the ground -- which is what was done.
     // It is a change to the air itself, in three files, and it still wants a still taken from a hilltop.
     float pcHigh = clamp((1.0 / max(uFog.x, 1e-6) - 200.0) / 2400.0, 0.0, 1.0);
-    dist *= mix(uOilC.w, 2.4, pcHigh);
+    // THE AIR FROM THE AIR (L5, 2026-11-24; LOOK-AUDIT F2). From the air the distance was taken 2.4 times and the
+    // ceiling below gone, so everything past a few hundred metres went wholly to the haze: the stills from the air
+    // measured the picture's saturation at 0.10, beige where the owner's aerial references are amber. uLookN.w
+    // (world/index.js: 0 on foot, 1 once the air's reach is the air's) takes the distance 1.4 times instead and keeps
+    // a share of the far land's own paint at every height (0.16 at the horizon, below). On foot it is 0 and nothing
+    // here moves; ?airfar=0 is the air exactly as it was. THE 2.4 AND THE 1.4 HAVE A TWIN in world/index.js
+    // (SHADOW.air, the lit air): change them together.
+    dist *= mix(mix(uOilC.w, 2.4, pcHigh), mix(uOilC.w, 1.4, pcHigh), uLookN.w);
   #endif
   float f = 1.0 - exp(-dist * uFog.x);
   #ifdef PC_OIL
@@ -448,6 +458,17 @@ float pcFogAmount(float dist) {
       float u = clamp((f - knee) / U, 0.0, 1.0);
       float fc = knee + U * u * (u - 1.0) * (u - 1.0) + D * u * u * (3.0 - 2.0 * u);
       f = mix(min(fc, f), f, pcHigh * pcHigh);      // (the min is both the identity below the knee and the promise that this can never make the air THICKER than it was)
+    }
+    if (uLookN.w > 0.0) {
+      // (L5: from the air the same knee, to a share of 0.16 kept: the land at the horizon from a mile up still shows a
+      // sixth of its own paint, as the far-view design's 0.86 of haze at the horizon asks; nothing nearer moves under
+      // the knee)
+      float keep = 0.16, cap = 1.0 - keep;
+      float knee = min(uOilAir.y, 1.0 - 2.0 * keep);
+      float U = 1.0 - knee, D = cap - knee;
+      float u = clamp((f - knee) / U, 0.0, 1.0);
+      float fc = knee + U * u * (u - 1.0) * (u - 1.0) + D * u * u * (3.0 - 2.0 * u);
+      f = mix(f, min(fc, f), uLookN.w);
     }
   #endif
   return clamp(max(f * uFog.z, uAirNear.x * (1.0 - exp(-dist / max(uAirNear.y, 0.1)))), 0.0, 1.0);
@@ -610,6 +631,16 @@ vec3 pcHazeAt(vec3 viewPos) {
 vec3 pcAtmosV(vec3 c, float f, vec3 viewPos) {
   vec3 h = pcOilHaze(pcHazeAt(viewPos));
   vec3 sunV = normalize((viewMatrix * vec4(uSunDirW, 0.0)).xyz);
+  if (uLookN.w > 0.0) {
+    // (L5, LOOK-AUDIT F6: the far air was one fixed mix of the gold and the blue-violet whichever way one looked, and
+    // the two are complementary: mixed they make the khaki of the golden hour from the air. A painter keeps them
+    // apart: the gold toward the sun, the blue-violet away from it and deeper with distance. From the air only, and
+    // the sky's lowest band does the same (sky.js pcSkyAir), so the land and the sky still meet in one air.)
+    float side = smoothstep(-0.4, 0.7, dot(normalize(viewPos), sunV));
+    vec3 hz = pcHazeAt(viewPos);
+    vec3 warm = mix(pow(hz, vec3(uOilC.x)), vec3(0.95, 0.85, 0.63), 0.75 * pcGold() * (0.45 + 0.55 * side));
+    h = mix(h, mix(warm, vec3(0.48, 0.50, 0.63), clamp(uOilS.x * mix(1.5, 0.45, side) * mix(0.8, 1.2, f), 0.0, 1.0)), uLookN.w);
+  }
   float toward = pow(max(dot(normalize(viewPos), sunV), 0.0), 3.0) * uDayness * (1.0 - uMoon) * (1.0 - uWx.x);
   h = mix(h, min(mix(pcOilSunC(), vec3(1.0), 0.5) * 1.05, vec3(1.0)), toward * uOilC.y);
   return mix(c, ${_far('c', 'h')}, f);      // (where ?farlight= is on, the thing's own light is carried into the air it stands in here: pcFarLight above. It is laid on the haze AFTER the sun's glow, so toward the sun, where the air goes to white, the gain can only be 1 or under and nothing burns out.)

@@ -88,6 +88,10 @@ export const LOOK = {
   // haze at 10 m goes 0.005 to 0.024, at 30 m 0.167 to 0.200, at 60 m 0.468 to 0.434 -- the mean of the curve is the
   // same, the steps are finer, and the near air wobbles by at most 0.034 either way. `?bands=` turns it.
   oilBands: _qn('bands', 10),
+  // THE AIR FROM THE AIR (L5, LOOK-AUDIT F2 and F6; chunks.js pcFogAmount and pcAtmosV, sky.js pcSkyAir): 1 on, 0 the
+  // far air exactly as it was (`?airfar=0`). world/index.js turns it into OIL.uLookN.w each frame: 0 on foot, rising to
+  // 1 as the air's reach grows from the ground's to the air's.
+  airFar: _qn('airfar', 1),
 };
 MODE.oil = LOOK.oil;      // (for the look data and the surface, which do not load this module: data/mode.js)
 MODE.calm = LOOK.oil && !!(_qs && _qs.get('floor') === 'calm');      // (a calmer forest floor, to compare: data/looks/earth.js)
@@ -201,8 +205,11 @@ export const OIL = {
   //     night key of its own, as Neptune's, which the owner liked as it was)
   //   y how far a colour goes toward its own value in the night key's hue (oil.night.c; 0.45, or 0.20 likewise)
   //   z THE SHADE FOLLOWS THE BODY (L6, LOOK-AUDIT F8; chunks.js pcTone): how far a green or grey thing's shade turns
-  //     from the plum of the clip's orange floor toward the key with its green kept. ?shadehue=0 is the shade as it was.
-  uLookN: { value: new THREE.Vector4(0.60, 0.45, _qn('shadehue', 1), 0) },
+  //     from the plum of the clip's orange floor toward the key with its green kept. OFF by default (seen to move almost
+  //     nothing: chunks.js); ?shadehue=1 turns it on.
+  //   w THE AIR FROM THE AIR (L5): how far the far air is laid as from the air -- 0 on foot, 1 from the air; set each
+  //     frame by world/index.js from LOOK.airFar and the air's reach.
+  uLookN: { value: new THREE.Vector4(0.60, 0.45, _qn('shadehue', 0), 0) },
 };
 
 // WHERE THE FIRE HAS BEEN, FOR THE GROUND'S OWN PAINT (the powers, fire; the paint itself is materials.js TERRAIN_FRAG).
