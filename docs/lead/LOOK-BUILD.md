@@ -37,7 +37,7 @@ the air) is OFF until it passes the coordinator's eye (`?airfar=1`). L6 is off (
 | L2 + L7 the foliage shade and quiet darks | on | `&leafshade=0&postdark=0` |
 | L3 one light (figure, creatures, bark, rock) | on | `&onelight=0` |
 | T1 + the air's top + FV1 (the sky from the air) | on | `&skyceil=0&airtop=0` |
-| L5 the air from the air (not yet in) | `&airfar=1` | off |
+| L5 the air from the air | on | `&airfar=0` |
 
 **THE PROOF (24 Nov):** the six standard stills (S1-S6, gallery, 1024x480, quality 1, lite), one browser, an export of
 origin/look-proto 3408e03 against look-director 7dae2f2 with `?look=oil&light=old`: S1, S2, S3, S4 and S5 identical to
@@ -257,7 +257,7 @@ same picture. Flipping it is one line in PROP_FRAG and dropping that define, in 
 trunk in the approved picture: it wants A/B stills (S1, S2 at noon, the 275 m view) in front of the coordinator and
 the owner first. Not started.
 
-## L5, the air from the air: built and seen (OFF by default until the coordinator's eye: `?airfar=1`)
+## L5, the air from the air: built and seen (ACCEPTED by the coordinator 24 Nov; on by default, `?airfar=0` or `?light=old` off)
 
 - `chunks.js` pcFogAmount: from the air (OIL.uLookN.w, set by world/index.js from the air's reach: 0 on foot, 1 by
   the air's) the distance is taken 1.4 times instead of 2.4, and a share of 0.16 of the far land's own paint is kept

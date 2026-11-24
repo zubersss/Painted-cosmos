@@ -83,7 +83,7 @@ const _qn = (k, d) => (_qs && _qs.has(k) && isFinite(+_qs.get(k)) ? +_qs.get(k) 
 // foliage shade and the quiet darks (L2 + L7), one light (L3) and the sky's ceiling with the air's top (T1 reworked,
 // FV1) are ON. `?light=old` turns all of them off together: the oil look exactly as it was before them (pixel-identical,
 // docs/lead/LOOK-BUILD.md), for the owner to compare. Each part keeps its own switch either way
-// (`?nightkey=0`, `?light=old&nightkey=1` and so on). The air from the air (L5) is not in it yet: off unless `?airfar=1`.
+// (`?nightkey=0`, `?light=old&nightkey=1` and so on). The air from the air (L5) is in it too (`?airfar=0` alone).
 const _LO = !!(_qs && _qs.get('look') === 'oil' && _qs.get('light') === 'old');
 const _LN = _LO ? 0 : 1;
 export const LOOK = {
@@ -97,9 +97,10 @@ export const LOOK = {
   // same, the steps are finer, and the near air wobbles by at most 0.034 either way. `?bands=` turns it.
   oilBands: _qn('bands', 10),
   // THE AIR FROM THE AIR (L5, LOOK-AUDIT F2 and F6; chunks.js pcFogAmount and pcAtmosV, sky.js pcSkyAir): 1 on, 0 the
-  // far air exactly as it was. OFF until it has passed the coordinator's eye: `?airfar=1` turns it on. world/index.js turns it into OIL.uLookN.w each frame: 0 on foot, rising to
+  // far air exactly as it was. ON by default since the coordinator accepted it (24 Nov); ?light=old turns it off
+  // with the rest, ?airfar=0 alone. world/index.js turns it into OIL.uLookN.w each frame: 0 on foot, rising to
   // 1 as the air's reach grows from the ground's to the air's.
-  airFar: _qn('airfar', 0),
+  airFar: _qn('airfar', _LN),
 };
 MODE.oil = LOOK.oil;      // (for the look data and the surface, which do not load this module: data/mode.js)
 MODE.calm = LOOK.oil && !!(_qs && _qs.get('floor') === 'calm');      // (a calmer forest floor, to compare: data/looks/earth.js)
