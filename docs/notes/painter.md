@@ -37,7 +37,14 @@ deg the side and turned-away planes lean further to the cool violet (1.25 to 1.3
 low sun, 16.8 h unchanged). HONEST: at the look director's audit views (sun behind the eye) almost no face is a side
 plane, so it changes nothing there (0.07 per cent of pixels even at a stronger trial value; rock S median stays 0.035
 at 420 m noon by my box); where a shaded face shows at noon (alpine meadow 420 m) its S goes 0.32 to 0.36. A stronger
-value (1.48) made that face a loud ultramarine (S 0.42): not kept. What is weak at those views is the LIT plane. FV6(b) ?bloomfar: the ground
+value (1.48) made that face a loud ultramarine (S 0.42): not kept. What is weak at those views is the LIT plane.
+THE SNOW IN FLAT TOUCHES (next commit after 5221c6e; the look director's R3.7 note on 263a2f5): the smooth ramp on the
+lit snow was a fifth of the bright snow being the ground BETWEEN the dabs (shown red by a temporary debug), whose wash
+drifts smoothly from point to point, and the dabs' own small drift. Now the land's snow is two flat paints by the dab's
+number (white, or pale blue) with a value step of its own (a little lighter or darker), and the ground between takes the
+snow's white. Ramp measure on the ridge (steps over 0.005 that are over 0.03): 23 to 31 per cent; the small steps left
+are most likely the air's smooth fade with distance (not measured apart). 5221c6e: the ?bloomfar index slip fixed.
+A1 (trees far) took the far crowns' shadows from my list; I keep the glades. FV6(b) ?bloomfar: the ground
 between the dabs takes no drift under 150 m (1ed9553, B's ask). B's flower line landed (design-flora dd86fb3); F passed it with 6cf9c7a.
 Scratch: `wt37` = main at v37.1.
 

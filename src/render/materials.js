@@ -555,6 +555,10 @@ vec3 pcGroundPaint(vec3 c, vec3 leaf, float fk, vec3 rnd, float snowC, float lvl
     float snW = smoothstep(0.80, 0.90, min(min(c.r, c.g), c.b)) * (1.0 - smoothstep(0.08, 0.16, max(max(c.r, c.g), c.b) - min(min(c.r, c.g), c.b)));
     cg = mix(cg, c, max(max(0.5 * gRock, gCliff), snW));      // (a cliff's dab keeps its bed's tone: no stray pigment)
     lvl -= (1.0 - f) * step(0.58, fract(rnd.x * 11.1)) * 0.9 * step(1.5, lvl) * (1.0 - gRock) * (1.0 - snW);
+    // (but each snow dab keeps a value step of its own, a little lighter or darker by its number, no hue: laid as one flat
+    // paint the brightest lit snow ran as a smooth ramp, a fifth of its steps 0.005 to 0.03 of lightness, faintly a glow;
+    // the look director by R3.7: light in steps with clean edges, white laid in flat touches)
+    lvl += (floor(fract(rnd.x * 7.3) * 3.0) - 1.0) * 0.22 * snW;
     vec3 k = pcDabTint(mix(cg, leaf, f), mix(rnd, vec3(0.5), max(0.5 * gRock, snW)), f);
   #else
   lvl -= (1.0 - f) * step(0.58, fract(rnd.x * 11.1)) * 0.9 * step(1.5, lvl);
@@ -562,6 +566,9 @@ vec3 pcGroundPaint(vec3 c, vec3 leaf, float fk, vec3 rnd, float snowC, float lvl
   #endif
   k = mix(pcWetWash(k, 1.0 - snowC), mix(vec3(0.94, 0.955, 1.0), vec3(0.86, 0.90, 1.0), rnd.x * 0.6), snowC);
   #ifdef PC_ROCKF
+    // (the land's snow laid in two flat paints, white or a pale blue by the dab's number: the wash under it drifts a little
+    // from point to point, and dab to dab that drift was the smooth ramp the look director measured on the lit snow)
+    k = mix(k, step(0.6, fract(rnd.x * 3.7)) > 0.5 ? vec3(0.88, 0.91, 1.0) : vec3(0.95, 0.96, 1.0), snW);
     k = mix(pcRockTemp(k), k, snowC);       // (a rock face warm in its lit plane, cool violet in its shade: render/farground.js)
   #endif
   // (GRASS in the shade is a deep green, its own colour laid heavier with half the cool key over it, as a leaf's shade
@@ -929,6 +936,12 @@ void main() {
         // blue-grey fleck of one or two pixels, SEEN at 1 km by the look director; ?rockdebug=1 shows those gaps grey)
         gRockP = clP; lvl0 = pcRockPlanes(lvl0, nV, sun0);
       }
+    #endif
+    #ifdef PC_ROCKF
+      // (and between the dabs the land's snow is the snow's own white, not the wash's smooth drift: from 420 m a fifth of the
+      // bright snow is these gaps, and their drift from point to point read as an airbrushed glow, R3.7)
+      { float snB = smoothstep(0.80, 0.90, min(min(bareC.r, bareC.g), bareC.b)) * (1.0 - smoothstep(0.08, 0.16, max(max(bareC.r, bareC.g), bareC.b) - min(min(bareC.r, bareC.g), bareC.b)));
+        bareC = mix(bareC, vec3(0.95, 0.96, 1.0), snB); }
     #endif
     vec3 bare = pcTone(bareC, lvl0);
     #ifdef PC_ROCKF
