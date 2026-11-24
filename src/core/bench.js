@@ -263,6 +263,10 @@ export function attachBench(pc) {
     // (?treesway=whole: the near trees bend whole, as the middle ones do, without the crown's branch-by-branch sway;
     //  world/flora.js setTreeSway, the trees' patches built again. With the two short programs only.)
     const sw0 = !!(flora() && flora().swayWhole);
+    // (?pines: the tall pines' and spruces' needles kept a few pixels across at range, world/flora.js setNeedles: a
+    //  uniform, nothing rebuilt; with no needle kind in the world the row times the same frame twice)
+    const nd0 = !!(flora() && flora().needles);
+    const swapNeedles = async (on) => { const f = flora(); if (f && f.setNeedles) f.setNeedles(on); await wait(400); };
     const swapSway = async (whole) => {
       const f = flora();
       if (!f || !f.setTreeSway || f.setTreeSway(whole) == null) return;
@@ -312,6 +316,7 @@ export function attachBench(pc) {
       ['middle trees as clusters', () => swapT2('cards-mid', false), () => swapT2(t2a)],
       ['clusters with a depth pass first', () => swapT2('cards', true), () => swapT2(t2a)],
       [sw0 ? 'near trees: branch sway as before' : 'near trees bend whole (no branch sway)', () => swapSway(!sw0), () => swapSway(sw0)],
+      [nd0 ? 'pines: needles as thin as before' : 'pines: needles kept wide at range', () => swapNeedles(!nd0), () => swapNeedles(nd0)],
     ];
     // ---- THE TENTH FORM'S HANDLES (see the top of this file) ----------------------------------------------------
     const tallMats = () => mats(/^pc-prop-tall/);
