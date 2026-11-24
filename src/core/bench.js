@@ -51,6 +51,7 @@
 
 import { BUILD } from './build.js';
 import { MAX_PIXELS } from './preset.js';   // (the ceiling on the 'every pixel the screen has' row)
+import { WX2 } from '../physics/wx2.js';     // (group D's switches: its rows run only while its pieces are on)
 
 export function attachBench(pc) {
   // which table (tenth form): '1' the whole of it, 'trees' the tree questions, 'air' or 'air,<metres>' the air table
@@ -405,7 +406,7 @@ export function attachBench(pc) {
         const g = sm({ x: d[0], y: d[1], z: d[2] }), r = Math.max(g.radius, g.liquidRadius || 0);
         const G = frameAt(d), cy = Math.cos(yaw * Math.PI / 180), sy = Math.sin(yaw * Math.PI / 180);
         const f = { x: G.n[0] * cy + G.e[0] * sy, y: G.n[1] * cy + G.e[1] * sy, z: G.n[2] * cy + G.e[2] * sy };
-        pin = { t: landing.t, p: { x: d[0] * r, y: d[1] * r, z: d[2] * r }, v: { x: 0, y: 0, z: 0 }, fwd: { ...f }, view: { ...f }, pitch: v.pitch, boom: landing.boom };
+        pin = { t: landing.t, p: { x: d[0] * r, y: d[1] * r, z: d[2] * r }, v: { x: 0, y: 0, z: 0 }, fwd: { ...f }, view: { ...f }, pitch: v.pitch, boom: landing.boom, flying: false };
       }
       putBack();
       await wait(600);
@@ -453,6 +454,8 @@ export function attachBench(pc) {
         if (MK <= 1) await sharpen(1);
       }
     }
+    const WX0 = { ...WX2 };      // (group D: its switches as the address set them, put back after each of its rows)
+    const holdStorm = (on) => { const P = pc.sim && pc.sim.physics; if (P && P.forceWeather) P.forceWeather(on ? { kind: 'storm' } : null); };
     const steps = [
       [AS, null, null],
       // the far trees: their paint, their shapes, which pass, which place in the order of drawing, which form
@@ -511,16 +514,37 @@ export function attachBench(pc) {
       ['trees cast no shadow', () => treeMeshes((o) => o.layers.disable(2)), () => treeMeshes((o) => o.layers.enable(2))],
       ['no light in the air', () => B({ shaft: false }), () => B({ shaft: true })],
       [lite0 ? 'the full paint' : 'the lighter paint', () => B({ lite: !lite0 }), () => B({ lite: lite0 })],
+      // (GROUP D, THE SECOND WEATHER: docs/lead/WEATHER-DESIGN.md section 7. Asked only while its pieces are switched on
+      //  (?wx2=1, ?windmap=1 ...): with them off the rows would time the same frame twice and say nothing.)
+      ...(WX2.windmap ? [
+        [AS, null, null],
+        // the far field the plants read beyond the bend field (physics flora.js FAR): one lookup for one lookup, so ~0
+        ['weather: no far wind on plants', () => { WX2.farwind = false; }, () => { WX2.farwind = WX0.farwind; }],
+        // the whole wind map's refresh stopped: read the script time against the row before (about 0.14 ms derived)
+        ['weather: wind map frozen', () => { WX2.freeze = true; }, () => { WX2.freeze = false; }],
+      ] : []),
+      // (group D: a STORM HELD OVERHEAD, physics.forceWeather, so the worst case is timed whatever the weather of the
+      //  moment: the sky, the rain, the wind of a thunderstorm. "storm: no rain drawn" is the same storm with the rain's
+      //  marks hidden: the gap between the two rows is what the falling rain costs.)
+      ...(WX2.cloudmap ? [
+        [AS, null, null],
+        ['weather: a storm held overhead', () => holdStorm(true), () => holdStorm(false)],
+        ['storm: no rain drawn', () => { holdStorm(true); show(/^pc-kit-rain/, false); }, () => { show(/^pc-kit-rain/, true); holdStorm(false); }],
+      ] : []),
+      // (group D: the rain shafts under distant storms and the lightning bolts, world/storms.js. Not with the storm held
+      //  overhead: a shaft is not drawn round the eye, so the row means something only with a storm in sight, about
+      //  1 to 7 km away -- the weather of the moment, as the table is run. Derived for the phone: about 0.2 ms a storm in view.)
+      ...((WX2.rainshaft || WX2.bolts) ? [
+        ['storm: no rain shafts or bolts', () => show(/^pc-storm-/, false), () => show(/^pc-storm-/, true)],
+      ] : []),
       // (TENTH FORM) THE AIR: no row had ever timed it. The same spot, from 150 m and 400 m up.
       ...airAt(150, 30, [T0.noFar, T0.blob, T0.imp]),
       ...airAt(400, 45, [T0.noFar, T0.imp]),
       onFoot,
-      // (the water's rows, at the bank and at the shore: see THE WATER VIEWS above)
-      ...waterRows,
+      // (the water's rows come LAST, after the final as-set row: see THE WATER'S ROWS LAST below)
       // (back to the size the device really draws, so the four rows below are measured from IT and not from
-      //  whatever sharper size the questions above had to be asked at: see MK at the top of this file; and back at the
-      //  landing, if the water's rows took the explorer away)
-      [AS, async () => { if (waterRows.length) await goView(null); await sharpen(1); }, null],
+      //  whatever sharper size the questions above had to be asked at: see MK at the top of this file)
+      [AS, () => sharpen(1), null],
       // (EIGHTH FORM, 2026-11-18) ROWS THAT MAKE THE GAME WORK HARDER, not easier. The owner's first believable table
       // read 16.7 ms = 60.0 a second on eleven rows running: that is the phone's own screen refusing to go faster, not
       // the game's speed, and under such a cap no row can be told from another. These rows raise the picture's
@@ -531,6 +555,11 @@ export function attachBench(pc) {
       ['every pixel the screen has', () => sharpen(kWhole), () => sharpen(1)],
       ['every pixel, full paint', async () => { await sharpen(kWhole); B({ lite: !lite0 }); }, async () => { B({ lite: lite0 }); await sharpen(1); }],
       [AS + ', last', null, null],
+      // (THE WATER'S ROWS LAST, at the device's own size: they move the explorer two kilometres, and the world must build
+      //  round it there, so everything above is in the table whatever happens at the shore. Each wait has its own limit --
+      //  the world settled in 30 s, the arrival veil in 40 s, a steady picture in 8 s (40 s while nothing is drawn) -- so a
+      //  view costs at most about two minutes and the test cannot hang on it.)
+      ...waterRows,
     ];
     // ?bench=trees: the tree questions alone, on foot and from the air (a shorter run: each row on a cooler phone)
     const treeSteps = [
@@ -558,6 +587,9 @@ export function attachBench(pc) {
         ['ground one flat colour', () => B({ flat: 1 }), () => B({ flat: 0 })],
         T0.noFar, T0.farFlat, T0.blob, T0.imp,
         ['no water drawn', () => show(/^pc-water/, false), () => show(/^pc-water/, true)],
+        // (the far view's canopy painted into the ground, FV2: render/farground.js; the same picture as ?canopy=0)
+        ['canopy painted off (FV2)', async () => { try { (await import('../render/farground.js')).CANOPY_BENCH.off = true; } catch { /* none */ } },
+          async () => { try { (await import('../render/farground.js')).CANOPY_BENCH.off = false; } catch { /* none */ } }],
         T0.a2c,
         ['no shadows at all', () => B({ shadow: false }), () => B({ shadow: true })],
       ]),
@@ -604,6 +636,8 @@ export function attachBench(pc) {
         + ' they cannot be trusted. Run it again without touching the phone, and wait for the wood to finish'
         + ' building before you start.';
     }
+    // the explorer back at the landing, if the water's rows or the air's took it away
+    if (waterRows.length) await goView(null);
     if (foot && pin !== foot) await land();
     // the picture is the phone's own again (it was held through the run: see sharpen above)
     if (pc.game && typeof pc.game.holdPictureSize === 'function') pc.game.holdPictureSize(0, 0);

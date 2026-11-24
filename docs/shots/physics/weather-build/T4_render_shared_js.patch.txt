@@ -1,0 +1,28 @@
+diff --git a/src/render/shared.js b/src/render/shared.js
+index 089d6e8..043f35a 100644
+--- a/src/render/shared.js
++++ b/src/render/shared.js
+@@ -495,17 +495,21 @@ export const PHYS = {
+   uPhysBranchPhase: { value: new THREE.Vector4() }, uPhysBranch: { value: new THREE.Vector4(0, 0, 0, 0.3) },
+   // (each branch rings on four clock lines: without this copied, every ring froze as a fixed offset)
+   uPhysBranchClock: { value: new THREE.Vector4() },
++  // (group D, ?farwind=1) the far field of the plants (physics flora.js FloraField.far) and where it lies; w = 0: off, never read
++  uPhysFar: { value: blank() }, uPhysFarMap: { value: new THREE.Vector4(0, 0, 1, 0) },
+ };
+-let _physV = -1, _physP = -1, _physF = null;
++let _physV = -1, _physP = -1, _physF = null, _physFV = -1;
+ export function syncPhysFlora(F) {
+   if (!F || !F.bend) { PHYS.uPhysOn.value = 0; return; }
+   if (F !== _physF) {
+     _physF = F;
+     const mk = (arr, n) => { const t = new THREE.DataTexture(arr, n, n, THREE.RGBAFormat, THREE.FloatType); t.minFilter = t.magFilter = THREE.NearestFilter; t.needsUpdate = true; return t; };
+     PHYS.uPhysBend.value = mk(F.bend, F.size); PHYS.uPhysWind.value = mk(F.wind, F.size); PHYS.uPhysPush.value = mk(F.push, F.nearSize);
+-    _physV = _physP = -1;
++    if (F.far) PHYS.uPhysFar.value = mk(F.far, F.farSize);
++    _physV = _physP = _physFV = -1;
+   }
+   if (F.version !== _physV) { PHYS.uPhysBend.value.needsUpdate = true; PHYS.uPhysWind.value.needsUpdate = true; _physV = F.version; }
++  if (F.far && F.farVersion !== _physFV) { PHYS.uPhysFar.value.needsUpdate = true; _physFV = F.farVersion; }
+   if (F.pushVersion !== _physP) { PHYS.uPhysPush.value.needsUpdate = true; _physP = F.pushVersion; }
+   for (const k in F.uniforms) if (PHYS[k]) PHYS[k].value.fromArray(F.uniforms[k]);
+   PHYS.uPhysOn.value = 1;
