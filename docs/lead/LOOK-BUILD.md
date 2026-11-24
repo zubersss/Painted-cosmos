@@ -300,4 +300,10 @@ the owner first. Not started.
   same, calmer (V median 0.69 to 0.64). On foot S2: the leaves a step deeper; the bright lime left there is the floor
   grass (B's sward and C's ground, not this). Honest limit: B reads a little greyer than ideal; more variety between
   crowns (some warmer, some bluer) would be the next step if wanted.
+- EACH SUMMER TREE ITS OWN GREEN (the coordinator's next step): chunks.js pcSummerTree, by the tree's own number over a
+  third lean warm and golden and over a third cool and deeper, in PROP_VERT, PROP_FRAG and the impostor (impostor.js,
+  one line); OIL.uLookG.y = LOOK.treeVar x (1 - season), so 0 in autumn; `?treevar=0` or `?light=old` off. SEEN: on foot
+  S2 4.8 % of pixels (the leaves only), stats unchanged; from 150 m with the impostors 31 % of pixels, S 0.21 to 0.23:
+  a modest mottle of warmer olive and bluer crowns, not yet a clear many-trees read, because at that distance a crown
+  is a few strokes (A1's two-step small crowns, `?impsmall=1`, should let it carry). Stills: build/canopy/treevar_*.
 
