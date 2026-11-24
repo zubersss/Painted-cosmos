@@ -24,10 +24,10 @@ const FLORA_TF = {      // the green wood: carpets under the open canopy, campio
     { kind: 'bluebell', shape: 'bell', c: M('ultramarine', 'cobaltViolet', 0.45), head: [0.010, 0.015], stalk: [0.16, 0.30], heads: [3, 6], drift: 8, peak: 22, share: 0.8, hab: { canopy: [0.05, 0.35] } },
     { kind: 'wood anemone', shape: 'rayed', c: D('cobaltViolet', 0.86), eye: M('quinGold', 'lemonYellow', 0.4), head: [0.012, 0.018], stalk: [0.08, 0.16], heads: [1, 1], drift: 6, peak: 26, share: 0.7, hab: { canopy: [0.05, 0.30] } },
     { kind: 'red campion', shape: 'rayed', c: M('alizarin', 'roseMadder', 0.5), head: [0.012, 0.019], stalk: [0.32, 0.58], heads: [1, 3], drift: 9, peak: 10, share: 0.6, hab: { canopy: [0.6, 0.1] } },
-    { kind: 'buttercup', shape: 'cup', c: M('lemonYellow', 'quinGold', 0.45), eye: M('quinGold', 'cadOrange', 0.35), head: [0.011, 0.017], stalk: [0.24, 0.48], heads: [1, 4], drift: 10, peak: 16, share: 0.9, hab: { canopy: [0.5, 0.0], wet: [-0.6, 0.4] } },
+    { kind: 'buttercup', shape: 'cup', c: mixc(K('lemonYellow', 'quinGold'), pig('lemonYellow'), 0.35), eye: K('lemonYellow', 'quinGold'), head: [0.011, 0.017], stalk: [0.24, 0.48], heads: [1, 4], drift: 10, peak: 16, share: 0.9, hab: { canopy: [0.5, 0.0], wet: [-0.6, 0.4] } },
     { kind: 'foxglove', shape: 'spike', c: M('roseMadder', 'alizarin', 0.35), head: [0.14, 0.26], stalk: [0.55, 0.95], heads: [1, 1], drift: 12, peak: 3, share: 0.35, hab: { canopy: [0.7, 0.25] } },
     // (the coordinator, 24 Nov: the bold kinds near the eye in every place; in the green wood's open glades, the ox-eye)
-    { kind: 'ox-eye daisy', shape: 'rayed', c: D('neutralTint', 0.83), eye: M('quinGold', 'lemonYellow', 0.3), head: [0.020, 0.030], stalk: [0.25, 0.50], heads: [1, 2], drift: 10, peak: 14, share: 0.9, hab: { canopy: [0.45, 0.05] } },
+    { kind: 'ox-eye daisy', shape: 'rayed', c: D('neutralTint', 0.75), eye: M('quinGold', 'lemonYellow', 0.3), head: [0.020, 0.030], stalk: [0.25, 0.50], heads: [1, 2], drift: 10, peak: 14, share: 0.9, hab: { canopy: [0.45, 0.05] } },
   ],
 };
 const FLORA_AW = {      // the autumn wood: violet against the gold and yellow-green is the floor's own complement
@@ -43,17 +43,18 @@ const FLORA_AW = {      // the autumn wood: violet against the gold and yellow-g
 };
 // (LOOK-RULES C6, COUNTED 24 Nov on the level meadow at 1.8 m: with the drifts dense near the eye V > 0.90 was 6.9 % of the
 // still, 4.6 of it yellow cups whose second tone paled toward white, 2.0 the ox-eyes. A yellow cup's second colour is a
-// deeper gold and the ox-eye a step under paper white.)
+// deeper gold and the ox-eye a step under paper white. Retaken: 5.7 %, 3.0 of it yellow; the buttercups' gold is now a
+// glaze of lemon over quinacridone gold, its highest channel 0.84 where it was 0.90, and the ox-eye 0.86.)
 const FLORA_AM = {      // the alpine meadow: gentian and pinks on the high turf, globe flower in the damp, ox-eye on the dry
   sward: { floor: 0.08 },
   blooms: [
     { kind: 'gentian', shape: 'cup', c: M('ultramarine', 'cobaltBlue', 0.3), head: [0.012, 0.019], stalk: [0.04, 0.10], heads: [1, 1], drift: 6, peak: 20, share: 0.8, hab: { height: [120, 380] } },
     { kind: 'alpine aster', shape: 'rayed', c: M('cobaltViolet', 'roseMadder', 0.15), eye: M('quinGold', 'lemonYellow', 0.3), head: [0.014, 0.021], stalk: [0.10, 0.20], heads: [1, 1], drift: 8, peak: 12, share: 0.45 },
-    { kind: 'ox-eye daisy', shape: 'rayed', c: D('neutralTint', 0.83), eye: M('quinGold', 'lemonYellow', 0.3), head: [0.020, 0.030], stalk: [0.25, 0.50], heads: [1, 2], drift: 10, peak: 16, share: 1.0, hab: { wet: [0.6, 0.0] } },
-    { kind: 'globe flower', shape: 'cup', c: M('lemonYellow', 'quinGold', 0.3), eye: M('quinGold', 'cadOrange', 0.35), head: [0.016, 0.024], stalk: [0.25, 0.45], heads: [1, 1], drift: 9, peak: 10, share: 0.6, hab: { wet: [0.0, 0.5] } },
+    { kind: 'ox-eye daisy', shape: 'rayed', c: D('neutralTint', 0.75), eye: M('quinGold', 'lemonYellow', 0.3), head: [0.020, 0.030], stalk: [0.25, 0.50], heads: [1, 2], drift: 10, peak: 16, share: 1.0, hab: { wet: [0.6, 0.0] } },
+    { kind: 'globe flower', shape: 'cup', c: mixc(K('lemonYellow', 'quinGold'), pig('lemonYellow'), 0.35), eye: K('lemonYellow', 'quinGold'), head: [0.016, 0.024], stalk: [0.25, 0.45], heads: [1, 1], drift: 9, peak: 10, share: 0.6, hab: { wet: [0.0, 0.5] } },
     { kind: 'alpine pink', shape: 'cushion', c: pig('roseMadder'), body: M('sapGreen', 'hookersGreen', 0.5), head: [0.05, 0.10], stalk: [0, 0], heads: [1, 1], drift: 7, peak: 6, share: 0.5 },
     { kind: 'alpine poppy', shape: 'cup', c: pig('cadScarlet'), eye: M('alizarin', 'sepia', 0.5), head: [0.020, 0.032], stalk: [0.20, 0.40], heads: [1, 2], drift: 10, peak: 14, share: 1.0 },
-    { kind: 'meadow buttercup', shape: 'cup', c: M('lemonYellow', 'quinGold', 0.45), eye: M('quinGold', 'cadOrange', 0.35), head: [0.011, 0.017], stalk: [0.25, 0.50], heads: [1, 4], drift: 10, peak: 16, share: 0.85 },
+    { kind: 'meadow buttercup', shape: 'cup', c: mixc(K('lemonYellow', 'quinGold'), pig('lemonYellow'), 0.35), eye: K('lemonYellow', 'quinGold'), head: [0.011, 0.017], stalk: [0.25, 0.50], heads: [1, 4], drift: 10, peak: 16, share: 0.85 },
   ],
 };
 const FLORA_SC = {      // the sea cliffs: thrift along the edge, campion on the stony ground, trefoil in the short turf
