@@ -305,7 +305,19 @@ will put the new flora in front of the owner behind one switch once told. O and 
 **PROVED** (bc04da1, five gallery views, each world settled before the grab: the autumn wood at 16.8, the alpine meadow at
 11, the green wood at night, the autumn wood from 420 m, the meadow in the watercolour game): `?flora=old` on design-flora
 against look-proto 0d5533b with no switch: 0 pixels differ in all five.
-**Branch state:** design-flora = look-proto 0d5533b + this lane's seven files (`git diff origin/look-proto` shows only them).
+**Branch state:** design-flora = look-proto v39 d9d9ed7 + this lane's seven files (`git diff origin/look-proto` shows only
+them); ?flora=old proved against v39 too (0 pixels, five views). The coordinator merged design-flora into look-proto for the
+next release after batch 1 of the final set (ACCEPTED by the coordinator, PASS by the look director).
+**THE FINAL SET** (`final-<place>-<height>-<season>-old-new.jpg`, ?flora=old above, the default below, ?season=0.15 and 0.85,
+the f-* cameras): the autumn landing, the meadow (and from 150 m), the green wood, the coast, the wetland, at 1.8 m and 10 m.
+Folded in while it was taken: under v39's brighter light the yellow, scarlet and white heads a step deeper for C6; past the
+near ring the runner-up kind a fifth of its share (the look director: no confetti at 10-30 m) and whites from the far ring a
+step deeper (no paper flecks at 150 m); a yellow cup's upper part its own yellow deeper, no gold (the coordinator: near
+buttercups leaned orange), the marsh marigold and yellow flag the same; the cotton grass a soft grey-white, fewer. Every
+still of the set inside C6 but the landing at 10 m in autumn, 4.2 % (4.9 % in the old picture) and the coast (25 %, 30 % in
+the old: its cliffs and sea). A2 (trees near) counted the lane at the landing: 26,928 marks against 12,967, 357k fragments
+against 272k (the rebuilt middle band halves today's 176k to 92k); its rows in ?bench=foot price it on the phone. A2's hooks
+(NEAR_VERT uNearCut, NEAR_FRAG flat mode 8) are to be kept when they reach look-proto.
 A lesson recorded: af83f25 copied data/looks/earth.js from a scratch copy older than a merge and dropped the look director's
 `airTop` (found by the 420 m proof, fixed in 2f779d8); never copy a whole shared file over a merge, apply the lane's diff. ASKED OF THE FAR-VIEW LANE through the coordinator: a ground dab that takes a drift's colour WHOLE
 (pointillist) from `bloomAt`, the one thing that would make drifts read from 150 m and a mile.
