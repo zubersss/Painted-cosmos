@@ -481,6 +481,16 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
   soft far off. So: give the room to SHARPNESS (the ladder, v27), and buy more of it by cutting the script, not by
   cutting what is drawn. **Do not cut content for speed on this phone until a table says content costs something.**
 
+**THE OWNER, 24 Nov (latest, overrides the 23 Nov list's order): 30 A SECOND, THE FAR VIEW TO A MILE, FLORA
+BEFORE FAUNA.** *"OK let's aim for 30 fps but also things should look good far before I get there like when im
+flying high in the sky up to a mile I want trees from a distance to look good rocks the water the grass specially it
+should also be alot denser and there should be flowers and other kinds of flaura focus on the flaura before the fauna
+you can make as many agents and helpers as you need"* The target is 30 a second on the S23 Ultra at its own settings,
+without losing the look (the trees may be drawn a different way). The view from the air to a mile must look good:
+trees, rocks, water, grass. Grass much denser; flowers and more kinds of plants. The creatures (fish, coat strokes)
+and the waterfall wait (branches `creatures`, `falls`). Full access to many-agent workflows. The v37 table that
+drives this is in the log (24 Nov).
+
 **THE OWNER, 23 Nov (latest): FINISH THE REST, AND MAKE IT RUN AT SIXTY.** *"Finish up the rest and also do a
 performance upgrade on it it runs a little laggy i want 60fps if you can find a way to do it while keeping the
 quality there most be something you can do find out then do it then come back to me when all my steps and asks
