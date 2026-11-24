@@ -747,6 +747,8 @@ half 0.45 (warm hue p90 18 deg: the oranges kept), full 0.34 (3 deg: gone). PASS
 reds and the rust and amber told apart, quieter and in the storm's light. `?stormleaf=1` is now 0.5 of the land's paint
 at a full storm (`?stormleaf=<0.3 to 1>` another share). OFF behind its own switch until look-director e2b9c14 (F's
 `?stormlight`, uLookS.x) is in look-proto (v39.4); then it follows that one switch (ON by default with F's).
+The address switch SEEN to work (a page opened with `&wx=storm&stormleaf=1`, before the value went from 0.6 to 0.5):
+the 38 tall-tree materials took the value, no other material, no program failed, no console error.
 
 **MERGED look-proto v39.3 (87053ed, pull request 46, the pines live) into trees-near: f281556**, clean, nothing
 doubled; unit 328, world 124, physics 449 pass.
