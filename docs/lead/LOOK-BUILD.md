@@ -414,3 +414,19 @@ the owner first. Not started.
 - Open questions for the coordinator: B's report that d4cab64 (the ?rockfield flip) carries an index slip in
   patchgen.js that paints every FV6 flower dab violet near the eye: C to confirm whether the default picture is
   touched before v39.4.
+
+## State at 19:35, 24 Nov
+
+- v39.4 in its gate (C's mountains to cc354f3, D's weather + W1's clouds, look-director e2b9c14: storm light and water
+  gold, A1's stands and bark, B's tuft and comb). The d4cab64 index slip CHECKED by me in the code: only with
+  ?bloomfar=1 (patchgen.js:156 makes the buffer only then), the default untouched; fixed in farview 5221c6e.
+- v39.5 assembled by the coordinator (local): trees-far 3e46836 (far spruce D, far storm crowns at half), trees-near
+  8633bef (storm crowns at half, tied to ?stormlight), design-flora d3e47d0 (patch and poppy centre), design-water
+  fd868b1 (far water line in the lake's own colour), farview 5221c6e (smudge clamp, speckle, snow paint, whole beds,
+  noon cool lean, the slip fix). All passed by me with stills opened.
+- v39.6 plan: W3's river paint as default (after cutting its cost to about +30 per cent at a bank, and the phone's
+  water rows), with E-W2's sea fixes. A1's far crown shadows (?farshadow, with C's canopy hook: my choice) wait for a
+  phone bench number or a cached map. C's noon lit plane split (my ruling: two lit values by the face's angle to the
+  sun, lit rock S 0.12-0.16).
+- For the owner's phone check: A2's ?leafgrow=1; the water rows; ?farshadow's bench row.
+- My open lane: the light's design (a dark frame round a bright warm middle distance). Not started.
