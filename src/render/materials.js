@@ -29,6 +29,8 @@ const _gf = (v) => (+v).toFixed(4);      // a number as GLSL must read it: a bar
 const SKYFACE = _d22('skyface', 1), FLOORVAR = _gf(_d22('floorvar', 1)), FARCROWN = _gf(_d22('farcrown', 1));
 // (?farfix=0: the far trees' tables at eight kinds, as before 2026-11-24; see makePropMaterial)
 const FARFIX = (() => { try { return new URLSearchParams(location.search).get('farfix') !== '0'; } catch { return true; } })();
+// (?pines: how many times a needle card is grown at 30 m and beyond, PROP_VERT; ?needlefill= to judge another)
+const NEEDLE_FILL = (() => { try { const v = +new URLSearchParams(location.search).get('needlefill'); return v > 0 ? Math.min(4, v) : 2.2; } catch { return 2.2; } })();
 // THE WATER'S PAINT KNOWS THE FALL, AND WHITE WATER WHERE IT CHURNS (the owner, 2026-11-23: the water should be
 // "constantly moving the way water would be naturally", with "airration"). Until now every dash on every river ran
 // at one fixed rate whatever the slope, and the only foam in the game was the sea's, raised by the wind. The mesher
@@ -1670,6 +1672,8 @@ uniform vec4 uOilA;
 uniform vec4 uOilB;
 uniform vec4 uOilD;
 uniform vec4 uOilG;
+uniform float uNeedle;    // (?pines: a conifer's needles never narrower on the screen than this many pixels; 0 off, as before)
+uniform vec4 uOilPx;      // (x: the angle one pixel of the scene pass takes, radians: shared.js)
 uniform mat4 uShM;
 uniform highp sampler2D uShTex;
 uniform vec4 uShK;
@@ -1768,6 +1772,19 @@ void main() {
       float e = (1.0 - keep) * 1.06 - 0.03;
       cardG = smoothstep(e - 0.03, e + 0.03, aData.w) * min(inversesqrt(keep), 2.4);
       cardO *= cardG;
+      lp = aCard + cardO;
+    }
+    // A CONIFER'S NEEDLES STAY A MASS AT RANGE (?pines, 24 Nov: the spruces and tall pines 20 to 60 m off read as bare
+    // poles). The spruce's foliage is sprays of needle cards with the air left between its whorls -- some 11 square
+    // metres of needles on a 16 m tree, about a fifth of its outline -- which near by is the approved look, and from 20 m
+    // on is a pole with specks. So from 10 m out each needle card grows about its own centre, up to NEEDLE_FILL times at
+    // 30 m and beyond, and the sprays close into the kind's dark mass; and wherever it stands a needle is kept at least
+    // uNeedle pixels across, its two side corners (uv.y +-1) pushed out (a needle under a pixel wide is missed by the
+    // pixels' centres more often than it is hit). Within 10 m nothing changes. 0: as before.
+    if (uNeedle > 0.0 && aData.y > 4.5 && aData.y < 6.5) {
+      float dN = max(distance((im * vec4(aCard, 1.0)).xyz, uCamLocal), 0.1);
+      cardO *= mix(1.0, ${NEEDLE_FILL.toFixed(2)}, smoothstep(10.0, 30.0, dN));
+      if (abs(uv.y) > 0.5) cardO *= clamp(0.5 * uNeedle * dN * uOilPx.x / max(length(mat3(im) * cardO), 1e-4), 1.0, 5.0);
       lp = aCard + cardO;
     }
   #endif
@@ -2935,6 +2952,7 @@ export function makePropMaterial(bodyU, opts = {}) {
     uLeafLod: { value: new THREE.Vector4(0, 0, 0, 0) },
     uLeafFam: { value: new THREE.Vector4().fromArray(opts.oilFam || [0, 0, 0, 0]) },
     uOilDark: { value: new THREE.Vector4(opts.oilDark ? opts.oilDark[0] : 0, 0, 0, 0) },
+    uNeedle: { value: opts.needle || 0 },      // (?pines: flora.js; 0 for every plant but a conifer with the switch on)
     uOilDarkA: v3(opts.oilDark && opts.oilDark[1], [0.5, 0.4, 0.4]), uOilDarkB: v3(opts.oilDark && opts.oilDark[2], [0.2, 0.15, 0.2]),
   };
   const defines = {};

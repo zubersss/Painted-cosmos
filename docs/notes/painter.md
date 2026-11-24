@@ -152,6 +152,22 @@ is 0.30 of 255 at 5 m and at 10 m (0.31 with `?light=old`, as before the merge);
 picture by 1.7, so the wood follows it; `?light=old&trees2=0` is pixel-identical to the still before the merge. Stills
 `A2_*-v39_*`. (The cards' own program, `CARD_FRAG`, does not take the one light: cards are dropped.)
 
+**THE PINES AS POLES (24 Nov, the coordinator's urgent check and the cure, `?pines=1`, OFF by default until F passes).**
+Not the split: on v39.1 the poles are the same with the one program (0.2 of 255; stills `A2_pines-v391_*`), and every
+leaf of every kit is identical with and without trees2 (Node). In the autumn wood the 'tall pines' near the camera are
+SPRUCES (no tall pine within the loaded patches): the spruce kit shares its needle budget out by limb length, so 685 of
+its 880 cards are in its lower half and its top is sparse (the middle form has whole tenths empty); behind the maples
+only that top shows. THE CURE (materials.js PROP_VERT `uNeedle`, flora.js `NEEDLE_KITS` tallpine and spruce,
+`_leafLod`, `setNeedles`; row 'pines: needles kept wide at range' in bench=trees): from 10 m out a needle card grows
+about its centre up to NEEDLE_FILL (2.2; `?needlefill=` to judge another) at 30 m; a needle is kept at least 3 px across;
+the needle kinds are thinned to at least 45 / 60 per cent (near / middle) instead of 20 / 35. SEEN (gallery, autumn wood,
+936 x 372 tier 1, the same spruce at 20, 40, 60 m, the switch flipped on one page): the spruces gain dark needle
+sprays up their stems and tufts at their tips; at 40 m still a pole with tufts rather than a mass (the kit's top is
+sparse); with ?needlefill=3 the tops read darker, but the low whorls seen between the maples' trunks become big dark
+spiky shapes. Triangles +2,834 at the landing (Node). The default is the picture before to the pixel. For F: stills
+`A2_pines_*` (A off, B on) and `A2_pines-fill3_*`. If a true needle mass is wanted at 40-60 m, the spruce kit's budget
+by limb COUNT rather than length (a denser top) is the next step: it changes the near spruce too.
+
 **ON FOOT TO UNDER 33 ms (the coordinator's job, 24 Nov, after the ground from the air was found to hold no 30 ms:
 the v38.2 table had the whole 400 m frame at 17.9 ms with impostors, ground included).** DERIVED from the phone's own
 rows: v39.1 (split trees + impostors) is about 22 ms on foot (40.3 split - 18.5 old far trees + 0.7 impostors; and
