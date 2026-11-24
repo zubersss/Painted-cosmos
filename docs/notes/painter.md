@@ -97,6 +97,13 @@ the phone prices both in one run.
 **Next:** A/B stills (5/10/18/30/45 m, autumn and green wood, phone and desktop) -> commit T2 split -> stills of cards
 and T5 (pixel-identical check) -> commit -> T3 (the middle tree) -> report each step to the coordinator and the look
 director (session_01R5Brhzz2JPPF6Ecz6XRQHx).
+**THE BAKE IN STEPS (`ImpostorAtlas.bake(renderer, budgetMs)`).** One step is one tree at one level: its 64 views drawn
+into its own square of the target and that square read back (at most 2.4 MB) into the level's array. The frame hook runs
+as many steps as fit in 4 ms of a frame (`?impbake=<ms>`, 0 = all at once, which the stills here use), always at least
+one; the impostors draw nothing until the last step (Earth: 13 trees x 6 levels = 78 steps). CHECKED: baked step by step
+it is byte for byte the one-shot atlas (0 of 50,319,360 bytes differ); here a step is about 0.13 s of software drawing.
+On the phone the steps' time is not measured; with one step a frame the far trees come in after 78 frames at worst.
+
 **THE GRAIN FIX (after the look director's review of T1, 24 Nov; it supersedes the T1 paragraph below where they
 differ).** Every leaf of a stroke now takes the stroke's ONE normal (the crown's front surface) and ONE inner shade, and is
 written at the stroke's own depth, so overlapping strokes are laid whole (no texel of the one behind pokes through);

@@ -40,6 +40,7 @@ export const IMP = {
   stroke: _qn('impstroke', 4.5, 1, 8),                   // a stroke's size in texels at every level (?impstroke=; 3.6 keeps it
                                                          //  at 2.5 screen px or more at the level picked, the look director)
   jit: _qn('impjit', 0.35, 0, 1),
+  bakeMs: _qn('impbake', 4, 0, 1000),                    // the bake's share of a frame, ms (?impbake=0: all at once)
   deep: _qn('impdeep', 0.5, 0, 1),                       // (a crown seen far off reads as a lit mass and a shaded one, not as its depths)                         // how much of a near leaf's own light jitter a stroke keeps (?impjit=)
   cols: 4,                                               // tree variants laid side by side in the atlas
   // (the quad stands at the tree's middle. It stood 0.35 of the tree's radius toward the eye, and then a big tree's quad
@@ -189,7 +190,7 @@ function hook() {
   hooked = true;
   // (the bake needs the renderer and must run OUTSIDE a render: the painter's frame hooks run before the frame's
   //  passes, render/index.js. The renderer is handed over by the first impostor mesh that is drawn, flora.js.)
-  FRAME_HOOKS.push(() => { for (const a of PENDING) { PENDING.delete(a); if (!a.ready && a.renderer) a.bake(a.renderer); } });
+  FRAME_HOOKS.push(() => { for (const a of PENDING) { if (a.ready || !a.renderer || a.bake(a.renderer, IMP.bakeMs > 0 ? IMP.bakeMs : Infinity)) PENDING.delete(a); } });
 }
 
 // The atlas for one world: `variants` = [{ geo, layer }], the kit geometries in layer order.
@@ -264,67 +265,80 @@ export class ImpostorAtlas {
     hook();
     PENDING.add(this);
   }
-  bake(renderer) {
+  // THE BAKE IN STEPS (the coordinator, 24 Nov: 48 MB baked in one go was about ten seconds in software and an unknown
+  // hitch on the phone at the first far draw). A step is one tree at one level: its 64 views drawn into its own square
+  // of the target, and that square read back into the level's array. The frame hook runs as many steps as fit in
+  // IMP.bakeMs of a frame (always one), and the atlas is made when the last is done; till then the impostors draw
+  // nothing (uImpK.x 0). ?impbake=0: all at once (for stills). Returns true when done.
+  bake(renderer, budgetMs = 0) {
     const t0 = performance.now();
     const W = this.width, H = this.height, N = IMP.views;
-    const rt = new THREE.WebGLRenderTarget(W, H, { type: THREE.UnsignedByteType, format: THREE.RGBAFormat, depthBuffer: true, stencilBuffer: false,
-      magFilter: THREE.NearestFilter, minFilter: THREE.NearestFilter, generateMipmaps: false });
-    rt.texture.colorSpace = THREE.NoColorSpace;
-    const mat = new THREE.ShaderMaterial({
-      vertexShader: BAKE_VERT, fragmentShader: BAKE_FRAG, side: THREE.DoubleSide,
-      uniforms: { uC: { value: new THREE.Vector3() }, uR: { value: 1 }, uD: { value: new THREE.Vector3(0, 0, 1) }, uCell: { value: 1 }, uCellK: { value: 1 }, uPad: { value: 0 }, uLeafK: { value: new THREE.Vector2(1, 0) }, uCC: { value: new THREE.Vector3() }, uCRad: { value: new THREE.Vector3(1, 1, 1) }, uDeepK: { value: IMP.deep } },
-    });
-    const scene = new THREE.Scene();
-    const mesh = new THREE.Mesh(this.geos[0], mat);
-    mesh.frustumCulled = false;
-    scene.add(mesh);
-    const cam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10);
+    let B = this._bk;
+    if (!B) {
+      const rt = new THREE.WebGLRenderTarget(W, H, { type: THREE.UnsignedByteType, format: THREE.RGBAFormat, depthBuffer: true, stencilBuffer: false,
+        magFilter: THREE.NearestFilter, minFilter: THREE.NearestFilter, generateMipmaps: false });
+      rt.texture.colorSpace = THREE.NoColorSpace;
+      const mat = new THREE.ShaderMaterial({
+        vertexShader: BAKE_VERT, fragmentShader: BAKE_FRAG, side: THREE.DoubleSide,
+        uniforms: { uC: { value: new THREE.Vector3() }, uR: { value: 1 }, uD: { value: new THREE.Vector3(0, 0, 1) }, uCell: { value: 1 }, uCellK: { value: 1 }, uPad: { value: 0 }, uLeafK: { value: new THREE.Vector2(1, 0) }, uCC: { value: new THREE.Vector3() }, uCRad: { value: new THREE.Vector3(1, 1, 1) }, uDeepK: { value: IMP.deep } },
+      });
+      const scene = new THREE.Scene();
+      const mesh = new THREE.Mesh(this.geos[0], mat);
+      mesh.frustumCulled = false;
+      scene.add(mesh);
+      const levels = [];
+      for (let lv = 0; lv < IMP.levels; lv++) { const Wl = W / (1 << lv), Hl = H / (1 << lv); levels.push({ data: new Uint8Array(Wl * Hl * 4), width: Wl, height: Hl }); }
+      B = this._bk = { rt, mat, scene, mesh, levels, cam: new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10), step: 0, ms: 0, frames: 0 };
+    }
+    const { rt, mat, scene, mesh, levels, cam } = B, U = mat.uniforms, C = new THREE.Vector3();
     // the renderer's own state, put back after
     const prevRT = renderer.getRenderTarget(), prevAuto = renderer.autoClear, prevAlpha = renderer.getClearAlpha();
     const prevCol = new THREE.Color(); renderer.getClearColor(prevCol);
     renderer.autoClear = false;
     renderer.setClearColor(0x000000, 0);
-    const levels = [];
-    const U = mat.uniforms, C = new THREE.Vector3();
-    for (let lv = 0; lv < IMP.levels; lv++) {
-      const tile = IMP.tile / (1 << lv), Wl = W / (1 << lv), Hl = H / (1 << lv);
-      rt.scissorTest = false; rt.viewport.set(0, 0, W, H);
+    const steps = this.n * IMP.levels;
+    do {
+      const lv = Math.floor(B.step / this.n), L = B.step % this.n;
+      const tile = IMP.tile / (1 << lv), Wl = W / (1 << lv);
+      const g = this.geos[L], cr = this.cr[L], rc = cr.w, hh = this.ch[L].x, R = this.ch[L].y;
+      mesh.geometry = g;
+      C.set(cr.x, cr.y, cr.z);
+      // (a texel of this level, taken on the tree's larger side: the stroke grid is IMP.stroke of them, doubled at
+      //  each coarser level so the grids nest; the trunk is thickened by a fifth of one; a leaf is never smaller
+      //  than IMP.minLeaf of them)
+      const texel0 = (2 * Math.max(rc, hh)) / IMP.tile, texel = texel0 * (1 << lv);
+      U.uC.value.copy(C); U.uR.value = R; U.uCell.value = IMP.stroke * texel0 * (1 << lv); U.uCellK.value = 1 << lv; U.uPad.value = texel * 0.2;
+      U.uLeafK.value.set(this.leafK[L], IMP.minLeaf * 0.5 * texel);
+      U.uCC.value.copy(this.ce[L][0]); U.uCRad.value.copy(this.ce[L][1]);
+      const col = L % IMP.cols, row = Math.floor(L / IMP.cols), sq = N * tile, x0 = col * sq, y0 = row * sq;
+      // (this tree's square of the target, cleared alone)
+      rt.scissorTest = true; rt.viewport.set(x0, y0, sq, sq); rt.scissor.set(x0, y0, sq, sq);
       renderer.setRenderTarget(rt);
       renderer.clear(true, true, false);
-      rt.scissorTest = true;
-      for (let L = 0; L < this.n; L++) {
-        const g = this.geos[L], cr = this.cr[L], rc = cr.w, hh = this.ch[L].x, R = this.ch[L].y;
-        mesh.geometry = g;
-        C.set(cr.x, cr.y, cr.z);
-        // (a texel of this level, taken on the tree's larger side: the stroke grid is IMP.stroke of them, doubled at
-        //  each coarser level so the grids nest; the trunk is thickened by a fifth of one; a leaf is never smaller
-        //  than IMP.minLeaf of them)
-        const texel0 = (2 * Math.max(rc, hh)) / IMP.tile, texel = texel0 * (1 << lv);
-        U.uC.value.copy(C); U.uR.value = R; U.uCell.value = IMP.stroke * texel0 * (1 << lv); U.uCellK.value = 1 << lv; U.uPad.value = texel * 0.2;
-        U.uLeafK.value.set(this.leafK[L], IMP.minLeaf * 0.5 * texel);
-        U.uCC.value.copy(this.ce[L][0]); U.uCRad.value.copy(this.ce[L][1]);
-        const col = L % IMP.cols, row = Math.floor(L / IMP.cols);
-        for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
-          const d = viewDir(i, j, N), b = viewBasis(d), [hw, hv] = viewRect(d, rc, hh);
-          U.uD.value.copy(d);
-          cam.left = -hw; cam.right = hw; cam.top = hv; cam.bottom = -hv; cam.near = R * 0.5; cam.far = R * 5.5;
-          cam.position.copy(C).addScaledVector(d, R * 3);
-          cam.up.copy(b.up);
-          cam.lookAt(C);
-          cam.updateProjectionMatrix(); cam.updateMatrixWorld(true);
-          const x = (col * N + i) * tile, y = (row * N + j) * tile;
-          rt.viewport.set(x, y, tile, tile); rt.scissor.set(x, y, tile, tile);
-          renderer.setRenderTarget(rt);
-          renderer.render(scene, cam);
-        }
+      for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+        const d = viewDir(i, j, N), b = viewBasis(d), [hw, hv] = viewRect(d, rc, hh);
+        U.uD.value.copy(d);
+        cam.left = -hw; cam.right = hw; cam.top = hv; cam.bottom = -hv; cam.near = R * 0.5; cam.far = R * 5.5;
+        cam.position.copy(C).addScaledVector(d, R * 3);
+        cam.up.copy(b.up);
+        cam.lookAt(C);
+        cam.updateProjectionMatrix(); cam.updateMatrixWorld(true);
+        const x = x0 + i * tile, y = y0 + j * tile;
+        rt.viewport.set(x, y, tile, tile); rt.scissor.set(x, y, tile, tile);
+        renderer.setRenderTarget(rt);
+        renderer.render(scene, cam);
       }
-      const buf = new Uint8Array(Wl * Hl * 4);
-      renderer.readRenderTargetPixels(rt, 0, 0, Wl, Hl, buf);
-      levels.push({ data: buf, width: Wl, height: Hl });
-    }
+      // (its square read back into the level's array, row by row)
+      const buf = new Uint8Array(sq * sq * 4), dst = levels[lv].data;
+      renderer.readRenderTargetPixels(rt, x0, y0, sq, sq, buf);
+      for (let r = 0; r < sq; r++) dst.set(buf.subarray(r * sq * 4, (r + 1) * sq * 4), ((y0 + r) * Wl + x0) * 4);
+      B.step++;
+    } while (B.step < steps && performance.now() - t0 < budgetMs);
     renderer.setRenderTarget(prevRT);
     renderer.autoClear = prevAuto;
     renderer.setClearColor(prevCol, prevAlpha);
+    B.ms += performance.now() - t0; B.frames++;
+    if (B.step < steps) return false;
     rt.dispose(); mat.dispose();
     const tex = new THREE.DataTexture(levels[0].data, W, H, THREE.RGBAFormat, THREE.UnsignedByteType);
     tex.mipmaps = levels;
@@ -337,11 +351,13 @@ export class ImpostorAtlas {
     this.uniforms.uImpTex.value = tex;
     this.uniforms.uImpK.value.x = 1;
     this.ready = true;
-    this.ms = performance.now() - t0;
-    this.bytes = levels.reduce((s, l) => s + l.data.length, 0);
+    this.ms = B.ms; this.frames = B.frames;
+    this.bytes = levels.reduce((s2, l) => s2 + l.data.length, 0);
+    this._bk = null;
     if (typeof window !== 'undefined') window.__pcImpostor = this;
+    return true;
   }
-  dispose() { if (this.texture) this.texture.dispose(); this.texture = null; this.ready = false; PENDING.delete(this); }
+  dispose() { if (this.texture) this.texture.dispose(); this.texture = null; this.ready = false; PENDING.delete(this); if (this._bk) { this._bk.rt.dispose(); this._bk.mat.dispose(); this._bk = null; } }
 }
 
 // One quad a tree: four corners, the shader turns it to the view.
