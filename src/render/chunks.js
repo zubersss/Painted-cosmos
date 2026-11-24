@@ -274,13 +274,18 @@ vec3 pcTone(vec3 c, float level) {
   // and it was laid on everything: a green alpine slope turned from the sun went to a dark violet mass, its own colour
   // gone (V median 0.13-0.16), and a grey rock face to a purple one. A painter's shade on a green field is a deeper,
   // cooler green, on grey stone a blue-grey. So the key's hue is kept as it is for warm bodies (the orange floor keeps
-  // its plum: S1 must not move) and turned, by how green the body is, toward the same key with its green kept and a
-  // breath of blue, and by how grey it is, part of the way there. uLookN.z is the switch (shared.js, ?shadehue=);
+  // its plum: S1 must not move) and turned, by how green the body is (its hue from the olives to the blue-greens),
+  // toward the same key with its green kept and a breath of blue, and by how grey it is, part of the way there. uLookN.z is the switch (shared.js, ?shadehue=);
   // 0 is the shade exactly as it was.
   {
     float bmx = max(b.r, max(b.g, b.b)), bch = bmx - min(b.r, min(b.g, b.b)), bs = bch / max(bmx, 1e-4);
-    float bgr = b.g >= bmx ? clamp((b.g - b.r) / max(bch, 1e-4), 0.0, 1.0) : 0.0;
-    float hw = max(smoothstep(0.10, 0.35, bgr) * smoothstep(0.12, 0.30, bs), (1.0 - smoothstep(0.08, 0.22, bs)) * 0.6) * uLookN.z;
+    // (the body's hue in degrees: green from the olives at about 52 -- the meadow's yellow-green, which the ground's
+    // own green exception, k.g over k.r, never caught -- to the blue-greens; the autumn floor's golds sit under 48)
+    float ic = 1.0 / max(bch, 1e-4);
+    float bh = bmx == b.r ? 60.0 * (b.g - b.b) * ic : bmx == b.g ? 60.0 * (2.0 + (b.b - b.r) * ic) : 60.0 * (4.0 + (b.r - b.g) * ic);
+    bh = bh < 0.0 ? bh + 360.0 : bh;
+    float hw = max(smoothstep(48.0, 62.0, bh) * (1.0 - smoothstep(180.0, 205.0, bh)) * smoothstep(0.10, 0.25, bs),
+                   (1.0 - smoothstep(0.08, 0.22, bs)) * 0.6) * uLookN.z;
     vec3 shG = shC / max(dot(shC, vec3(0.3, 0.5, 0.2)), 1e-3) * vec3(0.86, 1.02, 1.08);
     shH = mix(shH, shG, hw);
   }
