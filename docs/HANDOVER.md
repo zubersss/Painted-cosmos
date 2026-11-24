@@ -524,7 +524,7 @@ whether the performance work is one more version or a redesign.** Their own row 
 
 ## 3. State right now (update this before you stop)
 
-**STATE 24 Nov, 10:50 (first account): TWELVE HELPER SESSIONS BUILDING, EACH ON ITS OWN BRANCH. `main` is v38.3.**
+**STATE 24 Nov, 11:20 (first account): TWELVE HELPER SESSIONS BUILDING, EACH ON ITS OWN BRANCH. `main` is v39.**
 - The owner's direction (24 Nov): 30 a second on the S23 Ultra, the view from the air good to a mile, much denser
   grass, flowers and more plants, flora before fauna. The v37 speed test that drives it is in the log (24 Nov): as
   set about 89 ms (11 a second); near trees about 52 ms, far trees about 17-21, the plants' fragment work about 34;
@@ -539,6 +539,9 @@ whether the performance work is one more version or a redesign.** Their own row 
 - v38.1 is live (pull request #40): A2's split trees behind ?trees2=1 (the same picture), its rows in bench=trees.
   WAITING FOR THE OWNER: bench=trees once more, to price 'trees: two short programs'; if it saves what the wood costs,
   split becomes the default after the look director's review.
+- v39 is live (pull request #43): THE NEW LIGHT and THE CANOPY IN THE GROUND are the default oil look (the owner's
+  leave at 10:35); ?light=old and ?canopy=0 give the old look. Next: v39.1 (the split trees and the impostors as
+  default, both with compile guards; F's L5 and cloud-shadow hooks), v39.2 (the flora), then the water defaults.
 - v38.3 is live (pull request #42): the water and weather lanes behind their switches (rivers, runoff, lakes, ponds,
   falls, fjord; wind map, cloud and rain map, storms from the mountains, rain look, bolts). A gate render caught that
   the weather's plant-wind texture without its binding made the near plants vanish; fixed before shipping.
