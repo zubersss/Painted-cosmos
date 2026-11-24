@@ -92,13 +92,14 @@ const NEARLEAF = typeof location !== 'undefined' && /[?&]nearleaf=1\b/.test(loca
 // 1.15 times within 15 m of the eye (today up to 1.65 at 15 m on the phone's picture), back to today's by 25 m
 // (materials.js PROP_VERT, uLeafGrow); ?leafgrow=<1 to 2.4> another most. The same leaves, smaller, with the sky between
 // them; the needle kinds untouched. It changes the near trees the owner approved: OFF, never default without the owner.
-// ?stormleaf=1 (24 Nov, the coordinator after the look director's storm light): under a storm a tree's crown is painted
-// as the land is, nothing lit and the land's own glaze and deep wash in place of the fair-weather foliage shade
-// (materials.js PROP_VERT, uStormLeaf); with no storm nothing changes. At HALF the land's paint at a full storm: PASSED
-// by the look director at half (24 Nov, seen: half keeps the reds and the rust and amber told apart, quieter and in
-// the storm's light; all of it made every crown one plum-maroon). ?stormleaf=<0.3 to 1> another share. OFF until
-// look-director's ?stormlight (uLookS.x) is in look-proto (v39.4); then it follows that one switch.
-const STORMLEAF = (() => { try { const v = new URLSearchParams(location.search).get('stormleaf'); if (v == null) return 0; const n = +v; return n === 1 ? 0.5 : n >= 0.3 && n < 1 ? n : 0; } catch { return 0; } })();
+// THE CROWNS UNDER A STORM (24 Nov, the coordinator after the look director's storm light; THE DEFAULT in the oil look
+// from v39.5, the owner's ruling that passed work ships as the default with one opt-out): under a storm a tree's crown
+// is painted as the land is, the land's own glaze and deep wash in place of the fair-weather foliage shade (materials.js
+// PROP_VERT, uStormLeaf), HALF of it at a full storm, as the look director passed it (half keeps the reds and the rust
+// and amber told apart; all of it made every crown one plum-maroon). It follows the look director's one storm-light
+// switch: ?stormlight=0 turns it off with the land's (uLookS.x), and ?stormleaf=0 turns off the crowns' part alone;
+// ?stormleaf=<0.3 to 1> another share. With no storm nothing changes (uStorm 0), and the watercolour game never draws it.
+const STORMLEAF = (() => { try { const v = new URLSearchParams(location.search).get('stormleaf'); if (v == null) return 0.5; const n = +v; return n === 1 ? 0.5 : n >= 0.3 && n < 1 ? n : 0; } catch { return 0.5; } })();
 const LEAFGROW = (() => { try { const v = new URLSearchParams(location.search).get('leafgrow'); if (v == null) return 0; const n = +v; return n === 1 ? 1.15 : n > 1 && n <= 2.4 ? n : 0; } catch { return 0; } })();
 // (only a kind whose crown is leaves one by one, and nothing else, can be split: parts 0 bark, 5 leaf, 6 snow on a
 //  bough. A kind with crowns of washes (part 1: the green wood's conifer) keeps the one program.)
