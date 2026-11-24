@@ -88,6 +88,12 @@ const NEEDLE_KITS = new Set(['tallpine', 'spruce']), NEEDLE_PX = 3.0;
 // from 5 m out nothing changes. In motion a leaf shrinks as the eye comes near: the thing to watch on the device.
 // OFF until the look director passes it and the owner has seen it.
 const NEARLEAF = typeof location !== 'undefined' && /[?&]nearleaf=1\b/.test(location.search || '');
+// THE NEAR AND MIDDLE TREES ARE DRAWN AFTER THE GROUND (24 Nov, the owner's phone table v39.5, row 8 of the trees test:
+// -0.8 ms, free). The oil look draws the ground at renderOrder 5 (terrain.js) and the far trees at 9 (below); the tall
+// trees were at 0, before the ground, so where a hill or a bank hides a tree its leaves were painted and then covered.
+// They are opaque and depth-tested, so the order of opaque geometry decides only what is shaded, never what is seen
+// (the same argument, and the same kind of saving, as the far trees' own 9). ?treeorder=0: drawn first, as before.
+const TREES_AFTER_GROUND = typeof location === 'undefined' || !/[?&]treeorder=0\b/.test(location.search || '');
 // ?leafgrow=1 (24 Nov, AN OPTION FOR THE OWNER, the look director's (C)): a thinned broadleaf's kept leaf grows at most
 // 1.15 times within 15 m of the eye (today up to 1.65 at 15 m on the phone's picture), back to today's by 25 m
 // (materials.js PROP_VERT, uLeafGrow); ?leafgrow=<1 to 2.4> another most. The same leaves, smaller, with the sky between
@@ -845,6 +851,7 @@ export class Flora {
       if (c === 0) { if (g.mesh) { g.mesh.count = 0; g.mesh.visible = false; } continue; }
       if (!g.mesh) {
         g.mesh = this._instanced(chunk, g.geo, g.mat, list.length, g.far ? [0, T_FAR, JIT, 0.88] : [0, 1e7, 0, 0.999], g.far);
+        if (!g.far && LOOK.oil && TREES_AFTER_GROUND) g.mesh.renderOrder = 6;      // (after the ground's 5: TREES_AFTER_GROUND)
         // (the oil look's leaves by distance: a full tree keeps every leaf within about a quarter of its range and a fifth
         // of them at its end, where the middle tree, of fewer and larger leaves, takes over; the middle tree thins on from there)
         // (in units of the full tree's reach, flora.t0, read as it is drawn: the hand-over may move while the game runs)
