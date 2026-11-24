@@ -395,7 +395,9 @@ Branch `water-bodies` = lane 0 + look-proto v37.1 + `origin/design-water` (W1's 
   ropes, the milk body, the pale blue under it; only the lip's glass and the outflow keep the river's colour. SEEN at phone
   settings (scratch copy): lit whites V 0.91, the body's median 0.88 (0.87 before) with clear steps. F's literal numbers
   (milk 0.75 0.80 0.83) tried: the body went grey, median 0.83; both in `falls-ownmilk-ABC.jpg`; F to choose (three numbers).
-- NEXT: F's choice of the two milks; after the branches meet (the coordinator's call): the pool's pcThinLayer to W3's
+- **F: the fall's own water PASS** (the committed, lighter set; F's literal numbers read grey). Nothing more on the falls until
+  W3's sea fix lands.
+- NEXT: after the branches meet (the coordinator's call): the pool's pcThinLayer to W3's
   pcWStrokes, pcFallMilk and the FALL_ colours into waterchunk.js.
 
 ## Stations and tools
