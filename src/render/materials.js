@@ -2904,9 +2904,21 @@ void main() {
       vec3 da = t1 * cos(iCol.a) + t2 * sin(iCol.a), db = cross(ax, da);
       rel = da * (max(len, wPx * 1.2 * grow) * (t * 2.0 - 1.0)) + db * (side * max(iPar.x, wPx * 0.9) * grow);
     } else if (dab) {
-      rel = ax * (iCol.a * (len / max(iAxis.w, 1e-4)) + max(len, wPx * 1.3 * grow) * t) + sd * (side * max(iPar.x, wPx * 1.3) * grow);
+      float dl = len, dw = iPar.x;
       #ifdef PC_OIL
-      if (kind > 6.5) vTeeth = max(len, wPx * 1.3) / max(wPx, 1e-5);
+      // (a flower's head never shrinks under a few pixels across, so a poppy six metres off still reads as a poppy and
+      // not a speck -- the coordinator on the level meadow, 24 Nov: the old flowers were bold dabs, the new heads 3-6 px.
+      // The whole head grows, its shape kept: half-width 2.6 px for a daisy, cup or poppy, 2.0 for a bell (they hang
+      // several to a stalk), 1.4 for a spike or froth, which are tall already. Only the oil look's heads, kinds 7-12.)
+      if (kind > 6.5) {
+        float hf = kind > 9.5 && kind < 11.5 ? 1.4 : (kind > 8.5 && kind < 9.5 ? 2.0 : 2.6);
+        float fk = max(1.0, wPx * hf * grow / max(dw, 1e-5));
+        dl *= fk; dw *= fk;
+      }
+      #endif
+      rel = ax * (iCol.a * (len / max(iAxis.w, 1e-4)) + max(dl, wPx * 1.3 * grow) * t) + sd * (side * max(dw, wPx * 1.3) * grow);
+      #ifdef PC_OIL
+      if (kind > 6.5) vTeeth = max(dl, wPx * 1.3) / max(wPx, 1e-5);
       #endif
     } else {
       // a fan-brush touch: broad at the foot, spreading a little, its top cut into blades by the fragment shader

@@ -49,6 +49,7 @@ export function bloomSwitches() {
   return f;
 }
 
+const PT = [-0.30, 0.20], DT = [0.06, 0.28];   // (the patch field's step, and the drift's: TUNED 24 Nov by the coverage they give, see the notes)
 export const SHAPES = { rayed: 7, cup: 8, bell: 9, spike: 10, froth: 11, cushion: 12 };
 
 const ss = (a, b, x) => { if (a === b) return x >= b ? 1 : 0; const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
@@ -96,7 +97,7 @@ export function bloomAt(S, x, y, z, s, bi, out) {
   // the coordinator on the level meadow, 24 Nov: with each kind's drifts on their own noise, six kinds' drifts together
   // covered the whole meadow and the near flowers were an even confetti. A patch holds the drifts of two or three kinds
   // side by side, as the poppies beside the daisies in the old picture; between patches there is only a sprinkle.)
-  const patch = 0.06 + 1.24 * ss(-0.12, 0.32, n3(X / 26 - 5.3, Y / 26 + 8.9, Z / 26 - 2.2));
+  const patch = 0.15 + 1.1 * ss(PT[0], PT[1], n3(X / 26 - 5.3, Y / 26 + 8.9, Z / 26 - 2.2));
   let best = -1, bd = 0, bh = 0;
   for (let k = 0; k < B.length; k++) {
     const b = B[k], hab = habitat(b.hab, s);
@@ -115,7 +116,10 @@ export function bloomAt(S, x, y, z, s, bi, out) {
     if (v > bd) { bd = v; best = k; bh = heart; }
   }
   if (best < 0) return out;
-  out.kind = best; out.bloom = B[best]; out.dens = Math.min(1, bd * rich * patch); out.heart = bh * Math.min(1, patch);
+  // (bimodal: a drift is solid inside and stops in a short ragged step, and between drifts there is almost nothing; a
+  // value that was the product of four soft fields lay at a middling density everywhere, which is the even confetti)
+  const D = bd * rich * patch;
+  out.kind = best; out.bloom = B[best]; out.dens = Math.max(ss(DT[0], DT[1], D), Math.min(D, 0.04)); out.heart = bh * Math.min(1, patch);
   return out;
 }
 
