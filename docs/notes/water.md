@@ -13,6 +13,19 @@ review before a step is called done, a short message to the coordinator (session
 The weather group lands the rain field (its section 9.3: `fields.rain` at 32 a face, mm/h, 2 Hz, `rainAt`,
 `rainBetween`, a GPU channel `pcRainAt`): use theirs for rain (the design's `uRainCells[8]` and `rainAt` are replaced).
 
+**STATE (24 Nov, about noon), the short of it.** Pushed on design-water: W1 rivers with S-bends (aeca809), the index fix,
+mountain streams behind ?mount=1 (1eed43a; F: keep behind the switch, the white water is the paint's), THE DEFAULT FLIP in the
+oil look (4873c6a: rivers of the tree, lakes, ponds, puddles, fjord on; falls held), the speed test's falls view and
+?bench=water (597ab63), the stills of the landing's river (1ec1984, ACCEPTED by the coordinator). COMMITTED, NOT YET PUSHED:
+c229268 the landing's river (Earth's oil.springs / oil.keep, the save's nudge to 24 m) and dfbe555 (mountain floors wander):
+held only for E-W2's puddle fix (its hydro.test puddle share near the landing reads 7.73 % against 4 % with the wide river;
+E-W2 is fixing its rule; my measured suggestion: no puddle within 30 m of a stream). When water-bodies has it: merge, run the
+three suites, push, tell the coordinator (who ships the flip into the next release). OPEN: F's sand-bar notes (colour, grass,
+pebbles: C's recipe, asked; the trees' line can read c.barZone); the runoff paint (E-W3/W4) and its A/B in a storm; the
+falls flip (one line in mode.js when E-W2 sends it). The lead's sessions: coordinator session_01R5Bri1TV3HBTyuxNZZuhNw,
+F session_01R5Brhzz2JPPF6Ecz6XRQHx, E-W2 session_01R5Bri2xowNiwS1SnP3VG3f, E-W3/W4 session_01R5Bri2fSASVVvyrSG11UGF,
+C session_01R5Bri2AMBsFiRcxvUUZMvu, D (weather) session_01R5Bri2bBgFSfCmxpKKuURT (src/physics/index.js is now the water's).
+
 ### LANE 0 (built and pushed 24 Nov, commit b5924da): the hooks, the switches, the speed test's water views
 
 - `src/data/mode.js`: `MODE.water` and `waterFromSearch(search)`: `?rivers=tree ?lakes= ?ponds= ?puddles= ?swell= ?falls=
