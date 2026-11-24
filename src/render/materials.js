@@ -2703,7 +2703,8 @@ void main() {
   #endif
   vec3 nV = normalize(vNV);
   if (!seenFront) nV = -nV;
-  if (uOilL.y > 1.5 && uOilL.y < 2.5) { pcWrite(uBarkB, 0.0, nV, -vView.z, 3.0); return; }
+  // (2: the plants one flat colour; 7: the near bark one flat colour -- the split's wood is all bark)
+  if ((uOilL.y > 1.5 && uOilL.y < 2.5) || (uOilL.y > 6.5 && uOilL.y < 7.5)) { pcWrite(uBarkB, 0.0, nV, -vView.z, 3.0); return; }
   vec3 sunV = normalize((viewMatrix * vec4(uSunDirW, 0.0)).xyz);
   ${SKYUP('dot(nV, mat3(viewMatrix) * uUpW)')}
   float seed = vInst.z;
@@ -3306,6 +3307,7 @@ uniform vec3 uOrigin;
 uniform vec3 uCamLocal;
 uniform vec4 uNear;     // x full density out to here (m), y nothing beyond here, z now (s), w one pixel at 1 m (tangent)
 uniform vec4 uNear2;    // x, y the ring fades in between these distances (m), z how soft its marks are left
+uniform float uNearCut; // (the speed test only, core/bench.js: the share of the marks folded away whole, by number; 0 none)
 uniform float uTime;
 uniform vec4 uWx;
 varying vec3 vBody;
@@ -3337,6 +3339,9 @@ void main() {
   // every stroke has its own range (so the sward thins with distance) and grows in after it is laid
   float range = mix(uNear.x, uNear.y, fract(h * 7.31));
   float vis = (1.0 - smoothstep(range * 0.72, range, di)) * smoothstep(0.0, 0.7, uNear.z - iPar.w) * smoothstep(uNear2.x, uNear2.y, di);
+  // (the speed test's 'half the near grass': a share of the marks folded to nothing here, before any is rasterised, so
+  //  the row prices a mark whole; at 0, the default, this multiplies by exactly 1)
+  vis *= step(uNearCut, fract(h * 5.13 + 0.37));
   float flex = iExt.y;
   // fresh snow buries what is short: no stroke stands on a snowfield but the tall stubble
   float snowK = 1.0 - smoothstep(0.12, 0.50, uWx.z) * (1.0 - 0.30 * smoothstep(0.62, 0.95, iAxis.w));
@@ -3455,6 +3460,9 @@ void main() {
         r3o = fract(r3o + h1 * vec3(0.37, 0.61, 0.83));      // (each blade of the tuft its own number: its own tone)
       }
       vec3 nVo = normalize(vNV);
+      // (the speed test's 'near grass one flat colour', shared.js uOilL.y 8: every mark keeps its shape, its light and
+      //  paint are not worked out -- the gap to 'as set' is what the sward's paint costs a pixel)
+      if (uOilL.y > 7.5 && uOilL.y < 8.5) { pcWrite(vCol, 0.0, nVo, -vView.z, 4.0 + vS.z * 0.9); return; }
       // (a blade, a pebble, a frost needle faces the sky its own way: chunks.js pcUp, as the ground under it does.
       // A blade stands up, so it sees about half the sky and takes the ground's warm bounce on its side; the floor
       // it stands on faces the sky whole. That is the difference this term is for.)
@@ -3544,6 +3552,7 @@ export function makeNearMaterial(bodyU) {
     uniforms: baseUniforms(bodyU, Object.assign({
       uOrigin: { value: new THREE.Vector3() }, uCamLocal: { value: new THREE.Vector3() },
       uNear: { value: new THREE.Vector4(5, 13, 0, 0.002) }, uNear2: { value: new THREE.Vector4(0.8, 2.6, 0, 0) },
+      uNearCut: { value: 0 },
     }, PHYS)),
     vertexShader: NEAR_VERT, fragmentShader: NEAR_FRAG,
     side: THREE.DoubleSide,
