@@ -74,3 +74,18 @@ test('the water frame steps the registered parts, and a failing part does not st
   finally { console.warn = warn; WH.WATER_PARTS.length = 0; }
   assert.equal(a, 2); assert.equal(b, 0.02);
 });
+
+test('a water part may say how aerated its water is and how fast it runs, and only where it says so', () => {
+  const S = getSurface('earth'), o = makeSample(S.nB), sp = S.getSpawn();
+  S.sample(sp.x, sp.y, sp.z, o, false);
+  const t0 = o.turb, f0 = o.fspd;
+  let say = true;
+  S.hydro = { forest(SS, c) { if (say) { c.turbW = 0.37; c.fspdW = 2.5; } }, coast(SS, c, hh) { c.lqC = NaN; return hh; } };
+  try {
+    S.sample(sp.x, sp.y, sp.z, o, false);
+    assert.equal(o.turb, 0.37); assert.equal(o.fspd, 2.5);
+    say = false;
+    S.sample(sp.x, sp.y, sp.z, o, false);
+    assert.equal(o.turb, t0, 'the field\'s own churn again where the part says nothing'); assert.equal(o.fspd, f0);
+  } finally { S.hydro = null; }
+});

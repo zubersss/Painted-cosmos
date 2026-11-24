@@ -65,7 +65,6 @@ import * as THREE from 'three';
 import { VERT_PARS, VERT_END, FRAG_PARS, PAINT } from './chunks.js';
 import { register } from './shared.js';
 import { makePaintUniforms } from './materials.js';
-import { SUN_VIEW_SRC } from './chunks.js';
 import { EXPLORER_BODY, gaitOf, bobAt } from '../physics/explorer.js';
 
 // a number as GLSL must read it: always a float, never a bare integer (which is a type error there).
@@ -247,14 +246,6 @@ uniform vec4 uOilD;
 uniform vec4 uOilG;
 ${PC_UP_V}
 ${PAINT}
-#ifdef PC_OIL
-// (L3, one light: a flat piece is lit whole at its centre, here, so it reads the sun's shadow here too)
-uniform mat4 uShV;
-uniform vec3 uSunV;
-uniform highp sampler2D uShTex;
-uniform vec4 uShK;
-${SUN_VIEW_SRC}
-#endif
 // (chunks.js pcWetWash, as it stands there: it lives in FRAG_PARS, which a vertex shader does not take)
 vec3 pcWetWashB(vec3 c, float amt) {
   return pcDensity(c * mix(vec3(1.0), vec3(0.95, 0.96, 0.99), uWx.y * amt), 1.0 + 0.62 * uWx.y * amt);
@@ -533,8 +524,7 @@ void main() {
     float rimP = 1.0 - clamp(dot(nVp, normalize(-cV)), 0.0, 1.0);
     // the light in flat steps, half a tone each, with clean joins -- a piece shaded smoothly was a rendered
     // cylinder -- and the lit rim where the form turns from the eye on the sun's side (materials.js FIG_FRAG)
-    float sunFp = uLookF.z > 0.5 ? pcSunAtView(cV, 1.4) : 1.0;      // (L3: one light, read at the piece's centre lifted past the body)
-    float lvo = (uLookF.z > 0.5 ? pcLit(sunF * 0.5 + 0.5, sunFp, 0.0, 0.05) : pcLevel(sunF * 0.5 + 0.5, 0.05)) + 0.9 * smoothstep(0.50, 0.85, rimP) * smoothstep(0.0, 0.5, sunF) * uDayness * sunFp;
+    float lvo = pcLevel(sunF * 0.5 + 0.5, 0.05) + 0.9 * smoothstep(0.50, 0.85, rimP) * smoothstep(0.0, 0.5, sunF) * uDayness;
     lvo = floor(lvo * 2.0 + 0.5) * 0.5;
     // and the piece's own weight of pigment, by its own number: one ribbon heavier than the next
     vec3 co = pcWetWashB(pcDensity(col, 1.0 + (aRig.z - 0.5) * 0.45 * uOilB.z), 0.7);
@@ -606,8 +596,7 @@ void main() {
     pcThinLayer(fch, fdx, fdy, foc.x, 5.0, vObj, 40.0, 2.0, fr1, fds, fown, fr2);
     vec3 co = pcWetWash(pcDensity(vCol, 1.0 + (smoothstep(0.42, 0.62, fold) - 0.45) * 0.30 * (1.0 - max(vMat.z, 0.0))), 0.7);
     float sunF = dot(nV, sunV);
-    float sunFg = uLookF.z > 0.5 ? pcSunAtView(vView, 1.4) : 1.0;      // (L3: one light; lifted 1.4 m toward the sun, past its own body)
-    float lvo = (uLookF.z > 0.5 ? pcLit(sunF * 0.5 + 0.5, sunFg, 0.0, 0.05) : pcLevel(sunF * 0.5 + 0.5, 0.05)) + 0.9 * smoothstep(0.50, 0.85, rim) * smoothstep(0.0, 0.5, sunF) * uDayness * sunFg;
+    float lvo = pcLevel(sunF * 0.5 + 0.5, 0.05) + 0.9 * smoothstep(0.50, 0.85, rim) * smoothstep(0.0, 0.5, sunF) * uDayness;
     lvo = floor(lvo * 2.0 + 0.5) * 0.5;
     vec3 t1 = pcTone(pcDabTint(co, fr1, 0.0), lvo + (fr1.z - 0.5) * 0.5), t2 = pcTone(pcDabTint(co, fr2, 0.0), lvo + (fr2.z - 0.5) * 0.5);
     c = vMat.x > 0.985 ? pcTone(co, lvo) : mix(t2, t1, fown);
