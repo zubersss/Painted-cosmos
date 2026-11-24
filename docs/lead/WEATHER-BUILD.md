@@ -38,6 +38,7 @@ A separate session builds W1 CLOUDS once the look director's sky ceiling (touch 
 | `?rainlook=1` | a downpour reads as one: more of the box's drops drawn, from nearer the eye, each a third longer |
 | `?rainshaft=1` | rain shafts under every raining storm 1 to 7 km off (`world/storms.js`; turns on `cloudmap`; oil look only) |
 | `?bolts=1` | lightning bolts, cloud to ground (`world/storms.js`; turns on `cloudmap`; oil look only) |
+| `?rainmap=1` | the rain box's drops placed by the rain map at its four corners (turns on `cloudmap`) |
 | `?stormswing=0` | with `?stormland`: the land storms as W3.2 laid them (1 to 3 a day, the usual wind aloft); on by default |
 | `?clouds3d=1` | (the look director's switch for W1's clouds) also turns on `cloudmap` and `windmap` |
 
@@ -359,11 +360,32 @@ A separate session builds W1 CLOUDS once the look director's sky ceiling (touch 
   - The speed-test row 'storm: no rain shafts or bolts' stands.
 - **Suites:** physics 439, world and looks 73, unit 325, 0 failing.
 
+### W3.7: THE RAIN BOX FOLLOWS THE MAP (W3.3's last part; `particles.js`, `index.js`; behind `?rainmap=1`)
+
+- **Built:** while it rains at the focus, `physics/index.js` reads `rainAt` at the rain box's four corners and its
+  middle (5 calls a frame).
+  - Each new drop is kept where it lands by the rate there (the bilinear of the corners) over the wettest corner's,
+    with up to 6 tries. The respawn path places a drop where it will be at mid-fall, so this is where it rains.
+  - The number of drops is scaled by the box's mean rate over its middle's, so the middle keeps its density.
+  - Off: `rainCorners` is null, one comparison, and no extra random draws, so the rain is what it was.
+- **MEASURED, and said plainly: the effect is very small.**
+  - The box is 48 m across, and a rain cell's edge softens over 250 to 450 m. So even at a storm's edge the corners
+    differ by up to about a quarter to a half. The edge found in the test had 3.1 against 1.7 mm/h.
+  - There the wind carries each drop across the box in the under 3 s it falls, which smears where it was placed. 53 %
+    of the drops lay on the wet half with the switch, against 52 % without.
+  - The placement rule itself is exact (tested: 62.5 % on the wet half for corners 3, 1, 3, 1). **No still**: the
+    difference cannot be seen in a picture.
+  - A sharp shower edge would need sharper cells. That is a choice for the weather's look, not this switch.
+- **Cost:** 5 x `rainAt` at 4 microseconds = 0.02 ms a frame here while it rains, about 0.06 ms on the phone with the
+  assumed x3. Script only; the GPU draws the same number of drops (within a few per cent).
+- **Tests:** one new in `cloudfield.test.mjs`: corners read, count kept within 8 %, and the placement law.
+- **Suites:** physics 440, world and looks 73, unit 325, 0 failing.
+
 ## NEXT
 
 1. **The look director's second review** of the veils (W3.6), and their decision on region (a glaze keeping the region
    under it, or region 7).
-2. **W3.3's remainder** (the coordinator, 24 Nov): the rain box reads the map's four corners.
+2. (W3.3's remainder, the rain box from the map's corners: built as W3.7, with a very small effect.)
 3. **Then the water group's turn on `physics/index.js`** (touch T6): the rain field is in place for them
    (`fields.rain`: `cells`, `cellsX`, `now`, `GLSL`, `rainAt`, `rainBetween`, `throughfall`).
 4. W1 CLOUDS is another session's; the storm cannot be seen as a cloud until it lands, and the veils hang from nothing
