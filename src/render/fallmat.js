@@ -109,18 +109,15 @@ void main() {
     c = pcTone(col, level);
   } else {
     // ---- THE PLUNGE POOL ----
-    // radial strokes carried out from the foot: the first axis outward (metres, moving), the second round it
-    float r = length(vP), rN = vF.x;
-    float R0 = 0.5 * (vG.x + vG.y);
-    float th = atan(vP.x, vP.y);                         // (its seam lies toward the cliff, under the sheet and in the rock)
-    vec2 dpx = dFdx(vP), dpy = dFdy(vP);
-    float r2s = max(r * r, 1e-4);
-    vec2 ch = vec2(r - tw * vG.z, th * R0);
-    vec2 dcx = vec2(dot(vP, dpx) / max(r, 1e-3), R0 * (vP.y * dpx.x - vP.x * dpx.y) / r2s);
-    vec2 dcy = vec2(dot(vP, dpy) / max(r, 1e-3), R0 * (vP.y * dpy.x - vP.x * dpy.y) / r2s);
+    // strokes carried OUT from the cliff with the outflow, the first axis seaward (metres, moving), the second across. (A polar
+    // chart drew every stroke into the foot: a starburst, seen from above. Here no stroke meets another; the boil at the foot
+    // is the milk and the broken lace, and the slow bend of the rows fans them a little.)
+    float rN = vF.x;
+    vec2 ch = vec2(vP.y - tw * vG.z, vP.x);
+    vec2 dcx = vec2(dFdx(vP.y), dFdx(vP.x)), dcy = vec2(dFdy(vP.y), dFdy(vP.x));
     vec2 oc = pcStrokeOct(dist, uOilPx.z * 0.7);
     vec3 r1, r2; vec2 ds; float own;
-    pcThinLayer(ch, dcx, dcy, oc.x, 6.0, vec3(ch * 0.4, vG.w * 7.0), 40.0, 2.0, r1, ds, own, r2);
+    pcThinLayer(ch, dcx, dcy, oc.x, 5.0, vec3(ch * 0.4, vG.w * 7.0), 40.0, 6.0, r1, ds, own, r2);
     vec3 rr = own >= 0.5 ? r1 : r2;
     // milk at the foot, lace beyond: more strokes left out the farther from the foot
     float cover = 1.0 - smoothstep(0.30, 1.0, rN) * uFallK.y;
