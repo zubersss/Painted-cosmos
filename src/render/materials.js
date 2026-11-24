@@ -8,6 +8,7 @@ import { MODE } from '../data/mode.js';
 import { FLORA_GLSL } from '../physics/flora.glsl.js';
 import { WATER_GLSL } from '../physics/water.js';
 import { VERT_PARS, VERT_END, FRAG_PARS, FOG_BANK, PAINT, AIR_FN } from './chunks.js';
+import { SPRAY_GLSL } from './dabtex.js';
 
 // THE LOOK AT THREE HUNDRED YARDS (the owner, 2026-11-22: "better lighting ... i want things to look high quality and
 // fully rendered even from 300 yards away" -- 275 m). What this file does for that is on three dials, read once from
@@ -22,6 +23,8 @@ const _q22 = (() => { try { return new URLSearchParams(location.search); } catch
 const _d22 = (k, d) => (_q22 && _q22.has(k) && isFinite(+_q22.get(k)) ? +_q22.get(k) : d);
 const _gf = (v) => (+v).toFixed(4);      // a number as GLSL must read it: a bare integer there is a type error, not a float
 const SKYFACE = _d22('skyface', 1), FLOORVAR = _gf(_d22('floorvar', 1)), FARCROWN = _gf(_d22('farcrown', 1));
+// (?farfix=0: the far trees' tables at eight kinds, as before 2026-11-24; see makePropMaterial)
+const FARFIX = (() => { try { return new URLSearchParams(location.search).get('farfix') !== '0'; } catch { return true; } })();
 // THE WATER'S PAINT KNOWS THE FALL, AND WHITE WATER WHERE IT CHURNS (the owner, 2026-11-23: the water should be
 // "constantly moving the way water would be naturally", with "airration"). Until now every dash on every river ran
 // at one fixed rate whatever the slope, and the only foam in the game was the sea's, raised by the wind. The mesher
@@ -1484,9 +1487,37 @@ export function makeWaterMaterial(bodyU, skyU) {
 // Props: trees, undergrowth, rocks. One shader, instanced, parts selected per vertex.
 //   aData.y part: 0 bark, 1 foliage mass, 2 blade / frond, 3 accent dab, 4 rock
 // ------------------------------------------------------------------------------------------
+// A LEAF'S SUN AND A LEAF'S SHADE, one text each, included by the plants' vertex shader (PROP_VERT, where a leaf is
+// painted once a leaf) and by the cluster cards' fragment program (CARD_FRAG, where a leaf on a card is painted at its
+// own centre): one recipe in two places of use, not two recipes. (The shade is R1.2b's foliage shade, to be replaced
+// in both at once when the look director's shared one lands.)
+const LEAF_SUN = /* glsl */`
+// (chunks.js pcSunAt: the shadow map inside its square. Outside it the fragment shader reads a pattern from the noise;
+// a leaf takes its own number in the pattern's place: the same share of leaves in the sun)
+float pcSunAtV(vec3 bodyPos, float canopy, float r) {
+  float pat = mix(step(mix(0.05, 0.585, canopy), r), 1.0 - 0.42 * canopy, uWx.x);
+  if (uShK.x >= 0.004) {
+    vec3 q = (uShM * vec4(bodyPos, 1.0)).xyz;
+    vec2 a = abs(q.xy);
+    float inside = (1.0 - smoothstep(uShK.w, 0.97, max(a.x, a.y))) * uShK.x;
+    if (inside >= 0.004) return mix(pat, step(q.z - uShK.y, textureLod(uShTex, q.xy * 0.5 + 0.5, 0.0).r), inside);
+  }
+  return pat;
+}
+// (the trees lane's one leaf shade, for its own programs: since the merge with the look director's lane it IS the shared
+// foliage shade, chunks.js pcShadeLeaf, whose off branch (uLookF.y 0, the default without ?light=new) is this recipe
+// exactly: pcBody(pcDensity(cs, 1.35)) * mix(vec3(1.0), pcOilShadeC(), 0.5) * 0.80)
+vec3 pcLeafDeep(vec3 cs) { return pcShadeLeaf(cs); }
+`;
+
 const PROP_VERT = /* glsl */`
 ${VERT_PARS}
 ${FOG_VERT}
+#ifdef PC_TREE_CARD
+// (?treedepth=1: the cards are drawn twice, depth first and then colour where the depth is EQUAL, by two programs
+//  built from this one text; the place of every corner must come out the same to the last bit in both)
+invariant gl_Position;
+#endif
 attribute vec4 aData;     // x sway, y part, z inner shade, w blob hash
 attribute float aBranchId; // (trees) PHYSICS' crown: one number per branch and its foliage, -1 the trunk
 attribute float aLeaf01;   // (trees) 1 on foliage
@@ -1509,9 +1540,9 @@ varying vec3 vCardB;      // that centre on the body: a leaf is lit, shaded and 
 #ifdef PC_FAR
   attribute vec2 aInst2;  // species index into the far tables
   varying float vSpecies;
-  uniform float uFarTaper[8];
-  uniform float uFarTrunk[8];
-  uniform float uFarDrop[8];
+  uniform float uFarTaper[PC_NFAR];
+  uniform float uFarTrunk[PC_NFAR];
+  uniform float uFarDrop[PC_NFAR];
 #endif
 #ifdef PC_HOLLOW
   uniform vec4 uHollow;   // a spire's form in its own units: x girth at the foot, y height, z lean of the top along +Z (of the height)
@@ -1546,6 +1577,18 @@ varying vec4 vLeafC;      // rgb the leaf's paint, toned to its light; a: how fa
 varying vec4 vLeafK;      // rgb the leaf's own colour before the light (for the lantern); a: the plant's size (was vScaleO)
 #define vCardD vLeafC.a
 #define vScaleO vLeafK.a
+#ifdef PC_TREE_CARD
+// (a card of leaves, part 7: what is the same over the whole card, worked out here once and handed on unblended)
+flat varying vec3 vCardC;   // its centre on the body, at rest
+flat varying vec3 vCardU;   // one dab cell along the card's chart, on the body (the plant's size and the card's growth in it)
+flat varying vec3 vCardV;   // one cell across it
+flat varying vec3 vCardM;   // its mass normal, in the eye's space (the crown's roundness)
+flat varying vec3 vCardLA;  // the tree's three leaf colours, after its own run of the wood's colours
+flat varying vec3 vCardLB;
+flat varying vec3 vCardLC;
+flat varying vec4 vCardS;   // x its inner shade, y its number, z which way it faces the sky (pcUp), w 1 a tree of twigs
+flat varying vec2 vCardR;   // x the radius of its corners (dab cells, on its chart), y the sun through it toward the eye
+#endif
 uniform vec3 uSunDirW;
 uniform vec3 uGlaze;
 uniform vec3 uLight;
@@ -1568,11 +1611,11 @@ uniform vec4 uLeafFam;
 uniform float uOilKind;
 uniform float uCanopy;
 #ifdef PC_FAR
-  uniform vec3 uFarA[8];
-  uniform vec3 uFarB[8];
-  uniform vec3 uFarC[8];
-  uniform vec4 uFarFam[8];
-  uniform float uFarKind[8];
+  uniform vec3 uFarA[PC_NFAR];
+  uniform vec3 uFarB[PC_NFAR];
+  uniform vec3 uFarC[PC_NFAR];
+  uniform vec4 uFarFam[PC_NFAR];
+  uniform float uFarKind[PC_NFAR];
   uniform vec3 uSunDirL;    // the sun (by night the moon) in the BODY'S own axes, which is the frame a crown's pieces are measured in here. Every painted material is already handed it (baseUniforms); the far program is the only one of these that reads it.
 #endif
 ${PC_UP_V}
@@ -1589,19 +1632,11 @@ vec3 pcDabTintV(vec3 c, vec3 rnd, float leafy) {
 vec3 pcWetWashV(vec3 c, float amt) {
   return pcDensity(c * mix(vec3(1.0), vec3(0.95, 0.96, 0.99), uWx.y * amt), 1.0 + 0.62 * uWx.y * amt);
 }
-// (chunks.js pcSunAt: the shadow map inside its square. Outside it the fragment shader reads a pattern from the noise;
-// a leaf takes its own number in the pattern's place: the same share of leaves in the sun)
-float pcSunAtV(vec3 bodyPos, float canopy, float r) {
-  float pat = mix(step(mix(0.05, 0.585, canopy), r), 1.0 - 0.42 * canopy, uWx.x);
-  if (uShK.x >= 0.004) {
-    vec3 q = (uShM * vec4(bodyPos, 1.0)).xyz;
-    vec2 a = abs(q.xy);
-    float inside = (1.0 - smoothstep(uShK.w, 0.97, max(a.x, a.y))) * uShK.x;
-    if (inside >= 0.004) return mix(pat, step(q.z - uShK.y, textureLod(uShTex, q.xy * 0.5 + 0.5, 0.0).r), inside);
-  }
-  return pat;
-}
+${LEAF_SUN}
 uniform vec4 uLeafLod;    // the trees' leaves by distance (flora.js): x the distance within which every leaf is drawn (0: off), y the least share kept
+#endif
+#if defined(PC_TREE_LEAF) || defined(PC_TREE_CARD)
+uniform vec4 uFocus;      // (the trees' leaf program: the window round the explorer is cut here, whole leaves; flora.js _focus)
 #endif
 
 // MOTION. With PHYSICS' field (uPhysOn) plants bend as loaded stems: wind, gusts, things
@@ -1658,11 +1693,59 @@ void main() {
     // the share shrinks into its own centre over a few metres, so none appears or goes in one frame.
     vec3 cardO = position - aCard;
     vec3 cardC = aCard;       // (the leaf's centre in the plant's own space; a far tree's is moved by its taper, below)
-    if (uLeafLod.x > 0.0 && aData.y > 4.5 && aData.y < 6.5) {
+    float cardG = 1.0;        // (how much a leaf -- or a card of leaves, part 7 -- has been grown about its centre)
+    if (uLeafLod.x > 0.0 && aData.y > 4.5 && aData.y < 7.5) {
       float keep = clamp(pow(uLeafLod.x / max(di, 0.01), 1.2), uLeafLod.y, 1.0);
       float e = (1.0 - keep) * 1.06 - 0.03;
-      cardO *= smoothstep(e - 0.03, e + 0.03, aData.w) * min(inversesqrt(keep), 2.4);
+      cardG = smoothstep(e - 0.03, e + 0.03, aData.w) * min(inversesqrt(keep), 2.4);
+      cardO *= cardG;
       lp = aCard + cardO;
+    }
+  #endif
+  #if defined(PC_TREE_LEAF) || defined(PC_TREE_WOOD) || defined(PC_TREE_CARD)
+    // THE TREES' TWO SHORT PROGRAMS (?trees2=, 2026-11-24; docs/lead/TREES-DESIGN.md on r2, package T2). Everything the
+    // one big plant program decided pixel by pixel with a discard -- the window round the lens, the window round the
+    // explorer, the wash a tree arrives in, the leaves a fire has taken -- is decided here, ONCE A WHOLE LEAF OR A WHOLE
+    // BRANCH, by its own number, and a piece that is not there is folded into its own centre (no area, no pixel). So the
+    // two fragment programs below have no discard at all, and the graphics card may test depth before it paints.
+    {
+      vec3 cwT = (im * vec4(aCard, 1.0)).xyz;        // the leaf's centre (a branch: the middle of its ring), at rest
+      float cdT = distance(cwT, uCamLocal);
+      float hT = aData.w;
+      float keepT = 1.0;
+      #if defined(PC_TREE_LEAF) || defined(PC_TREE_CARD)
+        if (aData.y > 4.5) {
+          float aboveT = dot(cwT - io, normalize(io + uOrigin));
+          // (the lens: a leaf within 2.5 to 4.5 m of the eye, by its number -- a tree of the snow at any height, the rest
+          //  above head height -- and right at the lens any leaf, as the ragged window was)
+          if ((uOilKind > 0.5 || aboveT > 1.7) && cdT < 2.5 + 2.0 * fract(hT * 7.3)) keepT = 0.0;
+          if (cdT < 0.35 + 1.25 * fract(hT * 3.91 + 0.23)) keepT = 0.0;
+          // (the window round the explorer: a leaf between the lens and the figure, near the line of sight to it)
+          if (uFocus.w > 0.5) {
+            vec3 cvT = (modelViewMatrix * vec4(cwT + pcRound(io + uOrigin), 1.0)).xyz;
+            if (cvT.z > uFocus.z + 0.4) {
+              vec3 rdT = normalize(cvT);
+              float holeT = 1.0 - smoothstep(0.8, 2.0, length(uFocus.xyz - rdT * dot(uFocus.xyz, rdT)));
+              if (fract(hT * 5.37 + 0.17) * 0.8 + 0.08 < holeT) keepT = 0.0;
+            }
+          }
+          // (a wash: the leaves come, or go, one whole leaf at a time, each at its own moment)
+          if (vWash < 0.999) { float wnT = fract(hT * 11.7 + 0.29) * 0.96 + 0.02; if (vWash >= 0.0 ? wnT > vWash : wnT < 1.0 + vWash) keepT = 0.0; }
+          #ifdef PC_FIRE
+            if (fract(hT * 3.17 + 0.41) < vBurnt * uBurnK.x) keepT = 0.0;      // (the leaves a fire has taken)
+          #endif
+        }
+      #endif
+      #ifdef PC_TREE_WOOD
+        // (a branch at the lens is pinched in to its own line round the eye -- a trunk the eye passes through opens round
+        //  it, a thin branch in a crown overhead from farther off -- and a wash lays the branches one by one, the stem
+        //  last; kitbuild.js tube: with Builder.axis a ring's vertices carry the ring's centre in aCard)
+        float twT = step(0.5, aData.z) * step(1.7, dot(cwT - io, normalize(io + uOrigin)));
+        keepT = smoothstep(mix(0.35, 0.9, twT), mix(1.6, 3.6, twT), cdT);
+        float bnT = aBranchId < 0.0 ? 0.985 : fract(aBranchId * 7.31 + inst.z * 3.7) * 0.94 + 0.02;
+        if (vWash < 0.999 && (vWash >= 0.0 ? bnT > vWash : bnT < 1.0 + vWash)) keepT = 0.0;
+      #endif
+      if (keepT < 1.0) { cardO *= keepT; cardG *= keepT; lp = aCard + (lp - aCard) * keepT; }
     }
   #endif
   #ifdef PC_FAR
@@ -1760,7 +1843,7 @@ void main() {
     vCardB = vBody - (ir * cardO) * vis;       // (the leaf moves as one piece: its centre is this far from the vertex)
     vCardD = length(vCardB - uOrigin - uCamLocal);
     vLeafC.rgb = vec3(0.0); vLeafK.rgb = vec3(0.0);
-    if (aData.y > 4.5) {
+    if (aData.y > 4.5 && aData.y < 6.5) {
       // (from what is the same at every corner of the leaf: its centre at rest, its numbers, its tree)
       float hL = aData.w;
       vec3 r3 = vec3(hL, fract(hL * 13.7), fract(hL * 5.1));
@@ -1853,6 +1936,37 @@ void main() {
         }
       #endif
     }
+    #ifdef PC_TREE_CARD
+    if (aData.y > 6.5) {
+      // A CARD OF LEAVES (?trees2=cards; kitbuild.js clusterCard). Its whole frame from this one corner: the corner lies
+      // at uv metres along the card's two axes from its centre, and the card faces along the normal, so the first axis
+      // is (u d - v (n x d)) / |uv|^2 for d the corner less the centre (the cross product turns d a quarter round).
+      vec3 dK = position - aCard, nK = normalize(normal);
+      float q2 = max(dot(uv, uv), 1e-8);
+      vec3 uK = (uv.x * dK - uv.y * cross(nK, dK)) / q2;
+      vec3 vK = cross(nK, uK);
+      vec3 cB = (im * vec4(cardC * vis, 1.0)).xyz + uOrigin;
+      vec3 cV = (modelViewMatrix * vec4(cB - uOrigin + pcRound(io + uOrigin), 1.0)).xyz;
+      vCardC = cB; vCardU = ir * uK * cardG; vCardV = ir * vK * cardG;
+      vCardM = normalize(normalMatrix * (ir * aMass));
+      vec3 lA = uLeafA, lB = uLeafB, lC = uLeafC; vec4 famL = uLeafFam;
+      if (famL.a > 0.0) {
+        float tf = fract(inst.z * 9.73 + 0.37);
+        float cF = tf < 0.4 ? tf * 0.5 : (tf < 0.8 ? 0.3 + (tf - 0.4) * 0.75 : 0.75 + (tf - 0.8) * 1.25);
+        float a0 = clamp(cF - 0.13, 0.0, 1.0), b0 = clamp(cF + 0.13, 0.0, 1.0);
+        vec3 pa = a0 < 0.5 ? mix(lA, lB, a0 * 2.0) : mix(lB, famL.rgb, a0 * 2.0 - 1.0);
+        vec3 pb = b0 < 0.5 ? mix(lA, lB, b0 * 2.0) : mix(lB, famL.rgb, b0 * 2.0 - 1.0);
+        vec3 lC0 = lC;
+        lA = mix(lA, pa, famL.a); lB = mix(lB, pb, famL.a);
+        lC = mix(lC0, mix(pb, lC0, 0.55) * vec3(0.92, 0.80, 0.84), famL.a);
+      }
+      vCardLA = lA; vCardLB = lB; vCardLC = lC;
+      ${SKYUP('dot(normalize(ir * aMass), normalize(vBody))')}
+      vec3 sunVC = normalize((viewMatrix * vec4(uSunDirW, 0.0)).xyz);
+      vCardS = vec4(aData.z, aData.w, pcUp, step(1.5, uOilKind));
+      vCardR = vec2(sqrt(q2), pow(max(dot(normalize(cV), sunVC), 0.0), 1.5));
+    }
+    #endif
   #endif
   vFog = pcFogAmountV(di * pcFogBank(vBody));      // (PAINTER 19: a thick fog lies in banks)
   gl_Position = projectionMatrix * mv;
@@ -1876,8 +1990,8 @@ uniform float uGem;       // 1: a crystal or a splinter of ice or glass, lit thr
 uniform vec4 uLeafFam;    // the oil look: each tree its own colour (rgb the third colour of the wood, a red; a how far each tree keeps to its own part of yellow, orange, red)
 uniform float uOilKind;   // the oil look: 0 a tree in leaf; 1 a tree of the snow, its boughs loaded (snow on what faces up); 2 a bare tree: its "leaves" are twigs
 #ifdef PC_FAR
-  uniform float uFarKind[8];
-  uniform vec4 uFarFam[8];
+  uniform float uFarKind[PC_NFAR];
+  uniform vec4 uFarFam[PC_NFAR];
 #endif
 uniform vec4 uOilDark;    // x: the share of this kind's trees whose bark is the dark pair below (the oil look's woods)
 uniform vec3 uOilDarkA;
@@ -1885,11 +1999,11 @@ uniform vec3 uOilDarkB;
 #endif
 uniform mat3 normalMatrix;
 #ifdef PC_FAR
-  uniform vec3 uFarA[8];
-  uniform vec3 uFarB[8];
-  uniform vec3 uFarC[8];
-  uniform vec3 uFarBarkA[8];
-  uniform vec3 uFarBarkB[8];
+  uniform vec3 uFarA[PC_NFAR];
+  uniform vec3 uFarB[PC_NFAR];
+  uniform vec3 uFarC[PC_NFAR];
+  uniform vec3 uFarBarkA[PC_NFAR];
+  uniform vec3 uFarBarkB[PC_NFAR];
   varying float vSpecies;
 #endif
 #ifdef PC_HOLLOW
@@ -2409,6 +2523,254 @@ void main() {
 }
 `;
 
+// ------------------------------------------------------------------------------------------
+// THE TREES' TWO SHORT PROGRAMS (?trees2=, 2026-11-24; docs/lead/TREES-DESIGN.md on r2, package T2; the oil look only).
+// A near tree was ONE program for its bark and its leaves: the bark's two layers of streaks (some two thousand
+// operations a pixel, five to nine tones, three shadow reads) and the leaf's few dozen shared a program, so every leaf
+// pixel was run by a program the size of the bark's, and where a twig crossed the leaves the whole group of pixels
+// waited on the bark. The owner's phone measured the near trees at about 52 ms of an 89 ms frame (v37). Here a tree is
+// drawn by two programs, each only as long as its own part:
+//   WOOD_FRAG: the bark's streaks as before -- the same chart, the same octaves, the same paint at a streak's centre --
+//     but TWO tones a pixel (the streak it lies in and the one at its edge), where the old one laid the coarser
+//     layer whole under the finer one and toned every streak of both.
+//   LEAF_FRAG: a leaf's paint is already worked out once a leaf in the vertex shader; this only lays it, with the
+//     lantern and the air. No discard and no alpha to coverage: the leaves a window or a wash leaves out are folded
+//     away whole in the vertex shader (PROP_VERT, PC_TREE_LEAF), so the card can test depth before it paints.
+// (Neither program has a single discard: see PROP_VERT, PC_TREE_LEAF and PC_TREE_WOOD, for where those went.)
+const TREE_HEAD = /* glsl */`
+${FRAG_PARS}
+uniform vec3 uBarkA;
+uniform vec3 uBarkB;
+uniform vec4 uBarkP;
+uniform vec3 uLeafA;
+uniform float uCanopy;
+uniform vec4 uOilDark;
+uniform vec3 uOilDarkA;
+uniform vec3 uOilDarkB;
+uniform mat3 normalMatrix;
+varying vec3 vBody;
+varying vec3 vObj;
+varying vec3 vNV;
+varying vec3 vView;
+varying vec2 vUv;
+varying vec4 vData;
+varying vec4 vInst;
+varying float vAbove;
+varying float vFog;
+varying vec3 vRelO;
+varying vec3 vCardB;
+varying vec4 vLeafC;
+varying vec4 vLeafK;
+#define vScaleO vLeafK.a
+${PC_UP_F}
+#ifdef PC_FIRE
+varying float vBurnt;
+uniform vec4 uBurnK;
+${FIRE_GLOW}
+#endif
+`;
+
+const WOOD_FRAG = /* glsl */`
+${TREE_HEAD}
+// One streak of bark (PROP_FRAG's bark as it stands there): its own colour from its numbers, before the light.
+vec3 pcWoodColour(vec3 rnd, vec4 nA, vec3 barkA, vec3 barkB, float markP, float twig) {
+  float base = 1.0 - smoothstep(0.0, uBarkP.z, vUv.y + (rnd.y - 0.5) * 1.1);
+  float m1 = step(1.0 - markP, rnd.x);
+  vec3 k = mix(barkA, barkB, clamp(max(max(m1, base * 0.9), twig), 0.0, 1.0));
+  k = pcWetWash(pcDensity(k, 1.0 + ((rnd.y - 0.5) * 1.5 + (nA.r - 0.5) * 0.5) * uOilB.z), 0.9);
+  return k * mix(vec3(1.0), mix(vec3(1.12, 0.96, 0.80), vec3(0.90, 0.90, 1.08), rnd.z), 0.7 * uOilB.z);
+}
+// and its paint at the light level the streak's centre is in (the big program tones a streak and the one at its
+// edge at the SAME level, the level of the pixel's own streak, so only the colour differs between the two)
+vec3 pcWoodPaint(vec3 k, float lvl, float pk, vec3 Bc, float r) {
+  vec3 l = pcTone(k, lvl);
+  if (pk > 0.001) l = mix(l, pcTone(k, max(lvl, 1.0) * 0.5 + 1.0), pk);
+  l = pcLamp(l, k, Bc, r);
+  #ifdef PC_FIRE
+    l = pcFireLit(l, k, Bc, r);
+  #endif
+  return l;
+}
+void main() {
+  #include <logdepthbuf_fragment>
+  // (the speed test's cuts, shared.js uOilL.y, as the big program honours them: 4 written at once, 2 one flat colour)
+  if (uOilL.y > 3.5 && uOilL.y < 4.5) { pcWrite(vec3(0.42, 0.40, 0.32), 0.0, vec3(0.0, 0.0, 1.0), -vView.z, 3.0); return; }
+  pcDist = length(vView);
+  vec3 nV = normalize(vNV);
+  if (!gl_FrontFacing) nV = -nV;
+  if (uOilL.y > 1.5 && uOilL.y < 2.5) { pcWrite(uBarkB, 0.0, nV, -vView.z, 3.0); return; }
+  vec3 sunV = normalize((viewMatrix * vec4(uSunDirW, 0.0)).xyz);
+  ${SKYUP('dot(nV, mat3(viewMatrix) * uUpW)')}
+  float seed = vInst.z;
+  float canopy = vInst.w * uCanopy;
+  float vd = length(vView);
+  float dk = step(fract(seed * 5.31 + 0.17), uOilDark.x - 0.001);
+  vec3 barkA = mix(uBarkA, uOilDarkA, dk), barkB = mix(uBarkB, uOilDarkB, dk);
+  bool along = uBarkP.y > 0.5 || dk > 0.5;
+  float wpxP = uOilA.x * uOilPx.y / 720.0;
+  vec2 uvm = vec2(vUv.y, vUv.x * 1.1) * vScaleO;
+  vec2 ch = (along ? uvm : uvm.yx) + seed * 37.0;
+  vec2 ux = dFdx(vUv), uy = dFdy(vUv);
+  vec2 mx = vec2(ux.y, ux.x * 1.1) * vScaleO, my = vec2(uy.y, uy.x * 1.1) * vScaleO;
+  vec2 dcx = along ? mx : mx.yx, dcy = along ? my : my.yx;
+  vec2 oc = pcStrokeOct(vd * (0.85 + 0.3 * seed), 0.004);
+  float gone = smoothstep(0.15, 0.85, oc.y);
+  vec3 nvdx = dFdx(vNV), nvdy = dFdy(vNV), bdx = dFdx(vRelO), bdy = dFdy(vRelO);
+  float pale = smoothstep(0.55, 0.9, dot(barkA, vec3(0.333)));
+  float markP = mix(mix(0.10, 0.42, clamp((0.72 - uBarkP.x) * 4.0, 0.0, 1.0)), 0.34, dk);
+  float twig = smoothstep(0.0, 1.0, vData.z);
+  float pk = pale * 0.45 * max(uDayness, uMoon);
+  float ba = along ? 15.0 : 3.2;
+  // both layers' streaks, found for every pixel alike (they take screen derivatives): the finer, and the coarser it
+  // gives way to toward the next octave of the distance
+  vec3 rF, rF2, rC, rC2; vec2 dsF, dsC; float cF, cC;
+  pcThinLayer(ch, dcx, dcy, oc.x, ba, vObj + seed * 11.0, 4.0 * wpxP * ba, 2.0, rF, dsF, cF, rF2);
+  pcThinLayer(ch, dcx, dcy, oc.x * 2.0, ba, vObj + seed * 11.0, 8.0 * wpxP * ba, 2.0, rC, dsC, cC, rC2);
+  // WHICH TWO STREAKS THIS PIXEL IS PAINTED FROM. A fine streak that is still there lies on top: its own paint, and at
+  // its edge the next fine streak's if that one is there, the coarse one under it if not. Where the fine streak has
+  // gone (its number under the octave's share), the coarse streak and its neighbour. Two tones a pixel, always: the
+  // old program toned every streak of both layers and a wash under them, five to nine tones.
+  bool here = rF.x * 0.999 >= gone, there = rF2.x * 0.999 >= gone;
+  vec3 rA = here ? rF : rC, rB = here ? (there ? rF2 : rC) : rC2;
+  vec2 dsA = here ? dsF : dsC;
+  float wA = here ? oc.x : oc.x * 2.0, covA = here ? cF : cC;
+  // the light, once, at the centre of the pixel's own streak: its facing, and the shadow map there
+  vec3 Bc = vBody + bdx * dsA.x + bdy * dsA.y;
+  vec3 nVc = normalize(vNV + nvdx * dsA.x + nvdy * dsA.y);
+  if (!gl_FrontFacing) nVc = -nVc;
+  vec4 nA = uOilL.x > 0.5 ? vec4(0.5) : pcNoiseS(Bc, 9.0, wA);
+  float xs = dot(nVc, sunV) * 0.5 + 0.5;
+  xs *= mix(0.55 + 0.30 * pale, 1.0, pcSunAt(Bc, canopy * 0.8, 8.0 - vAbove, wA));
+  xs += (rA.x - 0.5) * 0.10;
+  float lvl = pcLevel(xs, 0.03);
+  vec3 tA = pcWoodPaint(pcWoodColour(rA, nA, barkA, barkB, markP, twig), lvl, pk, Bc, rA.y);
+  vec3 tB = pcWoodPaint(pcWoodColour(rB, nA, barkA, barkB, markP, twig), lvl, pk, Bc, rB.y);
+  vec3 c = mix(tB, tA, covA);
+  #ifdef PC_FIRE
+    if (vBurnt > 0.001) {
+      // (what the fire left standing is charred, as the big program chars it: a cold charcoal at the paint's own value)
+      float sv = dot(c, vec3(0.3, 0.5, 0.2));
+      vec3 soot = clamp(vec3(sv) * vec3(0.88, 0.88, 1.12) * (0.20 + 0.16 * fract(seed * 3.37)) * uBurnK.w, 0.0, 1.0);
+      c = mix(c, soot, vBurnt * uBurnK.x * (1.0 - uBurnK.z) * 0.66);
+    }
+  #endif
+  if (!(uOilL.y > 5.5 && uOilL.y < 6.5)) c = pcAtmosV(c, vFog, vView);
+  pcWrite(c, 1.0, nV, -vView.z, 3.0 + seed * 0.9);
+}
+`;
+
+const LEAF_FRAG = /* glsl */`
+${TREE_HEAD}
+void main() {
+  #include <logdepthbuf_fragment>
+  if (uOilL.y > 3.5 && uOilL.y < 4.5) { pcWrite(vec3(0.42, 0.40, 0.32), 0.0, vec3(0.0, 0.0, 1.0), -vView.z, 3.0); return; }
+  vec3 nV = normalize(vNV);
+  if (!gl_FrontFacing) nV = -nV;
+  if (uOilL.y > 1.5 && uOilL.y < 2.5) { pcWrite(uLeafA * 0.7, 0.0, nV, -vView.z, 3.0); return; }
+  // (a leaf: one piece of flat colour, worked out once a leaf in the vertex shader; here the lantern's light, the fire's
+  //  and the air are laid over it, as the big program's leaf branch lays them)
+  float h = vData.w;
+  vec3 c = uOilL.y > 4.5 && uOilL.y < 5.5 ? vLeafC.rgb : pcLamp(vLeafC.rgb, vLeafK.rgb, vCardB, fract(h * 13.7));
+  #ifdef PC_FIRE
+    c = pcFireLit(c, vLeafK.rgb, vCardB, fract(h * 13.7));
+  #endif
+  if (!(uOilL.y > 5.5 && uOilL.y < 6.5)) c = pcAtmosV(c, vFog, vView);
+  pcWrite(c, 1.0, nV, -vView.z, 4.0 + fract(vInst.z * 7.0 + h * 0.37) * 0.9);
+}
+`;
+
+// A CARD OF LEAVES (?trees2=cards; kitbuild.js clusterCard; docs/lead/TREES-DESIGN.md on r2, package T2). The card is
+// four triangles; its leaves are the baked layer of leaf dabs the ground already uses (dabtex.js), laid over the card's
+// own chart in metres. For each pixel: the topmost dab there that is laid at all (a share of the dabs is left out by
+// number: the sky between leaves) and that lies WHOLE inside the card (a leaf that would cross the card's edge is not
+// laid, so the card's outline is the leaves' own, ragged leaf by leaf). That leaf is painted at its own exact centre,
+// as a leaf card is in the vertex shader: its colour from the tree's three by its number, its light from the card's
+// mass normal turned its own way, the shadow map asked once at its centre, one tone. Where no leaf lies, the sky.
+const CARD_FRAG = /* glsl */`
+${FRAG_PARS}
+uniform float uCanopy;
+varying vec3 vView;
+varying vec2 vUv;
+varying vec4 vInst;
+varying float vFog;
+flat varying vec3 vCardC;
+flat varying vec3 vCardU;
+flat varying vec3 vCardV;
+flat varying vec3 vCardM;
+flat varying vec3 vCardLA;
+flat varying vec3 vCardLB;
+flat varying vec3 vCardLC;
+flat varying vec4 vCardS;
+flat varying vec2 vCardR;
+${PC_UP_F}
+#ifdef PC_FIRE
+varying float vBurnt;
+uniform vec4 uBurnK;
+${FIRE_GLOW}
+#endif
+${LEAF_SUN}
+${SPRAY_GLSL}
+void main() {
+  #include <logdepthbuf_fragment>
+  if (uOilL.y > 3.5 && uOilL.y < 4.5) { pcWrite(vec3(0.42, 0.40, 0.32), 0.0, vec3(0.0, 0.0, 1.0), -vView.z, 3.0); return; }
+  // the card's chart, in the dab layer's own cells (kitbuild.js clusterCard), its screen derivatives for the leaf's
+  // clean edge, and the topmost leaf laid there (dabtex.js SPRAY_GLSL: the shadow map finds the very same leaf)
+  vec2 off = vec2(vCardS.y * 23.0);
+  vec2 dpx = dFdx(vUv), dpy = dFdy(vUv);
+  vec2 ipx = 1.0 / max(vec2(length(vec2(dpx.x, dpy.x)), length(vec2(dpx.y, dpy.y))), vec2(1e-6));
+  vec3 rnd; vec2 ctr;
+  float ePx = pcSpray(vUv + off, off, ipx, vCardR.x, uOilS.z, rnd, ctr);
+  float cover = clamp(ePx, 0.0, 1.0);
+  // (a leaf's edge: with the scene multisampled it takes the share of the pixel it covers, by alpha to coverage, as a
+  //  crown's dab does in the big program; with one sample a leaf is there or it is not)
+  // (?treedepth=1, package T5: the DEPTH PASS cuts the leaves here and writes only depth; the COLOUR pass after it,
+  //  drawn where the depth is equal, never discards -- the leaf it is shading is the one the depth pass kept, so the
+  //  graphics card's early depth test does the cutting and every pixel of a tree is painted once)
+  #ifdef PC_TREE_DEPTH
+    if (cover < 0.5) discard;
+    pcWrite(vec3(0.0), 1.0, vec3(0.0, 0.0, 1.0), 0.0, 4.0);
+    return;
+  #endif
+  #ifndef PC_TREE_EQUAL
+    if (cover < (uOilG.z > 0.5 ? 0.06 : 0.5)) discard;
+  #endif
+  vec3 nV = vCardM;
+  if (uOilL.y > 1.5 && uOilL.y < 2.5) { pcWrite(vCardLA * 0.7, 0.0, nV, -vView.z, 3.0); return; }
+  pcUp = vCardS.z;
+  vec3 sunV = normalize((viewMatrix * vec4(uSunDirW, 0.0)).xyz);
+  float twig = vCardS.w;
+  // the leaf's colour: the tree's three by its own number, and the inner leaves of a clump in the darker one
+  float rr = length(ctr) / max(0.866 * vCardR.x, 1e-3);
+  float shL = clamp(vCardS.x + 0.6 * (1.0 - pow(rr, 0.35)), 0.0, 1.0);
+  float hueL = vInst.x + (rnd.x - 0.5) * 1.7;
+  vec3 cs = mix(vCardLA, vCardLB, clamp(0.5 + hueL * 0.5, 0.0, 1.0));
+  cs = mix(cs, vCardLC, clamp(shL * 0.55 + (rnd.y - 0.5) * 0.6, 0.0, 1.0));
+  cs = pcWetWash(pcDabTint(pcDensity(cs, 1.0 + vInst.y * 0.4), rnd, 1.0 - twig), 0.7);
+  // its light, at its centre, whole: the card's mass normal turned the leaf's own way, the sun through the leaves
+  // toward the eye, the shadow map once at the leaf's own place on the body
+  vec3 mL = normalize(vCardM + (rnd.yzx - 0.5) * 0.9);
+  float xl = (dot(mL, sunV) * 0.5 + 0.5) * (1.0 - shL * 0.35);
+  xl = max(xl, vCardR.y * (0.6 + 0.4 * rnd.x) * (1.0 - twig));
+  vec3 Bc = vCardC + vCardU * ctr.x + vCardV * ctr.y;
+  xl *= mix(0.50, 1.0, pcSunAtV(Bc, vInst.w * uCanopy * 0.4, rnd.z));
+  xl += (rnd.z - 0.5) * 0.25;
+  xl = max(xl, 0.30 + 0.15 * rnd.x);
+  float lv = pcLevel(xl, 0.03);
+  vec3 c = mix(pcLeafDeep(cs), pcTone(cs, lv), smoothstep(1.2, 2.0, lv));
+  if (!(uOilL.y > 4.5 && uOilL.y < 5.5)) c = pcLamp(c, cs, Bc, fract(rnd.x * 13.7));
+  #ifdef PC_FIRE
+    c = pcFireLit(c, cs, Bc, fract(rnd.x * 13.7));
+  #endif
+  if (!(uOilL.y > 5.5 && uOilL.y < 6.5)) c = pcAtmosV(c, vFog, vView);
+  pcWrite(c, cover, nV, -vView.z, 4.0 + fract(vInst.z * 7.0 + rnd.x * 0.37) * 0.9);
+}
+`;
+
+// THE CARDS LAID IN DEPTH FIRST (?treedepth=1, package T5; render/index.js draws them, world/flora.js fills it): on
+// whether the pass runs, meshes the card meshes that take part, each carrying in userData.pcDepthMats the materials it
+// is drawn with in that pass (its wood hidden, its cards in depth only).
+export const TREE_DEPTH = { on: false, meshes: new Set() };
+
 export function makePropMaterial(bodyU, opts = {}) {
   const v3 = (a, d) => ({ value: new THREE.Vector3().fromArray(a || d) });
   const own = {
@@ -2448,7 +2810,14 @@ export function makePropMaterial(bodyU, opts = {}) {
   if (opts.far) {
     // far trees of every species share one mesh: per-instance species picks the washes
     defines.PC_FAR = 1;
-    const pad = (a) => { while (a.length < 8) a.push(a[a.length - 1].clone ? a[a.length - 1].clone() : a[a.length - 1]); return a; };
+    // (2026-11-24, the trees lane) THE TABLES HOLD EVERY KIND. They were eight long, and Earth in the oil look has
+    // thirteen kinds of tree: the far trees of the poplar, the oak, the birch, the willow and the sapling -- five of the
+    // autumn wood's six -- read past the end of every table (the graphics card clamps such a read to the last entry it
+    // has, or returns nothing), so they were drawn with another kind's colours, taper and colour family. ?farfix=0
+    // keeps the eight, for an A and a B.
+    const nFar = FARFIX ? Math.max(8, opts.far.length) : 8;
+    defines.PC_NFAR = nFar;
+    const pad = (a) => { while (a.length < nFar) a.push(a[a.length - 1].clone ? a[a.length - 1].clone() : a[a.length - 1]); if (a.length > nFar) a.length = nFar; return a; };
     const arr = (k) => ({ value: pad(opts.far.map((f) => new THREE.Vector3().fromArray(f[k]))) });
     own.uFarA = arr('leafA'); own.uFarB = arr('leafB'); own.uFarC = arr('leafC');
     own.uFarBarkA = arr('barkA'); own.uFarBarkB = arr('barkB');
@@ -2458,12 +2827,21 @@ export function makePropMaterial(bodyU, opts = {}) {
     own.uFarKind = { value: pad(opts.far.map((f) => f.kind || 0)) };
     own.uFarFam = { value: pad(opts.far.map((f) => new THREE.Vector4().fromArray(f.fam || [0, 0, 0, 0]))) };
   }
+  // (the trees' two short programs, ?trees2=: opts.tree 'wood' or 'leaf' -- the oil look only; see WOOD_FRAG above)
+  const tree = LOOK.oil && (opts.tree === 'wood' || opts.tree === 'leaf' || opts.tree === 'card') ? opts.tree : null;
+  if (tree) defines[tree === 'wood' ? 'PC_TREE_WOOD' : tree === 'leaf' ? 'PC_TREE_LEAF' : 'PC_TREE_CARD'] = 1;
+  // (?treedepth=1, the cards only: opts.depth 'first' the depth pass, 'equal' the colour pass drawn after it)
+  const dpass = tree === 'card' && (opts.depth === 'first' || opts.depth === 'equal') ? opts.depth : null;
+  if (dpass) defines[dpass === 'first' ? 'PC_TREE_DEPTH' : 'PC_TREE_EQUAL'] = 1;
   const m = new THREE.ShaderMaterial({
     name: 'pc-prop-' + (opts.name || ''),
     defines,
     uniforms: baseUniforms(bodyU, own),
-    vertexShader: PROP_VERT, fragmentShader: PROP_FRAG,
-    side: opts.doubleSide ? THREE.DoubleSide : THREE.FrontSide,
+    vertexShader: PROP_VERT, fragmentShader: tree === 'wood' ? WOOD_FRAG : tree === 'leaf' ? LEAF_FRAG : tree === 'card' ? CARD_FRAG : PROP_FRAG,
+    // (the wood program draws only the faces that are seen: a tube's triangles turn their front inward, so from outside
+    //  it is their BACK that shows, and under DoubleSide the inner faces of the far side were drawn as well, only to be
+    //  hidden behind the near side. The near side is what wins the depth test either way, so the picture is the same.)
+    side: tree === 'wood' && opts.doubleSide ? THREE.BackSide : opts.doubleSide ? THREE.DoubleSide : THREE.FrontSide,
   });
   m.userData.pcPainted = true;
   // (the powers, fire: a crown that has burned is left bare and black. The plants need no list of burnt places -- each
@@ -2473,7 +2851,9 @@ export function makePropMaterial(bodyU, opts = {}) {
   addFire(m, false);
   if (m.defines && m.defines.PC_FIRE) m.defaultAttributeValues.aBurnt = [0];
   register(m, 'prop', opts);
-  if (LOOK.oil) m.alphaToCoverage = true;       // (a crown's leaves at its outline: PROP_FRAG, the oil branch)
+  if (LOOK.oil) m.alphaToCoverage = !tree || (tree === 'card' && !dpass);
+  if (dpass === 'first') m.colorWrite = false;
+  if (dpass === 'equal') { m.depthFunc = THREE.EqualDepth; m.depthWrite = false; }      // (a crown's leaves at its outline: PROP_FRAG, the oil branch. The trees' two short programs have no cut-out edge to soften and no discard: alpha to coverage would only cost them the early depth test)
   return m;
 }
 
@@ -3058,3 +3438,6 @@ export function standInFor(object, material) {
   standIns.set(material, s);
   return s;
 }
+
+// (the far impostors, render/impostor.js, take the plants' own air, the sky-facing line and the pcUp stand-in from here)
+export { FOG_VERT, SKYUP, PC_UP_F, FARCROWN };

@@ -13,7 +13,9 @@ the same time: this lane touches only the far parts of `flora.js`, `florakit.js`
 `render/impostor.js`, `render/shadow.js` and new rows in `core/bench.js`.
 
 **State (update this line every step):** T0 committed (rows built and run in software: they work; their timings mean
-nothing here, only the owner's phone can time them). T1 (impostors) being built. Nothing merged.
+nothing here, only the owner's phone can time them). T1 (impostors) committed behind `?fartree=impostor`, SEEN in A/B
+stills at the phone's and the desktop's settings (`docs/shots/painter/trees-far/`); not yet the default (waits for the
+owner's phone: `&bench=trees` has the row). Next: T4 (hand-over distances), then T6. Nothing merged.
 
 **T0, the speed test's tenth form (`src/core/bench.js`).** `?bench=1` the whole table with the new rows; `?bench=trees`
 the tree questions alone, on foot and from the air (24 rows); `?bench=air` or `?bench=air,<m>` the air table (FV7: 400 m
@@ -26,9 +28,107 @@ row now prints its triangles. SEEN in software at 936x372: leaves only 972k tria
 1,026k (so near wood about 152k triangles, near leaves about 98k, both passes).
 **Found on the way:** the far material's tables were 8 long and Earth has 13 kinds in the oil look: the far trees of
 the poplar, oak, birch, willow and sapling read past the end (drawn with another kind's colours, taper and family).
-To be fixed with T1 (it changes the default far wood, so A/B stills first). And the flat test of the far branch caught
+FIXED with T1 (`PC_NFAR`, the tables sized to the kinds; `?farfix=0` keeps eight): A/B at 150 m changes 5 % of the
+picture, the poplars taking their own taper and colours (`A1_farfix_air150_*`). And the flat test of the far branch caught
 rows 5 and 6 (a leaf in its own colour, no air on the plants) too, so those two v37 rows also flattened every far tree:
 fixed in T0 (the far flat now only for 2 and 3).
+
+## Hand-over of THE TREES NEAR lane (group A2, branch `trees-near`; kept current; 2026-11-24)
+
+The brief (from the coordinator): the owner wants 30 a second on the S23 Ultra (v37: about 89 ms a frame, the NEAR trees
+about 52 ms of it) without losing the look; the near trees at 5-15 m are approved as they look now. This lane builds
+packages T2, T3 and T5 of `docs/lead/TREES-DESIGN.md` (on `r2`), each behind a switch and a speed-test row, and does not
+touch the far trees, the hand-over distances or the shadows' cost (session A1, branch `trees-far`), nor chunks.js,
+post.js, shared.js or world/index.js (the look director's).
+
+**A FINDING THAT SHAPES THE LANE (measured in Node, not on a device).** A scratch rasteriser over the real grove kit
+(roundmaple seed 11, the phone's 372 lines, fov 58, today's leaf thinning applied to both): leaf CARDS carrying a dab
+spray RASTERISE 5 TO 9 TIMES THE FRAGMENTS of today's leaf polygons for the same leaves on screen (6 m: 153k-179k
+against 24.8k; 12 m: 78k-82k against 15.8k), because a spray card is mostly sky round its leaves and every one of those
+fragments runs the lookup before it is discarded, while a leaf polygon covers exactly its leaf and its paint is already
+done in the vertex shader. Cards save 3,000-5,000 triangles a tree. Told to the coordinator; so BOTH forms are built and
+the phone prices both in one run.
+
+**What is built (all behind `?trees2=`; without it every tree is what it was):**
+- `?trees2=1` (or `split`): the near AND middle trees drawn by TWO SHORT PROGRAMS (`materials.js` `WOOD_FRAG`,
+  `LEAF_FRAG`, chosen by `makePropMaterial(..., { tree: 'wood' | 'leaf' })`), over two groups of one index (wood, then
+  leaves; `flora.js` `splitGroups`), with the near tree's haze of HAIR TWIGS NOT BUILT and a side fewer on every tube
+  (`kits/grove.js`, `trees2`; the hairs were 1,072 to 2,500 triangles a tree). THE SAME TREE: every random number is
+  still drawn, so the skeleton and every leaf are where they were (`src/world/trees2.test.mjs` holds it).
+  The leaf program has NO DISCARD and no alpha to coverage: the lens window, the explorer's window, the wash and the fire
+  drop WHOLE LEAVES in the vertex shader (`PROP_VERT`, `PC_TREE_LEAF`), so the card can test depth before painting. The
+  wood program paints a pixel from TWO streaks (its own and the one at its edge) with ONE light at the streak's centre
+  and two tones, where the old program toned every streak of two layers and a wash under them; it pinches a branch in
+  round the lens (`PC_TREE_WOOD`, with `Builder.axis`: a tube's ring carries its centre in `aCard`) instead of
+  discarding, and lays the branches of a wash one by one.
+- `?trees2=cards`: the same wood, and the near tree's leaves as CLUSTERS ON CARDS (`kitbuild.js clusterCard`, part 7;
+  one six-cornered card where a clump of leaves hung; its chart in DAB CELLS so the shader needs no number of the
+  kind's own). The leaves on a card are the ground's own baked dab layer (`dabtex.js SPRAY_GLSL`, shared by the card's
+  paint `CARD_FRAG` and the shadow map, so a card throws exactly the leaves it is painted with); a leaf is laid only if
+  it lies whole inside the card (the outline is leaves); painted at its own centre with one tone. Cards thin and grow by
+  distance as leaves do (`sortLeafCards`, `uLeafLod`: part 7 counts as a leaf).
+- `?treedepth=1` (with `?trees2=cards`): package T5. The cards are drawn in DEPTH ONLY before the scene
+  (`render/index.js treeDepthFirst`, `materials.js TREE_DEPTH`), then in colour where the depth is EQUAL, with no discard
+  and no alpha to coverage; `invariant gl_Position` keeps the two passes' corners identical.
+- Speed-test rows (`core/bench.js`): 'trees: two short programs', 'near trees as clusters', 'clusters with a depth pass
+  first', each swapped in while the test runs (`flora.js setTrees2(mode, depth)`).
+- Hunks in files of other lanes, each small and said in the commit: `shadow.js` (a card's shadow through its spray;
+  cards thinned as leaves), `core/bench.js` (the rows, and its helpers now see a mesh with two materials).
+
+**Seen / measured / not (2026-11-24):**
+- SEEN, phone settings (936 x 372, tier 1, lighter paint, fov 58), the autumn wood at 16.8 h, the same tree framed from
+  5, 10, 18, 30, 45 m (`docs/shots/painter/trees-near/`, `A2_today_*` A, `A2_split_*` B, `A2_cards_*` C):
+  `?trees2=1` is the same picture to the eye (leaves identical, bark streaks the same kind; mean difference 0.35-2.0 of
+  255; the look director's `lookstats.py` equal to the hundredth). `?trees2=cards` reads as crowns of separate crisp
+  leaves; at 18-45 m it looks at least as good as today (the middle tree of many small leaves in place of big kites);
+  at 5-10 m it is SPARSER than today and a little lighter and less saturated (more sky between leaves).
+- MEASURED in Node at the spawn wood, phone tier (`tools/overdraw.mjs`, a scratch copy taught material arrays and the
+  wood/leaf split): near wood 71,504 -> 36,792 triangles with `split` (fragments 81.6k -> 77.7k); leaves unchanged.
+  With `cards`: near leaves 47,110 -> 14,718 triangles but RASTERISED FRAGMENTS 127k -> 461k; middle leaves 34,356 ->
+  21,778 triangles but 105k -> 749k fragments. So cards trade about 45k triangles for about a million more fragments
+  run through the leaf lookup (most of them discarded): almost certainly a LOSS on the phone unless the depth pass
+  (T5) makes discarded fragments nearly free, and even then the depth pass runs the lookup on every one of them.
+- NOT KNOWN: what the two short programs save on the phone (the design's reading: the bark's long program in every
+  near-tree wave; only the bench can say), anything in motion, anything on a real graphics card.
+
+**Next:** A/B stills (5/10/18/30/45 m, autumn and green wood, phone and desktop) -> commit T2 split -> stills of cards
+and T5 (pixel-identical check) -> commit -> T3 (the middle tree) -> report each step to the coordinator and the look
+director (session_01R5Brhzz2JPPF6Ecz6XRQHx).
+**T1, far trees as painted impostors (`src/render/impostor.js`; `?fartree=impostor`).** For every kind drawn far off as
+leaves (`CAN_CARD`), its lod-0 tree (one variant; `?impvar=2` two) is baked once per world, in a frame hook the first
+time an impostor is drawn (the painter's hooks run outside a render; the renderer is handed over by the first impostor
+mesh's `onBeforeRender`), into one atlas: 8 x 8 hemi-octahedral views from the horizon to nearly straight down, 96
+texels each (`?impres=`), 6 levels each BAKED again at half the size (no averaging, no blur), read back and uploaded as
+a DataTexture with its own mip chain (NEAREST_MIPMAP_NEAREST). Earth: 13 kinds, 3072 x 3072, 48 MB with levels; the bake
+took 8.5 s in software here (the phone's graphics card: not measured; a second or so of script is the guess).
+A texel holds a stroke's number, the normal, the inner shade, what it is (wood, leaf, snow leaf, core) and where its
+centre lies along the line of sight. What the bake does to make a far crown read (each SEEN to be needed, in order):
+leaves drawn larger until each kind's crown is equally dense (`?impdens=` 3.0; Earth's kinds run from 0.13, the spruce,
+to 1.3, the round maple, so one factor left conifers bare poles), never under 2 texels; leaves gathered into strokes of
+3.4 texels (a grid through the crown that nests from level to level); each stroke lit by the crown's FRONT surface along
+the line of sight (an ellipsoid round the leaves: a crown reads as a round lit mass with a shaded side, the references'
+"round crowns"; with each leaf's own normal the canopy was a speckle), with how deep behind that surface it lies as its
+inner shade; half the near leaf's light jitter (`?impjit=`); the trunk thickened by a third of a texel, the limbs only at
+the finest level. Drawn as two triangles a tree with the near tree's own matrix (size, lean, a felled tree's fall), the
+quad framed on the tree's upright cylinder as seen from the chosen view, stood 0.35 of its radius toward the eye; the
+fragment does one fetch and the leaf's steps of `PROP_VERT` with `pcTone` (not the private deep-shade recipe, R1.2b),
+the crown's lit side by the far rule, inside the shadow square the map as well (min of the two: impostors cast nothing).
+FROM THE AIR their reach is hypot(height, 1.5 km), held to the horizon (`?farreach=`; FV2-T): 1 km up on the phone a
+forest is drawn where today nothing is.
+COUNTED (gallery, autumn wood, 15.4 h, summer dress; frame = every pass): phone 936x372 tier 1, on foot 1,247k -> 651k
+triangles (far tier 816k -> 12k, 5,915 trees), 194 calls both; 150 m 2,942k -> 221k (far 5.88M -> 130k before the
+frustum's cut; 42,631 -> 64,816 trees as the reach grows to 1,050 m), calls 137 -> 162; 400 m 3,545k -> 221k, 128 ->
+188 calls (83,520 trees to 1.5 km); 1 km 96k (no trees) -> 171k, 62 -> 166 calls. Desktop 1280x720 tier 2: on foot
+3,220k -> 2,751k; 150 m 2,867k -> 385k; 400 m 3,354k -> 301k.
+DERIVED phone cost (T1 design's rate, 0.026 ms per 1000 far triangles from the v37 lumps row; the paint per pixel is
+not known): on foot about -20 ms of far geometry, plus 1 to 3 ms of impostor paint (design's figure, not measured);
+from the air the far tier from about 150 ms (5.9M triangles) to about 3 ms of geometry plus its paint. The extra draw
+calls from the air (+25 to +60) cost the script about 0.5 to 1.2 ms. Confirm with `&bench=trees`: rows 'far trees as
+impostors' on foot and at 150 m and 400 m.
+STILL WRONG / NOT KNOWN: the view switches (about 13 degrees apart, nearest, no blend) and the level switches are not
+seen in motion; the hard edge where the trees end 1 km up (the far-view lane's painted canopy, FV2, is meant for it);
+the darkest conifer strokes are V 0.13 (R1.2c asks 0.18 for conifers); the hand-over at 57 m to the middle tree (T4);
+the bake is one long step at the first far draw (could be spread over frames).
 
 ## Hand-over of THE OIL LOOK, prototype on branch `look-proto` (READ THIS FIRST; kept current)
 
