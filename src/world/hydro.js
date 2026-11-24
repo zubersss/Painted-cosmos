@@ -32,7 +32,9 @@
 //   PONDS (?ponds=1, pondAt). A jittered grid of 120 m cells; a cell may hold one small still pond in an open, level glade: its
 //     outline a bent ellipse, its level just under the lowest point of its rim (so it is always held in), its bed a bowl.
 //   PUDDLES (?puddles=1, puddleCap). The fine relief's hollows on near-level ground: c.cap is how deep water stands there at
-//     full wetness (at most 0.12 m). The paint (lane W3) lets them come and go with the ground's wetness.
+//     full wetness (at most 0.12 m). The paint (lane W3) lets them come and go with the ground's wetness. On a river's flat floor
+//     (where the land is near level everywhere, so the slope alone would let every hollow hold one) a hollow must be deeper,
+//     and none lies right at the water's edge: they stay few beside a wide river too.
 // THE FALLS LIST (S.hydro.falls) is what world/falls.js draws: one entry a lip, with its place, its way, width, the level at the
 // lip and at the foot, and the water's speed over it.
 //
@@ -90,6 +92,9 @@ export const HYDRO_DEF = {
   // puddles (a biome's oil.puddles, else the world's: 0 none .. 1)
   capMax: 0.12,      // metres
   capSlope: 0.03,    // no puddle on a slope steeper than this
+  capFloor: 0.12,    // metres: on a river's flat floor a hollow must be this much deeper to hold one (times (1 - rise)^2, the
+                     // wood's rise: 0 on the floor, 1 some 95 m from the water) ...
+  capBank: [4, 10],  // ... and none within the first of these metres of the water's edge, all by the second
 };
 
 const D2 = Math.PI / 4;
@@ -162,10 +167,10 @@ export function pondAt(rho, h, level, dep, out) {
 }
 
 // PUDDLES: the depth water stands at full wetness in a hollow of the fine relief (sm: the 15.5 m term, amplitude 0.42 m; mi: the
-// 3.4 m term), on ground whose slope is `slope`. 0 where there is none.
-export function puddleCap(sm, mi, slope, o, k) {
+// 3.4 m term), on ground whose slope is `slope`; `deep` (metres, default 0) more of a hollow asked for. 0 where there is none.
+export function puddleCap(sm, mi, slope, o, k, deep) {
   if (!(k > 0) || slope > o.capSlope) return 0;
-  const hollow = -sm - mi * 0.6 - 0.13;        // deeper than 13 cm under the mean of the 15 m relief
+  const hollow = -sm - mi * 0.6 - 0.13 - (deep || 0);   // deeper than 13 cm under the mean of the 15 m relief (and `deep`)
   if (hollow <= 0) return 0;
   const flat = 1 - smoothstep(o.capSlope * 0.5, o.capSlope, slope);
   const cap = Math.min(o.capMax, hollow * 0.55) * flat * Math.min(1, k);
@@ -964,7 +969,10 @@ class Hydro {
 
   _puddle(S, c, b, H) {
     if (b.lq > b.h - 0.3) return;                         // water already stands here
-    if (-H.sm - H.mi * 0.6 - 0.13 <= 0) return;           // (no hollow: the slope is not even asked)
+    const o = this.o, bank = smoothstep(o.capBank[0], o.capBank[1], H.s);   // (H.s: metres from the water's edge)
+    if (!(bank > 0)) return;
+    const fl = 1 - H.rise, deep = o.capFloor * fl * fl;   // a river's flat floor: a deeper hollow asked for
+    if (-H.sm - H.mi * 0.6 - 0.13 - deep <= 0) return;    // (no hollow: the slope is not even asked)
     // the slope of the land the hollow lies in: the hills (1,900 m, 350 m, 98 m terms), by differences 4 m apart
     const R = this.R, x = c.x, y = c.y, z = c.z, e = 4 / R, nA = S.nA.n3;
     const [u, v] = axes([x, y, z]);
@@ -975,7 +983,7 @@ class Hydro {
     const ru = big(ux, uy, uz) + forestRelief(S, ux, uy, uz) * H.rise, rv = big(vx, vy, vz) + forestRelief(S, vx, vy, vz) * H.rise;
     const slope = Math.hypot(ru - r0, rv - r0) / 4;
     // (the max rule shared with the rivers' runnels, which set c.cap in _base before this: never take a runnel's away)
-    c.cap = Math.max(c.cap, puddleCap(H.sm, H.mi, slope, this.o, this.puddleK));
+    c.cap = Math.max(c.cap, puddleCap(H.sm, H.mi, slope, o, this.puddleK * bank, deep));
   }
 }
 
