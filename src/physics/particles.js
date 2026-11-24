@@ -89,6 +89,8 @@ function makeBuffer(cap) {
     _p: new Float32Array(cap * 3), _v: new Float32Array(cap * 3), _vt: new Float32Array(cap), _ph: new Float32Array(cap), _n: 0,
     // for `left`: the height over the ground under it when last looked up, and when that was
     _alt: new Float32Array(cap).fill(1e9), _lt: new Float64Array(cap).fill(-1e9), _rate: new Float32Array(cap), _g: new Float32Array(cap), _wu: new Float32Array(cap), _tp: new Float32Array(cap),
+    // (group D, ?rainmap=1) the map at the box's corners while the switch is on (a shape from the start, as `far`)
+    _rc: null, _rcInv: 0,
   };
 }
 
@@ -109,6 +111,8 @@ export class Particles {
     this.shelters = new Float32Array(4 * 4); this.shelterCount = 0;
     this._cp = new Float32Array(16);          // canopy closure on the 4 x 4 patch
     // (P17) the context _fall reads (set by update per kind; numbers start as -0 so that their fields hold numbers, not small integers)
+    // (group D, ?rainmap=1) the rain map at the rain box's corners (-x-z, +x-z, -x+z, +x+z) and its middle, mm/h; or null
+    this.rainCorners = null;
     this._fc = { h: -0, Rb: -0, bx: -0, bz: -0, ground: -0, fx: -0, fy: -0, fz: -0, g: -0, time: -0, H: -0, canopyH: -0, through: -0, liquid0: -0, drip: -0, want: -0, draining: false, isSnow: false, target: false, pr: null, nSH: -0, times: null };
     this.dripping = 0;                        // 0..1: how hard the canopy over the focus is dripping
     this.frameVersion = -1;
@@ -289,6 +293,19 @@ export class Particles {
         if (canopyH > 1) want = Math.round(want * (1 - clamp01(cover.canopy01 || 0) * (1 - through) * Math.min(1, canopyH / H)));
         b.species = pr.species; b.fallSpeed = pr.fallSpeed;
         this._buildLut(bodyId, pr.species, rho, wx.temperature);
+      }
+      // (group D, ?rainmap=1) the rain box follows the map: each new drop kept where it lands by the rate there (the
+      // bilinear of the four corners) over the wettest corner's, so the drops lie as the rain does; their number scaled
+      // by the box's mean rate over its middle's, so the middle keeps the density it had. With the switch off this is
+      // one comparison.
+      b._rc = null;
+      if (kk === 0 && b === target && this.rainCorners) {
+        const rc = this.rainCorners, rf = rc[4];
+        const rmax = Math.max(rc[0], rc[1], rc[2], rc[3]), rmean = (rc[0] + rc[1] + rc[2] + rc[3]) * 0.25;
+        if (rf > 0.02 && rmax > 0) {
+          want = Math.min(cap, Math.round(want * rmean / rf));
+          b._rc = rc; b._rcInv = 1 / rmax;
+        }
       }
       // after the rain the soaked canopy goes on dripping: big slow drops from the leaf tips
       let drip = 0;
@@ -529,6 +546,16 @@ export class Particles {
   _spawn(b, i, fx, fz, y, snow, R = PARTICLES.radius) {
     const rng = this.rng, o = i * 3;
     b._p[o] = fx + (rng() * 2 - 1) * R; b._p[o + 1] = y; b._p[o + 2] = fz + (rng() * 2 - 1) * R;
+    // (?rainmap=1) kept where it lands by the map's rate there over the box's wettest (a few tries, then as it is)
+    if (b._rc) {
+      const rc = b._rc;
+      for (let k = 0; k < 6; k++) {
+        const u = (b._p[o] - fx) / (2 * R) + 0.5, v = (b._p[o + 2] - fz) / (2 * R) + 0.5;
+        const r = (rc[0] * (1 - u) + rc[1] * u) * (1 - v) + (rc[2] * (1 - u) + rc[3] * u) * v;
+        if (rng() < r * b._rcInv) break;
+        b._p[o] = fx + (rng() * 2 - 1) * R; b._p[o + 2] = fz + (rng() * 2 - 1) * R;
+      }
+    }
     // size: exponential tail of large drops (Marshall and Palmer 1948), index into the 8-step LUT
     const t = snow ? rng() * 5 : Math.min(7, -Math.log(1 - rng() * 0.98) * 1.6);
     const k = t | 0, f = t - k;

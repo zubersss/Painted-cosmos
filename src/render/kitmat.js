@@ -13,6 +13,17 @@ import * as THREE from 'three';
 import { makePaintUniforms } from './materials.js';
 import { G } from './shared.js';
 import { VERT_PARS, VERT_END, FRAG_PARS } from './chunks.js';
+// (group D, ?rainlook=1 or ?wx2=1, physics/wx2.js; read from the address here and not imported, so this shared file
+//  never needs the weather's modules: the look director's contract for the storms' hook. The look director's review of
+//  W3.3: a downpour's streaks were laid near paper white; with the switch they are laid at the sky's own pale value,
+//  never over V 0.85, so in front of dark trees they read as rain and not as scratches.)
+const RAINLOOK = (() => {
+  if (typeof location === 'undefined' || !location) return 0;
+  const q = new URLSearchParams(location.search || ''), on = (k) => q.has(k) && q.get(k) !== '0' && q.get(k) !== 'false';
+  if (q.has('rainlook')) return on('rainlook') ? 1 : 0;
+  if (q.get('weather') === 'old') return 0;
+  return q.has('wx2') ? (on('wx2') ? 1 : 0) : (q.get('look') === 'oil' ? 1 : 0);   // (the new weather is the oil look's default: physics/wx2.js)
+})();
 
 // what a kind is drawn with when it did not come from the ground (updated by the world: rain
 // takes the sky's wash, spray the liquid's)
@@ -84,7 +95,7 @@ const SHAPES = {
   // (PAINTER 13: each stroke its own length, tapering to its tail and broken where the brush skipped: in Neptune's gale every
   // stroke lay level, one length, one weight, and the storm sky carried rows of ruled dashes. `rh` is the drop's own number:
   // the world draws rain with vary 0.35, so vPcData.x is 0.65..1 and stays with the drop)
-  rain: 'float tpr = abs(vPcUv.x - 0.5) * 2.0; float rh = clamp((1.0 - vPcData.x) / 0.35, 0.0, 1.0); float rl = 0.38 + 0.62 * fract(rh * 7.31 + 0.13); if (tpr > 1.0 || vPcUv.y > rl || length(vView) < 3.2) discard; float yy = vPcUv.y / rl; float brk = smoothstep(0.28, 0.60, texture(uNoise3D, vec3(yy * 1.7 + rh * 13.0, rh * 5.3 + 0.21, 0.37)).r); vec3 bg = texture(uSceneCol, gl_FragCoord.xy / uSceneRes).rgb; float bl = dot(bg, vec3(0.3, 0.5, 0.2)); vec3 c = mix(mix(bg, vec3(0.94, 0.955, 0.97), 0.60), bg * ink * (0.95 + 0.05 * rh), smoothstep(0.50, 0.74, bl)); float w = 0.95; float ga = (1.0 - smoothstep(0.25, 1.0, tpr)) * (1.0 - smoothstep(0.30, 1.0, yy)) * smoothstep(0.0, 0.12, yy) * mix(0.35, 1.0, brk) * 0.70 * (1.0 - 0.45 * smoothstep(0.42, 0.56, bl) * (1.0 - smoothstep(0.62, 0.76, bl)));',
+  rain: 'float tpr = abs(vPcUv.x - 0.5) * 2.0; float rh = clamp((1.0 - vPcData.x) / 0.35, 0.0, 1.0); float rl = 0.38 + 0.62 * fract(rh * 7.31 + 0.13); if (tpr > 1.0 || vPcUv.y > rl || length(vView) < 3.2) discard; float yy = vPcUv.y / rl; float brk = smoothstep(0.28, 0.60, texture(uNoise3D, vec3(yy * 1.7 + rh * 13.0, rh * 5.3 + 0.21, 0.37)).r); vec3 bg = texture(uSceneCol, gl_FragCoord.xy / uSceneRes).rgb; float bl = dot(bg, vec3(0.3, 0.5, 0.2)); vec3 c = mix(mix(bg, ' + (RAINLOOK ? 'uHaze * min(1.0, 0.85 / max(max(uHaze.r, uHaze.g), max(uHaze.b, 1e-3)))' : 'vec3(0.94, 0.955, 0.97)') + ', 0.60), bg * ink * (0.95 + 0.05 * rh), smoothstep(0.50, 0.74, bl)); float w = 0.95; float ga = (1.0 - smoothstep(0.25, 1.0, tpr)) * (1.0 - smoothstep(0.30, 1.0, yy)) * smoothstep(0.0, 0.12, yy) * mix(0.35, 1.0, brk) * 0.70 * (1.0 - 0.45 * smoothstep(0.42, 0.56, bl) * (1.0 - smoothstep(0.62, 0.76, bl)));',
   streak: 'float tpr = abs(vPcUv.x - 0.5) * 2.0; if (tpr > 1.0 - 0.8 * vPcUv.y) discard; vec3 c = ink * vPcData.x; float w = 0.55;',
   dab: 'if (length(vPcUv - 0.5) > 0.5) discard; vec3 c = ink * vPcData.x; float w = 0.35;',
   // a flake: a speck of bare paper with a ragged edge (drawn out along its motion by the kit)

@@ -124,12 +124,22 @@ export default {
   cloud: 0.45,
   // (group D, the weather, with ?stormland=1: HOW STORMY the land is. One number for the owner to turn; it sets how
   //  many storms grow on a stormy afternoon and how far they drift. MEASURED over 200 game days at the spawn:
-  //    1    storms on 71 % of days, one in sight of the wood on 65 %, one over the wood on 24 % (as tuned)
-  //    0.5  in sight on 43 %, over the wood on 11 %
-  //    1.5  in sight on 67 %, over the wood on 36 %
+  //    1    storms on 71 % of days, one in sight of the wood on 62 %, one over the wood on 22 % (as tuned)
+  //    0.5  in sight on 42 %, over the wood on 11 %
+  //    1.5  in sight on 68 %, over the wood on 27 %
+  //  (no storm drifts faster than 10 m/s times the dial: a storm takes about three minutes to pass)
   //    0    no storms born from the land at all.   physics/weather.js STORMLAND.)
   storms: 1,
   deck: { height: 560 },
+  // THE WEATHER'S OWN HEIGHTS AND SHARES (group D, lane W1 CLOUDS; docs/lead/WEATHER-DESIGN.md 3 and 4.3). Read only in the
+  // oil look: by world/clouds.js (the 3D clouds, ?clouds3d=) and world/index.js skyCeiling (the sky stays a sky to
+  // `ceiling[0]` m over the land and is space by `ceiling[1]`). A world without this row keeps the defaults.
+  //   fair: the share of slots a fair sky holds where the cloud map says nothing (0.8 of `cloud`); base: a fair
+  //   cumulus' base over the land, morning and evening (m, where the map does not give one); alto, altoShare: the sky's
+  //   own flat cloud lifted to the altocumulus this far over the land, keeping this share of its cover; cirrus: the high
+  //   cloud's share where the map has none (sky.js A4); rainbow: 0 never (A9); deck, valley,
+  //   towers, cumulus: switches and heights for the pieces as WEATHER-DESIGN 3 sets them (the map gives the deck's).
+  weather: { cumulus: 1, fair: 0.36, base: [300, 380], towers: 1, deck: [180, 260], valley: 1, alto: 1000, altoShare: 0.75, cirrus: 0.25, rainbow: 1, ceiling: [2800, 6000] },
   visibility: [185, 2600],   // metres at ground level, and from high up
   sky: EARTH_SKY,
   // (the oil look: Earth takes the look's golden hours whole: its wood is the owner's reference clip's)
@@ -138,8 +148,20 @@ export default {
   // (airTop: the far-view design's FV1 on this world -- the ground's air, the cloud deck, the relief's rounding and the
   // visibility follow the horizon's dip; world/index.js AIRTOP. Earth is the only world it has been looked at on.)
   oil: { gold: 1, sites: { 0: 'autumn_woodland', 4: 'temperate_forest' }, rivers: 1, riverAt: [53.82, -8.34, -2.78], leaves: 0.5, airTop: 1,
-    // (?rivers=tree, world/rivers.js: the landing keeps a brook -- catchment added four nodes up the drainage tree from it)
-    springs: [{ at: 'landing', up: 4, acc: 30 }],
+    // (the rivers of the tree, world/rivers.js, the default in the oil look: the landing keeps its RIVER -- the coordinator,
+    //  24 Nov: the owner's first view is a wide stream under the maples, and the first thing they see must not have less
+    //  water. Catchment added sixteen nodes up the drainage tree from the landing, growing over ten of them, so the river
+    //  widens down to it as a river does: 18.8 m wide by the landing, in its S-bends. And `keep`: it bends round the landing,
+    //  its water's edge at least r off, so the landing stays dry with the river past it. r was 12 (the water 15.5 m off): in
+    //  the game's own first view that put the river behind the ship, less water than v39.1's stream beside the explorer
+    //  (docs/shots/painter/water-default/first-view-v391-vs-v392.jpg); now 3, the water 6.5 m off)
+    springs: [{ at: 'landing', up: 16, acc: 1100, ramp: 10 }],
+    keep: [{ at: 'landing', r: 3 }],
+    // (the first view's facing at the landing the world chooses, [yaw from north toward east, pitch], degrees: the river
+    //  from beside the explorer into the distance on the right, the ship on the left -- surface.js getSpawn; the game's camera
+    //  takes it as a look's spawn yaw. Chosen by a count of the water in the camera's view at every facing: 46 here against
+    //  about 41 for v39.1's first view and 22 for the v39.2 candidate's)
+    face: [100, -6.9],
     // (the bodies of water, world/hydro.js; each read only behind its own switch, ?lakes= ?ponds= ?puddles= ?fjord=:
     //  lakeK: the share of a filled basin's hills drowned where it is deepest (the tallest stand as islands);
     //  ponds: the chance a 120 m cell of low wood holds a small still pond (0.25: about 80 on Earth, 4 within 800 m of the

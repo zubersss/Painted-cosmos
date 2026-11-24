@@ -6,57 +6,62 @@
 // was the whole picture going white for a moment, with no bolt anywhere. The physics now knows every storm on the planet
 // (physics/cloudfield.js: its cells, and the last flash of every storm cell within 4 km), and this draws two things of
 // them:
-//   RAIN SHAFTS  under every system raining 2 mm/h and more at its core, a curtain from the cloud's base down to the
-//                ground: MANY THIN TAPERED VERTICAL STROKES, each fully painted where it lies, dense at the core and
-//                ragged at the edges and at the foot, slanted downwind. The land behind shows BETWEEN the strokes,
-//                never through a blur (the owner's first rule): this replaces the sky's soft drags of noise as the way
-//                far rain is seen. Fewer, broader strokes far off, so a stroke is never thinner than a pixel and the
-//                curtain never turns to grain.
+//   RAIN SHAFTS  under every system raining 2 mm/h and more at its core, two wide VEILS (the look director's
+//                review, 24 Nov: the first version was a comb of thin white lines): broad sheets hung from the cloud's
+//                base to the ground, slanted with the wind, each a flat VALUE STEP against what is behind it (a glaze,
+//                laid as a multiply), with low-contrast strokes inside that merge into the step, thinning toward its
+//                sides, its top and its foot in flat steps. Never a blur, never a fade (the owner's first rule).
 //   BOLTS        a cloud-to-ground flash: a crisp jagged ribbon from the cloud's base to the ground, 2 to 4 pixels wide
 //                whatever its distance, tapering, with one to three branches, every one of them from the flash's own
 //                seed; white with a breath of violet; on for the physics' own return strokes (3 or 4 in a third of a
 //                second) and off between them. No glow, no halo: the light of a flash on the land and the sky is the
 //                look director's (post.js), and inside the cloud the clouds lane's.
 //
-// WHAT IT COSTS. One instanced draw for all the shafts (at most MAX_SHAFTS) and one small draw for the bolts (only while
-// a flash is on). Derived for the phone from the v37 table (the ground's paint 24 to 34 ns a pixel; this shader is about
-// a third of it, so about 10 ns): one storm's curtain 3 km away covers about a quarter of the picture's width and a
-// tenth of its height, both walls of its cylinder drawn, about 5 % of 348,192 pixels: about 0.2 ms. Three in view:
-// about 0.6 ms. The bolts are a few hundred pixels: nothing measurable. Nothing at all without a storm in view.
+// WHAT IT COSTS. One instanced draw for all the veils (at most MAX_SHAFTS storms x VEILS) and one small draw for the
+// bolts (only while a flash is on). Derived for the phone from the v37 table (the ground's paint 24 to 34 ns a pixel;
+// the veil's shader is a few hashes, a fog and a multiply: under a third of it, about 8 ns): a storm 1.5 km off hangs
+// two or three veils of about 30 x 60 phone pixels where they show over the land, under 2 % of 348,192 pixels with
+// their overlaps: about 0.05 ms; a storm at 1 km about 0.1 ms; a few in view about 0.2 ms. The bolts are a few
+// hundred pixels: nothing measurable. Nothing at all without a storm in view.
 import * as THREE from 'three';
 import { makePaintUniforms, bindBodyUniforms } from '../render/materials.js';
 import { VERT_PARS, VERT_END, FRAG_PARS } from '../render/chunks.js';
 import { register, G } from '../render/shared.js';
 import { BODIES } from '../data/bodies.js';
+import { watchPrograms } from './wxguard.js';
 
 const MAX_SHAFTS = 12;
-const SEG = 14, ROWS = 4;               // the shaft's cylinder: segments round, rows up
+const VEILS = 2;                        // veils hung under one storm (the look director: two wide beat four thin)
 const MAX_BOLTS = 4, BOLT_SEGS = 40;    // bolts drawn at once, and segments in one (its channel and its branches)
 const SHAFT_RATE = 2;                   // mm/h at a system's core from which it has a shaft
 const SHAFT_REACH = 7000;               // m: a shaft further off than this is not drawn
 const BOLT_ON = 0.12;                   // a bolt is drawn while the flash is brighter than this
+const hs = (a, b) => { const x = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return x - Math.floor(x); };
 
-// ---- the shafts ---------------------------------------------------------------------------------------------
+// ---- the shafts ----------------------------------------------------------------------------------------------
+// (the look director's review of 24 Nov, LOOK-RULES R3/R4: what a painter lays under a distant storm is a FEW BROAD
+//  VEILS, each a VALUE STEP against what is behind it -- a little darker than the sky, the hue of the storm's shade, and
+//  over the land a glaze of that step -- with long parallel strokes inside at low contrast that merge into the step;
+//  slanted with the wind, all strokes of a veil one slant; thinning toward its sides and its foot in two or three flat
+//  steps, never a fade; stopped by the land in front of it. The first shafts were a comb of thin white lines.)
+// HOW IT IS LAID: each veil is a flat sheet in the world, hung from the cloud's base to the ground at a place fixed in
+// the storm, turned about the vertical to face the eye. It is drawn in the scene pass, after everything solid, as a
+// MULTIPLY: the colour under it times (1 - its step) in the shade's hue; the second target (region, depth: chunks.js
+// pcWrite's pcAux) times exactly 1, so the land and sky under it keep their own region and depth. Depth-tested, so the
+// land in front cuts it and the ground under its foot ends it.
 const SHAFT_VERT = /* glsl */`
 ${VERT_PARS}
-attribute vec4 aShaft;     // xyz: the foot's middle FROM THE EYE (body axes, m); w: radius (m)
-attribute vec4 aShaftU;    // xyz: up there (unit); w: height from the foot to the cloud's base (m)
-attribute vec4 aShaftS;    // xyz: how far the TOP stands from the foot's line, upwind (m): the rain falls slanted; w: rate 0..1
+attribute vec4 aVeil0;     // xyz: the veil's foot FROM THE EYE (body axes, m); w: its width (m)
+attribute vec4 aVeil1;     // xyz: up there (unit); w: its height, foot to the cloud's base (m)
+attribute vec4 aVeil2;     // xyz: where its top stands from the foot's line (upwind: the slant, m); w: its seed 0..1
+attribute vec4 aVeil3;     // xyz: across it (unit, level, square to the eye); w: its step (0.06 .. 0.10)
 varying vec3 vView;
-varying vec2 vUv;          // x: round the curtain 0..1, y: up 0..1
-varying float vRate;
-varying float vSeed;
+varying vec2 vUv;          // x: across 0..1, y: up 0..1
+varying vec2 vVeil;        // x: seed, y: step
 void main() {
-  vec3 up = aShaftU.xyz;
-  vec3 ax = normalize(cross(up, abs(up.y) < 0.9 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0)));
-  vec3 bx = cross(up, ax);
-  float ang = position.x * 6.2831853;
-  float h = position.y;
-  // a curtain hangs from the base and curls a little at its foot where the outflow pushes it (h^2: the slant grows down)
-  vec3 p = aShaft.xyz + (ax * cos(ang) + bx * sin(ang)) * aShaft.w * (1.0 - 0.18 * h) + up * (h * aShaftU.w) + aShaftS.xyz * (h * h);
-  vUv = vec2(position.x, h);
-  vRate = aShaftS.w;
-  vSeed = fract(aShaft.w * 0.0137 + aShaftU.w * 0.0071);
+  vec3 p = aVeil0.xyz + aVeil3.xyz * (position.x * aVeil0.w) + aVeil1.xyz * (position.y * aVeil1.w) + aVeil2.xyz * position.y;
+  vUv = vec2(position.x + 0.5, position.y);
+  vVeil = vec2(aVeil2.w, aVeil3.w);
   vec4 mv = modelViewMatrix * vec4(p, 1.0);
   vView = mv.xyz;
   gl_Position = projectionMatrix * mv;
@@ -66,42 +71,45 @@ void main() {
 
 const SHAFT_FRAG = /* glsl */`
 ${FRAG_PARS}
+uniform vec2 uSceneRes;
 varying vec3 vView;
 varying vec2 vUv;
-varying float vRate;
-varying float vSeed;
-float pcH1(float n) { return fract(sin(n * 12.9898 + vSeed * 78.233) * 43758.5453); }
+varying vec2 vVeil;
+float pcH1(float n) { return fract(sin(n * 12.9898 + vVeil.x * 78.233) * 43758.5453); }
 void main() {
   #include <logdepthbuf_fragment>
-  // THE STROKES. A curtain of columns round the shaft; how many depends on how big the shaft is on the screen, so that a
-  // stroke is never thinner than about a pixel and a far curtain is fewer, broader strokes and not grain.
-  float colsFull = 440.0;
-  float px = max(fwidth(vUv.x * colsFull), 1e-4);                 // pixels per column at full count, inverted below
-  float lod = clamp(exp2(floor(log2(max(px * 2.2, 1.0)))), 1.0, 32.0);
-  float cols = colsFull / lod;
-  float cx = vUv.x * cols, ci = floor(cx), f = cx - ci;
+  // THE STROKES: columns along the veil (its slant is the sheet's own), each the brush's width on the screen and never
+  // under two pixels; laid in octaves of the distance so a far veil is fewer, wider strokes, and one under about three
+  // strokes wide is one flat step (R4.5)
+  float strokePx = max(2.0, 4.6 * uSceneRes.y / 720.0);
+  float du = max(fwidth(vUv.x), 1e-6);
+  float want = 1.0 / (du * strokePx);                       // strokes across the veil at the brush's width
+  float cols = want >= 3.0 ? exp2(floor(log2(want))) : 1.0;
+  float ci = floor(vUv.x * cols);
   float h1 = pcH1(ci), h2 = pcH1(ci + 31.7), h3 = pcH1(ci + 57.1);
-  // which columns carry a stroke: more the harder it rains
-  if (h1 > 0.30 + 0.62 * vRate) discard;
-  // the stroke's own width in its column, and an edge one pixel wide
-  float wid = 0.22 + 0.20 * h2;
-  float fw = max(fwidth(cx), 1e-4);
-  float onS = smoothstep(-fw, fw, wid * 0.5 - abs(f - 0.5));
-  // along it: broken into long runs with gaps, its top where the base lets it go and a ragged foot
-  float y = vUv.y;
-  float run = fract(y * (1.2 + 1.8 * h3) + h2 * 3.0);
-  float top = 1.0 - 0.10 * h3, foot = 0.04 + 0.22 * h2 * (1.0 - vRate);
-  float along = step(foot, y) * step(y, top) * step(0.06 + 0.08 * h1, run);
-  // tapered: thinner toward each end of the run
-  float taper = smoothstep(0.0, 0.12, run) * smoothstep(0.0, 0.12, 1.0 - run);
-  if (onS * along * mix(0.55, 1.0, taper) < 0.5) discard;
-  // THE PAINT: the storm's own wet grey (the far air under a storm is the storm's wash: world/index.js), a step darker
-  // than the air it falls through, each stroke its own shade
-  // (a MIDDLE value, so a stroke reads pale against the dark land under it and a step darker against the bright sky behind
-  //  its top: the rain kit's own rule, PAINTER 16, without reading the scene behind it)
-  vec3 col = mix(uHaze, vec3(0.50, 0.52, 0.60), 0.65) * mix(0.82, 1.0, h3);
-  vec3 c = pcAtmosV(col, pcFogAmount(length(vView)), vView);
-  pcWrite(c, 1.0, normalize(-vView), -vView.z, 2.6);
+  // ITS LEVEL: full in the middle, two flat steps toward each side, the steps' edges wandering stroke by stroke
+  float side = abs((ci + 0.5) / cols - 0.5) * 2.0 + (h1 - 0.5) * (cols > 1.0 ? 0.30 : 0.0);
+  float level = side < 0.50 ? 1.0 : side < 0.78 ? 0.66 : side < 1.0 ? 0.33 : 0.0;
+  // and up it: each stroke leaves the cloud's base at its own height, a step thinner at first (the rain is still
+  // gathering under the base: and until the clouds lane draws the base, a flat top would read as a wall), and thins
+  // toward the foot in two flat steps
+  // (the look director's second look: until the clouds lane hangs them from a drawn cloud base, the top comes in by
+  //  the same two flat steps as the sides, its edges wandering stroke by stroke, never a ragged top in open air)
+  float y = vUv.y, yt = y + (h1 - 0.5) * 0.08;
+  if (yt > 0.74) level -= 0.34;
+  if (yt > 0.88) level -= 0.33;
+  if (y < 0.20 + 0.14 * h3) level -= 0.34;
+  if (y < 0.07 + 0.08 * h2) level -= 0.33;
+  if (level < 0.2) discard;
+  // THE STEP: the veil's own, by its level, each stroke within 0.03 of it; the air in front takes it back toward nothing
+  float st = vVeil.y * level + 0.03 * (h3 - 0.5) * 2.0 * step(2.0, cols);
+  // (the air in front takes back part of it, as the far land keeps a quarter of its paint: a veil 3 km off still reads)
+  st *= 1.0 - 0.6 * pcFogAmount(length(vView));
+  // in the hue of the shade (the cool key), half of it: a glaze, not a paint
+  vec3 sh = pcOilShadeC(); sh /= max(max(sh.r, sh.g), max(sh.b, 1e-3));
+  vec3 k = (1.0 - clamp(st, 0.0, 0.5)) * mix(vec3(1.0), sh, 0.5 * clamp(st * 8.0, 0.0, 1.0));
+  gl_FragColor = vec4(k, 1.0);
+  pcAux = vec4(1.0);          // (times one: the region and the depth under the veil stay what they were)
 }
 `;
 
@@ -136,7 +144,7 @@ void main() {
   #include <logdepthbuf_fragment>
   if (vOn < 0.5) discard;
   vec3 c = vec3(0.97, 0.95, 1.0);
-  pcWrite(c, 1.0, normalize(-vView), -vView.z, 6.0);
+  pcWrite(c, 1.0, normalize(-vView), -vView.z, 8.0);     // (region 8: a light of its own, kept out of the night key)
 }
 `;
 
@@ -174,24 +182,22 @@ function boltShape(seed, height, pts) {
 
 export function makeStorms(bodyUniforms, opts = {}) {
   const wantShafts = opts.shafts !== false, wantBolts = opts.bolts !== false;
-  // the shaft: an open cylinder of SEG x ROWS quads; position.x round (0..1), position.y up (0..1)
-  const sp = [], si = [];
-  for (let r = 0; r <= ROWS; r++) for (let q = 0; q <= SEG; q++) sp.push(q / SEG, r / ROWS, 0);
-  for (let r = 0; r < ROWS; r++) for (let q = 0; q < SEG; q++) {
-    const a = r * (SEG + 1) + q, b = a + 1, c = a + SEG + 1, d = c + 1;
-    si.push(a, b, c, b, d, c);
-  }
+  // the veils: one flat quad each, instanced; position.x across (-0.5..0.5), position.y up (0..1)
   const g = new THREE.InstancedBufferGeometry();
-  g.setAttribute('position', new THREE.Float32BufferAttribute(sp, 3));
-  g.setIndex(si);
-  const A = new Float32Array(MAX_SHAFTS * 4), AU = new Float32Array(MAX_SHAFTS * 4), AS = new Float32Array(MAX_SHAFTS * 4);
-  const aShaft = new THREE.InstancedBufferAttribute(A, 4), aShaftU = new THREE.InstancedBufferAttribute(AU, 4), aShaftS = new THREE.InstancedBufferAttribute(AS, 4);
-  for (const a of [aShaft, aShaftU, aShaftS]) a.setUsage(THREE.DynamicDrawUsage);
-  g.setAttribute('aShaft', aShaft); g.setAttribute('aShaftU', aShaftU); g.setAttribute('aShaftS', aShaftS);
+  g.setAttribute('position', new THREE.Float32BufferAttribute([-0.5, 0, 0, 0.5, 0, 0, -0.5, 1, 0, 0.5, 1, 0], 3));
+  g.setIndex([0, 1, 2, 1, 3, 2]);
+  const NVL = MAX_SHAFTS * VEILS;
+  const V0 = new Float32Array(NVL * 4), V1 = new Float32Array(NVL * 4), V2 = new Float32Array(NVL * 4), V3 = new Float32Array(NVL * 4);
+  const aV = [V0, V1, V2, V3].map((arr) => { const at = new THREE.InstancedBufferAttribute(arr, 4); at.setUsage(THREE.DynamicDrawUsage); return at; });
+  aV.forEach((at, q) => g.setAttribute('aVeil' + q, at));
   g.instanceCount = 0;
   const smat = new THREE.ShaderMaterial({
-    name: 'pc-storm-shaft', uniforms: makePaintUniforms(bodyUniforms, { uSceneAux: G.uSceneAux, uSceneRes: G.uSceneRes }),
+    name: 'pc-storm-shaft', uniforms: makePaintUniforms(bodyUniforms, { uSceneRes: G.uSceneRes }),
     vertexShader: SHAFT_VERT, fragmentShader: SHAFT_FRAG, side: THREE.DoubleSide,
+    // a multiply after everything solid: colour times the veil's step, the region and depth target times one
+    transparent: true, depthWrite: false, depthTest: true,
+    blending: THREE.CustomBlending, blendEquation: THREE.AddEquation, blendSrc: THREE.ZeroFactor, blendDst: THREE.SrcColorFactor,
+    blendEquationAlpha: THREE.AddEquation, blendSrcAlpha: THREE.ZeroFactor, blendDstAlpha: THREE.OneFactor,
   });
   smat.userData.pcPainted = true;
   register(smat, 'glaze');
@@ -216,21 +222,27 @@ export function makeStorms(bodyUniforms, opts = {}) {
   register(bmat, 'glaze');
   const bolts = new THREE.Mesh(bg, bmat);
   bolts.name = 'pc-storm-bolt'; bolts.frustumCulled = false; bolts.matrixAutoUpdate = false; bolts.visible = false;
+  // (a program that does not compile on a device switches itself off, and the sky goes on without it: wxguard.js)
+  watchPrograms(shafts, 'storm veils'); watchPrograms(bolts, 'storm bolts');
 
   const _o = {}, shape = [], cache = new Map();
   let bound = bodyUniforms || null;
   const place = (mesh, cameraPos, root) => { mesh.position.copy(cameraPos); mesh.quaternion.copy(root.quaternion); mesh.updateMatrix(); mesh.matrixWorld.copy(mesh.matrix); mesh.matrixWorldNeedsUpdate = false; };
 
+  // (for the look director, who lays the flash's light on the land and the sky in the shared light, not as a blur:
+  //  xyz the direction from the eye to the brightest flash on now, in the body's axes (as uSunDirL), w its strength
+  //  0..1 here: its own brightness, as near as it is: 1 within 500 m, a quarter at 2.5 km. Zero between flashes.)
+  const flash = new THREE.Vector4(0, 1, 0, 0);
   return {
-    shafts, bolts, objects: [shafts, bolts],
+    shafts, bolts, objects: [shafts, bolts], flash,
     // Every frame: the eye in the scene and in the body's axes (camL), the body's root and its uniforms, the physics.
     update(cameraPos, root, camL, bodyU, physics, bodyId) {
       const C = physics && physics.fields ? physics.fields.cloud : null;
-      if (!C || !C.ready || !root || physics.here.bodyId !== bodyId) { shafts.visible = false; bolts.visible = false; return; }
+      if (!C || !C.ready || !root || physics.here.bodyId !== bodyId) { shafts.visible = false; bolts.visible = false; flash.w = 0; return; }
       if (bodyU !== bound) { bindBodyUniforms(smat, bodyU); bindBodyUniforms(bmat, bodyU); bound = bodyU; }
       const R = Math.hypot(camL.x, camL.y, camL.z) || 1;
       const W = physics.fields.wind;
-      // THE SHAFTS: the raining systems nearest the eye
+      // THE SHAFTS: under the raining systems nearest the eye, two or three veils each
       let n = 0;
       if (wantShafts) {
         const cells = C.cells, cand = [];
@@ -243,34 +255,64 @@ export function makeStorms(bodyUniforms, opts = {}) {
           cand.push([d, i, rate]);
         }
         cand.sort((a, b) => a[0] - b[0]);
+        const Rb = BODIES[bodyId].radius;
+        let used = 0;
         for (const [d, i, rate] of cand) {
-          if (n >= MAX_SHAFTS) break;
+          if (used >= MAX_SHAFTS) break;
           const c = cells[i];
-          C.at(c.x, c.y, c.z, _o);
-          const ground = W && W.land && W.land.ready ? W.land.h[W.texel(c.x, c.y, c.z)] : 0;
-          const base = Math.max(ground + 120, _o.base), h = base - ground;
-          // the foot's middle, from the eye (the body's own radius: camL is body-local)
-          const Rb = BODIES[bodyId].radius;
-          const fx = c.x * (Rb + ground) - camL.x, fy = c.y * (Rb + ground) - camL.y, fz = c.z * (Rb + ground) - camL.z;
-          // inside its own curtain the shaft is not drawn: the falling rain round the eye is the particles'
-          if (Math.hypot(fx, fy, fz) < c.r * 0.6) continue;
-          const o = n * 4;
-          A[o] = fx; A[o + 1] = fy; A[o + 2] = fz; A[o + 3] = c.r * 0.72;
-          AU[o] = c.x; AU[o + 1] = c.y; AU[o + 2] = c.z; AU[o + 3] = h;
-          // slanted: the rain drifts downwind as it falls, so the top stands UPWIND of the foot (a third of the true drift,
-          // at a fall of 6.5 m/s, and never more than a third of the height: painted, not plotted)
-          let se = 0, sn = 0;
-          if (W && W.ready) { W.at(c.x, c.y, c.z, _o); se = _o.e10; sn = _o.n10; }
-          const U = Math.hypot(se, sn), slant = U > 0.1 ? Math.min(0.35 * h, U * h / 6.5 * 0.33) / U : 0;
+          // inside its own curtain the veils are not hung: the falling rain round the eye is the particles'
+          const g0 = W && W.land && W.land.ready ? W.land.h[W.texel(c.x, c.y, c.z)] : 0;
+          if (Math.hypot(c.x * (Rb + g0) - camL.x, c.y * (Rb + g0) - camL.y, c.z * (Rb + g0) - camL.z) < c.r * 0.6) continue;
+          used++;
           let ex = c.z, ez = -c.x; const el = Math.hypot(ex, ez) || 1; ex /= el; ez /= el;
           const nx = c.y * ez, ny = c.z * ex - c.x * ez, nz = -c.y * ex;
-          AS[o] = -(se * ex + sn * nx) * slant; AS[o + 1] = -(sn * ny) * slant; AS[o + 2] = -(se * ez + sn * nz) * slant;
-          AS[o + 3] = Math.min(1, rate / 25);
-          n++;
+          const nv = VEILS;
+          for (let k = 0; k < nv && n < NVL; k++) {
+            // each veil has its own place in the storm, fixed there (it does not slide as the eye moves), and its width
+            const hA = hs(c.i * 3 + k, c.gen), hR = hs(c.i * 3 + k + 0.5, c.gen + 7), hW = hs(c.i * 3 + k + 0.25, c.gen + 13);
+            const ang = 6.2831853 * (hA + k / nv), rho = c.r * (0.10 + 0.40 * hR);
+            let vx = c.x * Rb + (ex * Math.cos(ang) + nx * Math.sin(ang)) * rho, vy = c.y * Rb + ny * Math.sin(ang) * rho, vz = c.z * Rb + (ez * Math.cos(ang) + nz * Math.sin(ang)) * rho;
+            const vl = Math.hypot(vx, vy, vz); vx /= vl; vy /= vl; vz /= vl;
+            C.at(vx, vy, vz, _o);
+            const ground = W && W.land && W.land.ready ? W.land.h[W.texel(vx, vy, vz)] : 0;
+            const base = Math.max(ground + 120, _o.base), h = base - ground;
+            const fx = vx * (Rb + ground) - camL.x, fy = vy * (Rb + ground) - camL.y, fz = vz * (Rb + ground) - camL.z;
+            // across it: level and square to the line from the eye
+            let ax = vy * fz - vz * fy, ay = vz * fx - vx * fz, az = vx * fy - vy * fx; const al = Math.hypot(ax, ay, az) || 1; ax /= al; ay /= al; az /= al;
+            // slanted with the wind there: its top upwind of its foot, 10 to 25 degrees off the vertical
+            let se = 0, sn = 0;
+            if (W && W.ready) { W.at(vx, vy, vz, _o); se = _o.e10; sn = _o.n10; }
+            const U = Math.hypot(se, sn);
+            let ox = 0, oy = 0, oz = 0;
+            if (U > 0.1) {
+              const tl = Math.tan((10 + Math.min(15, 1.5 * U)) * Math.PI / 180) * h / U;
+              let vex = vz, vez = -vx; const vel = Math.hypot(vex, vez) || 1; vex /= vel; vez /= vel;
+              const vnx = vy * vez, vny = vz * vex - vx * vez, vnz = -vy * vex;
+              ox = -(se * vex + sn * vnx) * tl; oy = -(sn * vny) * tl; oz = -(se * vez + sn * vnz) * tl;
+            }
+            const o = n * 4;
+            V0[o] = fx; V0[o + 1] = fy; V0[o + 2] = fz; V0[o + 3] = c.r * (0.30 + 0.20 * hW);
+            V1[o] = vx; V1[o + 1] = vy; V1[o + 2] = vz; V1[o + 3] = h;
+            V2[o] = ox; V2[o + 1] = oy; V2[o + 2] = oz; V2[o + 3] = hs(c.i + k * 0.37, c.gen + 3);
+            V3[o] = ax; V3[o + 1] = ay; V3[o + 2] = az; V3[o + 3] = 0.06 + 0.04 * Math.min(1, rate / 25);
+            n++;
+          }
         }
       }
-      g.instanceCount = n; shafts.visible = n > 0;
-      if (n) { aShaft.needsUpdate = true; aShaftU.needsUpdate = true; aShaftS.needsUpdate = true; place(shafts, cameraPos, root); }
+      g.instanceCount = n; shafts.visible = n > 0 && !shafts.userData.pcGuardOff;
+      if (n) { for (const at of aV) at.needsUpdate = true; place(shafts, cameraPos, root); }
+      // THE FLASH'S LIGHT (every flash, cloud to ground or in the cloud): the brightest here
+      flash.w = 0;
+      {
+        const F = C.flashes, Rb = BODIES[bodyId].radius;
+        for (let i = 0; F && i < F.n; i++) {
+          const f = F[i]; if (!(f.flash01 > 0)) continue;
+          const hm = Rb + (f.base || 0) * 0.6;
+          const dx = f.x * hm - camL.x, dy = f.y * hm - camL.y, dz = f.z * hm - camL.z, d = Math.hypot(dx, dy, dz) || 1;
+          const k = f.flash01 / (1 + Math.max(0, d - 500) * Math.max(0, d - 500) / (1150 * 1150));
+          if (k > flash.w) flash.set(dx / d, dy / d, dz / d, Math.min(1, k));
+        }
+      }
       // THE BOLTS: the flashes on now, cloud to ground
       let nbv = 0;
       if (wantBolts) {
@@ -308,7 +350,7 @@ export function makeStorms(bodyUniforms, opts = {}) {
         }
       }
       for (let q = nbv; q < NV; q++) bo[q] = 0;
-      bolts.visible = nbv > 0;
+      bolts.visible = nbv > 0 && !bolts.userData.pcGuardOff;
       if (nbv) { aP.needsUpdate = true; aN.needsUpdate = true; aS.needsUpdate = true; aO.needsUpdate = true; bg.setDrawRange(0, (nbv / 4) * 6); place(bolts, cameraPos, root); }
     },
   };

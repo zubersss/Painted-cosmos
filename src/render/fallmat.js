@@ -37,7 +37,7 @@ const SHEET_VERT = /* glsl */`
 ${VERT_PARS}
 attribute vec4 aF;        // the sheet: x across (-1..1), y down (0 lip .. 1 foot), z time of flight (s), w kind (0 sheet, 1 pool)
                           // the pool: x its radius (0..1), y unused, z unused, w 1
-attribute vec4 aG;        // the sheet: x half width (m) here, y the chart's metres a second, z unused, w the fall's number
+attribute vec4 aG;        // the sheet: x half width (m) here, y the chart's metres a second, z how far above the lip its run starts (in s), w the fall's number
                           // the pool: x, y its two half axes (m, across and out), z its outflow speed, w the fall's number
 attribute vec2 aP;        // the pool: its local place (m) across and out from the foot
 uniform vec3 uOrgRel;     // the meshes' origin, measured from the eye in the body's axes (worked out in double on the CPU)
@@ -83,44 +83,58 @@ void main() {
   #ifdef PC_OIL
   if (vF.w < 0.5) {
     // ---- THE SHEET ----
+    // (the review, 24 Nov: "a white blind of even streaks"; real falls break into a few thick ROPES and ragged lace with dark
+    //  gaps where the rock shows, widen as they fall; the lip a ruled line; the whites few, the body milk and pale blue)
     float K = vG.y;
     float across = vF.x * vG.x;
     vec2 ch = vec2((vF.z - tw) * K, across);
     vec2 dcx = vec2(dFdx(vF.z) * K, dFdx(across)), dcy = vec2(dFdy(vF.z) * K, dFdy(across));
-    vec2 oc = pcStrokeOct(dist, uOilPx.z * 0.55);
+    vec2 oc = pcStrokeOct(dist, uOilPx.z * 0.85);
     vec3 r1, r2; vec2 ds; float own;
-    pcThinLayer(ch, dcx, dcy, oc.x, 10.0, vec3(ch * 0.5, vG.w * 13.0), 40.0, 1.6, r1, ds, own, r2);
+    pcThinLayer(ch, dcx, dcy, oc.x, 7.0, vec3(ch * 0.5, vG.w * 13.0), 40.0, 1.6, r1, ds, own, r2);
     vec3 rr = own >= 0.5 ? r1 : r2;                      // (whole strokes: the pixel takes the stroke it is most in)
-    // where the sheet thins it breaks into strands: whole strokes left out, the cliff between them
-    float edge = abs(vF.x);
-    float thin = smoothstep(0.62, 1.0, edge) * 0.75 + smoothstep(0.45, 1.0, vF.y) * (0.12 + 0.38 * edge);
-    if (rr.z < thin * uFallK.x) discard;
-    // the stroke's colour: bare white, milk, a share of the river's own wash; glassy near the lip, where it has not yet broken
-    float glassy = 1.0 - smoothstep(0.04, 0.26, vF.y);
-    vec3 milk = pcFallMilk(uFallWash, 0.9);
-    vec3 col = rr.x < 0.40 * uFallK.z ? vec3(0.92, 0.94, 0.95) : rr.x < 0.86 ? milk : pcFallMilk(uFallWash, 0.55);
-    if (rr.y < glassy * 0.75) col = pcDensity(uFallWash, 1.35);
+    // what the stroke's centre is: where across the sheet, how far down, and whether it lies on a ROPE (a slow noise across the
+    // sheet, fixed to it, about a third of its width a rope; asked at the centre, so a stroke is in a rope or not, whole)
+    float acrC = across + dFdx(across) * ds.x + dFdy(across) * ds.y;
+    float sC = vF.y + dFdx(vF.y) * ds.x + dFdy(vF.y) * ds.y;
+    float rope = texture(uNoise3D, vec3(acrC / max(3.0, vG.x * 0.55), vG.w * 0.37, 0.61)).r;
+    float edge = abs(acrC) / max(vG.x, 1e-3);
+    float down = clamp(sC, 0.0, 1.0);
+    // the run onto the lip (sC < 0): strokes start at different places, so the lip is broken by them and never ruled
+    if (sC < 0.0 && rr.z < smoothstep(0.0, -vG.z, sC)) discard;
+    // ragged sides: whole strokes left out toward the edges, more so lower down and between the ropes
+    float rag = smoothstep(0.72, 1.0, edge + 0.18 * (rope - 0.5)) * (0.55 + 0.45 * down);
+    if (rr.z < rag * uFallK.x) discard;
+    // between the ropes, lower down, the sheet thins to a few strands over the wet rock: those strokes are painted as the
+    // rock's dark wet face, not cut out (cheaper, and the gap reads dark as it does in a real fall)
+    float thick = smoothstep(0.26, 0.56, rope + 0.30 * (1.0 - down));
+    bool gap = rr.y > 0.45 + 0.55 * thick && sC > 0.25;
+    // the stroke's colour: a few bright whites (about V 0.92 once lit), the body in milk and pale blue steps, glassy near the lip
+    float glassy = 1.0 - smoothstep(-0.05, 0.22, sC);
+    vec3 col = rr.x < 0.14 * uFallK.z + 0.10 * thick ? vec3(0.86, 0.90, 0.92)
+             : rr.x < 0.66 ? pcFallMilk(uFallWash, 0.90)
+             : pcFallMilk(uFallWash, 0.66);
+    if (rr.y < glassy * 0.8) col = pcFallMilk(uFallWash, 0.30 + 0.5 * step(0.7, rr.x));
+    // (the wet rock seen through a thin place: a mid slate, a step or two under the water, never a black hole)
+    if (gap) col = mix(vec3(0.44, 0.45, 0.50), pcDensity(uFallWash, 1.2), 0.35);
     nb = normalize(vNb);
     // the light at the stroke's centre (R1.2a): the face's turn to the sun and the shadow map there
     vec3 ctrB = vBody + dFdx(vRel) * ds.x + dFdy(vRel) * ds.y;
-    float x = dot(nb, uSunDirL) * 0.5 + 0.5 + (rr.y - 0.5) * 0.08;
+    float x = dot(nb, uSunDirL) * 0.5 + 0.5 + (rr.y - 0.5) * 0.08 - (gap ? 0.06 : 0.0);
     float sunny = pcSunAt(ctrB, 0.0, 0.0, 0.1);
     float level = pcLevel(mix(min(x, 0.44), x, sunny), 0.04);
     c = pcTone(col, level);
   } else {
     // ---- THE PLUNGE POOL ----
-    // radial strokes carried out from the foot: the first axis outward (metres, moving), the second round it
-    float r = length(vP), rN = vF.x;
-    float R0 = 0.5 * (vG.x + vG.y);
-    float th = atan(vP.x, vP.y);                         // (its seam lies toward the cliff, under the sheet and in the rock)
-    vec2 dpx = dFdx(vP), dpy = dFdy(vP);
-    float r2s = max(r * r, 1e-4);
-    vec2 ch = vec2(r - tw * vG.z, th * R0);
-    vec2 dcx = vec2(dot(vP, dpx) / max(r, 1e-3), R0 * (vP.y * dpx.x - vP.x * dpx.y) / r2s);
-    vec2 dcy = vec2(dot(vP, dpy) / max(r, 1e-3), R0 * (vP.y * dpy.x - vP.x * dpy.y) / r2s);
+    // strokes carried OUT from the cliff with the outflow, the first axis seaward (metres, moving), the second across. (A polar
+    // chart drew every stroke into the foot: a starburst, seen from above. Here no stroke meets another; the boil at the foot
+    // is the milk and the broken lace, and the slow bend of the rows fans them a little.)
+    float rN = vF.x;
+    vec2 ch = vec2(vP.y - tw * vG.z, vP.x);
+    vec2 dcx = vec2(dFdx(vP.y), dFdx(vP.x)), dcy = vec2(dFdy(vP.y), dFdy(vP.x));
     vec2 oc = pcStrokeOct(dist, uOilPx.z * 0.7);
     vec3 r1, r2; vec2 ds; float own;
-    pcThinLayer(ch, dcx, dcy, oc.x, 6.0, vec3(ch * 0.4, vG.w * 7.0), 40.0, 2.0, r1, ds, own, r2);
+    pcThinLayer(ch, dcx, dcy, oc.x, 5.0, vec3(ch * 0.4, vG.w * 7.0), 40.0, 6.0, r1, ds, own, r2);
     vec3 rr = own >= 0.5 ? r1 : r2;
     // milk at the foot, lace beyond: more strokes left out the farther from the foot
     float cover = 1.0 - smoothstep(0.30, 1.0, rN) * uFallK.y;
@@ -152,12 +166,15 @@ uniform vec3 uOrgB;
 uniform vec4 uSprayK;     // x how many to keep (0..1), y the smallest a dab may be in pixels
 uniform float uTime;
 uniform vec4 uOilPx;      // (shared.js OIL: x metres a pixel a metre away, y the picture's lines)
+uniform vec4 uOilA;       // (shared.js OIL: x the look's stroke width in pixels at 720 lines)
 varying vec3 vBody;
 varying vec3 vView;
 varying vec2 vQ;
 varying float vH;
+varying float vKind;
 void main() {
   float h = aS.x;
+  vKind = aS.z;
   vec3 up = normalize(uOrgB + aC.xyz);
   // its life: a period of its own, thrown from the foot (or peeled off the lower sheet), arcing out and falling back
   float P = 1.1 + 1.4 * fract(h * 7.31);
@@ -166,30 +183,44 @@ void main() {
   vec3 out3 = aD.xyz, acr = aA.xyz;
   float a = (fract(h * 5.13) - 0.5) * 2.6;               // which way round: mostly out from the cliff, some along it
   vec3 hz = normalize(out3 * cos(a) + acr * sin(a));
-  float vh = (1.5 + 4.5 * fract(h * 11.7)) * k, vv = (2.5 + 6.0 * fract(h * 13.9)) * k;
+  float vh = (1.5 + 4.5 * fract(h * 11.7)) * k, vv = (3.0 + 8.0 * fract(h * 13.9)) * k;
   vec3 p0 = aC.xyz + acr * (aS.y * aC.w) + out3 * 0.6;
-  if (aS.z > 0.5) {
+  float own = (0.18 + 0.30 * fract(h * 31.1)) * k;
+  float grav = 9.81;
+  if (aS.z > 1.5) {
+    // THE SPRAY CLOUD over the pool (the review: "a big pale spray cloud"): slow dabs rising from all over the foot and
+    // drifting out, larger and paler than the thrown ones; each still one crisp stroke, the cloud is many of them
+    P = 2.6 + 2.2 * fract(h * 7.31);
+    t = fract(mod(uTime, 600.0) / P + h * 3.17) * P;
+    float rad = aC.w + 0.3 * drop;
+    p0 = aC.xyz + acr * (aS.y * rad) + out3 * (aS.w * (0.5 * aC.w + 0.25 * drop) - 1.0);
+    hz = normalize(out3 + acr * (fract(h * 19.7) - 0.5) * 0.8);
+    vh = 0.3 + 0.7 * fract(h * 23.9); vv = (0.7 + 1.2 * fract(h * 29.3)) * k; grav = 0.0;
+    own = (0.12 + 0.22 * fract(h * 31.1)) * k;
+  } else if (aS.z > 0.5) {
     // off the sheet: from somewhere on its lower half, drifting out and down with the air the fall drags
     float s = 0.45 + 0.5 * fract(h * 17.3);
     p0 = aC.xyz + acr * (aS.y * aC.w) - out3 * 0.4 * (1.0 - s) + up * (aA.w * (1.0 - s));
     hz = normalize(out3 + acr * (fract(h * 19.1) - 0.5)); vh = (0.8 + 1.6 * fract(h * 23.3)) * k; vv = (0.2 + 1.0 * fract(h * 29.7));
   }
-  vec3 vel = hz * vh + up * (vv - 9.81 * t);
-  vec3 p = p0 + hz * (vh * t) + up * (vv * t - 4.905 * t * t);
+  vec3 vel = hz * vh + up * (vv - grav * t);
+  vec3 p = p0 + hz * (vh * t) + up * (vv * t - 0.5 * grav * t * t);
   float above = dot(p - aC.xyz, up);
   vBody = uOrgB + p;
   vec4 mv = modelViewMatrix * vec4(p, 1.0);
   float dist = max(-mv.z, 0.1);
   // its size: a few decimetres, never under uSprayK.y pixels; farther off fewer are kept and each is larger
-  float own = (0.18 + 0.30 * fract(h * 31.1)) * k;
   float px = dist * uOilPx.x * uOilPx.y / 720.0;           // metres a pixel there, at 720 lines
-  float size = max(own, px * uSprayK.y);
-  float keep = step(h, uSprayK.x * min(1.0, (own * own) / (size * size) * 1.6)) * step(-0.25, above) * step(t, P * 0.96);
+  // (no larger than about twice the look's own stroke there, so near the eye the foam reads as spray and not as scattered
+  //  petals: the look director, 24 Nov; never under uSprayK.y pixels; and fewer of them close by)
+  float size = clamp(own, px * uSprayK.y, max(px * uSprayK.y, 1.4 * px * uOilA.x));      // (the sheet's strokes are 0.5 to 1 of px * uOilA.x: pcStrokeOct)
+  float nearK = mix(0.5, 1.0, smoothstep(25.0, 90.0, dist));
+  float keep = step(h, uSprayK.x * nearK * min(1.0, (own * own) / (size * size) * 1.6)) * step(-0.25, above) * step(t, P * 0.96);
   // the dab lies along its own motion on the screen
   vec3 vv3 = (viewMatrix * vec4(vel, 0.0)).xyz;
   vec2 ax = length(vv3.xy) > 1e-4 ? normalize(vv3.xy) : vec2(0.0, 1.0);
   vec2 ay = vec2(-ax.y, ax.x);
-  float len = size * (1.4 + min(2.2, length(vel) * 0.12)), wid = size * 0.6;
+  float len = aS.z > 1.5 ? size * 1.15 : size * (1.3 + min(1.2, length(vel) * 0.08)), wid = size * (aS.z > 1.5 ? 0.8 : 0.6);
   mv.xy += (ax * position.x * len + ay * position.y * wid) * keep;
   vView = mv.xyz;
   vQ = position.xy; vH = h;
@@ -207,12 +238,13 @@ varying vec3 vBody;
 varying vec3 vView;
 varying vec2 vQ;
 varying float vH;
+varying float vKind;
 void main() {
   #include <logdepthbuf_fragment>
-  // a short stroke, pointed at both ends, one flat colour
+  // a short stroke, pointed at both ends, one flat colour: the thrown ones white or milk, the cloud's paler and bluer
   if (abs(vQ.y) > 1.0 - vQ.x * vQ.x) discard;
   float k = fract(vH * 23.7);
-  vec3 col = k < 0.55 ? vec3(0.92, 0.94, 0.95) : pcFallMilk(uFallWash, 0.8);
+  vec3 col = vKind > 1.5 ? pcFallMilk(uFallWash, 0.82 + 0.15 * k) : k < 0.40 ? vec3(0.88, 0.91, 0.93) : pcFallMilk(uFallWash, 0.8);
   #ifdef PC_OIL
     float sun = pcSunAt(vBody, 0.0, 0.0, 0.1);
     vec3 c = pcTone(col, mix(1.6, 2.8, sun));

@@ -1,0 +1,48 @@
+THE LOOK DIRECTOR'S TOUCHES T5 AND T3 FOR THE CLOUD SHADOW MAP (lane W1 CLOUDS, second form, after F's ruling of 24 Nov:
+render/ does not import world/; K 0 by default; the glaze behind a uniform branch; its tone F's own).
+world/wxfield.js (weather-clouds) already takes these three objects from render/shared.js when they are there, under the
+name CLOUD_SHADOW (or CLOUDSHADOW, or as plain exports uCloudShadow/uCloudShadowV/uCloudShadowK), and world/clouds.js sets
+uCloudShadowK to 1 only while its map is drawn (0 at night, with the clouds off, and with the speed-test row
+'storm: no cloud shadows', which now sets world.clouds.shadowK). So with ?clouds3d=0 K stays 0 and the branch is not taken.
+
+---- src/render/shared.js, beside FRAME_HOOKS ----
+export const FRAME_HOOKS = [];
+// (group D's touch T5, WEATHER-DESIGN 8.4: passes drawn before the shadow pass and the scene, each (renderer, scene,
+// camera): world/clouds.js puts its cloud shadow map here. Empty, nothing runs.)
+export const PREPASSES = [];
+// (group D's touch T3: the cloud shadow map world/clouds.js draws along the sun, for the last pass. uCloudShadow: R 1 under
+// a cloud, smooth across a texel; uCloudShadowV: the eye's view space -> its uv; uCloudShadowK: 0 none (the default))
+export const CLOUD_SHADOW = {
+  uCloudShadow: { value: (() => { const t = new THREE.DataTexture(new Uint8Array(4), 1, 1); t.needsUpdate = true; return t; })() },
+  uCloudShadowV: { value: new THREE.Matrix4().set(0, 0, 0, -1, 0, 0, 0, -1, 0, 0, 0, 0, 0, 0, 0, 1) },
+  uCloudShadowK: { value: 0 },
+};
+
+---- src/render/index.js ----
+import { ..., PREPASSES } from './shared.js';
+// in render(), just before `const sf0 = shadow ? shadow.frames : 0;`
+    for (const p of PREPASSES) p(renderer, scene, camera);      // (group D, T5: the cloud shadow map, world/clouds.js)
+
+---- src/render/post.js ----
+import { getTextures, G, PREV, LOOK, OIL, CLOUD_SHADOW } from './shared.js';
+// OIL_FRAG uniforms
+uniform sampler2D uCloudShadow;
+uniform mat4 uCloudShadowV;
+uniform float uCloudShadowK;
+// OIL_FRAG, right after `float vz = exp2(aux.z) - 1.0;` (col is the picture so far; aux.w the region: clouds and sky 0)
+  if (uCloudShadowK > 0.0 && aux.w > 0.5) {
+    vec3 cvp = vec3((vUv * 2.0 - 1.0) * uTanHalf, -1.0) * vz;
+    vec2 cuv = (uCloudShadowV * vec4(cvp, 1.0)).xy;
+    if (cuv.x > 0.0 && cuv.y > 0.0 && cuv.x < 1.0 && cuv.y < 1.0) {
+      float cs = texture(uCloudShadow, cuv).r;
+      float cw = clamp(fwidth(cs), 0.02, 0.2);
+      cs = smoothstep(0.5 - cw, 0.5 + cw, cs) * uCloudShadowK * (1.0 - smoothstep(1800.0, 4200.0, vz));
+      // THE GLAZE'S TONE IS F's (the ruling: lit values toward the shade's own key, pcOilShadeC's hue at the shaded value).
+      // What the local A/B stills used, for reference only:
+      float cL = dot(col, vec3(0.3, 0.5, 0.2));
+      vec3 csh = mix(col, vec3(cL) * vec3(0.86, 0.90, 1.08), 0.32) * mix(1.0, 0.74, smoothstep(0.22, 0.72, cL));
+      col = mix(col, csh, cs * 0.85);
+    }
+  }
+// the OIL material's uniforms
+      uCloudShadow: CLOUD_SHADOW.uCloudShadow, uCloudShadowV: CLOUD_SHADOW.uCloudShadowV, uCloudShadowK: CLOUD_SHADOW.uCloudShadowK,
