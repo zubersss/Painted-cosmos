@@ -43,6 +43,8 @@ export { CANOPY, canopyOn, GROUND_SEASON, ROCKFIELD };
 export const CANOPY_DAB = (() => { try { const q = new URLSearchParams(location.search); const v = q.has('candab') ? +q.get('candab') : 0.5; return isFinite(v) && v > 0.05 ? Math.min(v, 1) : 0.5; } catch (e) { return 0.5; } })();
 // ?candebug=1: each dab of the canopy in a flat colour that says what it is (see the end of pcCanopyAt). For looking only.
 export const ROCK_DEBUG = (() => { try { const v = +new URLSearchParams(location.search).get('rockdebug'); return isFinite(v) && v > 0 ? v : 0; } catch (e) { return 0; } })();
+// ?canfloor=: the smallest a canopy dab may be, in pixels (2.6); 0 takes the floor out (for an A/B still).
+export const CANOPY_FLOOR = (() => { try { const q = new URLSearchParams(location.search); const v = q.has('canfloor') ? +q.get('canfloor') : 2.6; return isFinite(v) && v >= 0 ? Math.min(v, 12) : 2.6; } catch (e) { return 2.6; } })();
 export const CANOPY_DEBUG = (() => { try { return new URLSearchParams(location.search).get('candebug') === '1'; } catch (e) { return false; } })();
 
 // THE VERTEX SHADER'S PART: the stand rides in the far wash's spare byte (patchgen.js), morphed as everything else is.
@@ -279,9 +281,11 @@ void pcCanopyLayers(vec2 ch, vec2 dlx, vec2 dly, float o4x, float wpx, vec3 ocl,
   // same width in pixels at every distance (materials.js dabPx, from the stroke size and the picture's lines only), so
   // the canopy's is PC_CAN_DAB of it everywhere in a frame; on a phone at its smaller picture that came under three
   // pixels, a grain. There the next octave up is taken, for the whole frame at once: no line where it changes.)
+  // (PC_CAN_FLOOR, ?canfloor=: the floor in pixels, 2.6; 0 none. MEASURED: the phone view of 480 lines aims the
+  // ground's finest dab at 4.0 px, so the canopy's was 2.0; at 720 lines it is 2.99, which is left as it was)
   float canK = PC_CAN_DAB, aimPx = 0.50 * uOilS.w * uOilA.x * uOilPx.y / 720.0;
-  if (canK * aimPx < 3.0) canK *= 2.0;
-  if (canK * aimPx < 3.0) canK *= 2.0;
+  if (canK * aimPx < PC_CAN_FLOOR) canK *= 2.0;
+  if (canK * aimPx < PC_CAN_FLOOR) canK *= 2.0;
   for (int LC = 0; LC < 2; LC++) {
     if (rem < 0.004) break;
     float wsC = (LC == 0 ? 1.0 : 2.0) * canK, wC = o4x * wsC;
