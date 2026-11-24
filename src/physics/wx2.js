@@ -18,6 +18,8 @@ export const WX2 = {
   thermal: flag('thermal', true),
   nearmap: flag('nearmap', ALL),
   farwind: flag('farwind', ALL),
+  // (the speed test's row 'weather: wind map frozen': the map stops refreshing, so the script's change is its cost)
+  freeze: false,
 };
 // (the near grid and the far plants need the map: asking for either asks for it)
 if (WX2.nearmap || WX2.farwind) WX2.windmap = true;

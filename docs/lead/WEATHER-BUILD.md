@@ -31,8 +31,8 @@ A separate session builds W1 CLOUDS once the look director's sky ceiling (touch 
 | `?wx2=1` | everything built so far |
 | `?windmap=1` | the planet wind map |
 | `?thermal=0` | the map without its thermal winds |
-| `?nearmap=1` | the near grid takes its base from the map (not built yet) |
-| `?farwind=1` | the far plants read the map (not built yet) |
+| `?nearmap=1` | the near grid takes its base from the map |
+| `?farwind=1` | the far plants read the map |
 
 ## Done
 
@@ -72,14 +72,41 @@ A separate session builds W1 CLOUDS once the look director's sky ceiling (touch 
 - **Phone cost:** script only, about 0.14 ms a frame with the switch on (derived as above). The speed-test row
   `weather: wind and cloud maps frozen` comes with W2.3/W2.4.
 
+### W2.3 + W2.4: THE NEAR GRID AND THE FAR PLANTS (`src/physics/air.js`, `flora.js`, `flora.glsl.js`, `windmap.js`, `index.js`)
+
+- **`?nearmap=1`.** `AirGrid`'s 3 x 3 lattice takes `windMap.nearVecAt`, which is the map's wind with the map's own
+  crest speed-up divided back out, because the grid lays its own. `airAt` away from the grid takes `vecAt`.
+  - Test: at the focus, the near wind averaged over a minute is within 15 degrees of the map's direction, at the
+    log law's share of its speed.
+- **`?farwind=1`.** `FloraField.far` is 64 x 64 cells of 32 m, refreshed each second from the map, holding the same
+  load law as the bend field without its oscillator. `FLORA_GLSL` `pcPhysLoad` reads the bend field inside 112 m,
+  the far field beyond 128 m, and both only in the 16 m band between, so a plant pays one lookup either way. The
+  CPU twins (`plantBend`, `plantBendLite`) do the same.
+  - Tests: off means `uPhysFarMap.w` 0; on, at least 90 % of far cells carry a load; a plant 600 m off leans with
+    the far field; a plant inside the near field is untouched to the digit.
+- **What reaches the picture today.** Only the tall trees between 112 m and their hand-over to the far tier.
+  **The far tier (`world/flora.js` `far-tree` material, the trees group's) does not use the physics bend at all.**
+  - SEEN and MEASURED (wood, 150 m, the spawn's storm at 11 m/s), the noise floor between two identical shots being
+    0.00 %:
+    - without the far tier reading it, 0.04 % of pixels change (lower third only);
+    - with the far tier opted in (`phys: 'lite', stiff: 1, plantHeight: 12` on that material, tried locally and NOT
+      committed), 1.13 % change, the crowns across the whole far wood out to the far bank.
+  - Stills: `docs/shots/physics/weather-build/W2.4_*`. The opt-in line for the trees group:
+    `A_far_tree_tier_opt_in.patch.txt`.
+- **Touch T4 (the look director's).** The binding in `render/shared.js` is in
+  `docs/shots/physics/weather-build/T4_render_shared_js.patch.txt` (8 lines). It was applied locally for the stills
+  only and is NOT committed.
+- **Bench rows** (in `src/core/bench.js`, asked only while `WX2.windmap` is on): `weather: no far wind on plants` and
+  `weather: wind map frozen` (new switch `WX2.freeze`).
+- **Phone cost.**
+  - CPU, MEASURED in a physics frame here: the map 0.04 ms a frame on average; the far field 0.58 ms once a second,
+    which is 0.02 ms a frame at 30 a second. That is about 0.2 ms on the phone (assuming three times slower).
+  - GPU: the same number of lookups as before outside the 16 m band. If the trees group opts the far tier in, each
+    far-tree vertex gains one bilinear lookup (4 fetches). That needs its own row ('far trees bend with the wind')
+    before it is turned on.
+- **Suites:** physics 427, world 65, unit 325, 0 failing.
+
 ## NEXT
 
-1. **W2.3:** `air.js`, the near grid's 3 x 3 lattice (`_sup`) takes the map's 10 m wind in place of `windLarge` when
-   `WX2.nearmap` is on. Add a test that the near grid and the map agree within 10 % at the grid's centre.
-2. **W2.4:** `flora.js` `FloraField.far` (64 x 64 at 32 m, 1 Hz, from `fields.wind.at`), and `flora.glsl.js`
-   `pcPhysBend` / `pcPhysBendLite` blending to it beyond 112 to 128 m.
-   - Needs the look director's T4: `PHYS.uPhysFar` and `uPhysFarMap` in `render/shared.js`.
-   - Bench rows: `weather: no far wind on plants`, `weather: wind and cloud maps frozen`.
-   - A/B stills to the look director: the far wood at W-150, two frames 0.5 s apart.
-3. **W3.1:** `cloudfield.js` and the rain field (the design's 9.2 and 9.3, plus the water group's
+1. **W3.1:** `cloudfield.js` and the rain field (the design's 9.2 and 9.3, plus the water group's
    `uRainCells[8]` / `rainNow`).

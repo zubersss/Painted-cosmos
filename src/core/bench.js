@@ -37,6 +37,7 @@
 
 import { BUILD } from './build.js';
 import { MAX_PIXELS } from './preset.js';   // (the ceiling on the 'every pixel the screen has' row)
+import { WX2 } from '../physics/wx2.js';     // (group D's switches: its rows run only while its pieces are on)
 
 export function attachBench(pc) {
   const el = document.createElement('pre');
@@ -253,6 +254,7 @@ export function attachBench(pc) {
         if (MK <= 1) await sharpen(1);
       }
     }
+    const WX0 = { ...WX2 };      // (group D: its switches as the address set them, put back after each of its rows)
     const steps = [
       [AS, null, null],
       // the far trees: their paint, their shapes, which pass, which place in the order of drawing, which form
@@ -303,6 +305,15 @@ export function attachBench(pc) {
       ['trees cast no shadow', () => treeMeshes((o) => o.layers.disable(2)), () => treeMeshes((o) => o.layers.enable(2))],
       ['no light in the air', () => B({ shaft: false }), () => B({ shaft: true })],
       [lite0 ? 'the full paint' : 'the lighter paint', () => B({ lite: !lite0 }), () => B({ lite: lite0 })],
+      // (GROUP D, THE SECOND WEATHER: docs/lead/WEATHER-DESIGN.md section 7. Asked only while its pieces are switched on
+      //  (?wx2=1, ?windmap=1 ...): with them off the rows would time the same frame twice and say nothing.)
+      ...(WX2.windmap ? [
+        [AS, null, null],
+        // the far field the plants read beyond the bend field (physics flora.js FAR): one lookup for one lookup, so ~0
+        ['weather: no far wind on plants', () => { WX2.farwind = false; }, () => { WX2.farwind = WX0.farwind; }],
+        // the whole wind map's refresh stopped: read the script time against the row before (about 0.14 ms derived)
+        ['weather: wind map frozen', () => { WX2.freeze = true; }, () => { WX2.freeze = false; }],
+      ] : []),
       // (back to the size the device really draws, so the four rows below are measured from IT and not from
       //  whatever sharper size the questions above had to be asked at: see MK at the top of this file)
       [AS, () => sharpen(1), null],

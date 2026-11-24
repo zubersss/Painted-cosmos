@@ -199,3 +199,64 @@ test('wind map: off by default, the physics has none; on, it is read in slices a
     assert.ok(Number.isFinite(o.e10) && Number.isFinite(o.lift) && o.shelter > 1, `the hill's top: shelter ${o.shelter.toFixed(2)}`);
   } finally { WX2.windmap = was; }
 });
+
+test('wind map: the near grid takes its base from the map (?nearmap=1) and agrees with it at its centre', () => {
+  const sample = makeWorld({ R: 4000, cone: { dir: D0, radius: 900, height: 420 } });
+  const was = { m: WX2.windmap, n: WX2.nearmap };
+  try {
+    WX2.windmap = true; WX2.nearmap = true;
+    const p = createPhysics({ sampleSurface: (b, d) => sample(d), timeBudget: false });
+    // a point on the plain, 2.2 km from the hill, where the near grid's own land adds nothing
+    const c = Math.cos(2200 / 4000), sn = Math.sin(2200 / 4000);
+    let ax = D0.z, az = -D0.x; const al = Math.hypot(ax, az); ax /= al; az /= al;
+    const P = { x: (D0.x * c + ax * sn) * 4001.7, y: D0.y * c * 4001.7, z: (D0.z * c + az * sn) * 4001.7 };
+    const u = norm(P);
+    // a time at which no weather system is near (the weather adds its own wind on top of either base)
+    let t = 50;
+    for (; t < 20000; t += 37) { const W = p.weather('earth', { x: P.x, y: P.y, z: P.z }, {}, { time: t }); if (W.cloud01 < 0.02 && W.windFactor > 0.999 && W.windFactor < 1.001) break; }
+    for (let f = 0; f < 600; f++) p.update(1 / 30, { bodyId: 'earth', time: t + f / 30, focus: P, sunDir: null });
+    const W = p.fields.wind;
+    assert.ok(W && W.ready);
+    const o = W.nearVecAt(u.x, u.y, u.z, new Float64Array(4));
+    // the grid's mean wind at the focus, body-local, from here.air with the gusts averaged out over a minute
+    let sx = 0, sy = 0, sz = 0, n = 0;
+    for (let f = 0; f < 1800; f++) { p.update(1 / 30, { bodyId: 'earth', time: t + 20 + f / 30, focus: P, sunDir: null }); const a = p.here.air.wind; sx += a.x; sy += a.y; sz += a.z; n++; }
+    // (here.air is at the focus's own height, 1.7 m over grass: the 10 m wind times the log law's share)
+    const sp = Math.hypot(sx / n, sy / n, sz / n), want = o[3];
+    const dir = ((sx / n) * o[0] + (sy / n) * o[1] + (sz / n) * o[2]) / (sp * want);
+    assert.ok(dir > Math.cos(15 * Math.PI / 180), `the near wind turns ${(Math.acos(Math.min(1, dir)) * 57.3).toFixed(1)} degrees from the map's`);
+    assert.ok(sp > 0.3 * want && sp < 1.1 * want, `near ${sp.toFixed(2)} m/s at the focus against the map's ${want.toFixed(2)} m/s at 10 m`);
+  } finally { WX2.windmap = was.m; WX2.nearmap = was.n; }
+});
+
+test('wind map: the far plants (?farwind=1): a far field from the map, blended in beyond the bend field and off without the switch', () => {
+  const sample = makeWorld({ R: 4000, cone: { dir: D0, radius: 900, height: 420 } });
+  const was = { m: WX2.windmap, f: WX2.farwind };
+  const P = { x: D0.x * 4010, y: D0.y * 4010, z: D0.z * 4010 };
+  try {
+    WX2.windmap = true; WX2.farwind = false;
+    const p0 = createPhysics({ sampleSurface: (b, d) => sample(d), timeBudget: false });
+    for (let f = 0; f < 400; f++) p0.update(1 / 30, { bodyId: 'earth', time: 300 + f / 30, focus: P, sunDir: D0 });
+    assert.equal(p0.fields.flora.uniforms.uPhysFarMap[3], 0, 'off: the shader is told there is no far field');
+    WX2.farwind = true;
+    const p1 = createPhysics({ sampleSurface: (b, d) => sample(d), timeBudget: false });
+    for (let f = 0; f < 400; f++) p1.update(1 / 30, { bodyId: 'earth', time: 300 + f / 30, focus: P, sunDir: D0 });
+    const F = p1.fields.flora;
+    assert.equal(F.uniforms.uPhysFarMap[3], F.farSize);
+    let nz = 0; for (let i = 0; i < F.far.length; i += 4) if (Math.hypot(F.far[i + 2], F.far[i + 3]) > 1e-4) nz++;
+    assert.ok(nz > 0.9 * F.farSize * F.farSize, `${nz} far cells carry a load`);
+    // a plant 600 m off: its bend comes from the far field and differs from the bend field's clamped edge
+    const fr = p1.fields.frame, ax = fr.ex, an = fr.nx; void ax; void an;
+    const field = F.field, o1 = {}, o2 = {};
+    field.plantBendLite(field.ci * field.cell + 600, field.cj * field.cell - 400, 1, o1);
+    const keep = F.uniforms.uPhysFarMap[3]; F.uniforms.uPhysFarMap[3] = 0;
+    field.plantBendLite(field.ci * field.cell + 600, field.cj * field.cell - 400, 1, o2);
+    F.uniforms.uPhysFarMap[3] = keep;
+    assert.ok(Math.hypot(o1.e - o2.e, o1.n - o2.n) > 1e-4, 'a far plant leans with the far field, not with the near field\'s edge');
+    // and inside the near field nothing moved
+    const a1 = {}, a2 = {};
+    field.plantBendLite(field.ci * field.cell + 20, field.cj * field.cell + 10, 1, a1);
+    F.uniforms.uPhysFarMap[3] = 0; field.plantBendLite(field.ci * field.cell + 20, field.cj * field.cell + 10, 1, a2); F.uniforms.uPhysFarMap[3] = keep;
+    assert.equal(a1.e, a2.e); assert.equal(a1.n, a2.n);
+  } finally { WX2.windmap = was.m; WX2.farwind = was.f; }
+});

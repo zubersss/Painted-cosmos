@@ -15,7 +15,7 @@ import { weatherAt, weatherWind, moistureAt, cellsAt, DEFAULT_SEED, WEATHER, REG
 import { liquidAt, BIOME_LIQUID, groundAt, coverAt, MATERIALS, MATERIAL_IDS, MATERIAL_INDEX, MATERIAL_NONE, materialNow, BIOMES, GROUND, holdAngle, iceFriction, splashOn } from './ground.js';
 import { LocalFrame, TerrainGrid } from './near.js';
 import { AirGrid, airAt, AIR } from './air.js';
-import { FloraField, FLORA, PlantSim, plantDisplace, plantBranch, plantCrown, treeFrequency, stemFrequency } from './flora.js';
+import { FloraField, FLORA, FAR as FLORA_FAR, PlantSim, plantDisplace, plantBranch, plantCrown, treeFrequency, stemFrequency } from './flora.js';
 import { FLORA_GLSL } from './flora.glsl.js';
 import { Particles, PARTICLES, EVENT } from './particles.js';
 import { Loose, LOOSE, KICK, WADE } from './loose.js';
@@ -360,6 +360,7 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
     if (warming) budget = 64;
     let used = near.update(frame, fx, fz, sampleActive, Math.ceil(budget * 0.5) * bn, groundInto, clock, QUALITY.sampleMs);
     const t1 = now();
+    airGrid.windMap = WX2.nearmap && WX2.windmap ? windMap : null;      // (group D: the near grid's base from the map, ?nearmap=1)
     used += airGrid.update(frame, bodyId, time, fx, fz, sampleActive, Math.ceil(budget * 0.5) * ba, clock, QUALITY.sampleMs);
     let t2 = now();
     stats.samples = used; stats.msGround = t1 - t0; stats.msAir = t2 - t1;
@@ -367,7 +368,7 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
     if (WX2.windmap) {
       setThermal(WX2.thermal);
       if (!windMap.land.ready || windMap.bodyId !== bodyId) windMap.readLand(bodyId, sampleActive, warming ? null : clock, WINDMAP.staticMs, warming ? 1e9 : WINDMAP.staticBatch);
-      windMap.step(dt, bodyId, time, sunDir);
+      if (!WX2.freeze) windMap.step(dt, bodyId, time, sunDir);
       const t2b = now(); stats.msWind = t2b - t2; t2 = t2b;
     } else stats.msWind = 0;
 
@@ -451,6 +452,7 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
     // (P29) the plants are bent by the air at the plants (rhoGround): their wind load goes straight with the density
     // (the powers, space and time) and `times`, so a stopped place stops the grass and the trees in it as well as the
     // loose things: with no bubble open the field is handed null and steps as it always did (flora.js, "held cells")
+    flora.windMap = WX2.farwind && WX2.windmap ? windMap : null;      // (group D: the far plants read the map, ?farwind=1)
     flora.update(dt, frame, airGrid, near, rhoGround, fx, fz, dist, quality, devils, winds, TIMEHOLD.plants ? times : null);
     const t4 = now();
     skyNumbers(here.weather, here.sky);        // the weather as a painter needs it (sky.js)
@@ -809,6 +811,9 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
     flora: {
       // textures (RGBA float32, N x N, row j = north index, column i = east index)
       get bend() { return flora.bend; }, get wind() { return flora.wind; }, get push() { return flora.push; },
+      // (group D, ?farwind=1) the far field: FAR.N x FAR.N RGBA float (soft east, north, stiff east, north load), its uniform
+      // uPhysFarMap in `uniforms` (w = 0 while off: the shader never reads it); bind it as uPhysFar beside uPhysBend
+      get far() { return flora.far; }, farSize: FLORA_FAR.N, farCell: FLORA_FAR.cell, get farVersion() { return flora.farVersion; },
       size: FLORA.N, cell: FLORA.cell, nearSize: FLORA.nearN, nearCell: FLORA.nearCell,
       uniforms: flora.uniforms,
       get version() { return flora.version; }, get pushVersion() { return flora.pushVersion; },

@@ -187,6 +187,7 @@ export class WindMap {
     // THE WIND (dynamic)
     this.e10 = F(); this.n10 = F(); this.aloftE = F(); this.aloftN = F();
     this.lift = F(); this.trigger = F(); this.shelter = F().fill(1);
+    this.shelterLee = F().fill(1);                       // the shelter's lee part alone (what the near grid, which has its own crest, takes)
     this.ux3 = F(); this.uy3 = F(); this.uz3 = F();      // the 10 m wind body-local (for the convergence)
     this.conv = F();                                     // convergence last refresh (1/s)
     this.shade = F();                                    // cloud cover over the texel, handed in by the cloud map (0 until then)
@@ -306,7 +307,7 @@ export class WindMap {
     this.land.ready = false; this.land.progress = 0; this._staticCursor = 0;
     this.sites = [];
     this.ready = false; this._cursor = 0; this.version = 0;
-    this.shelter.fill(1); this.lift.fill(0); this.trigger.fill(0); this.conv.fill(0); this.shade.fill(0);
+    this.shelter.fill(1); this.shelterLee.fill(1); this.lift.fill(0); this.trigger.fill(0); this.conv.fill(0); this.shade.fill(0);
     this.e10.fill(0); this.n10.fill(0); this.aloftE.fill(0); this.aloftN.fill(0);
   }
 
@@ -469,7 +470,7 @@ export class WindMap {
     this._large(k, _d);
     // project onto the texel's tangent plane (the lattice's vector belongs to a place a little way off)
     const u0e = _d[0] * ex + _d[2] * ez, u0n = _d[0] * nx + _d[1] * ny + _d[2] * nz;
-    let ue = u0e, un = u0n, s = 1;
+    let ue = u0e, un = u0n, s = 1, sLee = 1;
     if (L.ready) {
       const sp0 = Math.hypot(u0e, u0n);
       // over and round: the crest's speed-up, the lee of higher land upwind
@@ -479,7 +480,8 @@ export class WindMap {
         let ph = Math.atan2(-u0n, -u0e) * (NB / (2 * Math.PI)); if (ph < 0) ph += NB;
         const m0 = Math.floor(ph) % NB, m1 = (m0 + 1) % NB, fm = ph - Math.floor(ph);
         const sx = this.sxB[k * NB + m0] * (1 - fm) + this.sxB[k * NB + m1] * fm;
-        s = 1 - W.leeLoss * smoothstep(0.03, 0.28, sx) + W.crestGain * smoothstep(0, W.crestRelief, L.relief[k]) * (1 - smoothstep(0.0, 0.15, sx));
+        sLee = 1 - W.leeLoss * smoothstep(0.03, 0.28, sx);
+        s = sLee + W.crestGain * smoothstep(0, W.crestRelief, L.relief[k]) * (1 - smoothstep(0.0, 0.15, sx));
         // channelled down a confined valley; a gap jet through a pass that lies along the wind
         const c = L.confine[k], ae = L.axisE[k], an = L.axisN[k];
         const ua = ue * ae + un * an, uc = -ue * an + un * ae;
@@ -506,7 +508,7 @@ export class WindMap {
         if (thermalOn()) { ue += ae2 + ke + be; un += an2 + kn + bn; }
       }
     }
-    this.e10[k] = ue; this.n10[k] = un; this.shelter[k] = s;
+    this.e10[k] = ue; this.n10[k] = un; this.shelter[k] = s; this.shelterLee[k] = clamp(sLee, W.shelterMin, W.shelterMax);
     this.ux3[k] = ue * ex + un * nx; this.uy3[k] = un * ny; this.uz3[k] = ue * ez + un * nz;
     // what the air does up
     let lift = 0, trig = 0;
@@ -588,6 +590,21 @@ export class WindMap {
     const dn = x3 * ux + y3 * uy + z3 * uz;           // (onto the tangent plane at the query point)
     x3 -= dn * ux; y3 -= dn * uy; z3 -= dn * uz;
     o[0] = x3; o[1] = y3; o[2] = z3; o[3] = Math.hypot(x3, y3, z3);
+    return o;
+  }
+  // The same wind for the NEAR grid (air.js, ?nearmap=1): the map's crest speed-up taken back out, because the near grid
+  // lays its own speed-up and shelter from the ground under each of its nodes; the lee of land beyond its own reach, the
+  // valley's channelling, the gap jets and the thermal winds stay. Body-local o[0..2], o[3] its speed.
+  nearVecAt(ux, uy, uz, o) {
+    this.vecAt(ux, uy, uz, o);
+    const N = this.N;
+    dirToFace(ux, uy, uz, _fc);
+    const x = clamp((_fc.u + 1) * 0.5 * N - 0.5, 0, N - 1), y = clamp((_fc.v + 1) * 0.5 * N - 0.5, 0, N - 1);
+    const i0 = Math.min(N - 2, Math.floor(x)), j0 = Math.min(N - 2, Math.floor(y)), fx = x - i0, fy = y - j0;
+    const b = _fc.face * N * N, k00 = b + j0 * N + i0, k10 = k00 + 1, k01 = k00 + N, k11 = k01 + 1;
+    const r = (k) => this.shelterLee[k] / Math.max(1e-3, this.shelter[k]);
+    const f = (r(k00) * (1 - fx) + r(k10) * fx) * (1 - fy) + (r(k01) * (1 - fx) + r(k11) * fx) * fy;
+    o[0] *= f; o[1] *= f; o[2] *= f; o[3] *= f;
     return o;
   }
   // The texel index of a body-local unit direction (for readers that keep per-texel state of their own).
