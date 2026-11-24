@@ -537,6 +537,7 @@ bake floored at V 0.24, deep green not near-black; ?farspruce=0 the old, ?farspr
 old whatever). RENDERED on trees-far at F's 150 m autumn view: dark-green pixels V median 0.251 -> 0.282, their share 9.7
 -> 9.9 percent, land under V 0.3 10.7 -> 9.7; the spruces' shapes the same. F TAKES THE 1 KM DARKS (the air's, its lane).
 A2 will take my storm ramp for its near crowns at v39.4 (stK = smoothstep(0.15, 0.6, uStorm) * uLookS.x * 0.5).
+THE STORM CROWNS PASSED BY F at half (uImpStorm 0.5, the default since c5ef26a; dormant until F's uLookS lands).
 Before: look-proto v39.3 (87053ed) merged into trees-far (a6e46ca,
 given to the coordinator for v39.4: it carries fad660f, F's passed weighted stands and bark at 30 px, default). THE CROWNS
 UNDER A STORM (F's storm light, look-director ce1701f): BUILT, SEEN in a scratch merge of trees-far + look-director
