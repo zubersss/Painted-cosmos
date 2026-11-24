@@ -671,7 +671,18 @@ vec3 pcAtmosV(vec3 c, float f, vec3 viewPos) {
   }
   float toward = pow(max(dot(normalize(viewPos), sunV), 0.0), 3.0) * uDayness * (1.0 - uMoon) * (1.0 - uWx.x);
   h = mix(h, min(mix(pcOilSunC(), vec3(1.0), 0.5) * 1.05, vec3(1.0)), toward * uOilC.y);
-  return mix(c, ${_far('c', 'h')}, f);      // (where ?farlight= is on, the thing's own light is carried into the air it stands in here: pcFarLight above. It is laid on the haze AFTER the sun's glow, so toward the sun, where the air goes to white, the gain can only be 1 or under and nothing burns out.)
+  // THE DARKS KEPT FROM THE AIR (fresh-eyes audit 2, docs/lead/LOOK-AUDIT-2.md, finding 1: from about 1 km up the wood
+  // had NO pixel under value 0.3, where the owner's aerial references keep their dark conifers to the horizon, bluer
+  // and paler but still the darks). A painter's distance compresses the values; it does not swap their order or wash
+  // the darks out first. So HIGH UP a dark stroke takes less of the air than a light one: down to 0.6 of it at the
+  // darkest, all of it from about 0.40 of lightness up. HIGH UP is by the horizon's dip (uLookG.w, world/index.js, where
+  // the air's top is on): from a dip of about 27 degrees (Earth: about 500 m) to 35 (about 900 m), so the low views
+  // keep their depth: a first laying from every height (down to 0.35, from 150 m) made the far wood at 150 m as dark
+  // as the near and lifted its saturation 0.61 to 0.74 (SEEN, rejected). The stroke's own colour is one flat colour,
+  // so this is one flat amount for the whole stroke and no edge moves. ?airdark=0 (uLookG.w) is the air as it was.
+  float fk = f;
+  if (uLookG.w > 0.0) fk = f * mix(1.0, mix(0.60, 1.0, smoothstep(0.08, 0.40, dot(c, vec3(0.3, 0.5, 0.2)))), uLookG.w * uLookN.w);
+  return mix(c, ${_far('c', 'h')}, fk);      // (where ?farlight= is on, the thing's own light is carried into the air it stands in here: pcFarLight above. It is laid on the haze AFTER the sun's glow, so toward the sun, where the air goes to white, the gain can only be 1 or under and nothing burns out.)
 }
 vec3 pcAtmosVWash(vec3 c, float f, vec3 viewPos) {
 #else
