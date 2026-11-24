@@ -904,6 +904,24 @@ goes default without the owner; the coordinator can put C to the owner on a phon
 B no visible gain, keep it off and stop there; C a clear gain ("small separate dabs with the sky between them"), F
 recommends it to the coordinator, who sends it to the owner for a side-by-side phone check; OFF until the owner says.
 
+**THE CROWNS UNDER A STORM ARE THE DEFAULT in the oil look (v39.5; 350b709 on the v39.4 merge de728ce).** With no
+address switch a tall tree's crown takes HALF the land's storm paint at a full storm (STORMLEAF 0.5, F's pass); it
+follows F's one storm-light switch (`?stormlight=0` turns it off with the land's, uLookS.x) and `?stormleaf=0` turns
+off the crowns' part alone; the ramp is A1's far crowns' (kSt = smoothstep(0.15, 0.6, uStorm) x uLookS.x x
+uStormLeaf). SEEN under `wx=storm` (a maple from 9 m, one page with no switch, the switches flipped live: uStormLeaf 0
+for `?stormleaf=0`, LOOK.stormLight 0 through the page's own shared.js for `?stormlight=0`, the path the address
+takes; 54 tall materials at 0.5, uLookS.x 1, uStorm 0.9, no program failed): on the crown pixels that did not change
+between two grabs of the default (17 per cent of the frame did: most likely the world still building round the camera
+after it was moved, see the no-storm check; I first took it for the storm's own motion), the default V 0.318 S 0.551,
+and both switches V 0.349 S 0.70, the crowns as they were. Still
+`A2_stormleaf_default_maple9m_storm_default_stormlight0_stormleaf0.jpg` (default, ?stormlight=0, ?stormleaf=0).
+NO STORM, 0 PIXELS, SEEN: a page with no weather (uStorm 0), the same maple, the world let SETTLE first (after the
+camera moved the near patches and plants went on building for some 30 frames: 124,807 pixels between grabs, then 0;
+the gallery's t=0 already freezes time): the default, ?stormleaf=0, ?stormlight=0 and the default again, 0 pixels
+apart each. The watercolour game cannot change: the step sits inside #ifdef PC_OIL. (A note for the lab: after moving
+the camera, step frames until two grabs match before any A/B.)
+The history of it follows.
+
 **THE CROWNS UNDER A STORM (`?stormleaf=1`, OFF; the coordinator after F's storm light, look-director e2b9c14, which
 steps the land a level down under a storm and leaves the crowns glowing).** MEASURED in the gallery under `wx=storm`
 (autumn stream, 1024 x 480): uStorm 0.9, overcast (uWx.x) 1.0, the light curve (uOilAir.z) 1. A FIRST TRY (the
@@ -955,6 +973,54 @@ sparse); with ?needlefill=3 the tops read darker, but the low whorls seen betwee
 spiky shapes. Triangles +2,834 at the landing (Node). The default is the picture before to the pixel. For F: stills
 `A2_pines_*` (A off, B on) and `A2_pines-fill3_*`. If a true needle mass is wanted at 40-60 m, the spruce kit's budget
 by limb COUNT rather than length (a denser top) is the next step: it changes the near spruce too.
+
+**THE OWNER'S PHONE TABLES v39.5 ARE IN (r2 docs/lead/bench/2026-11-24-v39.5-owner-phone.md): THIS LANE'S COST IS
+SOLVED.** The split saves 7.7 ms; bark flat 0.2-0.7, wind 0.2, one-sided +0.5; 'no near trees' is SLOWER (+2.9, +4.0:
+the far trees behind them, A1's). Clusters CLOSED (near +1.7, middle -0.6 noise, with a depth pass +0.8): their bench
+rows are gone, the code stays off behind ?trees2=cards until a clean-up. 'Near trees after the ground' -0.8 ms: THE
+DEFAULT now (flora.js TREES_AFTER_GROUND, renderOrder 6 after the ground's 5; ?treeorder=0 as before; the bench row asks
+the other way round); the 0-pixel proof on a settled page is in the next entry when done.
+
+**THE SHARPER PICTURE ON A TOUCH DEVICE (the coordinator's job for this lane, 24 Nov late; 0c0a198, PILOT files:
+main.js, core/dynres.js, core/bench.js, tests/dynres.test.mjs).** A phone or a tablet in the oil look starts on RUNG 1 of
+dynres's sharpening ladder: 1.2x each way (1.5 picture pixels to the point for 1.25; the owner's 823x384 box draws
+1234x576 for 1028x480), may climb to rung 2 (1.4x) after 6 s under 20 ms, gives the rungs back FIRST (before scale or
+tier) when the smoothed frame is over 27 ms for half a second, and nothing else is shed during that half second. The
+device keeps its preset's tier as its top (sharpness before a higher tier). `?sharp=0`: exactly as before. WHY THE OLD
+LADDER NEVER HELPED: it climbed only from tier 2 (the phone is tier 1) and only with room above 60 a second (a phone held
+at 60 by its display never shows any). The coordinator's answers: 1.2x with room to 1.4x; the 27 / 20 ms lines; phones
+and tablets (a big tablet gets no rung: its preset's 1.6 MP limit); this reverses the 19 Nov 'sharpening never trades
+smoothness' on touch devices, under the owner's word. F's rule R3.9 (look-director 56bbf00): look thresholds in pixels
+are written at 480 lines and scaled by lines / 480; anti-grain floors stay in real pixels (this lane's NEEDLE_PX 3 px is
+a floor: stays). THIS LANE'S TREES FOLLOW THE LINES: at 576 lines the near trees thin from 6.9 m (6.5 at 480) and hand
+over at 28.8 m (27), at 672 lines (rung 2) from 8.1 m and at 33.6 m: a little leafier with sky, and a few more full trees.
+MODELLED, not measured (tests/dynres.test.mjs, a 60 Hz phone fitted to the v39.5 foot and bank rows; the table does not
+pin the frame-to-frame wobble, so two machines): on foot rung 1 about 16.7 ms and 0 per cent of frames held twice at a
+15 per cent wobble, 20.2 ms and 21 per cent at 20; the bank about 18.7 ms (keeps the rung) or 29 ms (gives it back).
+Frames held twice on a 60 Hz display read as judder: the owner judges sharpness against feel with ?sharp=0 as the A/B.
+Bench: a row 'the picture as before (?sharp=0 size)' after the first row of every table; each row remembers the size it
+was asked at and the header lists the runs (the stale 'Rows 24 on are back at that size' is gone).
+
+**READING THE OWNER'S `?bench=foot` TABLE (prepared 24 Nov, late, before it arrives; v39.5 merged, 2a4d2fb).** Each
+row is set against the "as set" row before it; first check the table agrees with itself (the "as set" rows within 25
+per cent, or it says so). Rows and what each answers, with the near-tree cut each would call for:
+- 2-4 NEAR GRASS (`pc-near`): 'no near grass or flowers' its whole cost; 'half its marks' how much of it is per mark
+  (triangles and set-up: half the marks should save about half if so); 'one flat colour' how much is the paint per
+  pixel. The flora lane's (B) to act on; `?nearcut` (uNearCut) is built for it.
+- 6 'no small plants' (bushes, undergrowth: not tall, not far): B's lane.
+- 7-8 the ground (drawn at all; one flat colour = its paint per pixel): C's / the look director's.
+- 10-11 shadows ('no shadows at all'; 'trees cast no shadow' = the trees' share of the shadow pass): A1's shadow lane.
+- 12 the light in the air; 13 the lighter or full paint: the look director's.
+- 15 'NO NEAR TREES' (every `pc-prop-tall` mesh: the near and middle tiers): THIS LANE'S NUMBER. Read with 16 'near
+  bark one flat colour' (the wood program's paint per pixel) and the triangle counts: if 15 is large and 16 small, the
+  cost is the leaves (triangles and the leaf program); if 16 is a good part of 15, the bark's two-layer paint.
+  Cuts ready or near: (a) the near hand-over nearer (`?treenear=`, metres at the phone's scale; today 27 m; 18 m was
+  SEEN to make the 15-20 m trees umbrellas of big kites with today's middle tree, so it needs F's eye); (b) the leaf
+  budget of the near maple (2,560 cards, 10k triangles a tree) cut by a share, the thinning's growth keeping the crown
+  full; (c) for the bark: one streak layer instead of two beyond a few metres (`pcWoodLevel`'s fine layer is already
+  only where near); (d) `?treesway=whole` (built: the cheaper sway). Each behind a switch and a row, the look kept.
+- 17 'no far trees' (the impostors: A1's), 18 'no trees' (all of it).
+The derived figure to test: v39.1 on foot about 22 ms (40.3 split - 18.5 old far trees + 0.7 impostors); never measured.
 
 **ON FOOT TO UNDER 33 ms (the coordinator's job, 24 Nov, after the ground from the air was found to hold no 30 ms:
 the v38.2 table had the whole 400 m frame at 17.9 ms with impostors, ground included).** DERIVED from the phone's own

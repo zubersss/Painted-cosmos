@@ -97,6 +97,15 @@ const PRESET = (() => {
 // A phone held upright: the game waits under a slip that asks for it to be turned (W3.4). A
 // tablet plays upright (its view keeps 60 degrees across: src/player/camera.js portraitFov).
 const isUpright = () => PRESET.id === 'phone' && window.innerHeight > window.innerWidth;
+// THE SHARPER PICTURE ON A TOUCH DEVICE (24 Nov, the owner's phone table v39.5: held at 60 by its own display at the size
+// it is given -- 1028 x 480 stretched over 3086 x 1440, most of why it looks soft -- and still 42 to 52 a second drawn
+// 1.5 times as sharp each way; the owner's standing word: "give the room to SHARPNESS"). A phone or a tablet in the oil
+// look STARTS ON THE FIRST RUNG of the sharpening ladder (1.2 times as sharp each way: 1.5 picture pixels to the screen
+// point for 1.25), may climb to the second (1.4 times) when frames have room, and gives the rungs back first, before
+// anything else, when frames run slower than 27 ms for half a second (core/dynres.js sharpHighMs). Sharpness comes
+// before a higher tier: the device keeps its preset's tier as its top. ?sharp=0: the device exactly as before.
+const SHARP_TOUCH = params.get('look') === 'oil' && (PRESET.id === 'phone' || PRESET.id === 'tablet') && params.get('sharp') !== '0';
+const SHARP_TOUCH_RUNGS = 2;      // the most rungs it may climb to (1.4 times as sharp each way)
 let upright = false;
 const canvas = document.getElementById('pc-canvas');
 const loading = document.getElementById('pc-loading');
@@ -229,7 +238,8 @@ async function boot() {
     // picture and loses pictures a second.)
     tuning: params.get('look') !== 'oil' ? undefined
       : PRESET.id === 'desktop' ? { minScale: 0.8 }
-        : { minScale: 0.85, targetMs: 33.3, highMs: 37, lowMs: 27, panicMs: 62, tierUpMs: 22 },
+        : { minScale: 0.85, targetMs: 33.3, highMs: 37, lowMs: 27, panicMs: 62, tierUpMs: 22,
+          ...(SHARP_TOUCH ? { sharpHighMs: 27, sharpLowMs: 20, sharpDownAfter: 0.5 } : {}) },
     // Start at the best picture (top tier, full resolution) and give some of it up only when
     // the measured frame time asks: under 30 fps the controller sheds load within a second or
     // two, and it climbs back by careful steps (src/core/dynres.js). ?quality=0|1|2 pins the
@@ -239,7 +249,9 @@ async function boot() {
     // (a phone starts a tier down: the preset; the controller may climb from there)
     quality: params.has('quality') ? Number(params.get('quality')) : BEST_PIN ? 2 : PRESET.tier,
     minQuality: params.has('quality') ? Number(params.get('quality')) : 0,
-    maxQuality: params.has('quality') ? Number(params.get('quality')) : 2,
+    maxQuality: params.has('quality') ? Number(params.get('quality')) : SHARP_TOUCH ? PRESET.tier : 2,
+    // (a touch device with the sharper picture: the ladder climbs from its own tier, not from tier 2 first)
+    sharpTier: SHARP_TOUCH && !params.has('quality') ? PRESET.tier : undefined,
     // THE SHARPENING LADDER (the owner's speed table of 2026-11-19: their phone draws 1028 x 480 for a screen of
     // 3086 x 1440, holds 60 a second with room to spare, and looks soft). How many rungs this screen has in it is
     // worked out in resize() below, once the canvas has a size; 0 until then, which is the game as it was.
@@ -316,7 +328,7 @@ async function boot() {
   // ?best=1 asks for every pixel the screen has, which is what the owner asked about on 2026-11-18: on their S23
   // Ultra that is 3086 x 1440, nine times the pixels the phone is given today. ?dpr= still wins where both are given.)
   const DPR_PIN = Math.max(0, Math.min(4, +params.get('dpr') || (BEST_PIN ? window.devicePixelRatio || 0 : 0)));
-  game.device = { preset: PRESET.id, ratio: 1, deviceRatio: window.devicePixelRatio || 1, w: 0, h: 0, depth: depthMode, aa: aaMode, sharp: 0 };
+  game.device = { preset: PRESET.id, ratio: 1, baseRatio: PRESET.dpr, deviceRatio: window.devicePixelRatio || 1, w: 0, h: 0, depth: depthMode, aa: aaMode, sharp: 0 };
   // THE SHARPENING LADDER'S CEILING, in picture pixels to the screen point. Never more than the screen itself has
   // (more picture pixels than points is waste), never past what this kind of device may hold as drawing targets
   // (the preset's own limit and MAX_PIXELS), and nothing at all where the player has asked for a sharpness or
@@ -331,7 +343,7 @@ async function boot() {
     const css = Math.max(1, canvas.clientWidth * canvas.clientHeight);
     const ceil = Math.min(window.devicePixelRatio || 1, Math.sqrt(Math.min(PRESET.maxPixels, MAX_PIXELS) / css));
     const rungs = Math.max(0, Math.floor((ceil - PRESET.dpr) / DYNRES.sharpStep + 1e-6));
-    return SHARP_PIN > 0 ? Math.min(SHARP_PIN, rungs) : rungs;
+    return SHARP_PIN > 0 ? Math.min(SHARP_PIN, rungs) : SHARP_TOUCH ? Math.min(SHARP_TOUCH_RUNGS, rungs) : rungs;
   };
   let curSharp = 0;              // the rung the ladder stands on now (dynres decides; this applies it)
   const dprNow = () => (DPR_PIN > 0 ? DPR_PIN : curSharp > 0 ? PRESET.dpr + DYNRES.sharpStep * curSharp : 0);
@@ -415,6 +427,7 @@ async function boot() {
     if (painter.setRenderScale) painter.setRenderScale(Math.min(1, (DPR_PIN * sc) / want));
   };
   if (SHARP_PIN > 0) dyn.sharp = Math.min(SHARP_PIN, dyn.sharpMax);
+  else if (SHARP_TOUCH) dyn.sharp = Math.min(1, dyn.sharpMax);      // (the touch device starts on the first rung)
   applyDynScale(dyn.scale, dyn.sharp);
   painter.setQuality(dyn.quality);
   // PHYSICS' particle counts and sampling follow the tier too (hardening review P8): a tier

@@ -222,7 +222,28 @@ export function attachBench(pc) {
       + (which ? 'THIS IS TEST ' + which + ' OF 3.' : 'THIS IS THE WHOLE TABLE (not one of the three).') + '\n\n';
   })();
   let MK = 1;             // how much sharper each way the questions are asked (1: not capped, asked as drawn)
+  let curK = 1;           // the size each way the picture is at NOW, against the picture as set (sharpen() keeps it)
+  const rowsK = [];       // the size each row was really asked at, row by row: the header says it from these (24 Nov)
   let capMs = 0;          // the frame interval the device is held at, if it is held at one
+  // WHICH ROWS WERE ASKED AT WHICH SIZE (24 Nov: the line before this said "Rows 24 on are back at that size", which was
+  // true of the whole table only -- MK is set once and the three short tests never go back -- so the owner's v39.5
+  // tables said it of rows asked at 1.5x). Now each row remembers the size it was asked at, and the line is built from
+  // that: runs of rows at one size, each against the picture as set. And where the picture as set is a touch device's
+  // sharper one (main.js SHARP_TOUCH), the line says so and how much sharper it is than before.
+  const sizesLine = () => {
+    let out = '';
+    try {
+      const dv = (pc.game && pc.game.device) || {};
+      if (dv.sharp > 0 && dv.baseRatio > 0 && dv.ratio > 0) out += '\nTHE PICTURE AS SET IS THE SHARPER TOUCH PICTURE: ' + (dv.ratio / dv.baseRatio).toFixed(2) + ' times as sharp each way as before (rung ' + dv.sharp + '; ?sharp=0 for the old one).';
+    } catch { /* not told */ }
+    if (!rowsK.length || rowsK.every((k) => Math.abs(k - 1) < 1e-3)) return out + (rowsK.length ? '\nEvery row was asked at the picture as set.' : '');
+    const runs = [];
+    for (let i = 0; i < rowsK.length; i++) {
+      const k = rowsK[i], last = runs[runs.length - 1];
+      if (last && Math.abs(last.k - k) < 1e-3) last.b = i + 1; else runs.push({ a: i + 1, b: i + 1, k });
+    }
+    return out + '\nSIZES ROW BY ROW (each way, against the picture as set): ' + runs.map((r) => 'rows ' + (r.a === r.b ? r.a : r.a + '-' + r.b) + ' at ' + r.k.toFixed(2) + 'x').join(', ') + '.';
+  };
   const head = (r0) => {
     let gpu = '?';
     try { const gl = R.getContext(), e = gl.getExtension('WEBGL_debug_renderer_info'); if (e) gpu = String(gl.getParameter(e.UNMASKED_RENDERER_WEBGL)); } catch { /* not told */ }
@@ -235,7 +256,8 @@ export function attachBench(pc) {
       (r0 ? ' | script ' + r0.script.toFixed(1) + ' ms, ' + Math.round(r0.calls) + ' calls, ' + Math.round(r0.tris / 1000) + 'k triangles a frame' : '') +
       (MK > 1 ? '\nTHE QUESTIONS BELOW WERE ASKED WITH THE PICTURE ' + MK.toFixed(2) + ' TIMES AS SHARP EACH WAY, because at the\n'
         + 'size this device draws it is held at ' + (1000 / Math.max(capMs, 1e-3)).toFixed(0) + ' a second and NOTHING could be told apart: every row read -0.0 ms.\n'
-        + 'So the + / - below are real costs, but of a picture ' + (MK * MK).toFixed(1) + ' times the one it draws. Rows 24 on are back at that size.' : '');
+        + 'So the + / - below are real costs, but of a picture ' + (MK * MK).toFixed(1) + ' times the one it draws.' : '')
+      + sizesLine();
   };
   const run = async () => {
     el.textContent = GUIDE + 'speed test: waiting for the first view...';
@@ -302,6 +324,7 @@ export function attachBench(pc) {
     })();
     const sharpen = async (k) => {
       if (typeof P.resize !== 'function') return;
+      curK = k;
       const w = Math.max(2, Math.round(canvas0.w * k)), h = Math.max(2, Math.round(canvas0.h * k));
       // HELD, so that a resize the phone fires for its own reasons cannot put the picture back without the test
       // knowing. In the owner's v27 table the last eight rows were measured at a size the test did not know it was
@@ -316,16 +339,21 @@ export function attachBench(pc) {
     // (the trees-near lane's rows, in the full table and in ?bench=trees: the near and middle trees drawn by two short
     //  programs, wood and leaves, with no hair twigs (T2, ?trees2=1); the leaves as clusters on cards (?trees2=cards);
     //  the cards laid in depth first (T5). Each against the "as set" row above it, built afresh while the test runs.)
+    // THE SHARPER TOUCH PICTURE PRICED (24 Nov, main.js SHARP_TOUCH): the picture at the size the device was given before,
+    // in the same minute. Only where the picture as set is the sharper one; asked at the probe's size like every row.
+    const k0 = (() => { try { const dv = pc.game && pc.game.device; return dv && dv.sharp > 0 && dv.baseRatio > 0 && dv.ratio > 0 ? dv.baseRatio / dv.ratio : 1; } catch { return 1; } })();
+    const SHARP0 = k0 < 0.999 ? [['the picture as before (?sharp=0 size)', () => sharpen(MK * k0), () => sharpen(MK)]] : [];
     const T2ROWS = [
       [t2a ? 'trees in one program as before' : 'trees: two short programs', () => swapT2(t2a ? '' : 'split'), () => swapT2(t2a)],
-      ['near trees as clusters', () => swapT2('cards-near', false), () => swapT2(t2a)],
-      ['middle trees as clusters', () => swapT2('cards-mid', false), () => swapT2(t2a)],
-      ['clusters with a depth pass first', () => swapT2('cards', true), () => swapT2(t2a)],
+      // (the leaves as clusters on cards, near and middle, and with a depth pass first: CLOSED, 24 Nov, after the owner's
+      //  phone table v39.5 read near +1.7 ms, middle -0.6 (noise), with a depth pass +0.8; their rows are gone, their code
+      //  stays switched off behind ?trees2=cards until a clean-up takes it out)
       [sw0 ? 'near trees: branch sway as before' : 'near trees bend whole (no branch sway)', () => swapSway(!sw0), () => swapSway(sw0)],
       [nd0 ? 'pines: needles as thin as before' : 'pines: needles kept wide at range', () => swapNeedles(!nd0), () => swapNeedles(nd0)],
     ];
     // ---- THE TENTH FORM'S HANDLES (see the top of this file) ----------------------------------------------------
     const tallMats = () => mats(/^pc-prop-tall/);
+    const ORDER_OLD = /[?&]treeorder=0\b/.test(location.search || '');      // (flora.js TREES_AFTER_GROUND turned off)
     const tallMeshes = (fn) => pc.scene.traverse((o) => { if (o.isMesh && o.material && /^pc-prop-tall/.test(mname(o))) fn(o); });
     const nearPart = (v) => () => { const f = flora(); if (f) f.benchNear = v; };
     // (no wind in the near trees' vertex shader: their own uPhysOn is 0 while the rest of the world's stays as it is.
@@ -381,7 +409,10 @@ export function attachBench(pc) {
       bark: ['near bark one flat colour', () => B({ flat: 7 }), () => B({ flat: 0 })],
       wind: ['near trees: no wind in shader', () => noWind(true), () => noWind(false)],
       side: ['near trees one-sided', () => oneSide(true), () => oneSide(false)],
-      order: ['near trees after the ground', () => tallMeshes((o) => { o.renderOrder = 6; }), () => tallMeshes((o) => { o.renderOrder = 0; })],
+      // (24 Nov: the near trees are drawn after the ground BY DEFAULT now, flora.js TREES_AFTER_GROUND, after this row read
+      //  -0.8 ms on the owner's phone; so the row asks the other way round, unless the address put the old order back)
+      order: ORDER_OLD ? ['near trees after the ground', () => tallMeshes((o) => { o.renderOrder = 6; }), () => tallMeshes((o) => { o.renderOrder = 0; })]
+        : ['near trees before the ground (as before)', () => tallMeshes((o) => { o.renderOrder = 0; }), () => tallMeshes((o) => { o.renderOrder = 6; })],
       a2c: ['plants without alpha-to-cov', () => a2c(false), () => a2c(true)],
       blob: ['far trees as crossed cards', () => farForm('blob'), () => farForm(form0)],
       // (T1: the far trees as painted impostors, two triangles a tree, swapped in the same minute; render/impostor.js.
@@ -558,6 +589,7 @@ export function attachBench(pc) {
     const holdStorm = (on) => { const P = pc.sim && pc.sim.physics; if (P && P.forceWeather) P.forceWeather(on ? { kind: 'storm' } : null); };
     const steps = [
       [AS, null, null],
+      ...SHARP0,
       // the far trees: their paint, their shapes, which pass, which place in the order of drawing, which form
       ['far trees one flat colour', () => B({ flat: 3 }), () => B({ flat: 0 })],
       ['no far trees', () => show(/^pc-prop-far/, false), () => show(/^pc-prop-far/, true)],
@@ -706,6 +738,7 @@ export function attachBench(pc) {
     // ?bench=trees: the tree questions alone, on foot and from the air (a shorter run: each row on a cooler phone)
     const treeSteps = [
       [AS, null, null],
+      ...SHARP0,
       T0.leaves, T0.wood, T0.bark, T0.wind,
       [AS, null, null],
       T0.side, T0.order, T0.a2c, T0.noNear,
@@ -726,6 +759,7 @@ export function attachBench(pc) {
     const airH = (() => { const m = /^air,(\d+)/.exec(MODE_B); const h = m ? +m[1] : 400; return Math.max(30, Math.min(1500, h)); })();
     const airSteps = [
       [AS + ', on foot', null, null],
+      ...SHARP0,
       ...airAt(airH, 45, [
         ['no ground drawn', () => ground(false), () => ground(true)],
         ['ground one flat colour', () => B({ flat: 1 }), () => B({ flat: 0 })],
@@ -750,6 +784,7 @@ export function attachBench(pc) {
     // measured), so these rows are asked off the cap, where they can be read: each against the "as set" row before it.
     const footSteps = [
       [AS, null, null],
+      ...SHARP0,
       ...GRASS,
       [AS, null, null],
       ['no small plants', () => show(/^pc-prop-(?!tall|far)/, false), () => show(/^pc-prop-(?!tall|far)/, true)],
@@ -778,6 +813,7 @@ export function attachBench(pc) {
       const [name, on, off, opt] = steps[k];
       el.textContent = head(r0) + '\n' + rows.join('\n') + '\n... ' + (k + 1) + ' of ' + steps.length + ': ' + name;
       if (on) await on();
+      rowsK[k] = curK;      // (the size this row is asked at: sizesLine)
       const ok = await calm();
       const f0 = P._shadow ? P._shadow.frames : -1;
       const r = stats(await sample(2400));

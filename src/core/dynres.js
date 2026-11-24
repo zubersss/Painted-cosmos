@@ -80,6 +80,16 @@ export const DYNRES = Object.freeze({
   sharpBackoffMax: 16,       // a rung that did not hold doubles the wait, up to sharpUpAfter x this
   sharpBack: 0.5,            // s after giving a rung back before another may go
   sharpGiveUp: 3,            // rungs that did not hold before the ladder is left alone until the next rest()
+  // THE LADDER ON A TOUCH DEVICE (24 Nov, the owner's phone table v39.5 and the owner's standing word "give the room
+  // to SHARPNESS"; main.js sets these for a phone or a tablet in the oil look, ?sharp=0 leaves them at 0). At the size
+  // the phone is given it is held at 60 by its own display, so it never shows room above sixty and the ladder above
+  // never climbed; and drawn 1.5 times as sharp each way it still ran 42 to 52 a second. So on a touch device the
+  // ladder spends room down to a line well above the owner's thirty a second (the margin is for moving play), held
+  // for half a second before a rung goes, and climbs only from frames comfortably fast; the two lines apart are the
+  // hysteresis, and a rung is a whole quarter step, so the picture never creeps. 0 is each line as it was above.
+  sharpHighMs: 0,            // > 0: a rung is given back when the smoothed frame is over this for sharpDownAfter s
+  sharpLowMs: 0,             // > 0: a rung is climbed only after sharpUpAfter s under this
+  sharpDownAfter: 0,         // s over sharpHighMs before a rung goes (0: at once, as before)
 });
 
 export class DynamicResolution {
@@ -100,6 +110,9 @@ export class DynamicResolution {
     // ratio and what the device may hold); 0 is every device until the caller says otherwise, and then nothing
     // below changes anything at all.
     this.sharpMax = Math.max(0, opts.sharpMax || 0);
+    // (the tier the ladder may climb from: by default the top of everything (maxQuality), as before; a touch device
+    //  gives its own preset's tier, so that sharpness comes before a higher tier, the owner's word)
+    this.sharpTier = opts.sharpTier != null ? opts.sharpTier : null;
     this.sharp = Math.max(0, Math.min(this.sharpMax, opts.sharp || 0));
     this.sharpChanges = 0;
     this.sharpBackoff = 1;
@@ -124,6 +137,7 @@ export class DynamicResolution {
     this.sinceSharp = Infinity;          // s since the last rung was taken
     this.sharpProbing = false;           // the newest rung is still on trial
     this.sharpFails = 0;                 // rungs that did not hold; after sharpGiveUp the ladder is left alone
+    this.sharpOver = 0;                  // s the smoothed frame has been over the touch device's line (sharpHighMs)
   }
 
   // The lines the frame time is judged against: the defaults, or stretched to a known cap.
@@ -199,7 +213,13 @@ export class DynamicResolution {
     // (the wait holds for a panic too. Without it one rung too far cost the WHOLE ladder: a picture a hair past
     //  what a 60 Hz display can hold is shown a whole interval late, 33 ms, which is over the panic line, and the
     //  controller emptied the ladder in a third of a second and then climbed it again, over and over. Traced.)
-    if (this.sharp > 0 && (sharpPanic || ms > B.high)) {
+    const sHigh = T.sharpHighMs > 0 ? T.sharpHighMs : B.high;
+    if (this.sharp > 0 && ms > sHigh) this.sharpOver += dt; else this.sharpOver = 0;
+    // (while a rung stands and the touch device's half second over its line is still running, NOTHING ELSE is shed
+    //  either: without this the ordinary controller, at 37 ms after 0.45 s, shrank the picture before the rung could go
+    //  -- found by the test beside this file. With no hold, as before, this never applies.)
+    if (this.sharp > 0 && ms > sHigh && !sharpPanic && this.sharpOver < (T.sharpDownAfter || 0)) { this.over = 0; this.steady = 0; this.under = 0; return same(); }
+    if (this.sharp > 0 && (sharpPanic || (ms > sHigh && this.sharpOver >= (T.sharpDownAfter || 0)))) {
       // NOTHING ELSE IS SHED WHILE THE LADDER STANDS. The sharpening is the one thing in the frame that is not the
       // game: it must ALL be given back before the picture is shrunk or a tier is dropped. (Without this the half
       // second between one rung and the next was enough for the ordinary controller to panic at the 33 ms a rung
@@ -208,7 +228,7 @@ export class DynamicResolution {
       if (this.sinceSharp < T.sharpBack) { this.over = 0; this.steady = 0; this.under = 0; return { scale: this.scale, quality: this.quality, sharp: this.sharp, changed: false }; }
       this.sharp = sharpPanic ? Math.floor(this.sharp / 2) : this.sharp - 1;   // a panic gives back half the ladder
       if (this.sharpProbing || sharpPanic) { this.sharpBackoff = Math.min(T.sharpBackoffMax, this.sharpBackoff * 2); this.sharpFails++; }
-      this.sharpProbing = false; this.sinceSharp = 0; this.sharpSteady = 0;
+      this.sharpProbing = false; this.sinceSharp = 0; this.sharpSteady = 0; this.sharpOver = 0;
       this.over = 0; this.steady = 0; this.under = 0;
       // (the average is NOT wound back here. It was, and that hid a real panic: each slow frame gave back one rung
       //  and then forgot how slow it had been, so a machine falling off a cliff walked down the ladder a rung at a
@@ -229,9 +249,11 @@ export class DynamicResolution {
     // (and after a few rungs have failed the ladder is left alone until the next rest(). A rung too far costs a
     //  blink of 30 a second while it is tried, and a device that has refused three times is a device whose answer
     //  is no: trying it again every minute for an hour is worse than a slightly softer picture.)
+    const sLow = T.sharpLowMs > 0 ? T.sharpLowMs : Math.min(T.highMs, DYNRES.highMs);
+    const sTop = this.sharpTier != null ? this.sharpTier : this.maxQuality;
     if (this.sharp < this.sharpMax && this.sharpFails < T.sharpGiveUp
-        && this.scale >= T.maxScale - 1e-6 && this.quality >= this.maxQuality
-        && this.over === 0 && !this.probing && ms <= Math.min(T.highMs, DYNRES.highMs)) {
+        && this.scale >= T.maxScale - 1e-6 && this.quality >= sTop
+        && this.over === 0 && !this.probing && ms <= sLow) {
       this.sharpSteady += dt;
       if (this.sharpSteady >= T.sharpUpAfter * this.sharpBackoff) {
         this.sharp++; this.sharpChanges++;
