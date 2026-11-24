@@ -20,6 +20,7 @@
 //                        and the test times it against that view's own "as set" row. So a lane adds its own rows without
 //                        touching core/bench.js.
 import { MODE } from '../data/mode.js';
+import { getSurface } from './surface.js';
 
 export const WATER_PARTS = [];
 export const WATER_BENCH = [];
@@ -55,6 +56,12 @@ export function ensureWater(bodyId) {
   if (!DR || attached.has(bodyId)) return;
   attached.add(bodyId);
   try {
+    // (only a world with a WOOD: every part serves it -- the rivers are drawn in the wood's recipe, the lakes, ponds and
+    //  puddles there, the mouths and fjords where its rivers reach the sea -- and the drainage field alone changes a world's
+    //  white water and pools, so on any other world nothing is built: with the parts on by default in the oil look, only
+    //  Earth changes; ?flow=1 still builds the field anywhere, as it did)
+    const S0 = getSurface(bodyId);
+    if (!S0 || !S0.biomes.some((b) => b.terrain === 'forest')) return;
     const drain = DR.ensureDrainage(bodyId);
     if (!drain) return;                                  // a world with no liquid: nothing of the water attaches
     const S = drain.S;

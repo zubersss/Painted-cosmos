@@ -9,11 +9,22 @@ MODE.oil = true; overlayOil(LOOKS);
 const { getSurface, makeSample, NOLQ } = await import('./surface.js');
 const WH = await import('./waterhooks.js');
 
-test('the switches: none of them is the game as it was', () => {
-  const W = waterFromSearch('?look=oil&flow=1');
+test('the switches: the watercolour game has none; the oil look has the reviewed water on by default, each with its opt-out', () => {
+  const W = waterFromSearch('?flow=1');
   assert.equal(W.on, false);
   for (const k of ['rivers', 'lakes', 'ponds', 'puddles', 'swell', 'falls', 'fjord', 'wpaint', 'splash']) assert.equal(W[k], 0, k);
   assert.equal(W.wakes, 1);
+  // (the oil look's defaults, 24 Nov: rivers of the tree with bends, lakes, ponds, puddles, fjord; the falls held)
+  const O = waterFromSearch('?look=oil');
+  assert.equal(O.on, true);
+  for (const k of ['rivers', 'lakes', 'ponds', 'puddles', 'fjord']) assert.equal(O[k], 1, k);
+  for (const k of ['falls', 'swell', 'runoff', 'mount', 'wpaint', 'splash']) assert.equal(O[k], 0, k);
+  assert.equal(O.bends, 1);
+  // (all five turned off: the oil look as it was)
+  const X = waterFromSearch('?look=oil&rivers=old&lakes=0&ponds=0&puddles=0&fjord=0');
+  assert.equal(X.on, false);
+  for (const k of ['rivers', 'lakes', 'ponds', 'puddles', 'falls', 'fjord']) assert.equal(X[k], 0, k);
+  assert.equal(waterFromSearch('?look=oil&rivers=old').rivers, 0); assert.equal(waterFromSearch('?look=oil&lakes=0').lakes, 0);
   const V = waterFromSearch('?rivers=tree&lakes=1&wpaint=2&wakes=2');
   assert.equal(V.on, true); assert.equal(V.rivers, 1); assert.equal(V.lakes, 1); assert.equal(V.wpaint, 2); assert.equal(V.wakes, 2);
   assert.equal(waterFromSearch('?wpaint=2').on, false, 'the paint alone changes no ground');

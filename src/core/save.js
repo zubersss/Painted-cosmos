@@ -102,7 +102,24 @@ export function restore(sim, d) {
   sim.shFrame = bodyFrame(d.ship.bodyId, true);
   sim.shipCam = createShipCamera();
   sim.bodyId = d.bodyId;
-  const eg = onGround(d.bodyId, d.explorer.p);
+  let eg = onGround(d.bodyId, d.explorer.p);
+  // (A place saved on dry ground may be under shallow water NOW: the water's parts moved the oil look's rivers, 24 Nov --
+  //  11 of 800 places along the landing's old brook stand in water up to 0.56 m deep. Such a place comes back on the nearest
+  //  dry ground within 12 m, so a loaded game does not open with the explorer standing in a stream; one saved swimming, in
+  //  water deeper than the swimming depth, still comes back swimming.)
+  const wet0 = eg.floor - eg.radius;
+  if (wet0 > 0.05 && wet0 <= EXPLORER.swimDepth) {
+    const u = eg.dir, a = Math.abs(u.y) < 0.9 ? V(-u.z, 0, u.x) : V(0, u.z, -u.y), al = len(a) || 1;
+    const t1 = V(a.x / al, a.y / al, a.z / al), t2 = V(u.y * t1.z - u.z * t1.y, u.z * t1.x - u.x * t1.z, u.x * t1.y - u.y * t1.x);
+    const Rb = BODIES[d.bodyId].radius;
+    search: for (let r = 1.5; r <= 12; r += 1.5) {
+      for (let k = 0; k < 16; k++) {
+        const th = k * Math.PI / 8, c = Math.cos(th) * r / Rb, sn = Math.sin(th) * r / Rb;
+        const g = onGround(d.bodyId, V(u.x + t1.x * c + t2.x * sn, u.y + t1.y * c + t2.y * sn, u.z + t1.z * c + t2.z * sn));
+        if (g.floor - g.radius <= 0.01) { eg = g; break search; }
+      }
+    }
+  }
   // In liquid deeper than the swimming depth the explorer floats, feet that far under the
   // surface: a game saved while swimming comes back swimming, not standing on the bed.
   const deep = eg.floor - eg.radius > EXPLORER.swimDepth;
