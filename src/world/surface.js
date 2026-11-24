@@ -35,6 +35,7 @@ export function makeSample(nBiomes) {
     dry: 0, wet: 0, canopy: 0, aux: 0,
     qr: 0.6, qg: 0.74, qb: 0.8, qk: 0.85, qglow: 0, qcloud: 0,   // liquid look: colour, mirror, glow, cloud
     trees: 0, birch: 0, under: 0, rock: 0, s: 1e9, glade: 0, strata: 0, lip: 0,
+    still: 0, bank: 0, cap: 0, swell: 0,   // the water's (world/waterhooks.js): written by sample() EVERY time, 0 with no water part attached
   };
 }
 
@@ -89,6 +90,11 @@ class Surface {
     // go downhill any further"). Null until world/drainage.js attaches a solved field; nothing of it is
     // imported or built without its switch, so with the switch off every level below is what it always was.
     this.drain = null;
+    // THE WATER'S PARTS (docs/lead/WATER-DESIGN.md; world/waterhooks.js attaches them behind their switches, after the drainage
+    // field and before the first patch): `rivers` answers the distance to the nearest water in _base (world/rivers.js),
+    // `hydro` lakes, ponds and puddles in _forest and a river's mouth in the coast (world/hydro.js). Both null: the game as it was.
+    this.rivers = null;
+    this.hydro = null;
     this._dw = null;      // scratch biome weights for waterBaseAt (made on first use: only drainage asks)
   }
 
@@ -216,6 +222,9 @@ class Surface {
     c.baseReady = true;
     const R = this.R, x = c.x, y = c.y, z = c.z;
     c.L = this._bigL(x, y, z);
+    // (THE WATER, ?rivers=tree: the rivers drawn from the drainage field's own flow tree answer the whole of this -- c.s, and
+    //  c.pool, c.bar, c.fu, c.fv as _riversOil sets them -- in place of the noise lines below. world/rivers.js.)
+    if (this.rivers) { c.s = this.rivers.sample(this, c); return; }
     // the stream network: the zero contour of a warped noise field. s is the distance in
     // metres from the nearest stream centre line (true distance near the stream, where the
     // field is divided by its gradient; a looser pseudo distance far away).
@@ -450,6 +459,12 @@ class Surface {
       // like; a pool covers the whole channel and more.
       b.lq = pl + Math.max(0, L - 0.70 - pl) * (1 - smoothstep(w0, w0 + 2.5, s));
     } else b.lq = L - 0.4;
+    // (THE WATER, ?rivers=tree: the level the rivers' own part gave in _base, which runs downhill all along a river and is the
+    //  lake's level in a basin; NaN, and so nothing, unless that part is attached. world/rivers.js.)
+    if (c.lvR === c.lvR) b.lq = c.lvR;
+    // (THE WATER, ?lakes= ?ponds= ?puddles=: a basin's hills lowered under its lake, a pond carved, a hollow's puddle. It is
+    //  handed the parts b.h was made of, so it can make b.h again, and may set b.lq, c.still, c.bank, c.cap. world/hydro.js.)
+    if (this.hydro) { const H = this._hyd || (this._hyd = {}); H.L = L; H.hb = hb; H.hill = hill * 24 + mid * 4.5; H.rise = rise; H.sm = sm; H.mi = mi; H.rock = rockBump; H.s = s; H.w0 = w0; this.hydro.forest(this, c, b, H); }
     if (!full) return;
     const fg = R / 125, fp = R / 270, fv = R / 26;
     // (the oil look may open a wood: the biome's oil.glade = [from, to] in place of 0.24, 0.62: more and wider glades of
@@ -671,9 +686,14 @@ class Surface {
         const st = this._stacks(X, Y, Z, T.stackCell || 95, T.stacks == null ? 0.45 : T.stacks, true);
         if (st > 0) { const near = smoothstep(-30, -16, hh) * (1 - smoothstep(-6, -1.5, hh)); hh += st * near * (cl * 0.9 - hh); face = Math.max(face, this._stF * near); crown = st * near; }
       }
+      // (THE WATER, ?falls= ?fjord=: a river's mouth cut through the shelf to the cliff's lip, a fjord drowned up a river's last
+      //  reach. It sets c.lqC, the level of river water standing in that cut, NaN where there is none. world/hydro.js.)
+      let lqC = NaN;
+      if (this.hydro) { hh = this.hydro.coast(this, c, hh, T); lqC = c.lqC; }
       h = hh + C.n3(x * R / 9, y * R / 9 + 2.0, z * R / 9) * 0.25 + (C.n3(x * R / 37 + 4.0, y * R / 37, z * R / 37) * 2.6 + C.n3(x * R / 11 - 2.0, y * R / 11, z * R / 11 + 6.0) * 0.9 + C.n3(x * R / 3.7 + 8.0, y * R / 3.7, z * R / 3.7) * 0.4) * (1 - smoothstep(3, 16, Math.abs(hh)));
       t = clamp((h + 2) / 34, 0, 1); dry = 0.25 + 0.5 * t; wet = h < 1 ? 0.6 : 0.2;
       lq = this.sea == null ? 0 : this.sea;
+      if (lqC === lqC) lq = lqC;
       grow = bi.tallWet ? (1 - smoothstep(-14, -3, h)) * smoothstep(-34, -20, h) * 1.0 + smoothstep(-3, 0, h) * 0 : smoothstep(cl * 0.7, cl * 0.9, h);
       meadow = smoothstep(cl * 0.5, cl * 0.8, h);
       bed = 1 - smoothstep(-0.5, 2.5, h);
@@ -952,6 +972,7 @@ class Surface {
     o.top = top;
     const c = this._ctx; c.x = x; c.y = y; c.z = z; c.baseReady = false;
     c.fu = 0; c.fv = 0; c.dr = null;
+    c.still = 0; c.bank = 0; c.cap = 0; c.swell = 0; c.lvR = NaN;
     const b = this._b;
     let h = 0;
     const gw = this._gw, gl = this._gl;
@@ -1018,6 +1039,8 @@ class Surface {
     o.lq = lq;
     // (the oil look's rivers: the current where there is water, in this place's two tangent axes: _riversOil)
     o.fu = c.fu; o.fv = c.fv;
+    // (the water's own fields: written EVERY time -- the sample object is shared by every call, docs/lead/WATER-DESIGN.md)
+    o.still = c.still; o.bank = c.bank; o.cap = c.cap; o.swell = c.swell;
     // WHERE THE WATER FALLS, IT IS WHITE. (The owner, 23 Nov: waterfalls. The drainage field already knows how
     // steeply the water SURFACE drops here and how much country drains through, and patchgen.js was built with a
     // socket for exactly these two and nothing has ever filled it -- see its own note at :60.)

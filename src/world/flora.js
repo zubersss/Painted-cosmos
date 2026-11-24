@@ -18,7 +18,7 @@ import { dirToFace, faceToDir, nodeSize } from './cubesphere.js';
 import { INST_STRIDE, U_GRASS, U_FERN, U_BUSH, U_ROCK, U_FLOWER, U_STONE, U_REED, U_SHARD } from './floraplace.js';
 import { SEASON, leafNow } from '../data/season.js';
 import { FLORA_PHYS, TALL_KITS, farCardGeometry, farBlobGeometry, sortLeafCards, leafDrawCount, farTreeGeometry, grassGeometry, grassPatchGeometry, reedGeometry, fernGeometry, bushGeometry, rockGeometry, flowerGeometry, shardGeometry } from './florakit.js';
-import { makePropMaterial } from '../render/materials.js';
+import { makePropMaterial, TREE_DEPTH } from '../render/materials.js';
 import { treeCell, underCell, hasCell, TREE_LEVEL, UNDER_LEVEL } from './obstacles.js';
 import { QUALITY, G, LOOK, SCREEN, SHADOW } from '../render/shared.js';
 import { SHADOW_LAYER } from '../render/shadow.js';
@@ -55,6 +55,34 @@ const FAR_LUMP = typeof location !== 'undefined' && /[?&]fartree=lump\b/.test(lo
 // It stays opt-in, for the speed test and for comparisons.
 const FAR_BLOB = typeof location !== 'undefined' && /[?&]fartree=blob\b/.test(location.search || '');
 const FAR_CARDS = !FAR_LUMP;
+// THE TREES TO 30 A SECOND (?trees2=, 2026-11-24; docs/lead/TREES-DESIGN.md on r2, package T2; the oil look only).
+//   ?trees2=1 or split: the near and middle trees drawn by TWO SHORT PROGRAMS, one for the wood and one for the leaves
+//     (materials.js WOOD_FRAG, LEAF_FRAG), with the wood's haze of hair twigs not built (kits/grove.js): the same
+//     leaves, the same skeleton, the same paint.
+//   ?trees2=cards: that, with the near tree's leaves as CLUSTERS on cards (kitbuild.js clusterCard).
+// Without it (or ?trees2=0) every tree is exactly what it was. The speed test swaps it while it runs (setTrees2).
+const TREES2 = (() => {
+  if (typeof location === 'undefined' || !location.search) return '';
+  const q = new URLSearchParams(location.search).get('trees2');
+  return q === '1' || q === 'split' ? 'split' : q === 'cards' ? 'cards' : '';
+})();
+// (only a kind whose crown is leaves one by one, and nothing else, can be split: parts 0 bark, 5 leaf, 6 snow on a
+//  bough. A kind with crowns of washes (part 1: the green wood's conifer) keeps the one program.)
+function splittable(geos) {
+  for (const g of geos) { const d = g.attributes.aData.array; for (let i = 1; i < d.length; i += 4) { const p = d[i]; if (!(p < 0.5 || (p > 4.5 && p < 6.5))) return false; } }
+  return true;
+}
+// Wood first, then the leaves (sortLeafCards already orders them so: everything that is not a leaf, then the leaves by
+// number), as two groups of one index, one for each program.
+// (?treedepth=1, package T5: the cards of leaves laid in depth first, render/index.js; only with ?trees2=cards)
+const TREEDEPTH = typeof location !== 'undefined' && /[?&]treedepth=1\b/.test(location.search || '');
+const HIDDEN = new THREE.MeshBasicMaterial({ visible: false });      // (the wood's place in the depth pass: not drawn)
+function hasPart(geo, part) { const d = geo.attributes.aData.array; for (let i = 1; i < d.length; i += 4) if (Math.abs(d[i] - part) < 0.5) return true; return false; }
+function splitGroups(geo) {
+  const base = geo.userData.leaf ? geo.userData.leaf.base : geo.index.count;
+  geo.clearGroups(); geo.addGroup(0, base, 0); geo.addGroup(base, geo.index.count - base, 1);
+  return geo;
+}
 const RANGE_SCALE = [0.28, 0.6, 1.0];                    // (the lower tiers keep the ranges they had)
 const TRIM = [1, 1];          // (was [0.82, 0.88] to pay for a triangle budget; the owner withdrew the budget: trees hand over where they read best)
 const WASH_T = 0.55;                   // seconds a new thing takes to wash in, and a tree to change hands between two tiers
@@ -165,6 +193,9 @@ export class Flora {
     this.farFill = !!(LOOK.oil && FAR_FILL);
     this.farSize = this.treeSize * this.farSpan;       // far trees are batched in cells this many tree cells to a side
     this.rangeScale = 1; this.treeScale = 1; this.farScale = 1; this.lastScale = -1; this.benchTreeK = null;
+    // (the speed test's handle on the near trees' index, core/bench.js: 'leaves' draws a tall mesh from its first leaf
+    //  card on, 'wood' only what comes before it -- sortLeafCards puts every piece of wood first. null: the whole tree.)
+    this.benchNear = null;
     this.lastLaid = -10; this.washNow = 1; this._washWall = 0;
     this.lastRelease = -10;
     this.held = [];                    // cells that are built and wait for their ground (see update)
@@ -196,17 +227,20 @@ export class Flora {
     //  look -- boughs sampled off a curve rather than drawn as two straight bars -- must be behind it, or the
     //  watercolour game changes and the pixel gate says so.)
     const TALL = L.tall.map((sp) => (LOOK.oil ? Object.assign({}, sp, { oilLook: 1 }, sp.kit === 'broadleaf' || sp.kit === 'maple' || sp.kit === 'aspen' ? { leafy: 1, double: 1 } : null, sp.kit === 'roundmaple' || sp.kit === 'poplar' || sp.kit === 'oak' || sp.kit === 'birch' || sp.kit === 'willow' || sp.kit === 'sapling' ? { double: 1 } : null, sp.oil) : sp));
+    this.tall = TALL;
     this.species = TALL.map((sp, i) => {
-      const mat = makePropMaterial(bodyUniforms, { name: 'tall-' + sp.kit + i, barkA: sp.bark[0], barkB: sp.bark[1], leafA: sp.leaf[0], leafB: sp.leaf[1], leafC: sp.leaf[2], barkP: sp.barkP, leafP: sp.leafP, accent: sp.accent, oilDark: sp.dark || null, oilFam: sp.fam || null, oilKind: sp.snowy ? 1 : sp.bare ? 2 : 0, wind: sp.wind == null ? 0.03 : sp.wind, doubleSide: !!sp.double, phys: sp.kit === 'vine' ? null : 'lite', branch: BRANCHY.has(sp.kit), stiff: sp.kit === 'kelp' ? 0.1 : 1, plantHeight: (FAR_DIMS[sp.kit] || [0, 10])[1], gem: sp.kit === 'crystal',
+      const mo = { name: 'tall-' + sp.kit + i, barkA: sp.bark[0], barkB: sp.bark[1], leafA: sp.leaf[0], leafB: sp.leaf[1], leafC: sp.leaf[2], barkP: sp.barkP, leafP: sp.leafP, accent: sp.accent, oilDark: sp.dark || null, oilFam: sp.fam || null, oilKind: sp.snowy ? 1 : sp.bare ? 2 : 0, wind: sp.wind == null ? 0.03 : sp.wind, doubleSide: !!sp.double, phys: sp.kit === 'vine' ? null : 'lite', branch: BRANCHY.has(sp.kit), stiff: sp.kit === 'kelp' ? 0.1 : 1, plantHeight: (FAR_DIMS[sp.kit] || [0, 10])[1], gem: sp.kit === 'crystal',
         // (the last fixes: a spire parts round an eye inside it; its girth at the foot, height and lean, florakit.js spireGeometry)
-        hollow: sp.kit === 'spire' ? (sp.slim ? [1.3, 10.5, 0.3] : [2.0, 12, 0]) : null });
+        hollow: sp.kit === 'spire' ? (sp.slim ? [1.3, 10.5, 0.3] : [2.0, 12, 0]) : null };
+      const mat = makePropMaterial(bodyUniforms, mo);
       mat.userData.pcCasts = true;
       const gen = TALL_KITS[sp.kit];
       const fd = sp.farD || (sp.kit === 'crystal' && sp.thin ? [1.8, 8, 0.9] : FAR_DIMS[sp.kit]);      // (farD: a kind's own far size [across, high, taper]: the oil look's trees of the snow)
       // (the oil look: a tree's leaves in the order of their numbers, so that far off only a share of them is drawn:
       // florakit.js sortLeafCards)
       const lf = LOOK.oil ? sortLeafCards : (g) => g;
-      return { mat, geo0: [lf(gen(11 + i * 10, 0, sp)), lf(gen(12 + i * 10, 0, sp))], geo1: lf(gen(13 + i * 10, 1, sp)), far: fd, pine: sp.kit === 'conifer',
+      const geo0 = [lf(gen(11 + i * 10, 0, sp)), lf(gen(12 + i * 10, 0, sp))], geo1 = lf(gen(13 + i * 10, 1, sp));
+      return { mat, mat1: mat, geo0, geo1, base: { mat, geo0, geo1 }, mo, t2: null, t2Mode: '', canSplit: LOOK.oil && !!gen && splittable([geo0[0], geo1]), far: fd, pine: sp.kit === 'conifer',
         // (far off it is drawn as leaf cards, not as a lump: the trees in leaf of the oil look; ?fartree=lump: as it was)
         // (2026-11-18, found by an independent reader and re-measured: this list was left at the two old kits when the
         //  four new ones went into the autumn wood, so 38,686 of 38,968 FAR TREES IN IT FELL BACK TO THE 26-TRIANGLE
@@ -231,6 +265,8 @@ export class Flora {
       this._turn.push({ mat: this.species[i].mat, far: i, sum: sp.leafSum || sp.leaf, aut: sp.leafAut || sp.leaf,
         famW: sp.fam ? (sp.fam[3] == null ? 1 : sp.fam[3]) : 0 });
     }
+    this.treeDepth = TREEDEPTH; TREE_DEPTH.on = TREEDEPTH;
+    if (TREES2) this._useTrees2(TREES2);
     const U = L.under || { leaf: [[0.8, 0.85, 0.4], [0.55, 0.7, 0.3], [0.35, 0.5, 0.3]], accent: [0.86, 0.29, 0.17], bush: [[0.64, 0.77, 0.37], [0.45, 0.63, 0.36], [0.24, 0.41, 0.36]], rock: [[0.8, 0.79, 0.83], [0.47, 0.45, 0.55]] };
     this.U = U;
     this.pal = new Map();
@@ -265,7 +301,7 @@ export class Flora {
   // its programs and are not listed.
   warmSet() {
     if (!this.ready) this._init();
-    const K = this.kit, M = this.mats, out = this.species.map((s) => [s.mat, s.geo1]);
+    const K = this.kit, M = this.mats, out = this.species.flatMap((s) => (s.mat1 && s.mat1 !== s.mat ? [[s.mat, s.geo0[0]], [s.mat1, s.geo1]] : [[s.mat, s.geo1]]));      // (?trees2: each tier its own programs)
     if (M.far) out.push([M.far, K.far]);
     out.push([M.under, K.grass], [M.patch, K.patch], [M.bush, K.bush], [M.rock, K.rock], [M.shard, K.shard]);
     return out;
@@ -354,6 +390,7 @@ export class Flora {
     const g = new THREE.BufferGeometry();
     for (const k of SHARED) if (geo.attributes[k]) g.setAttribute(k, geo.attributes[k]);
     g.setIndex(geo.index);
+    for (const gr of geo.groups) g.addGroup(gr.start, gr.count, gr.materialIndex);      // (?trees2: wood, then leaves)
     if (geo.userData.leaf) g.userData.leaf = geo.userData.leaf;
     const inst = new THREE.InstancedBufferAttribute(new Float32Array(cap * 4), 4);
     g.setAttribute('aInst', inst);
@@ -371,7 +408,8 @@ export class Flora {
     // FIRST, is +2.3 ms, which is the other half of the same fact.
     if (far) mesh.renderOrder = 9;
     // (the oil look's cast shadows, render/shadow.js: trees, bushes and stones cast; blades and flowers do not)
-    if (mat.userData.pcCasts) mesh.layers.enable(SHADOW_LAYER);
+    if ((Array.isArray(mat) ? mat[0] : mat).userData.pcCasts) mesh.layers.enable(SHADOW_LAYER);
+    if (Array.isArray(mat) && mat.depthMats) { mesh.userData.pcDepthMats = mat.depthMats; TREE_DEPTH.meshes.add(mesh); }      // (?treedepth=1)
     mesh.count = 0;
     mesh.position.copy(chunk.origin);
     mesh.matrixAutoUpdate = false; mesh.updateMatrix();
@@ -380,6 +418,14 @@ export class Flora {
     //  to break its outline, so a crown must not be culled at the edge of the screen for those few extra metres.)
     mesh.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 0, 0), chunk.size * 0.75 + (LOOK.oil ? 30 : 24));
     const origin = chunk.origin, flora = this, camRel = new THREE.Vector3(), lodv = new THREE.Vector4().fromArray(lod);
+    // (the draw range of a tree's sorted index: n is what the leaves by distance ask for; the speed test may keep only
+    //  the wood or only the leaves of a NEAR tree, flora.benchNear, and never touches a far one)
+    const benchRange = (geometry, lf, n) => {
+      const bn = far ? null : flora.benchNear;
+      if (bn === 'wood') geometry.setDrawRange(0, lf.base);
+      else if (bn === 'leaves') geometry.setDrawRange(lf.base, Math.max(0, n - lf.base));
+      else geometry.setDrawRange(0, n);
+    };
     mesh.onBeforeRender = function (renderer, scene, camera, geometry, material) {
       // (a tree's ranges follow its size on the screen in the oil look, and the far trees the air they are seen through: update())
       const u = material.uniforms, k = far ? flora.farScale : chunk.isTree ? flora.treeScale : flora.rangeScale;
@@ -401,11 +447,11 @@ export class Flora {
             let thr = (1 - keep) * 1.06 - 0.06;
             // (the shadow pass: of a crown's leaves only a share throws a shadow at all, shadow.js uThinLeaf)
             if (u.uThinLeaf) thr = 1 - Math.min(1 - u.uThinLeaf.value, keep * 0.5) - 0.02;
-            geometry.setDrawRange(0, leafDrawCount(lf, thr));
+            benchRange(geometry, lf, leafDrawCount(lf, thr));
           }
         } else {
           u.uLeafLod.value.set(0, 0, 0, 0);
-          if (lf) geometry.setDrawRange(0, Infinity);
+          if (lf) benchRange(geometry, lf, geometry.index ? geometry.index.count : Infinity);
         }
       }
       if (u.uWashIn) u.uWashIn.value.set(flora.washNow, mesh.userData.laid, WASH_T);
@@ -533,7 +579,7 @@ export class Flora {
       else {
         const kind = d[o + 5], v = d[o + 6] % 2, sp = this.species[kind];
         add('0:' + kind + ':' + v, i, sp.geo0[v], sp.mat);
-        add('1:' + kind, i, sp.geo1, sp.mat);
+        add('1:' + kind, i, sp.geo1, sp.mat1 || sp.mat);
       }
     }
     chunk.groups = Object.values(groups);
@@ -742,6 +788,69 @@ export class Flora {
     }
   }
 
+  // THE TREES' TWO SHORT PROGRAMS (?trees2=; see TREES2 at the head of this file). Each kind that can be split is
+  // given a wood program and a leaf program (one material each, in that order, over the two groups of one index) and
+  // its trees built again for them; a kind that cannot keeps what it had. mode '' puts every kind back. The kinds'
+  // first forms are kept, so the speed test can swap one for the other in the same minute (setTrees2).
+  _useTrees2(mode) {
+    // ('cards-near' / 'cards-mid': only that tier in cards, the other split -- so the speed test can price each alone)
+    const nearC = mode === 'cards' || mode === 'cards-near', midC = mode === 'cards' || mode === 'cards-mid';
+    for (let i = 0; i < this.species.length; i++) {
+      const s = this.species[i];
+      if (!mode || !s.canSplit) { s.mat = s.mat1 = s.base.mat; s.geo0 = s.base.geo0; s.geo1 = s.base.geo1; s.t2Mode = ''; continue; }
+      if (!s.t2 || s.t2.mode !== mode || s.t2.deep !== !!this.treeDepth) {
+        const gen = TALL_KITS[this.tall[i].kit];
+        const spN = Object.assign({}, this.tall[i], { trees2: nearC ? 'cards' : 'split' }), spM = Object.assign({}, this.tall[i], { trees2: midC ? 'cards' : 'split' });
+        const g = (seed, lod, sp) => splitGroups(sortLeafCards(gen(seed, lod, sp)));
+        const geo0 = [g(11 + i * 10, 0, spN), g(12 + i * 10, 0, spN)], geo1 = g(13 + i * 10, 1, spM);
+        // (a tier whose tree came out in cards of leaves, part 7, has its leaves drawn by the card program; a kind with
+        //  no cards of its own, by the leaf program)
+        const cN = nearC && hasPart(geo0[0], 7), cM = midC && hasPart(geo1, 7), deep = !!this.treeDepth;
+        s.mats = s.mats || {};
+        // (t: wood, leaf, card, card-eq, card-first; '-mid' the middle tier's own, package T3: its trees bend whole, as
+        //  every other plant does, without the crown's branch-by-branch sway -- a few pixels at that distance, and the
+        //  dearest thing in a tree's vertex shader)
+        const mk = (t) => {
+          if (s.mats[t]) return s.mats[t];
+          const mid = t.endsWith('-mid'), base = mid ? t.slice(0, -4) : t;
+          const m = makePropMaterial(this.bodyUniforms, Object.assign({}, s.mo, { name: s.mo.name + '-' + t, tree: base.startsWith('card') ? 'card' : base,
+            depth: base === 'card-eq' ? 'equal' : base === 'card-first' ? 'first' : undefined }, mid ? { branch: false } : null));
+          m.userData.pcCasts = true;
+          // (the depth pass shares the colour pass's uniforms: whatever the mesh sets before it is drawn holds for both)
+          if (base === 'card-first') m.uniforms = mk('card-eq' + (mid ? '-mid' : '')).uniforms;
+          // (the leaf programs turn with the year as the kind's own material does)
+          const q = base !== 'wood' && base !== 'card-first' && this._turn && this._turn.find((x) => x.mat === s.base.mat);
+          if (q) { this._turn.push(Object.assign({}, q, { mat: m, far: null })); this._seasonAt = -1; this.setSeason(SEASON.t); }
+          return (s.mats[t] = m);
+        };
+        const leafOf = (cards, sfx) => mk(cards ? (deep ? 'card-eq' : 'card') + sfx : 'leaf' + sfx);
+        const mats0 = [mk('wood'), leafOf(cN, '')], mats1 = [mk('wood-mid'), leafOf(cM, '-mid')];
+        if (deep && cN) mats0.depthMats = [HIDDEN, mk('card-first')];
+        if (deep && cM) mats1.depthMats = [HIDDEN, mk('card-first-mid')];
+        s.t2 = { mode, deep, mats0, mats1, geo0, geo1 };
+      }
+      s.mat = s.t2.mats0; s.mat1 = s.t2.mats1; s.geo0 = s.t2.geo0; s.geo1 = s.t2.geo1; s.t2Mode = mode;
+    }
+    this.trees2 = mode;
+  }
+  // (PILOT's speed test, core/bench.js) The trees' two programs swapped in while the game runs: every near and middle
+  // patch is dropped and built again in its turn; the caller waits for the world to settle. Returns the mode now
+  // drawn, or null where there is nothing to swap (not the oil look, or no kind that can be split).
+  setTrees2(mode, depth) {
+    if (!LOOK.oil || !this.ready || !this.species.some((s) => s.canSplit)) return null;
+    mode = mode === 'cards' || mode === 'cards-near' || mode === 'cards-mid' ? mode : mode ? 'split' : '';
+    depth = depth == null ? !!this.treeDepth : !!depth;
+    if ((this.trees2 || '') === mode && !!this.treeDepth === depth) return mode;
+    this.treeDepth = depth; TREE_DEPTH.on = depth;
+    this._useTrees2(mode);
+    for (const [key, ch] of this.treeChunks) {
+      if (ch.queued) { const qi = this.queue.indexOf(ch); if (qi >= 0) this.queue.splice(qi, 1); ch.queued = false; }
+      this._disposeChunk(ch); this.treeChunks.delete(key);
+    }
+    this.lastTreeEval.set(1e9, 0, 0);
+    return mode;
+  }
+
   // (PILOT's speed test, core/bench.js) The far trees' form swapped while the game runs: the lump, or the flat pieces of
   // ?fartree=cards. Every far patch is dropped and built again in its turn; the caller waits for the world to settle.
   // Returns which form is now drawn (true: flat pieces), or null where there is nothing to swap (not the oil look).
@@ -750,19 +859,41 @@ export class Flora {
     on = !!on;
     const now = this.species.some((sp) => sp.cardFar);
     if (on === now) return now;
-    if (on && !this.kit.farCards) this.kit.farCards = sortLeafCards(FAR_BLOB ? farBlobGeometry(6) : farCardGeometry(6));   // (ordered for thinning here too, or the speed test's swap loses it)
-    for (const sp of this.species) sp.cardFar = on && sp.canCard;
+    return this.setFarForm(on ? (FAR_BLOB ? 'blob' : 'cards') : 'lump') !== 'lump';
+  }
+  // THE FAR TREES' FORM, swapped while the game runs (the speed test, core/bench.js; 2026-11-24, trees lane T0):
+  // 'cards' the tree of flat pieces that ships (138 triangles), 'blob' two crossed six-cornered cards (?fartree=blob:
+  // 10 triangles, which prices on the phone what a quad's fragments cost against a mesh's triangles), 'lump' the old
+  // lump. Every far patch is dropped and built again in its turn. Returns the form now drawn, or null where there is
+  // nothing to swap (not the oil look, or not yet made).
+  setFarForm(form) {
+    if (!LOOK.oil || !this.ready) return null;
+    const now = this.farForm || (this.species.some((sp) => sp.cardFar) ? (FAR_BLOB ? 'blob' : 'cards') : 'lump');
+    if (form === now) return now;
+    // (ordered for thinning here too, or the speed test's swap loses it)
+    // (each form made once and kept: its buffers stay on the graphics card while the meshes come and go)
+    const fg = this._farGeo || (this._farGeo = {});
+    if (this.kit.farCards && now !== 'lump' && !fg[now]) fg[now] = this.kit.farCards;
+    if (form === 'blob') this.kit.farCards = fg.blob || (fg.blob = sortLeafCards(farBlobGeometry(6)));
+    else if (form === 'cards') this.kit.farCards = fg.cards || (fg.cards = sortLeafCards(farCardGeometry(6)));
+    else form = 'lump';
+    for (const sp of this.species) sp.cardFar = form !== 'lump' && sp.canCard;
+    this.farForm = form;
+    this._dropFar();
+    return form;
+  }
+  _dropFar() {
     for (const [key, ch] of this.farChunks) {
       if (ch.queued) { const qi = this.queue.indexOf(ch); if (qi >= 0) this.queue.splice(qi, 1); ch.queued = false; }
       this._disposeChunk(ch); this.farChunks.delete(key);
     }
     this.lastTreeEval.set(1e9, 0, 0);
-    return on;
   }
 
   _disposeChunk(chunk) {
     for (const m of chunk.meshes) {
       this.group.remove(m);
+      TREE_DEPTH.meshes.delete(m);
       for (const k of SHARED) m.geometry.deleteAttribute(k);
       m.geometry.setIndex(null);
       m.geometry.dispose();

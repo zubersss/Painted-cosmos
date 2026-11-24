@@ -19,7 +19,34 @@
 //   THE CREATURES ARE AN OIL-LOOK FEATURE. Each biome's list of animals rides under its `oil.over` (so the live
 //   watercolour game cannot see one) and overlayOil below is what lays those lists on, which it only does with the
 //   oil look. So ?beasts=1 without ?look=oil finds no animals anywhere, which is the safe way round.
-export const MODE = { oil: false, powers: false, calm: false, beasts: 0, get wanderer() { return this.oil; } };
+export const MODE = { oil: false, powers: false, calm: false, beasts: 0, water: null, get wanderer() { return this.oil; } };
+
+// THE WATER (group E, docs/lead/WATER-DESIGN.md; the owner, 23-24 Nov: water that runs downhill, pools, rivers that reach the
+// sea, lakes, waterfalls, fjords, and water that answers the player and the weather). Every part has its own switch in the
+// address, read by waterFromSearch before anything is made (main.js, gallery.js), and none does anything without the oil
+// look. `on` is true when any part that changes the WORLD is asked for (rivers, lakes, ponds, puddles, swell, falls,
+// fjord): world/waterhooks.js then fetches and attaches those parts, with the drainage field they all stand on (so these
+// imply ?flow=1). The paint and the player's parts (wpaint, wakes, splash) are read where they are used.
+//   ?rivers=tree   rivers drawn from the drainage field's own flow tree (world/rivers.js); else today's _riversOil
+//   ?lakes=1       lake beds in the basins the field fills          ?ponds=1    ponds in flat glades
+//   ?puddles=1     puddles that come with rain and dry after it     ?swell=1    streams that rise after rain
+//   ?falls=1       waterfalls where rivers meet cliffs              ?fjord=1    fjords at high river mouths
+//   ?wpaint=2      the water's new paint (0: v37's)                 ?wakes=2    ring waves per pixel (1: v37's, per vertex)
+//   ?splash=1      splashes going in, from footsteps, from a low flight
+// A NUMBER or 0 for each: 0 is off, which is exactly the game as it was.
+MODE.water = { on: false, rivers: 0, lakes: 0, ponds: 0, puddles: 0, swell: 0, falls: 0, fjord: 0, wpaint: 0, wakes: 1, splash: 0 };
+export function waterFromSearch(search) {
+  const W = MODE.water;
+  let q;
+  try { q = new URLSearchParams(search || ''); } catch { return W; }
+  const n = (k, d) => { if (!q.has(k)) return d; const v = q.get(k); if (v === 'tree') return 1; const x = parseInt(v, 10); return isFinite(x) ? x : d; };
+  W.rivers = q.get('rivers') === 'tree' ? 1 : 0;
+  W.lakes = n('lakes', 0); W.ponds = n('ponds', 0); W.puddles = n('puddles', 0); W.swell = n('swell', 0);
+  W.falls = n('falls', 0); W.fjord = n('fjord', 0);
+  W.wpaint = n('wpaint', 0); W.wakes = n('wakes', 1); W.splash = n('splash', 0);
+  W.on = !!(W.rivers || W.lakes || W.ponds || W.puddles || W.swell || W.falls || W.fjord);
+  return W;
+}
 
 // THE OIL LOOK'S OWN CONTENT, laid over the looks ONCE when the look is switched on (render/shared.js calls this; with
 // the look off nothing is touched, so the default game's worlds are what they were). A look may name kinds of tall
