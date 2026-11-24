@@ -234,7 +234,13 @@ Branch `water-bodies` = lane 0 + look-proto v37.1 + `origin/design-water` (W1's 
   cloud of small pale dabs (`falls-ropes-68m-29m-B1-scratchcurtainfix.jpg`, taken with W3's curtain lines in a scratch
   copy only). The fjord: the wide mouth nearest the landing stays a fall. `c.cap` / `c.swell` by the max rule (runnels).
   RULE from F: do not show the owner the 68 m falls view until W3's curtain lines land.
-- NEXT: F's second look; W3's curtain fix and bench.js's falls view when they land (then the phone's row).
+- **DEFAULTS (the coordinator, 24 Nov, with the owner's leave):** the coordinator ACCEPTED the lake cores and the reworked
+  falls. Lakes, ponds, puddles and the fjord become the default on Earth in the oil look with E's rivers flip; `?x=0` opts
+  out. W2's side is landed (221040b): a part is built only on a world whose look asks for it (`oil.lakeK`, `oil.fjords`,
+  `oil.ponds`, `oil.puddles`); with every switch on only Earth changes (test). The flip itself is E's, in data/mode.js
+  (exact lines sent: `n('lakes', 1)` etc., falls staying `n('falls', 0)`). THE FALLS FLIP (`n('falls', 1)`) IS HELD until
+  W3's curtain lines land and F has seen the falls without the curtain.
+- NEXT: E's flip, then merge design-water and re-check; F's second look; W3's curtain fix; bench.js's falls view.
 
 ## Stations and tools
 
