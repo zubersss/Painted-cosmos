@@ -628,7 +628,19 @@ FV7 of `docs/lead/FARVIEW-DESIGN.md`. A second session (A2, branch `trees-near`)
 the same time: this lane touches only the far parts of `flora.js`, `florakit.js`, the plant material's far branch,
 `render/impostor.js`, `render/shadow.js` and new rows in `core/bench.js`.
 
-**State (update this line every step):** (24 Nov, about 19:30) THE FAR CROWNS' SHADOWS ON THE GROUND (the coordinator's new
+**State (update this line every step):** (24 Nov, about 20:10) F CHOSE C (the far shadows WITH the canopy hook) on two
+conditions: (1) OFF by default until the owner's speed test has a number from the bench row OR the far crowns' part of the
+map is cached; (2) a 16 h pair at 150 m and 420 m. BOTH DONE: (1) THE FAR MAP KEPT (shadow.js FAR_SHADOW.cache, default on
+with ?farshadow; ?farshcache=0 draws it every frame): the square keeps its place, axes and depth while its middle drifts
+under 64 texels (54 m), the sun under 0.25 deg and no far crown comes or goes (the last two wait 30 frames), at most 120
+frames; between whole draws only what moves (figures, other crowds) is drawn, over its last patch put back from the kept
+copy (a second 2048 float target, made only when asked). MEASURED, 150 m: kept frames 141-144 calls (137 with no far
+shadows, 203-206 drawn every frame), the picture the same (0.003 of 255); a whole draw +130 calls once; moving 10 m a
+frame, one whole draw every 6 frames. The default picture unchanged to the bit (checked after the pass's rework). (2) 16 h
+pair SEEN (A1_farshadow_16h_*_AC, with the hook in a local copy): long umber-plum pools on the floor between the crowns,
+the crowns still lit and apart; land under V 0.3 150 m 10.8 -> 16.5 percent, 420 m 1.5 -> 1.8; V median of the land
+0.643 -> 0.565 at 150 m. The hook: C to put it in (C's file, F asked C for its yes), behind ?farshadow.
+Before: THE FAR CROWNS' SHADOWS ON THE GROUND (the coordinator's new
 job, F's audit finding 1, taken from C's list; C told, C keeps the glades): BUILT AND SEEN, OFF BY DEFAULT, ?farshadow=1
 (render/shadow.js FAR_SHADOW; ?farshr= the square's half-size, 860). From the air (eye over 60 m) the shadow square grows
 to 860 m a side-half and lies 0.75 of it ahead of the eye (the impostors reach 1,500 m), its depth stretched for a low
