@@ -548,13 +548,23 @@ FV7 of `docs/lead/FARVIEW-DESIGN.md`. A second session (A2, branch `trees-near`)
 the same time: this lane touches only the far parts of `flora.js`, `florakit.js`, the plant material's far branch,
 `render/impostor.js`, `render/shadow.js` and new rows in `core/bench.js`.
 
-**State (update this line every step):** (24 Nov, about 17:30) CROWN MASS (F's audit 2, finding 1, the coordinator's top
-priority) built and tuned, OFF by default until F passes it (?crownmass=1; then default with ?crownmass=0 the old way):
-render/impostor.js PC_MASS (one colour a tree under 30 px, whole light steps, one tone under 4-7 px; stands: every tree its
-32 m block's place on the family run, uMassK2.x 1.0; a warm crown's paint x0.65, uMassK2.y). MEASURED autumn noon 150 m V
-0.86 -> 0.71, 420 m 0.82 -> 0.65, 1 km 0.76 -> 0.66; patterns longer (`A1_crownmass_*`); bright yellow crowns still
-scattered (the yellow kind with no family run). Sent to F. The gust crowns: ACCEPTED by F, dormant until the binding.
-Before that: look-proto v39.2 (c7d8d9e: my small crowns and the
+**State (update this line every step):** (24 Nov, about 18:40) THE FAR SPRUCE BUILT AND SEEN, OFF BY DEFAULT, waiting for
+F's ruling between two ways (flora.js FAR_SPRUCE; both act only with A2's ?pines, which is on trees-near and reaches
+trees-far with v39.3): `?farspruce=near` (today's near-tree bake, its crown floored at V 0.24: SEEN, the clean dense cones
+kept, deep green not near-black; MY RECOMMENDATION) or `?farspruce=bough` (F's order: the by-bough middle tree; at A2's 2.2
+growth the spruces all but vanish from the air, at 4, ?farsprucek=4, the density rule's growth, big flat green shards).
+Sheets `docs/shots/painter/trees-far/A1_farspruce_{150m,close,side}_ABCD` (A today, B bough x4, C bough x2.2, D near +
+floor), rendered in a scratch merge of trees-far + trees-near 067535f. When F rules: flip the default in FAR_SPRUCE.
+F'S 1 KM DARKS (asked after the spruce), MEASURED at the 1 km audit view (autumn noon, cam=high dy=600 = my fview dy 870),
+crown mass + weighted stands + any far spruce: land under V 0.3 = 0.02 percent (A, B, C and D the same to four places),
+under 0.35 = 0.75, under 0.4 = 4.4; the land's V 5th percentile 0.40. At 420 m under V 0.3: A 1.85, B-D about 0.6.
+Before: CROWN MASS IS THE DEFAULT (f230b40, row c7abccd; in v39.3).
+F's decisions after it, on trees-far (fad660f): bark as shaded leaves up to 30 px (uMassK2.w), and a stand's place on the
+run weighted by the references' canopy (20 yellow, 50 amber, 25 orange, 5 red); MEASURED 150 m bright yellow 15.5 -> 11.2
+percent (25.2 without crown mass), near-black 0.99 -> 0.49; F PASSED both (with crown mass into v39.4). Also on: the yellow kind borrows the wood's run,
+a tree strays 0.35 in its stand, gaps in crowns under 8 px filled. The gust crowns: accepted, dormant until the binding.
+Tuning handles live in the page: uMassK (x cap drop, y/w one tone px, z crown mass px), uMassK2 (x stand share, y warm
+paint, z stray in a stand, w bark-as-leaf px). Before that: look-proto v39.2 (c7d8d9e: my small crowns and the
 shadow saving live) merged into trees-far (e85dabd), rendered, pushed. THE GUST ON THE FAR CROWNS ACCEPTED BY F at
 150 m and 600 m (11738e6: a small turned crown's one tone at its cap, two-thirds step); dormant until F's binding
 (look-director 43540c5) reaches look-proto, with D's physics (design-weather d2f4277). READY, NOT BUILT: F's audit finding
