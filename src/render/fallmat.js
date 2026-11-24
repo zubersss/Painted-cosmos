@@ -166,6 +166,7 @@ uniform vec3 uOrgB;
 uniform vec4 uSprayK;     // x how many to keep (0..1), y the smallest a dab may be in pixels
 uniform float uTime;
 uniform vec4 uOilPx;      // (shared.js OIL: x metres a pixel a metre away, y the picture's lines)
+uniform vec4 uOilA;       // (shared.js OIL: x the look's stroke width in pixels at 720 lines)
 varying vec3 vBody;
 varying vec3 vView;
 varying vec2 vQ;
@@ -210,13 +211,16 @@ void main() {
   float dist = max(-mv.z, 0.1);
   // its size: a few decimetres, never under uSprayK.y pixels; farther off fewer are kept and each is larger
   float px = dist * uOilPx.x * uOilPx.y / 720.0;           // metres a pixel there, at 720 lines
-  float size = max(own, px * uSprayK.y);
-  float keep = step(h, uSprayK.x * min(1.0, (own * own) / (size * size) * 1.6)) * step(-0.25, above) * step(t, P * 0.96);
+  // (no larger than about twice the look's own stroke there, so near the eye the foam reads as spray and not as scattered
+  //  petals: the look director, 24 Nov; never under uSprayK.y pixels; and fewer of them close by)
+  float size = clamp(own, px * uSprayK.y, max(px * uSprayK.y, 1.4 * px * uOilA.x));      // (the sheet's strokes are 0.5 to 1 of px * uOilA.x: pcStrokeOct)
+  float nearK = mix(0.5, 1.0, smoothstep(25.0, 90.0, dist));
+  float keep = step(h, uSprayK.x * nearK * min(1.0, (own * own) / (size * size) * 1.6)) * step(-0.25, above) * step(t, P * 0.96);
   // the dab lies along its own motion on the screen
   vec3 vv3 = (viewMatrix * vec4(vel, 0.0)).xyz;
   vec2 ax = length(vv3.xy) > 1e-4 ? normalize(vv3.xy) : vec2(0.0, 1.0);
   vec2 ay = vec2(-ax.y, ax.x);
-  float len = aS.z > 1.5 ? size * 1.15 : size * (1.4 + min(2.2, length(vel) * 0.12)), wid = size * (aS.z > 1.5 ? 0.8 : 0.6);
+  float len = aS.z > 1.5 ? size * 1.15 : size * (1.3 + min(1.2, length(vel) * 0.08)), wid = size * (aS.z > 1.5 ? 0.8 : 0.6);
   mv.xy += (ax * position.x * len + ay * position.y * wid) * keep;
   vView = mv.xyz;
   vQ = position.xy; vH = h;
