@@ -32,11 +32,11 @@
 // ?canopy=0 takes it out (world/farstand.js reads it): the ground's program is compiled without any of it and the
 // mesher packs nothing new, so the picture is the one before to the bit. Only in the oil look, only on CANOPY_WORLDS.
 import { SEASON, leafNow } from '../data/season.js';
-import { CANOPY, NEEDLE, CANOPY_WORLDS, GROUND_SEASON, ROCKFIELD, canopyOn } from '../world/farstand.js';
+import { CANOPY, NEEDLE, CANOPY_WORLDS, GROUND_SEASON, ROCKFIELD, canopyOn, BLOOM_FAR, bloomFarOn, bloomPaletteOf } from '../world/farstand.js';
 import { MODE } from '../data/mode.js';
 import { pig, dilute, mixc } from '../data/looks/common.js';
 
-export { CANOPY, canopyOn, GROUND_SEASON, ROCKFIELD };
+export { CANOPY, canopyOn, GROUND_SEASON, ROCKFIELD, BLOOM_FAR };
 // ?candab=: the canopy's own dabs against the ground's (0.5: its finer layer is half the ground's finest, its coarser
 // layer the ground's finest). From a few hundred metres up the ground's dab is as big as a whole crown, so the roof's
 // cap and shaded side could not be laid with it; a crown wants three or four strokes across.
@@ -560,6 +560,50 @@ vec3 pcRockWash(vec3 c, float up, vec3 Bc, float strata, float dist, vec3 rnd, f
 }
 #endif`;
 
+// THE FLOWER DRIFTS FROM THE AIR (FV6(b) of the design, with flora B; ?bloomfar=1, the oil look, a world with flowers).
+// From 150 m the drifts were a few flecks: a tint in the ground's wash cannot show a drift, only dabs in the flower's own
+// colour, whole, can (B's stills on design-flora: final-meadow-150m-summer-old-new.jpg). world/bloom.js writes each full
+// sample's drift cover (o.fd) and its colour as an index into the world's 16-colour palette (o.fi, from the look data,
+// whites held to 0.80); patchgen.js packs them into aBloom (and its parent copy, the cover halfway, the index the stronger
+// neighbour's). A ground dab whose own number is under 0.9 of the cover at its centre is laid in the flower's colour,
+// in its own light and its usual shade; the ground between the dabs takes 0.45 of the drift. Nothing else changes.
+export const BLOOM_VERT_DECL = /* glsl */`
+#ifdef PC_BLOOMF
+attribute vec4 aBloom;
+attribute vec4 aBloomP;
+varying float vBloomK;
+flat varying float vBloomI;
+#endif
+`;
+export const BLOOM_VERT_MAIN = /* glsl */`
+#ifdef PC_BLOOMF
+  vBloomK = mix(aBloom.x, aBloomP.x, m);
+  vBloomI = m > 0.5 ? aBloomP.y : aBloom.y;      // (an index is not interpolated: the triangle's first vertex names it)
+#endif
+`;
+export const BLOOM_FRAG = /* glsl */`
+#ifdef PC_BLOOMF
+varying float vBloomK;
+flat varying float vBloomI;
+uniform vec3 uBloomPal[16];
+uniform float uBloomOn;     // 1 on a world whose flowers bloom.js hands over (farstand.js bloomFarOn), else 0
+float gBloom = 0.0;         // this dab is a flower's (set in pcGroundAt, read in pcGroundPaint)
+vec3 gBloomC;
+float gBkdx, gBkdy;         // (main) the cover's screen derivatives
+vec3 pcBloomPal(float i) { return uBloomPal[int(clamp(floor(i * 15.0 + 0.5), 0.0, 15.0))]; }
+// is the dab at dsA (pixels to its centre, already held short) a flower: by its own number against the cover there
+void pcBloomAt(vec2 dsA, vec3 rnd) {
+  gBloom = 0.0;
+  if (uBloomOn < 0.5) return;
+  float k = clamp(vBloomK + gBkdx * dsA.x + gBkdy * dsA.y, 0.0, 1.0);
+  if (k <= 0.02 || fract(rnd.z * 23.17 + rnd.y * 5.31) >= 0.9 * k) return;
+  gBloomC = pcBloomPal(vBloomI);
+  gBloom = 1.0;
+}
+#endif
+`;
+export function bloomUniforms() { return { uBloomPal: { value: new Float32Array(48) }, uBloomOn: { value: 0 } }; }
+
 // THE UNIFORMS (plain arrays: three reads a vec3 from three numbers), and what writes them each frame.
 export function canopyUniforms() {
   return {
@@ -684,6 +728,15 @@ export const CANOPY_BENCH = { off: false };
 const _c = [0, 0, 0];
 export function syncCanopy(material, S) {
   const u = material && material.uniforms;
+  if (u && u.uBloomPal) {
+    const on = bloomFarOn(S);
+    u.uBloomOn.value = on ? 1 : 0;
+    if (on && u.uBloomPal.userData !== S.id) {
+      const p = bloomPaletteOf(S), a = u.uBloomPal.value;
+      for (let i = 0; i < 16; i++) for (let t = 0; t < 3; t++) a[i * 3 + t] = p.colours[i] ? p.colours[i][t] || 0 : 0;
+      u.uBloomPal.userData = S.id;
+    }
+  }
   if (u && u.uRockK) {
     u.uRockK.value = MODE.oil && CANOPY_WORLDS[S.id] ? 1 : 0;
     if (u.uRockB) u.uRockB.value[2] = S.sea == null ? 0 : S.sea;

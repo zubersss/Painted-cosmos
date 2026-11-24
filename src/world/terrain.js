@@ -142,6 +142,8 @@ export class PlanetTerrain {
     g.setAttribute('aColor2P', new THREE.BufferAttribute(d.colors2P, 4, true));
     g.setAttribute('aParamsP', new THREE.BufferAttribute(d.paramsP, 4, true));
     g.setAttribute('aNormalP', new THREE.BufferAttribute(d.normalsP, 3));
+    // (the flower drifts from the air, FV6(b), ?bloomfar=1: the cover and the palette index, patchgen.js; render/farground.js)
+    if (d.bloom) { g.setAttribute('aBloom', new THREE.BufferAttribute(d.bloom, 4, true)); g.setAttribute('aBloomP', new THREE.BufferAttribute(d.bloomP, 4, true)); }
     g.setIndex(sharedIndex());
     g.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 0, 0), d.boundR);
     const mesh = new THREE.Mesh(g, this.material);
