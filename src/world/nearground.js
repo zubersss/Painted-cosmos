@@ -74,22 +74,22 @@ const VISTA = (() => {
 //   a wave of marks arriving from the feet outward, which is the owner's own complaint about things loading in;
 //   nothing pops without it, because a mark has no size at the rim where cells are listed (NEAR_VERT, `vis`).
 // THE FLORA LANE'S SWITCHES (2026-11-24, docs/lead/FLORA-DESIGN.md; the oil look only, the watercolour game never reads them).
-// THE MASTER SWITCH IS OPT-IN: `?flora=new` turns the lane on (the grass package, the flowers, the year, the blades'
-// greens); without it the oil look is the picture as it was before the lane. Inside it each of these is 1 by default
-// and 0 gives that package back exactly as it was. (The cull, G1, is on with or without it: it changes no pixel.)
+// The lane is ON by default; `?flora=old` (the one opt-out, for the owner's comparison) gives the oil look back as it was
+// before the lane, to the bit. Each of these is 1 by default and 0 gives that package back exactly as it was. (The
+// cull, G1, is on either way: it changes no pixel.)
 //   `?grass2=`   0 takes the whole grass package away (G2-G4): the oil look's near grass as it was on 24 Nov.
-//   `?nearcull=` 0 shades every mark again, in view or not (G1; the speed test's row does the same). On without ?flora=new.
+//   `?nearcull=` 0 shades every mark again, in view or not (G1; the speed test's row does the same). On with ?flora=old too.
 //   `?bladegreen=` 0 gives the blades the undergrowth's greens again instead of their own (`oil.flora.sward.leaf`, F10)
 //   `?sheen=`    0 takes away the gusts' sheen on the blades (G4: needs PHYSICS' bend, so the game, or the gallery's &physics=1).
 const FLORA = (() => {
-  const f = { grass2: 0, cull: 1, sheen: 0, bloom: 0, blade: 0 };
+  const f = { grass2: 1, cull: 1, sheen: 1, bloom: 0, blade: 1 };
   try {
     const q = new URLSearchParams(location.search), on = (k) => !q.has(k) || (q.get(k) !== '0' && q.get(k) !== 'false');
-    // THE MASTER SWITCH, OPT-IN (the coordinator, 24 Nov, to ship the lane without changing the look before the owner
-    // judges it): ?flora=new turns on everything of the lane that changes the picture; without it the oil look is the
-    // picture as it was. The marks the eye cannot see are dropped either way (G1, picture-identical; ?nearcull=0 off).
-    const isNew = q.get('flora') === 'new' || q.get('flora') === '1';
-    f.grass2 = isNew && on('grass2') ? 1 : 0;
+    // THE ONE OPT-OUT (the owner, 24 Nov, through the coordinator: "No do make it look different"): the lane is ON by
+    // default; ?flora=old gives today's flora back for comparison, every part of the lane that changes the picture off.
+    // The marks the eye cannot see are dropped either way (G1, picture-identical; ?nearcull=0 off).
+    const isOld = q.get('flora') === 'old' || q.get('flora') === '0' || q.get('flora') === 'false';
+    f.grass2 = !isOld && on('grass2') ? 1 : 0;
     f.cull = on('nearcull') ? 1 : 0;
     f.sheen = f.grass2 && on('sheen') ? 1 : 0;
     f.blade = f.grass2 && on('bladegreen') ? 1 : 0;
