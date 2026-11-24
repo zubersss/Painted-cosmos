@@ -910,9 +910,21 @@ void main() {
     #ifdef PC_ROCKF
       // (on a cliff the ground between the dabs is the cliff's rock at the pixel's own place, render/farground.js)
       float clP = smoothstep(0.66, 0.50, gFaceP.x) * smoothstep(0.05, 0.20, 1.0 - vCol.a) * gFaceOn;
-      if (clP > 0.0) { bareC = mix(bareC, pcCliffC(vBody, rB - uBodyR, vec3(0.5), bareC, lw), clP); lvl0 = mix(lvl0, min(lvl0, 0.9), gGully * clP); }
+      if (clP > 0.0) {
+        gCliffU = 1.0;
+        bareC = mix(bareC, pcCliffC(vBody, rB - uBodyR, vec3(0.5), bareC, lw), clP);
+        gCliffU = 0.0;
+        lvl0 = mix(lvl0, min(lvl0, 0.9), gGully * clP);
+        // (and it takes the dabs' own light planes and their warm and cool lean, at the pixel's facing: in plain daylight
+        // it was lighter and bluer than the planes around it, so every gap between the dabs on a far face read as a pale
+        // blue-grey fleck of one or two pixels, SEEN at 1 km by the look director; ?rockdebug=1 shows those gaps grey)
+        gRockP = clP; lvl0 = pcRockPlanes(lvl0, nV, sun0);
+      }
     #endif
     vec3 bare = pcTone(bareC, lvl0);
+    #ifdef PC_ROCKF
+      if (clP > 0.0) bare = pcRockTemp(bare);
+    #endif
     #ifdef PC_ROCKDEBUG
       if (gFaceOn > 0.5 && uRockDbg < 1.5) bare = vec3(0.5);
     #endif

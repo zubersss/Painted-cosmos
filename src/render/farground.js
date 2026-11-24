@@ -403,6 +403,7 @@ float gGully = 0.0;       // how far into a gully the cliff dab lies: its light 
 float gRockLw = 1.0;      // (main) the surface's metres per pixel here (lw): how many pixels a bed spans
 float gRockT = 0.0;       // the rock dab's temperature by its plane: +0.8 lit (warm) .. -1 turned away (cool), pcRockPlanes
 float gRockP = 0.0;       // how much the light planes rule this dab: bedded rock only (a cliff, a mountain's face), never snow
+float gCliffU = 0.0;      // 1 while pcCliffC paints the ground BETWEEN the dabs, per pixel (main's bare branch)
 float gFaceOn = 0.0;      // (main) this pixel is steep enough that the upright charts may lay its dabs
 float gFaceD = 0.0;       // (main) the dab being painted lies on an upright chart
 #ifdef PC_ROCKDEBUG
@@ -539,7 +540,11 @@ vec3 pcCliffC(vec3 Bc, float hB, vec3 rnd, vec3 c, float w) {
   else if (f > 0.89) tone = mix(tone, lipC, 0.6);      // (the lit lip: the only near-white on a face)
   vec3 meanC = 0.5 * (mix(uRockC0, uRockC3, 0.28) + mix(uRockC1, uRockC2, 0.4));
   vec3 meanM = 0.5 * (mix(uRockM0, uRockM3, 0.4) + mix(uRockM1, uRockM2, 0.3));
-  tone = mix(tone, mix(meanC, meanM, kM), 0.85 * kB);
+  // (the ground between the dabs is asked per pixel, not per dab: there a bed under about 3 px tall, its seams and lips
+  // a fraction of a pixel, came out as a dither of light and dark pixels, the speckle the look director saw on the far
+  // faces at 1 km. So under the dabs the beds go WHOLLY to the mean by 3 px, the way a dab's beds go to it by 7.)
+  float kBf = mix(0.85 * kB, 1.0, gCliffU * (1.0 - smoothstep(3.0, 6.0, uRockB.x / max(w, 1e-4))));
+  tone = mix(tone, mix(meanC, meanM, kM), kBf);
   tone = mix(tone, pcDensity(mix(mix(uRockC1, uRockC2, 0.4), mix(uRockM1, uRockM2, 0.5), kM), 1.15), gGully * 0.75);
   float lc = max(dot(c, vec3(0.3, 0.5, 0.2)), 0.05);
   tone = clamp(tone * mix(vec3(1.0), clamp(c / lc, vec3(0.7), vec3(1.4)), 0.08), 0.0, 1.0);

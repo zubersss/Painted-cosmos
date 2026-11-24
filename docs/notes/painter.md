@@ -22,8 +22,13 @@ the surface's snow mix on steep faces, which brings anything laid over the snow 
 16 times and below zero. ?bloomair=0 clears them (dark red 0.72 to 0.02 per cent of the land). Mine: the undone wash
 held to 0..1 (red becomes a smaller grey blot, 0.19). B's: one line in bloomAt, no flower in snow (sent; tested in my
 tree, not committed: 0.14, the summit white 4.1 to 5.6 per cent). Next for v39.5 (the look director's order): the far
-rock's 1-2 px pale speckle at 1 km measured against v37 (fade the under-layer by pixel span if over), the snowy tops in
-fewer bigger patches, a stronger cool side plane at noon. Scratch: `wt37` = main at v37.1 for that comparison.
+rock's 1-2 px pale speckle at 1 km (DONE, next commit after 6cf9c7a: it was the ground BETWEEN the dabs on a cliff,
+drawn per pixel in plain daylight, lighter and bluer than the dabs' shade planes; now it takes the planes and the
+warm/cool lean, and its beds go wholly to the mean by 3 px: isolated light flecks on the 1 km mountain 33.2 to 13.5 per
+thousand, ?rockfield=0 16.4; v37 at that address is another place at night in haze, not comparable), the snowy tops
+in fewer bigger patches (cause read: where the shedding leaves 40 per cent snow over the turf's green and cream
+patches), a stronger cool side plane at noon. B's flower line landed (design-flora dd86fb3); F passed it with 6cf9c7a.
+Scratch: `wt37` = main at v37.1.
 
 **STATE (24 Nov, second session, evening):** FV2 and FV3 ON by default. FV4 (THE COAST CLIFF AND THE MOUNTAINS) is ON
 BY DEFAULT from farview d4cab64 (`?rockfield=0` the opt-out; the oil look on Earth only), for v39.4, PASSED by the look
