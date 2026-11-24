@@ -140,6 +140,21 @@ const PHONE_TS = 0.30;
 // on foot. From the air every kind is an impostor.
 const IMP_FOOT = (() => { try { const v = new URLSearchParams(location.search).get('impfoot'); return v === 'all' || v === 'none' ? v : 'conifers'; } catch { return 'conifers'; } })();
 const IMP_AIR = 40;
+// THE FAR SPRUCE (the look director's order 3 after crown mass, 24 Nov; A2's ?pines). OFF BY DEFAULT until the look
+// director rules between the two ways below; both act only where the spruce's spec carries needleTop (?pines,
+// kits/spruce.js), so ?pines=0 is the old far spruce whatever is asked here.
+//   ?farspruce=near   the atlas bakes the spruce from its near tree, as today, and its crown is never painted under
+//                     V 0.24, as the middle spruce's needles are from 20 m out (materials.js PROP_VERT): today's dense
+//                     cone in the references' deep green, not near-black. (SEEN, 24 Nov: the clean dense cones kept.)
+//   ?farspruce=bough  its two layers are baked from its BY-BOUGH MIDDLE tree (seeds 13 and 12 at lod 1, 650 triangles),
+//                     with the same floor, and its needles drawn FAR_SPRUCE_K times larger about their centres as the
+//                     middle spruce's are from 30 m out (NEEDLE_FILL), not by the atlas's density rule. (SEEN, 24 Nov:
+//                     at 2.2 a pole with green sprays that all but vanishes from the air; at 4, ?farsprucek=4, the
+//                     density rule's growth, its fewer larger needle cards are big flat green shards.)
+// (From the air only: on foot the spruce keeps today's far spike.)
+const FAR_SPRUCE = (() => { try { const v = new URLSearchParams(location.search).get('farspruce'); return v === 'near' || v === 'bough' ? v : ''; } catch { return ''; } })();
+const FAR_SPRUCE_V = 0.24;
+const FAR_SPRUCE_K = (() => { try { const v = +new URLSearchParams(location.search).get('farsprucek'); return v > 0 ? Math.min(4, v) : 2.2; } catch { return 2.2; } })();
 const HAND = (() => {
   try {
     const q = new URLSearchParams(location.search), num = (k) => { const v = q.get(k); const n = v == null ? NaN : +v; return isFinite(n) && n > 1 && n < 400 ? n : null; };
@@ -394,19 +409,23 @@ export class Flora {
   // frame the bake is done they hand over (_impReady).
   _impostors(on) {
     if (on && !this.imp) {
-      const geos = [];
-      for (const sp of this.species) {
-        if (!sp.canCard) { sp.impLayer = -1; continue; }
+      const geos = [], floors = [], leafK = [];
+      this.species.forEach((sp, i) => {
+        if (!sp.canCard) { sp.impLayer = -1; return; }
         sp.impLayer = geos.length;
         // (on foot this kind keeps today's far form: the conifers' dark spikes, which the look director judged
         //  better on the skyline than their impostors, 24 Nov; ?impfoot=all makes every kind an impostor on foot,
         //  ?impfoot=none none)
         sp.footCards = IMP_FOOT === 'none' || (IMP_FOOT !== 'all' && sp.far[2] >= 0.5);
-        geos.push(sp.geo0[0]);
-        if (IMP.variants > 1) geos.push(sp.geo0[1]);
-      }
+        // (the spruce with ?pines and ?farspruce=near or bough: FAR_SPRUCE above; with neither, as before)
+        const spec = this.tall[i], pine = !!FAR_SPRUCE && !!(spec && spec.needleTop) && !!TALL_KITS[spec.kit], byBough = pine && FAR_SPRUCE === 'bough';
+        sp.impByBough = byBough;
+        geos.push(byBough ? sp.base.geo1 : sp.geo0[0]);
+        if (IMP.variants > 1) geos.push(byBough ? TALL_KITS[spec.kit](12 + i * 10, 1, spec) : sp.geo0[1]);
+        for (let v = 0; v < Math.max(1, IMP.variants); v++) { floors.push(pine ? FAR_SPRUCE_V : 0); leafK.push(byBough ? FAR_SPRUCE_K : 0); }
+      });
       if (!geos.length) return false;
-      this.imp = new ImpostorAtlas(geos);
+      this.imp = new ImpostorAtlas(geos, { floors, leafK });
       this.mats.imp = makeImpostorMaterial(this.bodyUniforms, this.imp, this.mats.far);
       // (the guard: if this device cannot draw them, today's far tree, and the hand-over as it was)
       this.imp.onFail = (why) => { this.impFailed = why; this.setFarForm(FAR_BLOB ? 'blob' : 'cards'); this.setHandover(HAND.near, HAND.mid); };

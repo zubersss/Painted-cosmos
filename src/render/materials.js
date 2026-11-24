@@ -559,6 +559,9 @@ vec3 pcGroundPaint(vec3 c, vec3 leaf, float fk, vec3 rnd, float snowC, float lvl
   vec3 k = pcDabTint(mix(cg, leaf, f), rnd, f);
   #endif
   k = mix(pcWetWash(k, 1.0 - snowC), mix(vec3(0.94, 0.955, 1.0), vec3(0.86, 0.90, 1.0), rnd.x * 0.6), snowC);
+  #ifdef PC_ROCKF
+    k = mix(pcRockTemp(k), k, snowC);       // (a rock face warm in its lit plane, cool violet in its shade: render/farground.js)
+  #endif
   // (GRASS in the shade is a deep green, its own colour laid heavier with half the cool key over it, as a leaf's shade
   // is; under the key whole a shaded meadow was a violet-brown floor: the owner's references of 2026-11-16 have the
   // shade on grass blue-green. Only where the stroke's wash is green; earth, litter, rock and snow shade as they did.)
@@ -905,7 +908,7 @@ void main() {
       bareC = mix(bareC, canM.rgb, canM.a);
     #endif
     #ifdef PC_BLOOMF
-      bareC = mix(bareC, pcBloomPal(vBloomI), 0.45 * vBloomK * uBloomOn);      // (the ground between the dabs takes a share of the drift)
+      bareC = mix(bareC, pcBloomPal(mix(vBloomI.x, vBloomI.y, step(325.0, dist))), mix(0.45, 0.2, smoothstep(250.0, 400.0, dist)) * vBloomK * uBloomOn);      // (far off a smaller share: with every drift on a slope taking the slope's kind, a whole hillside was washed in one strong red at 1 km, SEEN by flora B)      // (the ground between the dabs takes a share of the drift)
     #endif
     float lvl0 = pcLevel(mix(min(x0, 0.44) - 0.10 * vPar.z, x0, sun0), 0.05);
     #ifdef PC_ROCKF
@@ -1362,6 +1365,20 @@ void main() {
   float line = uTreeLine + (r3.r - 0.5) * 0.30;
   float skyAmt = smoothstep(line - 0.05, line + 0.05, re + (r1.g - 0.5) * 0.18);
   vec3 skyc = mix(uSkyHorizon, uSkyZenith, clamp(re * 1.2, 0.0, 1.0));
+  #ifdef PC_OIL
+    // THE GOLDEN HOUR IN THE WATER (the first audit's F9, still open in the fresh-eyes audit 2: under a gold sky the
+    // stream and the sea stayed ice-blue). The keys' sky colours carry no gold: the sky's own shader lays it on top
+    // (sky.js, the wash and the warm glow toward the sun). So the water's mirror takes the same two, by the reflected
+    // ray: the wash, strongest low down, and the glow by the ray's angle to the sun. pcGold is the sky's own gold
+    // (the same sun height, day, weather and world dial). With the golden hour's sky (?goldsky=0: as it was).
+    if (uLookG.x > 0.5) {
+      float gW = pcGold();
+      skyc = mix(skyc, vec3(0.92, 0.80, 0.58), gW * mix(0.80, 0.45, smoothstep(0.0, 0.7, re)));
+      vec3 sunVw = normalize((viewMatrix * vec4(uSunDirW, 0.0)).xyz);
+      vec3 RvW = reflect(normalize(vView), normalize(normalMatrix * n));
+      skyc = mix(skyc, vec3(0.93, 0.87, 0.72), pow(max(dot(RvW, sunVw), 0.0), 3.0) * 0.60 * uDayness * (1.0 - uWx.x));
+    }
+  #endif
   #ifdef PC_WPAINT
   vec3 skyT = skyc;
   #endif
@@ -3821,6 +3838,13 @@ void main() {
         float fk = max(1.0, wPx * hf * grow / max(dw, 1e-5));
         dl *= fk * yrS; dw *= fk * yrS;     // (yrS: a head about to go out of flower shrinks first, the year above)
       }
+      // (audit 2, nearground.js PATCH: a drift's patch in the middle and far rings comes in only past 11-16 m, where the
+      // near ring's flowers end; nearer than that it would be a blob of colour over the flowers themselves)
+      if (kind > 5.35 && kind < 5.45) {
+        float pk = smoothstep(11.0, 16.0, di) * yrS;
+        if (pk < 0.02) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); return; }
+        dl *= pk; dw *= pk;
+      }
       #endif
       rel = ax * (iCol.a * (len / max(iAxis.w, 1e-4)) + max(dl, wPx * 1.3 * grow) * t) + sd * (side * max(dw, wPx * 1.3) * grow);
       #ifdef PC_OIL
@@ -4049,7 +4073,9 @@ void main() {
   }
   // (a flick carries little more pigment than the ground it stands on: a loaded, crisp, wet
   // mark pooled by the sheet as well was a black comma)
-  float d = 1.0 + (0.55 - vS.x) * (vKind > 4.5 && vKind < 5.5 ? 1.5 : 0.7) * vLoad + (vS.z - 0.5) * 0.5 * vLoad + (n1.r - 0.5) * 0.5;
+  // (a drift's patch, kind 5.4, nearground.js PATCH, is one flat colour, LOOK-RULES R3.1: SEEN 24 Nov, the dab's loaded-brush
+  // step darkened a white drift's touches to a grey-beige that read as pebbles)
+  float d = 1.0 + (0.55 - vS.x) * (vKind > 5.35 && vKind < 5.45 ? 0.0 : (vKind > 4.5 && vKind < 5.5 ? 1.5 : 0.7)) * vLoad + (vS.z - 0.5) * 0.5 * vLoad + (n1.r - 0.5) * 0.5;
   vec3 c = pcWetWash(pcDensity(vCol, d), mix(1.0, 0.4, 1.0 - vLoad));
   c = mix(c, vec3(1.0), max(uWx.z * smoothstep(0.35, 0.9, vS.x) * 0.8, vFlat * 0.16));     // snow on the tips; trodden grass shows its pale side
   vec3 nV = normalize(vNV);

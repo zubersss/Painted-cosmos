@@ -63,6 +63,7 @@ uniform vec4 uOilAir;
 uniform vec4 uLookF;   // the look director's switches and the night's two numbers (shared.js; also declared in FRAG_PARS)
 uniform vec4 uLookN;
 uniform vec4 uLookG;   // x the golden hour's sky (sky.js), y how far summer crowns vary tree by tree (shared.js)
+uniform vec4 uLookS;   // x a storm takes the land's light down a step (shared.js OIL.uLookS)
 #endif
 `;
 
@@ -141,6 +142,14 @@ float pcLevel(float x, float soft) {
   // (PAINTER 16/17: it was 0.17 + 0.26 x, every form in the two deepest washes; the lit side keeps the local wash now,
   // so a wood in the rain is still a wood in three values)
   x = mix(x, 0.25 + x * 0.36, uStorm);
+  #ifdef PC_OIL
+    // (THE LAND UNDER A STORM, the oil look, 24 Nov: with the storm over the eye -- uStorm 0.63, overcast 0.81, MEASURED
+    // by group D in the gallery -- the land still stood at the LOCAL level, and the oil look's local colour of grass and
+    // leaves is light, so a meadow under a thunderhead read as a fair noon. Here the storm takes every form a further
+    // step down, toward the cool glaze: a lit face to the turn between local and glaze, a turned one into the glaze.
+    // Still a level, never a darkening multiplied on (R1.3b). ?stormlight=0 (uLookS.x) is the light as it was.)
+    x = mix(x, 0.20 + x * 0.38, uStorm * uLookS.x);
+  #endif
   return smoothstep(0.26 - soft, 0.26 + soft, x)
        + smoothstep(0.50 - soft, 0.50 + soft, x)
        + smoothstep(0.76 - soft, 0.76 + soft, x);
@@ -558,6 +567,7 @@ uniform vec4 uOilAir;  // the air's ceiling and the light's four values (shared.
 uniform vec4 uLookF;   // the look director's switches (shared.js OIL.uLookF; also declared in VERT_PARS)
 uniform vec4 uLookN;   // the night's two numbers for the world the eye is on (shared.js OIL.uLookN)
 uniform vec4 uLookG;   // x the golden hour's sky, y summer crowns tree by tree (shared.js OIL.uLookG)
+uniform vec4 uLookS;   // x a storm takes the land's light down a step (shared.js OIL.uLookS)
 uniform vec4 uOilL;    // x 1: the lighter paint (phones); y the speed test's flat modes (shared.js)
 uniform vec4 uOilPx;
 uniform mat4 uShM;
