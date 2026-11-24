@@ -46,6 +46,7 @@
 // 400 m (45 degrees down) over the same spot and a few questions are asked there.
 //   ?bench=1      the whole table (these rows included)
 //   ?bench=trees  the tree questions only, on foot and in the air: shorter, so the phone is cooler for each row
+//   ?bench=water  the water's views only: the brook's bank, a sea shore, and any view a water part places (the falls')
 //   ?bench=air    the air table (FV7 of docs/lead/FARVIEW-DESIGN.md): 400 m up and 45 degrees down, or ?bench=air,150
 //                 for another height; the questions every air lane waits on.
 
@@ -53,7 +54,8 @@ import { BUILD } from './build.js';
 import { MAX_PIXELS } from './preset.js';   // (the ceiling on the 'every pixel the screen has' row)
 
 export function attachBench(pc) {
-  // which table (tenth form): '1' the whole of it, 'trees' the tree questions, 'air' or 'air,<metres>' the air table
+  // which table (tenth form): '1' the whole of it, 'trees' the tree questions, 'air' or 'air,<metres>' the air table,
+  // 'water' the water's views only (the bank, the shore, and a view a water part places, as the falls': short, for a phone)
   const MODE_B = String(new URLSearchParams(location.search).get('bench') || '1').toLowerCase();
   const el = document.createElement('pre');
   el.id = 'pc-bench';
@@ -343,10 +345,15 @@ export function attachBench(pc) {
       if (!S || !landing) return;
       if (!name) pin = landing;
       else {
-        const v = WV[name], R0 = 4000, l0 = Math.hypot(...v.dir), u = v.dir.map((a) => a / l0), F = frameAt(u);
+        const v = WV[name], R0 = 4000;
+        // (a view a water part places itself -- the falls: world/falls.js fallsView, in the sea before the widest fall --
+        //  from the world's surface as it is built: { dir, yaw (degrees), pitch (radians) })
+        const pl = v.place ? v.placed : null;
+        const vd = pl ? pl.dir : v.dir, l0 = Math.hypot(...vd), u = vd.map((a) => a / l0), F = frameAt(u);
         const sm = S.sampler(S.bodyId), at = (b, B, e, nn) => { const q = [0, 1, 2].map((i) => b[i] + (B.e[i] * e + B.n[i] * nn) / R0); const ql = Math.hypot(...q); return q.map((a) => a / ql); };
         const wetAt = (q) => { const s2 = sm({ x: q[0], y: q[1], z: q[2] }); return s2.liquidRadius > s2.radius; };
-        let d = at(u, F, v.e, v.n), yaw = v.yaw;
+        let d = pl ? u : at(u, F, v.e, v.n), yaw = pl ? pl.yaw : v.yaw;
+        const pitch = pl ? pl.pitch : v.pitch;
         // (the BANK is wherever the nearest water to that spot is: the rivers move with ?rivers=tree. Walk out from it to the
         //  nearest water, stand two metres back from its edge, and look the way the water runs longest, as the painter's
         //  gallery stands on a bank)
@@ -372,7 +379,7 @@ export function attachBench(pc) {
         const g = sm({ x: d[0], y: d[1], z: d[2] }), r = Math.max(g.radius, g.liquidRadius || 0);
         const G = frameAt(d), cy = Math.cos(yaw * Math.PI / 180), sy = Math.sin(yaw * Math.PI / 180);
         const f = { x: G.n[0] * cy + G.e[0] * sy, y: G.n[1] * cy + G.e[1] * sy, z: G.n[2] * cy + G.e[2] * sy };
-        pin = { t: landing.t, p: { x: d[0] * r, y: d[1] * r, z: d[2] * r }, v: { x: 0, y: 0, z: 0 }, fwd: { ...f }, view: { ...f }, pitch: v.pitch, boom: landing.boom, flying: false };
+        pin = { t: landing.t, p: { x: d[0] * r, y: d[1] * r, z: d[2] * r }, v: { x: 0, y: 0, z: 0 }, fwd: { ...f }, view: { ...f }, pitch, boom: landing.boom, flying: false };
       }
       putBack();
       await wait(600);
@@ -388,7 +395,17 @@ export function attachBench(pc) {
     if (pc.sim && pc.sim.bodyId === 'earth') {
       let extra = [];
       try { extra = (await import('../world/waterhooks.js')).WATER_BENCH || []; } catch { extra = []; }
-      for (const view of ['bank', 'shore']) {
+      // (a water part's own view, placed by the part: E-W2's falls view. Asked once here, of the world as it is built; a part
+      //  that is not loaded adds no row, and one that finds nothing to look at on this world (null) adds no view)
+      let surf = null;
+      try { surf = (await import('../world/surface.js')).getSurface('earth'); } catch { surf = null; }
+      for (const r of extra) {
+        if (!r || !r.place || WV[r.view]) continue;
+        let placed = null;
+        try { placed = surf ? r.place(surf) : null; } catch { placed = null; }
+        if (placed && placed.dir) WV[r.view] = { place: r.place, placed };
+      }
+      for (const view of ['bank', 'shore', ...Object.keys(WV).filter((k) => WV[k].place)]) {
         waterRows.push([AS + ', ' + view + ' view', () => goView(view), null, { alone: true }]);
         waterRows.push([view + ' view: no water drawn', () => show(/^pc-water/, false), () => show(/^pc-water/, true)]);
         for (const r of extra) if (r && r.view === view) waterRows.push([view + ' view: ' + r.name, r.on, r.off]);
@@ -530,6 +547,7 @@ export function attachBench(pc) {
       [AS + ', last', null, null],
     ];
     if (MODE_B === 'trees') steps.splice(0, steps.length, ...treeSteps);
+    else if (MODE_B === 'water') steps.splice(0, steps.length, [AS, null, null], ...waterRows);      // (the water's views only)
     else if (MODE_B === 'air' || MODE_B.startsWith('air,')) steps.splice(0, steps.length, ...airSteps);
     const rows = [];
     let r0 = null, base = null;

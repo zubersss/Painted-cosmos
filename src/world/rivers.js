@@ -32,7 +32,8 @@
 // THE CONTRACT (fixed by lane 0; world/waterhooks.js calls attachRivers once a world, before its first patch):
 //   attachRivers(S, drain)   build the network and set S.rivers = net; return net (or null: nothing attached).
 //   net.sample(S, c)         with c.x, c.y, c.z (the unit direction) and c.L (the wood's base level) set. Sets, EVERY time:
-//                            c.pool, c.bar, c.fu, c.fv, c.still, c.swell, c.lvR (the water level, which surface.js _forest
+//                            c.pool, c.bar, c.barZone (the bar and 6 m beyond: where trees stand back), c.fu, c.fv, c.still,
+//                            c.swell, c.lvR (the water level, which surface.js _forest
 //                            uses in place of the staircase) and c.L (the base level, graded toward the river); RETURNS the
 //                            distance to the nearest water (under the nominal half width 2.5 m inside a channel; beyond it,
 //                            metres from the water's edge), which _forest reads as c.s.
@@ -758,7 +759,7 @@ class RiverNet {
       } else if (si >= 0) Pr += (pF - Pr) * smoothstep(o.near - 25, o.near, dC);
     }
     // 2. the channel, in the terms the land's recipes read (as _riversOil's `lay`)
-    let best = 1e9, bar = 0, deep = 0, win = 0;
+    let best = 1e9, bar = 0, deep = 0, win = 0, zone = 0;
     const lay = (sI, k, gv, who) => {
       const w = k * W;
       let d = sI < w ? (k <= 1 ? sI / k : Math.max(0, sI - (w - W))) : W + (sI - w) * gv;
@@ -791,6 +792,8 @@ class RiverNet {
         const out = sI - w, d = pb ? Math.min(W + out, W + 2.0 + Math.min(out, barW) * 0.12 + Math.max(0, out - barW) * 3)
           : W + Math.min(out, barW) * 0.2 + Math.max(0, out - barW);
         if (d < best) { best = d; win = 0; bar = (1 - smoothstep(barW * 0.75, barW, out)) * smoothstep(0, 1.2, out); }
+        // (where the trees stand back: the bar and 6 m beyond it, so their crowns do not hide it from the air: F, 24 Nov)
+        zone = (1 - smoothstep(barW, barW + 6, out)) * smoothstep(0, 1.2, out);
       } else lay(sI, kP, 1);
       if (p2 > 0.5) lay(Math.abs(sd + p2), 0.8 + 0.1 * kM, 1);
     } else {
@@ -817,7 +820,7 @@ class RiverNet {
         lay(qs, 0.5 * mask * (1 - smoothstep(10, ro ? 125 : 85, parent)), 3.0, 2);
       }
     }
-    c.pool = deep; c.bar = bar;
+    c.pool = deep; c.bar = bar; c.barZone = zone;
     // 4. the current, along the channel that won, downstream
     c.fu = 0; c.fv = 0;
     if (best < W + 3) {
