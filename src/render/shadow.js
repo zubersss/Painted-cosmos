@@ -13,6 +13,7 @@
 // a rise still throws its shadow through the rise: not seen in a wood on level ground.
 import * as THREE from 'three';
 import { SHADOW, SHADOW_CROWD, OIL, QUALITY } from './shared.js';
+import { SPRAY_GLSL } from './dabtex.js';
 
 export const SHADOW_LAYER = 2;
 
@@ -60,9 +61,12 @@ varying float vS;
 varying vec3 vCell;
 varying float vPart;
 varying float vLeafH;
+varying vec2 vCardUv;     // (a card of leaves, ?trees2=cards: its chart in dab cells, and the radius of its corners)
+flat varying float vCardR;
 void main() {
   vec3 p = position;
   vLeafH = aData.w;
+  vCardUv = uv; vCardR = length(uv);
   float sc = 1.0;
   #ifdef USE_INSTANCING
     // each plant is in a near mesh and a far one, and the painted shader draws the one whose range the eye is in:
@@ -75,7 +79,7 @@ void main() {
     vec3 lp = position;
     // (LEAVES BY DISTANCE, as materials.js PROP_VERT. Of a crown's leaves only the share 1 - uThinLeaf throws a shadow
     // at all (FRAG below); far off fewer still are drawn, each larger, so that the crown's shade stays as deep.)
-    if (uLeafLod.x > 0.0 && aData.y > 4.5 && aData.y < 6.5) {
+    if (uLeafLod.x > 0.0 && aData.y > 4.5 && aData.y < 7.5) {      // (7: a card of leaves, thinned as a leaf is)
       float keep = clamp(pow(uLeafLod.x / max(di, 0.01), 1.2), uLeafLod.y, 1.0);
       float shr = 1.0 - uThinLeaf;
       float fs = min(shr, keep * 0.5);
@@ -93,10 +97,16 @@ void main() {
 const FRAG = /* glsl */`
 uniform float uThin;
 uniform float uThinLeaf;
+uniform highp sampler2D uDabP;
+uniform highp sampler2D uDabId;
+uniform vec4 uOilS;
 varying float vS;
 varying vec3 vCell;
 varying float vPart;
 varying float vLeafH;
+varying vec2 vCardUv;
+flat varying float vCardR;
+${SPRAY_GLSL}
 float h3(vec3 p) { p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
 void main() {
   // a crown is not a solid: the light comes through it in pieces (each about a third of a metre: a bough's worth)
@@ -105,6 +115,8 @@ void main() {
   // full crown shades its whole floor: with every leaf throwing, a wood in leaf was nine parts shade; the clip's floor
   // is about half in the sun)
   if (vPart > 4.5 && vLeafH < uThinLeaf) discard;
+  // (a card of leaves throws the shadow of its leaves, the very ones it is painted with: dabtex.js SPRAY_GLSL)
+  if (vPart > 6.5) { vec3 r; vec2 c; vec2 off = vec2(vLeafH * 23.0); if (pcSpray(vCardUv + off, off, vec2(1e6), vCardR, uOilS.z, r, c) < 0.0) discard; }
   gl_FragColor = vec4(vS, 0.0, 0.0, 1.0);
 }
 `;
@@ -176,6 +188,7 @@ export class ShadowMap {
       uniforms: {
         uOrigin: { value: new THREE.Vector3() }, uCamLocal: { value: new THREE.Vector3() }, uLod: { value: new THREE.Vector4(0, 1e9, 0, 0.9) },
         uInv: { value: 1 / (2 * this.D) }, uThin: { value: 0.6 }, uThinLeaf: { value: 0.66 }, uLeafLod: { value: new THREE.Vector4(0, 0, 0, 0) },
+        uDabP: OIL.uDabP, uDabId: OIL.uDabId, uOilS: OIL.uOilS,      // (the cards of leaves' shadows, ?trees2=cards)
       },
       vertexShader: VERT, fragmentShader: FRAG, side: THREE.DoubleSide,
     });

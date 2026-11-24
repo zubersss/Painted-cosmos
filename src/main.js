@@ -37,7 +37,7 @@ import { choosePreset, bufferSize, BASIC_GPU, MAX_PIXELS } from './core/preset.j
 import { attachPlatform } from './core/platform.js';
 import { attachBench } from './core/bench.js';
 import { BUILD } from './core/build.js';
-import { MODE } from './data/mode.js';
+import { MODE, waterFromSearch } from './data/mode.js';
 import { seasonFromSearch } from './data/season.js';
 
 // Every static import has loaded: index.html's watchdog stands down (hardening review P14).
@@ -52,6 +52,9 @@ if (params.has('powers') && params.get('powers') !== '0') MODE.powers = true;
 //  It needs ?look=oil with it: a biome's list of animals rides under its oil overlay. Without the flag not one
 //  module of the creatures is fetched, exactly as none of the powers is.)
 if (params.has('beasts')) MODE.beasts = Math.max(0, Math.min(3, parseInt(params.get('beasts'), 10) || 0));
+// (the water's parts, ?rivers=tree ?lakes= ?ponds= ?puddles= ?swell= ?falls= ?fjord= ?wpaint= ?wakes= ?splash=: data/mode.js,
+//  docs/lead/WATER-DESIGN.md. Read before anything is made; with none of them the game is exactly as it was.)
+waterFromSearch(location.search);
 // (the turn of the year, ?season= and ?year=: data/season.js. Read here, before any world is made, because a world's
 //  plants take their first colour from where the year stands.)
 seasonFromSearch(location.search);
@@ -154,6 +157,15 @@ async function boot() {
       const { ensureDrainage } = await import('./world/drainage.js');
       ensureDrainage(params.get('body') || 'earth', params.has('pool') ? { bias: +params.get('pool') } : undefined);
     } catch (e) { console.warn('flow: the drainage field did not build', e); }
+  }
+  // THE WATER'S PARTS for the first world (world/waterhooks.js), awaited here for the same reason: they change the ground and
+  // the water, and must land before the first patch. Each brings the drainage field with it.
+  if (MODE.water.on) {
+    try {
+      const WH = await import('./world/waterhooks.js');
+      await WH.loadWater();
+      WH.ensureWater(params.get('body') || 'earth');
+    } catch (e) { console.warn('water: the parts did not load', e); }
   }
   const world = prov.createWorld(scene);
   const painter = prov.createPainter(renderer);

@@ -97,7 +97,9 @@ export function attachBench(pc) {
   document.body.appendChild(copyBtn);
   const P = pc.painter, R = pc.renderer;
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
-  const mats = (re) => { const s = new Set(); pc.scene.traverse((o) => { const m = o.material; if (m && m.name && re.test(m.name)) s.add(m); }); return s; };
+  // (a tree drawn by two programs, ?trees2=, carries an ARRAY of materials, wood then leaves: both are counted)
+  const mats = (re) => { const s = new Set(); pc.scene.traverse((o) => { for (const m of [].concat(o.material || [])) if (m && m.name && re.test(m.name)) s.add(m); }); return s; };
+  const mname = (o) => { const m = Array.isArray(o.material) ? o.material[0] : o.material; return (m && m.name) || ''; };
   const show = (re, on) => { for (const m of mats(re)) m.visible = on; };
   // the script's own time and the frame's draw calls, taken round the game's frame while a row is measured
   const acc = { ms: 0, n: 0, calls: 0, tris: 0 };
@@ -226,12 +228,21 @@ export function attachBench(pc) {
     if (pc.settle) await Promise.race([pc.settle(12), wait(20000)]);
     const hasB = typeof P._bench === 'function', lite0 = !!P.lite;
     const B = (o) => hasB && P._bench(o);
-    const farMeshes = (fn) => pc.scene.traverse((o) => { if (o.isMesh && o.material && /^pc-prop-far/.test(o.material.name || '')) fn(o); });
-    const treeMeshes = (fn) => pc.scene.traverse((o) => { if (o.isMesh && o.material && /^pc-prop-(tall|far)/.test(o.material.name || '')) fn(o); });
+    const farMeshes = (fn) => pc.scene.traverse((o) => { if (o.isMesh && o.material && /^pc-prop-far/.test(mname(o))) fn(o); });
+    const treeMeshes = (fn) => pc.scene.traverse((o) => { if (o.isMesh && o.material && /^pc-prop-(tall|far)/.test(mname(o))) fn(o); });
     const flora = () => (pc.world && pc.world._flora) || null;
     // (the far trees' form swapped while the test runs, world/flora.js setFarCards: the two forms are then timed in the
     // same minute, on a phone as warm for the one as for the other)
     const cards0 = !!(flora() && flora().species && flora().species.some((sp) => sp.cardFar));
+    // (the trees' two short programs, and the trees of clusters, swapped in while the test runs, world/flora.js
+    // setTrees2: the trees' patches are built again, so each is timed in the same minute as the trees it replaces)
+    const t2a = (flora() && flora().trees2) || '', t2d = !!(flora() && flora().treeDepth);
+    const swapT2 = async (mode, depth) => {
+      const f = flora();
+      if (!f || !f.setTrees2 || f.setTrees2(mode, depth == null ? t2d : depth) == null) return;
+      await wait(400);
+      if (pc.settle) await Promise.race([pc.settle(12), wait(20000)]);
+    };
     const swapFar = async (on) => {
       const f = flora();
       if (!f || !f.setFarCards || f.setFarCards(on) == null) return;
@@ -266,9 +277,18 @@ export function attachBench(pc) {
       if (pc.settle) await Promise.race([pc.settle(12), wait(20000)]);
     };
     const AS = 'as set';
+    // (the trees-near lane's rows, in the full table and in ?bench=trees: the near and middle trees drawn by two short
+    //  programs, wood and leaves, with no hair twigs (T2, ?trees2=1); the leaves as clusters on cards (?trees2=cards);
+    //  the cards laid in depth first (T5). Each against the "as set" row above it, built afresh while the test runs.)
+    const T2ROWS = [
+      [t2a ? 'trees in one program as before' : 'trees: two short programs', () => swapT2(t2a ? '' : 'split'), () => swapT2(t2a)],
+      ['near trees as clusters', () => swapT2('cards-near', false), () => swapT2(t2a)],
+      ['middle trees as clusters', () => swapT2('cards-mid', false), () => swapT2(t2a)],
+      ['clusters with a depth pass first', () => swapT2('cards', true), () => swapT2(t2a)],
+    ];
     // ---- THE TENTH FORM'S HANDLES (see the top of this file) ----------------------------------------------------
     const tallMats = () => mats(/^pc-prop-tall/);
-    const tallMeshes = (fn) => pc.scene.traverse((o) => { if (o.isMesh && o.material && /^pc-prop-tall/.test(o.material.name || '')) fn(o); });
+    const tallMeshes = (fn) => pc.scene.traverse((o) => { if (o.isMesh && o.material && /^pc-prop-tall/.test(mname(o))) fn(o); });
     const nearPart = (v) => () => { const f = flora(); if (f) f.benchNear = v; };
     // (no wind in the near trees' vertex shader: their own uPhysOn is 0 while the rest of the world's stays as it is.
     //  The uniform is shared by every plant, so the near trees are given one of their own for the row and handed the
@@ -326,10 +346,85 @@ export function attachBench(pc) {
     };
     const r = (row, tag) => [row[0] + tag, row[1], row[2]];
     // THE AIR ROWS: an "as set" that lifts the pin (it is the base the questions after it are set against), the
-    // questions, and an "as set" back on foot that puts it down again.
-    const airAt = (h, deg, qs) => [[AS + ', ' + h + ' m up, ' + deg + ' deg down', () => lift(h, deg), null]].concat(qs.map((q) => r(q, ' (' + h + ' m up)')));
+    // questions, and an "as set" back on foot that puts it down again. (The air's "as set" rows are a different picture,
+    // so, like the water views', they are kept out of the check that the "as set" rows agree: `alone`.)
+    const airAt = (h, deg, qs) => [[AS + ', ' + h + ' m up, ' + deg + ' deg down', () => lift(h, deg), null, { alone: true }]].concat(qs.map((q) => r(q, ' (' + h + ' m up)')));
     const onFoot = [AS + ', back on foot', () => land(), null];
     const ground = (on) => show(/^pc-terrain/, on);
+    // ---- THE WATER VIEWS (docs/lead/WATER-DESIGN.md, section 6) -------------------------------------------------------
+    // The view this test is held at, the landing, has NO WATER in it: 0.0 % of its pixels, measured 24 Nov in a copy of
+    // that view (936 x 372). So no row taken there can measure the water, and v37's "no water drawn -0.6 ms" was noise.
+    // Two places on Earth are held instead for the water's rows: the landing brook's BANK, looking upstream (water about a
+    // fifth of the picture in the painter's copy of it), and a sea SHORE at the waterline, looking out (about three
+    // quarters). The explorer is put there and held there exactly as it is held at the landing (`pin`), the world is let
+    // build round it, and each water row is set against ITS view's own "as set" row. Its "as set" rows are not counted in
+    // the check that the landing's agree with each other: a different picture is not a disagreement. A water lane adds
+    // its own rows from its own file (world/waterhooks.js WATER_BENCH). Worlds other than Earth: no water rows.
+    const landing = pin;
+    const WV = {
+      bank: { dir: [0.196307, 0.620916, 0.758899], e: 0, n: 0, yaw: 20, pitch: -0.12, find: true },
+      shore: { dir: [0.19461, 0.62161, 0.75877], e: -1720, n: -1202, yaw: 185, pitch: -0.10 },
+    };
+    const frameAt = (u) => {      // east = (0, 1, 0) x up, north = up x east: the frame sim.js and the gallery use
+      let ex = u[2], ey = 0, ez = -u[0]; const el = Math.hypot(ex, ey, ez) || 1; ex /= el; ey /= el; ez /= el;
+      return { e: [ex, ey, ez], n: [u[1] * ez - u[2] * ey, u[2] * ex - u[0] * ez, u[0] * ey - u[1] * ex] };
+    };
+    const goView = async (name) => {
+      const S = pc.sim;
+      if (!S || !landing) return;
+      if (!name) pin = landing;
+      else {
+        const v = WV[name], R0 = 4000, l0 = Math.hypot(...v.dir), u = v.dir.map((a) => a / l0), F = frameAt(u);
+        const sm = S.sampler(S.bodyId), at = (b, B, e, nn) => { const q = [0, 1, 2].map((i) => b[i] + (B.e[i] * e + B.n[i] * nn) / R0); const ql = Math.hypot(...q); return q.map((a) => a / ql); };
+        const wetAt = (q) => { const s2 = sm({ x: q[0], y: q[1], z: q[2] }); return s2.liquidRadius > s2.radius; };
+        let d = at(u, F, v.e, v.n), yaw = v.yaw;
+        // (the BANK is wherever the nearest water to that spot is: the rivers move with ?rivers=tree. Walk out from it to the
+        //  nearest water, stand two metres back from its edge, and look the way the water runs longest, as the painter's
+        //  gallery stands on a bank)
+        if (v.find) {
+          let bestR = 1e9, bestA = 0;
+          for (let a = 0; a < 48; a++) {
+            const an = (a / 48) * Math.PI * 2;
+            for (let rr = 2; rr < 320 && rr < bestR; rr += rr < 60 ? 1.5 : 4) if (wetAt(at(u, F, v.e + Math.sin(an) * rr, v.n + Math.cos(an) * rr))) { bestR = rr; bestA = an; break; }
+          }
+          if (bestR < 1e9) {
+            const r0 = Math.max(0, bestR - 2);
+            d = at(u, F, v.e + Math.sin(bestA) * r0, v.n + Math.cos(bestA) * r0);
+            const B = frameAt(d);
+            let bs = -1;
+            for (let a = 0; a < 48; a++) {
+              const an = (a / 48) * Math.PI * 2;
+              let sc = 0;
+              for (let rr = 4; rr < 70; rr += 3) if (wetAt(at(d, B, Math.sin(an) * rr, Math.cos(an) * rr))) sc += 1 + rr * 0.02;
+              if (sc > bs) { bs = sc; yaw = an * 180 / Math.PI + 6; }
+            }
+          }
+        }
+        const g = sm({ x: d[0], y: d[1], z: d[2] }), r = Math.max(g.radius, g.liquidRadius || 0);
+        const G = frameAt(d), cy = Math.cos(yaw * Math.PI / 180), sy = Math.sin(yaw * Math.PI / 180);
+        const f = { x: G.n[0] * cy + G.e[0] * sy, y: G.n[1] * cy + G.e[1] * sy, z: G.n[2] * cy + G.e[2] * sy };
+        pin = { t: landing.t, p: { x: d[0] * r, y: d[1] * r, z: d[2] * r }, v: { x: 0, y: 0, z: 0 }, fwd: { ...f }, view: { ...f }, pitch: v.pitch, boom: landing.boom };
+      }
+      putBack();
+      await wait(600);
+      if (pc.settle) await Promise.race([pc.settle(12), wait(30000)]);
+      // (a move of two kilometres is taken by the world for an ARRIVAL, and the picture is veiled until the land is laid
+      //  (world/index.js, render/shared.js SHEET.laid): a row timed under the veil would time the veil. Wait for it.)
+      try {
+        const SHEET = (await import('../render/shared.js')).SHEET, t0 = performance.now();
+        while (SHEET.laid < 1 && performance.now() - t0 < 40000) await wait(250);
+      } catch { /* no painter's sheet: nothing to wait for */ }
+    };
+    const waterRows = [];
+    if (pc.sim && pc.sim.bodyId === 'earth') {
+      let extra = [];
+      try { extra = (await import('../world/waterhooks.js')).WATER_BENCH || []; } catch { extra = []; }
+      for (const view of ['bank', 'shore']) {
+        waterRows.push([AS + ', ' + view + ' view', () => goView(view), null, { alone: true }]);
+        waterRows.push([view + ' view: no water drawn', () => show(/^pc-water/, false), () => show(/^pc-water/, true)]);
+        for (const r of extra) if (r && r.view === view) waterRows.push([view + ' view: ' + r.name, r.on, r.off]);
+      }
+    }
     // ---- IS THIS DEVICE HELD AT ITS REFRESH? (see MK at the top of this file) ----------------------------------
     // Two questions, because one is not enough: a device that is really drawing shows a spread in its frame times
     // AND goes faster when it is given fewer pixels. One held at its refresh does neither, and nor does one whose
@@ -394,6 +489,10 @@ export function attachBench(pc) {
         () => { const f = flora(); if (f) { f.benchTreeK = null; f.lastScale = -1; } }],
       ['near trees at a third of the distance', () => { const f = flora(); if (f) { f.benchTreeK = 0.33; f.lastScale = -1; } },
         () => { const f = flora(); if (f) { f.benchTreeK = null; f.lastScale = -1; } }],
+      // (2026-11-24, the trees to 30 a second, docs/lead/TREES-DESIGN.md on r2: the near and middle trees drawn by
+      //  two short programs, wood and leaves, with no hair twigs (T2, ?trees2=1); the near tree's leaves as clusters
+      //  on cards (?trees2=cards). Each against the "as set" row above, built afresh while the test runs.)
+      ...T2ROWS,
       ['no trees', () => show(/^pc-prop-(tall|far)/, false), () => show(/^pc-prop-(tall|far)/, true)],
       ['no small plants', () => show(/^pc-prop-(?!tall|far)/, false), () => show(/^pc-prop-(?!tall|far)/, true)],
       // (2026-11-20) WHERE THE DRAW CALLS ARE. The table's header says 350 of them and 9.6 ms of script, and a draw
@@ -414,9 +513,12 @@ export function attachBench(pc) {
       ...airAt(150, 30, [T0.noFar, T0.blob, T0.imp]),
       ...airAt(400, 45, [T0.noFar, T0.imp]),
       onFoot,
+      // (the water's rows, at the bank and at the shore: see THE WATER VIEWS above)
+      ...waterRows,
       // (back to the size the device really draws, so the four rows below are measured from IT and not from
-      //  whatever sharper size the questions above had to be asked at: see MK at the top of this file)
-      [AS, () => sharpen(1), null],
+      //  whatever sharper size the questions above had to be asked at: see MK at the top of this file; and back at the
+      //  landing, if the water's rows took the explorer away)
+      [AS, async () => { if (waterRows.length) await goView(null); await sharpen(1); }, null],
       // (EIGHTH FORM, 2026-11-18) ROWS THAT MAKE THE GAME WORK HARDER, not easier. The owner's first believable table
       // read 16.7 ms = 60.0 a second on eleven rows running: that is the phone's own screen refusing to go faster, not
       // the game's speed, and under such a cap no row can be told from another. These rows raise the picture's
@@ -434,6 +536,8 @@ export function attachBench(pc) {
       T0.leaves, T0.wood, T0.bark, T0.wind,
       [AS, null, null],
       T0.side, T0.order, T0.a2c, T0.noNear,
+      [AS, null, null],
+      ...T2ROWS,
       [AS, null, null],
       T0.blob, T0.imp, T0.noFar, T0.farFlat,
       [AS, null, null],
@@ -467,7 +571,7 @@ export function attachBench(pc) {
     let r0 = null, base = null;
     const bases = [];      // (2026-11-19) every "as set" row, so the table can say when it disagrees with itself
     for (let k = 0; k < steps.length; k++) {
-      const [name, on, off] = steps[k];
+      const [name, on, off, opt] = steps[k];
       el.textContent = head(r0) + '\n' + rows.join('\n') + '\n... ' + (k + 1) + ' of ' + steps.length + ': ' + name;
       if (on) await on();
       const ok = await calm();
@@ -475,7 +579,7 @@ export function attachBench(pc) {
       const r = stats(await sample(2400));
       r.fps = 1000 / Math.max(r.mean, 1e-3);
       if (k === 0 && P._shadow) sunOut = P._shadow.frames > f0;
-      if (off) { await off(); if (name.startsWith('far trees as') || name.startsWith('far trees of')) await calm(); }
+      if (off) { await off(); if (name.startsWith('far trees as') || name.startsWith('far trees of') || /program|clusters|depth pass/.test(name)) await calm(); }
       // (a row that left the ground is put down again if the table ends up there; see airAt)
       // (2026-11-19) The header quotes the first row THAT WAS REALLY DRAWING. It used to quote the first row
       // whatever it was, and at v22 that row drew nothing, so the header described the whole game as "script
@@ -486,7 +590,7 @@ export function attachBench(pc) {
       const d = base && !isBase ? r.mean - base.mean : null;
       rows.push(String(k + 1).padStart(2) + ' ' + (name + ' ').padEnd(27, '.') + ' ' + r.mean.toFixed(1).padStart(5) + ' ms = ' + r.fps.toFixed(1).padStart(5) + ' a second' +
         (d == null ? '          ' : '  ' + ((d >= 0 ? '+' : '') + d.toFixed(1)).padStart(6) + ' ms') + '  (middle ' + r.mid.toFixed(0) + ', longest ' + r.worst.toFixed(0) + ', script ' + r.script.toFixed(1) + ', ' + Math.round(r.tris / 1000) + 'k tri' + (r.calls < DRAWS ? ', NOTHING DRAWN' : ok ? '' : ', NOT SETTLED') + ')');
-      if (isBase) { base = r; bases.push(r.mean); }
+      if (isBase) { base = r; if (!(opt && opt.alone)) bases.push(r.mean); }
     }
     // DO THE BASELINES AGREE? Every + / - in this table is measured against the "as set" row before it, so if those
     // rows disagree with each other the whole table is noise however steady each row looked on its own. At v22 they
