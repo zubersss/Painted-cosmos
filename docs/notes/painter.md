@@ -420,8 +420,24 @@ not where they stand. The fix (`flora.js` `U2SPAN` = 1 << UNDER2_SHIFT with the 
 covers. COUNTED in Node at the autumn wood on foot: 8 meshes, 90 instances, 4,860 triangles, 7,015 px -> 29 meshes, 377
 instances, 54,756 triangles, 13,169 px (the whole frame's triangles +2.7 per cent, pixels +0.2). `flora.setU2Cells(on)`
 flips it at run time (disposes the under2 chunks); `core/bench.js` row 'outer undergrowth from its own cells' (asked the
-other way when the run started with it on). The coordinator: it becomes the DEFAULT in v39.6 once the look director passes
-the on-foot pairs (the autumn landing, the green wood, the meadow), `?u2cells=0` then the opt-out.
+other way when the run started with it on). PASSED BY THE LOOK DIRECTOR as the default ("a correctness fix: the plants
+where their obstacles are"; the stills `u2cells-*-asset-fix.jpg`, as set above, the fix below: the meadow on foot gains its
+boulders, young shrubs and a bush, 10.9 per cent of the picture; the landing 2.6; lookstats V>0.90 unchanged) and ON BY
+DEFAULT in the oil look for v39.6; `?u2cells=0` the opt-out. F's follow-up, its own pair when done: THE BOULDERS read as
+smooth blue-violet pebbles in the warm meadow; give them the mountains' rock family (C's grey-violet with the warm lean,
+farview ROCK_LOOK), lit with a lit top and a cool shaded side, laid in strokes like the ground, their foot settled into the
+grass. The bush near the eye (old leaf cards) is A2's lane.
+
+**THE NEAR GROUND DENSER (`?dense=1`, OFF; eb1b68f, c175020; BUILT, counted, NOT yet seen).** The coordinator, after the
+owner's v39.5 phone table (the near grass and flowers 0.5 ms of 24 ms at 2.25x the pixels; the small plants 2.7): "room
+for more grass and flowers near the eye ... the owner wants much denser". `world/nearground.js` `DENSE_K`, `ringsFor`: the
+carpet 22 blades a cell's worth where 16, to 8 m (7); the fine ring to 16 m at tier 1 (12; the top tier's 23 as it was),
+its blades' own ranges 0.75-1 of it (0.66-1), room for 15 (12; stones and litter as before, `per0`), flowers 1.4x; the
+middle ring room for 10 touches (7), the drift's heads 1.3x. `NearGround.setDense` rebuilds the rings on their materials
+(no shader compiled); `?bench=foot` row 'near grass and flowers denser' (asked the other way when started with it on).
+Tests: `src/world/neardense.test.mjs`. COUNTED (scratch overdraw counter, tier 1, 1024x480, on foot): the meadow's near
+strokes 267k -> 558k pixels (the fine ring 13,920 -> 38,700 marks, self-lap 1.92 -> 3.05), the whole frame +26 per cent
+pixels, +15 per cent triangles; the autumn landing near strokes 338k -> 509k, the frame +6 per cent.
 
 **Done:**
 1. Speed-test rows (`core/bench.js`, after 'no small plants'): 'no near grass', 'near grass: the blades only (the fine

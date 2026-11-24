@@ -231,14 +231,15 @@ const UNDER2_SHIFT = (() => {
     if (n === 1) return 1; if (n === 2) return 2; } catch { /* no address */ }
   return 2;
 })();
-// THE OUTER UNDERGROWTH CELL'S OWN PLACEMENT CELLS (the flora lane, 24 Nov; `?u2cells=1`, OFF until the look director
-// and the coordinator rule on it). Since the cell grew to four placement cells a side above (UNDER2_SHIFT, ba27b30),
+// THE OUTER UNDERGROWTH CELL'S OWN PLACEMENT CELLS (the flora lane, 24 Nov; ON BY DEFAULT in the oil look since the look
+// director passed it, design-flora d89ee23, "a correctness fix: the plants where their obstacles are"; `?u2cells=0` the
+// opt-out, the cells as they were). Since the cell grew to four placement cells a side above (UNDER2_SHIFT, ba27b30),
 // the two places that read its placement cells still read two a side at ix * 2 + a: a cell at level 6 read level-8
 // cells somewhere else on the face. COUNTED in Node (the autumn wood on foot): cells 17-182 m from the eye built their
 // ferns, bushes, flowers and boulders where those stand, 615-754 m away, past the 110 m reach, so none of them is drawn
 // near the eye in the oil look (and the obstacles, which read the right cells, are bushes and rocks one cannot see).
 // With it on, a cell reads its own (1 << shift) a side.
-let U2SPAN = (() => { let on = false; try { on = new URLSearchParams(location.search).get('u2cells') === '1'; } catch { /* no address */ }
+let U2SPAN = (() => { let on = true; try { const v = new URLSearchParams(location.search).get('u2cells'); on = v !== '0' && v !== 'false'; } catch { /* no address */ }
   return on && LOOK.oil ? 1 << UNDER2_SHIFT : 2; })();
 
 // WHICH KITS ARE DRAWN FAR OFF AS LEAF CARDS and not as the old lump (the oil look's far tree, v13). A kit left out
