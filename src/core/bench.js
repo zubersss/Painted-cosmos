@@ -546,8 +546,8 @@ export function attachBench(pc) {
         ['weather: clouds as before', () => clouds3d(false), () => clouds3d(true)],
         ...(WX2.cloudmap ? [
           ['storm: no clouds drawn', () => { holdStorm(true); show(/^pc-cloud/, false); }, () => { show(/^pc-cloud/, true); holdStorm(false); }],
-          ['storm: no cloud shadows', async () => { holdStorm(true); (await import('../world/wxfield.js')).WX.uCloudShadowK.value = 0; },
-            async () => { (await import('../world/wxfield.js')).WX.uCloudShadowK.value = 1; holdStorm(false); }],
+          ['storm: no cloud shadows', () => { holdStorm(true); const c = pc.world && pc.world.clouds; if (c) c.shadowK = 0; },
+            () => { const c = pc.world && pc.world.clouds; if (c) c.shadowK = 1; holdStorm(false); }],
         ] : []),
       ] : []),
       // (back to the size the device really draws, so the four rows below are measured from IT and not from
