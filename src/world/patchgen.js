@@ -46,7 +46,7 @@ const CS = 25;   // floats kept per sample: wash, far wash, parameters, liquid l
                  // there. The water lead owns this layout for the water lanes: the runoff's cap and swell take 25 and 26.)
 const _col = new Float32Array(E * E * CS);
 const _fs = [0, 0];     // (the stand and its needle share at a sample: world/farstand.js)
-const _bl = new Float32Array(E * E * 2);      // (the flower drift at a sample, FV6(b): its cover and its palette index; kept apart from _col so it takes no sample slot)
+const _bl = new Float32Array(E * E * 3);      // (the flower drift at a sample, FV6(b): its cover and its palette index; kept apart from _col so it takes no sample slot)
 let _s = null;
 let _stillGrid = new Float32Array(0), _stillSamp = null;      // (scratch: the water's section, how still, on a coarse grid)
 
@@ -143,7 +143,7 @@ export function stepPatch(job, deadline) {
         _col[c + 23] = s.still || 0;                              // (the water's: how still, where a water part says; 0 otherwise)
         if (gse) { _col[c + 6] = s.canA || 0; _col[c + 7] = s.canS || 0; }
         _col[c + 24] = rkf ? s.snowK || 0 : 0;                    // (the far view's snow: 24 since the water took 23)
-        if (blm) { _bl[k * 2] = s.fd || 0; _bl[k * 2 + 1] = s.fi || 0; }
+        if (blm) { _bl[k * 3] = s.fd || 0; _bl[k * 3 + 1] = s.fi || 0; _bl[k * 3 + 2] = s.fi2 != null ? s.fi2 : s.fi || 0; }
       }
     }
   }
@@ -182,17 +182,24 @@ export function stepPatch(job, deadline) {
         if (sk > 0.01) {
           const pr = 1 / Math.sqrt(_px[k] * _px[k] + _py[k] * _py[k] + _pz[k] * _pz[k]);
           const upn = (nor[o] * _px[k] + nor[o + 1] * _py[k] + nor[o + 2] * _pz[k]) * pr;
-          // (from about 49 degrees, all but a fifth of it by 61: MEASURED from 400 m, shedding from 38 degrees took the snow
-          // off nearly every summit -- at a far patch's spacing a summit's faces all read steep -- and the range went grey)
-          const st = sstep(0.66, 0.48, upn);
+          // (from about 55 degrees, all but two fifths of it by 70: MEASURED from 400 m, shedding from 38 degrees took the snow
+          // off nearly every summit -- at a far patch's spacing a summit's faces all read steep -- and the range went grey;
+          // from 49 to 61 degrees with a fifth kept, the peaks lost their white tips at 420 m and 1 km once the rock faces
+          // were laid, SEEN by the look director: snow wins over rock above the snowline, so only the sheerest faces shed)
+          const st = sstep(0.57, 0.34, upn);
           if (st > 0) {
-            const k2 = sk * (1 - 0.8 * st), cc = k * CS, iv = 1 / (1 - sk);
+            const k2 = sk * (1 - 0.6 * st), cc = k * CS, iv = 1 / (1 - sk);
             for (let t = 0; t < 3; t++) {
               const base = (_col[cc + t] - SNOW[t] * sk) * iv, base2 = (_col[cc + 3 + t] - SNOW[t] * sk) * iv;
               _col[cc + t] = base + (SNOW[t] - base) * k2;
               _col[cc + 3 + t] = base2 + (SNOW[t] - base2) * k2;
             }
           }
+          // (SNOW WINS OVER ROCK: where snow still lies after the shedding, the place reports no beds, so the ground's rock
+          // faces (render/farground.js, which lay rock only where the land has beds) leave it as snow. Read off the wash's
+          // whiteness instead, half the peaks' snow was taken for rock: white 8.3 to 4.7 per cent at the alpine view, SEEN.)
+          const left = st > 0 ? sk * (1 - 0.6 * st) : sk;
+          _col[k * CS + 16] *= 1 - sstep(0.15, 0.35, left);
         }
       }
       // morph target: where this vertex sits on the parent's (half resolution) mesh
@@ -212,7 +219,13 @@ export function stepPatch(job, deadline) {
       // crack's depth, which the oil look's ground never paints -- the needle share; world/farstand.js)
       col2[q] = b8(_col[c + 3]); col2[q + 1] = b8(_col[c + 4]); col2[q + 2] = b8(_col[c + 5]); col2[q + 3] = can ? b8(_col[c + 21]) : 255;
       par[q] = b8(_col[c + 6]); par[q + 1] = b8(_col[c + 7]); par[q + 2] = b8(_col[c + 8]); par[q + 3] = b8(_col[c + (can ? 22 : 9)]);
-      if (blo) { blo[q] = b8(_bl[k * 2]); blo[q + 1] = b8(_bl[k * 2 + 1] / 15); }
+      // (the drift's cover is taken off steep ground: the sample is one point and carries no slope, so on a cliff it was the
+      // turf's, and from the air flower colours ran up the mountains' faces, SEEN by flora B at 420 m and 1 km; the near
+      // flowers keep off steep ground by their own slope test. z: the slope's own kind, o.fi2, for the far dabs)
+      if (blo) {
+        const upn = (nor[o] * _px[k] + nor[o + 1] * _py[k] + nor[o + 2] * _pz[k]) / Math.sqrt(_px[k] * _px[k] + _py[k] * _py[k] + _pz[k] * _pz[k]);
+        blo[q] = b8(_bl[k * 3] * (1 - sstep(0.13, 0.29, 1 - upn)));      // (from 30 degrees, gone by 45: from 46 the far patches' smoothed normals left red on the peaks' faces, SEEN by flora B) blo[q + 1] = b8(_bl[k * 3 + 1] / 15); blo[q + 2] = b8(_bl[k * 3 + 2] / 15);
+      }
       if (!io && !jo) {
         // the parent's own normal here: its grid is twice as wide (at the border the apron is one cell deep)
         const il2 = i > 0 ? k - 2 : k - 1, ir2 = i < N ? k + 2 : k + 1, jl2 = j > 0 ? k - 2 * E : k - E, jr2 = j < N ? k + 2 * E : k + E;
@@ -235,7 +248,7 @@ export function stepPatch(job, deadline) {
         parP[v * 4 + t] = (par[v1 * 4 + t] + par[v2 * 4 + t] + 1) >> 1;
       }
       // (the drift's cover halfway, its colour the stronger neighbour's: an index is a name, not a number to average)
-      if (bloP) { bloP[v * 4] = (blo[v1 * 4] + blo[v2 * 4] + 1) >> 1; bloP[v * 4 + 1] = blo[(blo[v1 * 4] >= blo[v2 * 4] ? v1 : v2) * 4 + 1]; }
+      if (bloP) { const vs = blo[v1 * 4] >= blo[v2 * 4] ? v1 : v2; bloP[v * 4] = (blo[v1 * 4] + blo[v2 * 4] + 1) >> 1; bloP[v * 4 + 1] = blo[vs * 4 + 1]; bloP[v * 4 + 2] = blo[vs * 4 + 2]; }
       if (io || jo) for (let t = 0; t < 3; t++) norP[v * 3 + t] = (norP[v1 * 3 + t] + norP[v2 * 3 + t]) * 0.5;
     }
   }

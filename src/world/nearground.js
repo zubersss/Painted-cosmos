@@ -80,9 +80,15 @@ const VISTA = (() => {
 //   `?grass2=`   0 takes the whole grass package away (G2-G4): the oil look's near grass as it was on 24 Nov.
 //   `?nearcull=` 0 shades every mark again, in view or not (G1; the speed test's row does the same). On with ?flora=old too.
 //   `?bladegreen=` 0 gives the blades the undergrowth's greens again instead of their own (`oil.flora.sward.leaf`, F10)
+//   `?tuft=`     0 lets each blade pick its own colour again instead of its tuft's, and each touch of the middle band its
+//                own instead of mostly its cell's (the look director's audit 2)
+//   `?comb=`     0 lets the middle band's grass touches lean every way again instead of with the meadow's comb (audit 2)
+//   `?driftpatch=` 1 lays a coloured drift's heart past the near ring as a patch of round touches instead of many
+//                floor-sized heads (audit 2; OFF by default until the look director passes it on the phone)
+//   `?patchfloor=` 1 also brings the heads' floor down in the middle and far rings (0.55 and 0.4 of it; not yet seen)
 //   `?sheen=`    0 takes away the gusts' sheen on the blades (G4: needs PHYSICS' bend, so the game, or the gallery's &physics=1).
 const FLORA = (() => {
-  const f = { grass2: 1, cull: 1, sheen: 1, bloom: 0, blade: 1 };
+  const f = { grass2: 1, cull: 1, sheen: 1, bloom: 0, blade: 1, tuft: 1, comb: 1, patch: 0, pfloor: 0 };
   try {
     const q = new URLSearchParams(location.search), on = (k) => !q.has(k) || (q.get(k) !== '0' && q.get(k) !== 'false');
     // THE ONE OPT-OUT (the owner, 24 Nov, through the coordinator: "No do make it look different"): the lane is ON by
@@ -93,10 +99,18 @@ const FLORA = (() => {
     f.cull = on('nearcull') ? 1 : 0;
     f.sheen = f.grass2 && on('sheen') ? 1 : 0;
     f.blade = f.grass2 && on('bladegreen') ? 1 : 0;
+    f.tuft = f.grass2 && on('tuft') ? 1 : 0;
+    f.comb = f.grass2 && on('comb') ? 1 : 0;
   } catch { /* no address to read */ }
-  if (!LOOK.oil) { f.grass2 = 0; f.cull = 0; f.sheen = 0; f.blade = 0; }
+  if (!LOOK.oil) { f.grass2 = 0; f.cull = 0; f.sheen = 0; f.blade = 0; f.tuft = 0; f.comb = 0; }
   // (F1-F3: the flowers from world/bloom.js's map, ?bloom=0 off; read there, where the ground's colour reads it too)
   f.bloom = LOOK.oil ? bloomSwitches().bloom : 0;
+  try {
+    const q = new URLSearchParams(location.search), on = (k) => !q.has(k) || (q.get(k) !== '0' && q.get(k) !== 'false');
+    // (the drift patch is OPT-IN until the look director passes it on the phone: ?driftpatch=1; tuft and comb are passed)
+    f.patch = f.bloom && q.get('driftpatch') === '1' ? 1 : 0;
+    f.pfloor = f.patch && q.get('patchfloor') === '1' ? 1 : 0;
+  } catch { f.patch = 0; }
   return f;
 })();
 export { FLORA };
@@ -138,7 +152,18 @@ function stoneC(c, gr, gg, gb, m, out) {
   const v = Math.max(r, g, b); if (v < 0.62) { const f = 0.62 / Math.max(v, 1e-3); r = Math.min(1, r * f); g = Math.min(1, g * f); b = Math.min(1, b * f); }
   out[0] = r; out[1] = g; out[2] = b; return out;
 }
-const _stc = [0, 0, 0];
+const _stc = [0, 0, 0], _cuv = [1, 0];
+// A BLADE'S TONE (the look director's audit 2: "marks take their colour from the PIXEL, not the THING"; from 10 to 30 m
+// the sward was a speckle of three greens, blade by blade). With ?tuft on, a TUFT takes one of the three colours (or is a
+// dark accent tuft, one in seven) and its blades differ only by a value step; off, each blade picks its own as before.
+// Returns the colour's index (0 light, 1 mid, 2 the dark accent), whether it is the accent, and the density to lay it at.
+const _bt = { i: 0, acc: false, dk: 1 };
+function bladeTone(pv, th) {
+  if (!FLORA.tuft) { _bt.acc = pv < 0.14; _bt.i = _bt.acc ? 2 : pv < 0.55 ? 1 : 0; _bt.dk = _bt.acc ? 1.12 : pv < 0.36 ? 0.84 : 1.2; return _bt; }
+  _bt.acc = th < 0.14; _bt.i = _bt.acc ? 2 : th < 0.55 ? 1 : 0;
+  _bt.dk = (_bt.acc ? 1.12 : th < 0.36 ? 0.84 : 1.2) * (0.94 + 0.12 * pv);
+  return _bt;
+}
 const packTone = (c) => Math.min(262143, 1 + Math.round(Math.max(0, Math.min(1, c[0])) * 63) * 4096 + Math.round(Math.max(0, Math.min(1, c[1])) * 63) * 64 + Math.round(Math.max(0, Math.min(1, c[2])) * 63));
 // (the year, ?bloomyear=0 off) a kind's flowering window, `season: [from, to]` on SEASON.t (0 high summer, 1 deep autumn),
 // in sevenths, in the six bits above the colour: when it comes into flower times 8, plus how far before the end of the
@@ -163,6 +188,9 @@ function vnoise(x, y, seed) {
 // is its width at half length), 2 a grass flick, 3 a flick left crisp, 4 a fan-brush touch,
 // 5 a round touch facing the eye, 6 a touch laid flat on the ground; +0.25: left crisp.
 const FLICK = 2, FAN = 4, DAB = 5, LYING = 6, CRISP = 0.25;
+// (audit 2, ?driftpatch: a drift's patch is a crisp dab in every way but one, so the shader knows it: it comes in only
+// past 11-16 m, where the near ring's own flowers stop, materials.js NEAR_VERT)
+const PATCH = DAB + 0.4;
 const SEED_HEAD = [0.88, 0.76, 0.46], LITTER = [[0.80, 0.62, 0.34], [0.66, 0.42, 0.26], [0.46, 0.30, 0.24]], TWIG = [0.36, 0.27, 0.25];
 
 // What grows or lies near the eye in a biome: shares of each kind in a full clump (0..1).
@@ -300,7 +328,7 @@ class Ring {
     // 0.66 to 1, so past about 25 m the band thins toward its rim instead of standing in rows behind one another: its
     // touches painted each pixel they covered 3.8 times at the autumn landing. The shader grows a touch as the band thins.)
     u.uNear.value.set(RANGE * (FLORA.grass2 && cfg.name === 'mid' ? 0.40 : 0.66), RANGE, this.now, pixel || 0.002);
-    if (u.uNearK) u.uNearK.value.w = cfg.name === 'mid' ? 0.85 : (cfg.name === 'far' ? 0.6 : 1);   // (a flower head's least size on screen, a share)
+    if (u.uNearK) u.uNearK.value.w = cfg.name === 'mid' ? (FLORA.pfloor ? 0.55 : 0.85) : (cfg.name === 'far' ? (FLORA.pfloor ? 0.4 : 0.6) : 1);   // (a flower head's least size on screen, a share)
     if (u.uNearK) u.uNearK.value.y = FLORA.bloom ? SEASON.t : 0;    // (the flowers' year: packYear above)
     // (the fade-in band is a tier's own where a ring says so: the vista ring is laid at two tiers whose reaches
     // differ by more than twice, and one band of metres cannot serve both -- at the middle tier it would fade in
@@ -536,15 +564,15 @@ class Ring {
       // (a flick: pressed on at the root, lifted off to a point, curved; most are short, the
       // tuft's leader is long; the outer ones lean far over)
       const lead = k < 2 && q3 > 0.45;
-      const pv = (q5 * 9.7) % 1, acc = pv < 0.14;
+      const pv = (q5 * 9.7) % 1, bt = bladeTone(pv, H(960 + tf)), acc = bt.acc;
       const len = (0.09 + 0.34 * q3 * q3) * tsz[tf] * (lead ? 1.5 : 1) * (acc ? 1.2 : 1), wid = 0.020 + 0.018 * q4;
       // most are close to the ground's own value (a little richer, or a little paler: the
       // sunlit and the dry); one in seven is a darker accent, and only those are left crisp
-      const L = st.leafB, c = L ? L[acc ? 2 : pv < 0.55 ? 1 : 0] : null, gm = acc ? Math.max(st.gmB, st.gm) * 0.73 : st.gmB;
+      const L = st.leafB, c = L ? L[bt.i] : null, gm = acc ? Math.max(st.gmB, st.gm) * 0.73 : st.gmB;
       let cr = gr, cg = gg, cb = gb;
       if (c) { cr = lerp(c[0], gr, gm); cg = lerp(c[1], gg, gm); cb = lerp(c[2], gb, gm); }
       if (lead && tall > 0.3 && !acc) { const m = 0.5 * tall; cr = lerp(cr, SEED_HEAD[0], m); cg = lerp(cg, SEED_HEAD[1], m); cb = lerp(cb, SEED_HEAD[2], m); }
-      const dk = acc ? 1.12 : pv < 0.36 ? 0.84 : 1.2;
+      const dk = bt.dk;
       this.put(Math.cos(ang) * rad + tu[tf], Math.sin(ang) * rad + tv[tf], 0, 0.08 + 0.85 * q4 * q4, (tf ? t3 : t4) * 6.2832 + (q2 - 0.5) * 1.5, len, wid, acc && (k < 2 || q2 < 0.3) ? 3 : 2, q3 * 0.61 + q1 * 0.39, born,
         dens(cr, dk), dens(cg, dk), dens(cb, dk), (q5 - 0.5) * 1.5 + (q1 - 0.5) * 0.5, 1);
     }
@@ -716,13 +744,13 @@ class Ring {
       const tf = k % nT;
       const ang = q1 * 6.2832, rad = 0.015 + 0.075 * q2;
       const lead = k < nT * 2 && q3 > 0.45;
-      const pv = (q5 * 9.7) % 1, acc = pv < 0.14;
+      const pv = (q5 * 9.7) % 1, bt = bladeTone(pv, H(970 + tf)), acc = bt.acc;
       const len = (0.09 + 0.34 * q3 * q3) * tsz[tf] * (lead ? 1.5 : 1) * (acc ? 1.2 : 1), wid = 0.020 + 0.018 * q4;
-      const L = st.leafB, c = L ? L[acc ? 2 : pv < 0.55 ? 1 : 0] : null, gm = acc ? Math.max(st.gmB, st.gm) * 0.73 : st.gmB;
+      const L = st.leafB, c = L ? L[bt.i] : null, gm = acc ? Math.max(st.gmB, st.gm) * 0.73 : st.gmB;
       let cr = gr, cg = gg, cb = gb;
       if (c) { cr = lerp(c[0], gr, gm); cg = lerp(c[1], gg, gm); cb = lerp(c[2], gb, gm); }
       if (lead && tall > 0.3 && !acc) { const m = 0.5 * tall; cr = lerp(cr, SEED_HEAD[0], m); cg = lerp(cg, SEED_HEAD[1], m); cb = lerp(cb, SEED_HEAD[2], m); }
-      const dk = acc ? 1.12 : pv < 0.36 ? 0.84 : 1.2;
+      const dk = bt.dk;
       this.put(Math.cos(ang) * rad + tu[tf], Math.sin(ang) * rad + tv[tf], 0, 0.08 + 0.85 * q4 * q4, tl[tf] + (q2 - 0.5) * 1.5, len, wid, acc && (k < 2 || q2 < 0.3) ? 3 : 2, q3 * 0.61 + q1 * 0.39, born,
         dens(cr, dk), dens(cg, dk), dens(cb, dk), (q5 - 0.5) * 1.5 + (q1 - 0.5) * 0.5, 1);
     }
@@ -759,7 +787,39 @@ class Ring {
         // takes a fifth of the share it takes near the eye; and from the far ring a white head is held a step under the
         // meadow's lightest grass, as at 150 m pale flecks read as the paper)
         const b1 = b, sh1 = sh, tone1 = tone, B2 = o.bloom2, mx2 = o.mix * 0.2;
-        for (let q = 0; q < nf; q++, k++) {
+        // THE DRIFT AS ONE PATCH (the look director's audit 2, ?driftpatch=0 off): past 15 m the heads were many
+        // floor-sized dots side by side, the same 4-5 px dot for every flower, an even rain of dots where the references
+        // show pools of colour with dots scattered round them. So where the drift is thick (its heart), the cell lays one
+        // to three touches in the drift's colour, standing in the sward and facing the eye, gathered round one centre so
+        // that the cell's flowers are one pool, as many and as broad as the cell's COVER says (the thing, not the
+        // pixel), with two heads (one in the far ring) left over them; where it is thin (its edge) the heads stay
+        // scattered as before. The touches are kept small and ROUND (about 0.2-0.3 m across in the middle ring, 0.4-0.9 m
+        // in the far ring, a little squat there; as tall as they are wide, as a head is; SEEN at the top tier, far touches
+        // of 0.7-1.5 m were flat discs of 15-20 px along the horizon from 1.8 m, polka dots): MEASURED (Node, the meadow on foot) touches sized to fill
+        // the cell painted 36 per cent more of the picture and, at 10 m, were blobs some 70 px across; and SEEN, touches
+        // a quarter as tall as wide were thin horizontal lines of red and white from 1.8 m and 10 m, not pools.
+        let nh = nf, patched = false, np0 = 0;
+        if (FLORA.patch && nf >= 2) {
+          const cov = Math.min(1, o.dens * (two2 ? 1.5 : 1));
+          // (a WHITE drift keeps its heads: SEEN 24 Nov, its patches read as pale blue-grey puddles, then, made cream and flat,
+          // as pebbles: a plain disc loses the daisy's eye, which is what makes it a daisy. Only a coloured drift is pooled.)
+          const c1 = b1.c, pale = Math.max(c1[0], c1[1], c1[2]) - Math.min(c1[0], c1[1], c1[2]) < 0.25 * Math.max(c1[0], c1[1], c1[2]);
+          if (cov > 0.22 && !pale) {
+            const np = Math.min(nf - 1, far ? (cov > 0.5 ? 2 : 1) : (cov > 0.6 ? 3 : cov > 0.38 ? 2 : 1));
+            const pc = c1, wj = 1;
+            const st0 = b1.stalk ? 0.5 * (b1.stalk[0] + b1.stalk[1]) : 0.2;
+            const c0 = at(0.3 + 0.4 * H(918 + ho), 0.3 + 0.4 * H(919 + ho)), dw0 = far ? 0.20 + 0.18 * cov : 0.09 + 0.05 * cov;
+            for (let q = 0; q < np; q++, k++) {
+              const q1 = H(900 + q + ho), q2 = H(906 + q + ho), q3 = H(912 + q + ho);
+              const dw = dw0 * (0.85 + 0.3 * q3), jit = (0.94 + 0.12 * q2) * wj;
+              const p = np === 1 ? c0 : [c0[0] + (q1 - 0.5) * 2.4 * dw0, c0[1] + (q2 - 0.5) * 1.8 * dw0];
+              this.put(p[0], p[1], 0, 0, 0, dw * (far ? 1.2 + 0.3 * q1 : 1.5 + 0.4 * q1) * kh, dw, PATCH, q3, born, pc[0] * jit, pc[1] * jit, pc[2] * jit, st0 * 0.3, flex * 0.5, tone1);
+            }
+            left -= np; patched = true; np0 = np;
+            nh = Math.min(nf - np, far ? 1 : 2);
+          }
+        }
+        for (let q = 0; q < nh; q++, k++) {
           const q1 = H(102 + q + ho), q2 = H(106 + q + ho), q3 = H(110 + q + ho), p = at(q1, q2);
           let jit = 0.94 + 0.12 * q2;
           // (some touches are the runner-up drift's, as in the near ring)
@@ -782,7 +842,9 @@ class Ring {
             this.put(p[0], p[1], 0, 0, 0, r0 * 2, r0, sh || (DAB + CRISP), q3, born, b.c[0] * jit, b.c[1] * jit, b.c[2] * jit, st0 * 0.85 * kh, flex, tone);
           }
         }
-        left -= nf;
+        // (the look director, audit 2: the patch must be PIXEL-NEUTRAL, so the room its heads gave up is not handed to
+        // the cell's grass; the ground's own paint, already tinted by the drift, carries it)
+        left -= patched ? nf - np0 : nh;
       }
       }
     }
@@ -870,16 +932,23 @@ class Ring {
       const ng = Math.min(left, Math.round(st.blade * per * this.meadow * (0.55 + 0.6 * this.rough) * (st.reed > 0 ? 0.3 + 0.7 * Math.min(1, this.reedy) : 1) + H(200) - 0.5));
       // (G3, the flora lane, ?grass2=0 off: a touch in the blades' own greens, narrower, and more upright)
       const L = st.leafB, g2 = FLORA.grass2, nw = g2 ? 0.6 : 1, nt = g2 ? 0.5 : 1;
+      // (audit 2, ?tuft: from 10 to 40 m each touch picking its own of the three greens was the same speckle the blades
+      // made nearer; now seven touches in ten take their cell's green, so the band reads in patches of a couple of metres,
+      // with a value step between them)
+      const vc = H(975), vcell = vc < 0.36 ? 2 : vc < 0.72 ? 1 : 0;
+      // (audit 2, ?comb: the touches lean with the meadow's comb, the same slow wind as the far drags, grassTurn,
+      // instead of every way, so from 20 to 60 m the grass has a direction)
+      const cb0 = FLORA.comb ? this.combUV(H(976), _cuv) : null, cla = cb0 ? Math.atan2(cb0[1], cb0[0]) : 0;
       for (let q = 0; q < ng; q++, k++) {
         const q1 = H(201 + q), q2 = H(208 + q), q3 = H(215 + q), q4 = H(222 + q), q5 = H(229 + q), p = at(q1, q2);
         // the shaded side of a tuft, the sunlit one, the dry one: all near the ground's own value
-        const v = q5 < 0.36 ? 2 : q5 < 0.72 ? 1 : 0, c = L ? L[v] : null, gm = v === 2 ? st.gmB - 0.02 : st.gmB;
+        const v = FLORA.tuft && H(980 + q) < 0.7 ? vcell : q5 < 0.36 ? 2 : q5 < 0.72 ? 1 : 0, c = L ? L[v] : null, gm = v === 2 ? st.gmB - 0.02 : st.gmB;
         let cr = gr, cg = gg, cb = gb;
         if (c) { cr = lerp(c[0], gr, gm); cg = lerp(c[1], gg, gm); cb = lerp(c[2], gb, gm); }
         if (v === 0 && tall > 0.2) { const m = 0.55 * tall; cr = lerp(cr, SEED_HEAD[0], m); cg = lerp(cg, SEED_HEAD[1], m); cb = lerp(cb, SEED_HEAD[2], m); }
-        const dk = v === 2 ? 1.10 : v === 1 ? 1.04 : 0.86;
-        this.put(p[0], p[1], 0, 0.12 * q4 * nt, q3 * 6.28, (0.15 + 0.24 * q3) * (1 + 1.1 * tall) * kh, (0.13 + 0.20 * q4) * kw * nw, FAN, q3 * 0.61 + q1 * 0.39, born,
-          dens(cr, dk), dens(cg, dk), dens(cb, dk), (q2 - 0.5) * 0.5, flex);
+        const dk = (v === 2 ? 1.10 : v === 1 ? 1.04 : 0.86) * (FLORA.tuft ? 0.95 + 0.1 * q5 : 1);
+        this.put(p[0], p[1], 0, cb0 ? 0.16 + 0.12 * q4 : 0.12 * q4 * nt, cb0 ? cla + (q3 - 0.5) * 0.5 : q3 * 6.28, (0.15 + 0.24 * q3) * (1 + 1.1 * tall) * kh, (0.13 + 0.20 * q4) * kw * nw, FAN, q3 * 0.61 + q1 * 0.39, born,
+          dens(cr, dk), dens(cg, dk), dens(cb, dk), cb0 ? (q2 - 0.5) * 0.2 : (q2 - 0.5) * 0.5, flex);
       }
     }
   }
@@ -895,6 +964,20 @@ class Ring {
   // that wanders slowly (a fifth of a turn either way over a kilometre and a half), and on a slope the drags still run
   // along the contour (contourTurn), the two handed over by the slope, drag by drag. Seen from the air a meadow is
   // brushed in one direction and changes it as the land does.
+  // the comb's direction on the ground here, read on the clump's own (u, v) frame (the lean `put` takes): the same
+  // slow wind from the west as grassTurn, so the middle band's touches and the far drags are combed alike
+  combUV(q, out) {
+    const nx = this.nx, ny = this.ny, nz = this.nz, R = this.S.R;
+    let ex = nz, ez = -nx; const l = Math.hypot(ex, ez);
+    if (!(l > 1e-6)) { out[0] = 1; out[1] = 0; return out; }
+    ex /= l; ez /= l;
+    const wx = ny * ez, wy = nz * ex - nx * ez, wz = -ny * ex;                                   // north = n x east
+    const w = 0.6 * this.S.nC.n3(this.x * R / 1500 + 3.1, this.y * R / 1500 - 7.7, this.z * R / 1500 + 1.3) + (q - 0.5) * 0.4;
+    const cw = Math.cos(w), sw = Math.sin(w), dx = ex * cw + wx * sw, dy = wy * sw, dz = ez * cw + wz * sw;
+    out[0] = dx * this.ux + dy * this.uy + dz * this.uz; out[1] = dx * this.vx + dy * this.vy + dz * this.vz;
+    return out;
+  }
+
   grassTurn(q, q2) {
     const steep = this.steep, k = sstep(0.08, 0.25, steep);
     if (q2 < k) return this.contourTurn(q);

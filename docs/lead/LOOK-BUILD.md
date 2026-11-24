@@ -337,3 +337,49 @@ the owner first. Not started.
   nothing dark left to keep (the air is the smaller part). The darks have to come from the things: A1's crown masses
   (passed for v39.3) and its next steps (the small crowns' gaps in their shaded tone, the far spruce by limb), and C's
   mountains' shade plane. To be re-measured at 1 km once those are in.
+
+## The golden hour in the water (cbf7f41, 24 Nov): SEEN, a small first step
+
+- materials.js WATER_FRAG, oil look, under the golden-hour sky switch (uLookG.x; `?goldsky=0` as before): the
+  water's mirror fallback (skyc) takes the sky's own gold wash, strongest low, by pcGold, and the warm glow by the
+  reflected ray's angle to the sun, as sky.js lays them on the sky.
+- SEEN (look-director, autumn stream on foot at 16.8, 8 and 12, coast 16.8; uLookG.x 1 then 0 in one page): the
+  stream's water mean (0.368, 0.434, 0.464) to (0.381, 0.436, 0.446) at 16.8 and (0.440, 0.547, 0.533) to (0.456,
+  0.546, 0.508) at 8; noon 0.5 per cent of the picture (the sun's glow, which the sky has at noon too); coast
+  (0.346, 0.495, 0.597) to (0.353, 0.493, 0.580). Stills build/watergold/.
+- SAID PLAINLY: right direction, too small to see by eye. The water's own paint (WATER_FRAG's oil block: 55 per cent
+  of its own blue wash laid over everything, the sun's path a narrow pow 56) covers the mirror. The bigger half is
+  W3's: at a golden hour lay less of the blue wash and widen the sun's path in the sun's colour (asked of W3, 24 Nov).
+
+## State at 16:55, 24 Nov (for whoever picks up group F)
+
+- v39.3 in its gate (16:51): A2's pines and A1's crown mass as defaults, look-director to dbd646c (uPhysGust
+  binding, skylimb, olive darks, airdark). v39.4 (after about 17:55): C's mountains (?rockfield default, ON THE
+  CONDITION that the peaks' snow survives over the rock), W1's anvil and mountain cloud (weather-clouds c4b612e),
+  look-director 5a65e9d (water gold).
+- Waiting on, to review: C's mountains with snow and a warmer/cooler noon split (uRockM3 warm lean, 1.25 blue cool
+  lean; aim rock S 0.15-0.22); A1's next crown steps (yellow kind into the stands, small crowns' gaps in their shaded
+  tone, the far spruce by limb); W3's like-for-like river on foot (v37 against theirs at 12 and 16.8, with the water's
+  blue wash eased and the sun's path widened at a golden hour); E-W2's full sea sheet after W3's pointed ends; B's
+  round drift patches (1.8 m, 10 m, 150 m at both tiers); A2's ?nearleaf (leaves shrink within about 3.5 m); D's
+  gust ground step (no lift over V 0.80, more blue-grey).
+- My open lanes (the coordinator, 24 Nov): the light's design (a dark frame round a bright warm middle distance, the
+  far wood stepping back into pale gold at 16.8) and the storm-lit land (the weather key takes the land down under a
+  storm). Neither started.
+
+## The land under a storm (ce1701f, cce1cd1, 24 Nov): SEEN, a first step
+
+- chunks.js pcLevel, oil only: x = mix(x, 0.20 + 0.38 x, uStorm * uLookS.x), a further level toward the cool glaze
+  under a storm (a level, R1.3b; the same picture to the bit when uStorm is 0). world/index.js: OIL.uLookS.x from
+  LOOK.stormLight (`?stormlight=0` off; first named ?stormland, which is the weather group's land storms, renamed),
+  and uStorm takes the most of the physics storm and the 3D clouds' overhead01 x overheadStorm01 (`?stormsky=0`;
+  0 until weather-clouds 090d0d8 merges).
+- SEEN (gallery, phone settings, forced sky, LOOK.stormLight 1 then 0 in one page): autumn stream on foot with
+  wx=storm: 13.8 per cent changes, the banks and the far meadow from green to a cool grey-green, land V median 0.41
+  to 0.38, S 0.37 to 0.31. Green wood with wx=rain: 44 per cent, the lime slope to a deep moss green, V 0.44 to
+  0.37, S 0.59 to 0.46. Autumn wood from 150 m with wx=storm: 16.4 per cent, the floor between the trees from
+  green-ochre to a cool violet-grey. Stills build/stormlight/.
+- SAID PLAINLY, what it does not reach: (1) the trees' crowns, near and far (their paint does not go through this
+  step: the leaves' and the impostors' own light), stay as bright as in fair weather, the red crowns glowing under a
+  storm sky; (2) the river and the lake stay the palest thing under a storm (the water's mirror and wash, W3/E). Both
+  to be asked of their lanes: under uStorm the crowns a level down (A1, A2), the water toward the storm's grey (W3).
