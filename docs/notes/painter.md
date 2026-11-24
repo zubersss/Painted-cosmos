@@ -12,7 +12,13 @@ FV7 of `docs/lead/FARVIEW-DESIGN.md`. A second session (A2, branch `trees-near`)
 the same time: this lane touches only the far parts of `flora.js`, `florakit.js`, the plant material's far branch,
 `render/impostor.js`, `render/shadow.js` and new rows in `core/bench.js`.
 
-**State (update this line every step):** (24 Nov, about 12:45) URGENT FIX DONE for v39.1 (the coordinator): during
+**State (update this line every step):** (24 Nov, about 13:10) WAITING: F on making the small-crown rule the
+default (A/B sent, phone and desktop 1080: `A1_small_*`; that also covers step (a), the desktop still); C on the seam
+(two options sent); the coordinator on whether a 1-2/255 difference from the bake fix is acceptable (MEASURED against
+1ecf744, phone settings: the speed-test alpha edits and the small-crown code switched off are byte-identical; the
+flora.js bake fix moves at most 2 levels of 255 on 1.1 percent of pixels on foot and 4.3 percent at 150 m, all impostor
+pixels; likely the instances' order or birth time in the impostor mesh after the swap, not proven), and on merging
+look-proto after v39.1. Scratch worktree `seam` (C's farview merged, never pushed) kept for more seam stills. URGENT FIX DONE for v39.1 (the coordinator): during
 the bake over frames the far wood was gone; now today's far trees stand in until the bake is done and hand over in that
 frame (flora.js impWant / impOn, _impReady; impostor.js step(), onReady, bakeTick), the bake counts as busy from the
 frame it is asked for. SEEN, gallery autumn wood 16.8 h on foot, phone settings: mid-bake (step 5 of 78, not ready,
