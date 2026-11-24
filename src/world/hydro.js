@@ -310,6 +310,7 @@ class Hydro {
       const top = se.lq !== NOLQ && se.lq > se.h - 0.5 ? se.lq : m.levelTop;
       if (!(top - sea > o.fallMin)) { this.cutFail.low = (this.cutFail.low || 0) + 1; continue; }
       const fjord = !!this.want.fjord && m.width >= fj.minW && (nf++ % Math.max(1, fj.every | 0)) === 0;
+      if (!fjord && !this.want.falls) continue;            // (?fjord=1 alone: the other mouths are left as they were)
       const cor = fjord ? this._fjordCor(m, tr, top, sea) : this._fallCor(m, tr, top, sea);
       if (!cor) { this.cutFail.shelf = (this.cutFail.shelf || 0) + 1; continue; }
       this.cors.push(cor);
@@ -371,20 +372,27 @@ class Hydro {
     const kS = Math.max(0, n - Math.max(4, Math.ceil((hw + o.bankMax) / o.step) + 2));
     const pS = [S0.st[kS * 3], S0.st[kS * 3 + 1], S0.st[kS * 3 + 2]], lS = [S0.lf[kS * 3], S0.lf[kS * 3 + 1], S0.lf[kS * 3 + 2]];
     const tE = [S0.tg[(n - 1) * 3], S0.tg[(n - 1) * 3 + 1], S0.tg[(n - 1) * 3 + 2]];
-    const span = hw + o.bankMax + 1.5, wallD = [], wallT = [];
-    for (let d = -span; d <= span + 1e-6; d += 1.5) {
+    // (every 3 m across, walked 3 m at a time from a little before where the last offset found it, then bisected to 0.4 m)
+    const WS = 3, span = Math.ceil((hw + o.bankMax + 1.5) / WS) * WS, wallD = [], wallT = [];
+    const land = (q) => this._h(q).h >= sea + o.seaFoot + 1;
+    let guess = tLip - S0.arc[kS];
+    for (let d = -span; d <= span + 1e-6; d += WS) {
       const q0 = move(pS, lS, d, R), td = tangent(q0, tE);
-      let tw = tLip + 30, prevIn = true;
-      for (let a = 0; a <= tLip - S0.arc[kS] + 30; a += 1) {
-        const sh = this._h(move(q0, td, a, R));
-        const inLand = sh.h >= sea + o.seaFoot + 1;
-        if (!inLand && prevIn && a > 0) { tw = S0.arc[kS] + a - 0.5; break; }
-        prevIn = inLand;
+      let tw = tLip + 30;
+      let a = Math.max(0, guess - 9);
+      if (!land(move(q0, td, a, R))) a = 0;              // (already past it there: walk from the station itself)
+      for (; a <= tLip - S0.arc[kS] + 30; a += WS) {
+        if (!land(move(q0, td, a + WS, R))) {
+          let lo = a, hi = a + WS;
+          for (let it = 0; it < 3; it++) { const mid = (lo + hi) * 0.5; if (land(move(q0, td, mid, R))) lo = mid; else hi = mid; }
+          tw = S0.arc[kS] + (lo + hi) * 0.5; guess = (lo + hi) * 0.5;
+          break;
+        }
       }
       wallD.push(d); wallT.push(tw);
     }
     const wallAt = (d) => {
-      const f = (d + span) / 1.5, i = Math.max(0, Math.min(wallD.length - 2, Math.floor(f))), u = Math.max(0, Math.min(1, f - i));
+      const f = (d + span) / WS, i = Math.max(0, Math.min(wallD.length - 2, Math.floor(f))), u = Math.max(0, Math.min(1, f - i));
       return wallT[i] + (wallT[i + 1] - wallT[i]) * u;
     };
     for (let k = 0; k < n; k++) {
@@ -411,7 +419,7 @@ class Hydro {
     const edgeU = [], edgeT = [];
     for (let i = 0; i <= 8; i++) { const u = -1 + i / 4; edgeU.push(u); edgeT.push(Math.max(-6, Math.min(6, wallAt(u * hw) - tLip))); }
     fall.edgeU = edgeU; fall.edgeT = edgeT;
-    return Object.assign(S0, { kind: 'fall', hw, lv, TL, TR, B, dep, wallD, wallT, wallSpan: span, t0: S0.arc[0], tLip, reach: hw + o.bankMax + 2, fall });
+    return Object.assign(S0, { kind: 'fall', hw, lv, TL, TR, B, dep, wallD, wallT, wallSpan: span, wallStep: WS, t0: S0.arc[0], tLip, reach: hw + o.bankMax + 2, fall });
   }
 
   // A FJORD: the corridor and the river's own last reach drowned to the sea's level between steep walls; the river falls into
@@ -549,7 +557,7 @@ class Hydro {
 
   _pastWall(C, q) {
     if (!C.wallT) return q.t > C.tLip;
-    const ff = (q.d + C.wallSpan) / 1.5, i = Math.max(0, Math.min(C.wallD.length - 2, Math.floor(ff))), u = Math.max(0, Math.min(1, ff - i));
+    const ff = (q.d + C.wallSpan) / C.wallStep, i = Math.max(0, Math.min(C.wallD.length - 2, Math.floor(ff))), u = Math.max(0, Math.min(1, ff - i));
     return q.t > C.wallT[i] + (C.wallT[i + 1] - C.wallT[i]) * u;
   }
 

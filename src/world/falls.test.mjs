@@ -21,7 +21,7 @@ const WH = await import('./waterhooks.js');
 const FL = await import('./falls.js');
 MODE.oil = true; overlayOil(LOOKS);
 waterFromSearch('?rivers=tree&falls=1');
-const { getSurface } = await import('./surface.js');
+const { getSurface, makeSample } = await import('./surface.js');
 const { ensureDrainage } = await import('./drainage.js');
 const { attachRivers } = await import('./rivers.js');
 const { attachHydro } = await import('./hydro.js');
@@ -39,6 +39,11 @@ test('the layer registers itself with the water\'s frame and the speed test', ()
   const row = WH.WATER_BENCH.find((r) => r.name === 'no falls');
   assert.ok(row && typeof row.on === 'function' && typeof row.off === 'function');
   row.on(); assert.equal(FL.FALLS.on, false); row.off(); assert.equal(FL.FALLS.on, true);
+  // and where its view stands: in the sea, facing the widest fall
+  const v = row.place(S);
+  assert.ok(v && Math.abs(Math.hypot(...v.dir) - 1) < 1e-9 && Number.isFinite(v.yaw) && Number.isFinite(v.pitch));
+  const o = makeSample(S.nB); S.sample(v.dir[0], v.dir[1], v.dir[2], o, false);
+  assert.ok(o.lq > o.h + 1, 'the falls view stands in the sea');
 });
 
 test('a jet leaves the lip at the river\'s level and lands at the foot, clear of the wall', () => {

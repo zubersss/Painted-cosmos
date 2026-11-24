@@ -231,4 +231,20 @@ export const FALLS = new FallsLayer();
 WATER_PARTS.push({ name: 'falls', update: (ctx) => FALLS.update(ctx) });
 // (the speed test: a fall in view, with and without its sheets, pools and spray. The view itself is asked of the speed test's
 //  owner: core/bench.js has the bank and the shore; the falls view is to be added there, docs/notes/water.md)
-WATER_BENCH.push({ name: 'no falls', view: 'falls', on: () => { FALLS.on = false; }, off: () => { FALLS.on = true; } });
+// `place` says where that view stands: in the sea 60 m out from the widest fall's foot and 25 m to one side, at the sea's level,
+// facing the middle of the sheet (dir: a unit direction; yaw: degrees from north toward east, the frame core/bench.js and the
+// gallery use; pitch: radians, as core/bench.js's own views give it). Null on a world with no fall.
+export function fallsView(S) {
+  const hy = S && S.hydro;
+  if (!hy || !hy.falls || !hy.falls.length) return null;
+  const f = hy.falls.reduce((a, b) => (b.width > a.width ? b : a)), R = S.R;
+  const F = fallFrame(f, R), foot = fallFoot(F, 0, [0, 0, 0]), mid = fallAt(F, F.T * 0.5, 0, [0, 0, 0]);
+  const P = [0, 1, 2].map((i) => foot[i] + F.dir[i] * 60 + F.acr[i] * 25);
+  const l = Math.hypot(P[0], P[1], P[2]), u = P.map((v) => v / l);
+  let ex = u[2], ey = 0, ez = -u[0]; const el = Math.hypot(ex, ey, ez) || 1; ex /= el; ey /= el; ez /= el;
+  const nx = u[1] * ez - u[2] * ey, ny = u[2] * ex - u[0] * ez, nz = u[0] * ey - u[1] * ex;
+  const eye = R + f.foot + 1.6, v = [mid[0] - u[0] * eye, mid[1] - u[1] * eye, mid[2] - u[2] * eye];
+  const ve = v[0] * ex + v[1] * ey + v[2] * ez, vn = v[0] * nx + v[1] * ny + v[2] * nz, vu = v[0] * u[0] + v[1] * u[1] + v[2] * u[2];
+  return { dir: u, yaw: Math.atan2(ve, vn) * 180 / Math.PI, pitch: Math.atan2(vu, Math.hypot(ve, vn)) };
+}
+WATER_BENCH.push({ name: 'no falls', view: 'falls', place: fallsView, on: () => { FALLS.on = false; }, off: () => { FALLS.on = true; } });
