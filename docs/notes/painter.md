@@ -4,6 +4,29 @@ Branch: `cosmos` (shared with PILOT and PHYSICS, one working tree). Commits: `to
 This file was rewritten by the second PAINTER agent (the first ran out of working context). The
 first agent's record of M1 is kept at the end ("Earlier answers").
 
+## Hand-over of LANE W1 CLOUDS, branch `weather-clouds` (group D; READ THIS FIRST if you are the clouds session)
+
+Helper session for group D's clouds lane (coordinator `session_01R5Bri1TV3HBTyuxNZZuhNw`; look director, who reviews
+every still and owns world/index.js, chunks.js, post.js, shared.js, render/index.js: `session_01R5Brhzz2JPPF6Ecz6XRQHx`;
+the weather group, who owns src/physics/: `session_01R5Bri2bBgFSfCmxpKKuURT`). The design is
+`docs/lead/WEATHER-DESIGN.md` section 4 (A1 already built by the look director) with the budget in 7, the files in 8
+and the contracts in 9. Branch = look-proto v37.1 + design-weather 03c3f1c + look-director fff5694. Files this lane
+owns: src/world/clouds.js, src/world/wxfield.js (new), src/world/sky.js, src/world/orbit.js (makeCloudShell only), the
+`weather:` rows of src/data/looks/*.js, its own block at the END of src/core/bench.js's rows, docs/shots/clouds/.
+Commit code with `tools/commit.sh painter`; docs/shots/clouds/ is not in that script's paths, so stills go up with a
+plain `git add docs/shots/clouds && git commit` naming the path.
+
+| step | state | what was done, seen, measured |
+| --- | --- | --- |
+| 1. wxfield.js | DONE | `WX` (uWxField, uWxField2, uWxN, uWxOn, uCloudShadow, uCloudShadowM, uCloudShadowK) and `WXFIELD_GLSL` (pcWxField, pcWxField2, pcRainAt, pcWindAt, pcCloudBase, pcCloudTop, pcCloudShadow), the contract of design 9.4; `createWxField().update(fields)` rebuilds the atlases when a map's version moves, at most twice a second. MEASURED: 6 tests (src/world/wxfield.test.mjs: seams and corners, wind vectors, zeros when off, the 2 Hz gate, Earth's real cloud map); rebuild 0.09 ms (cloud) + 0.16 ms (wind) warm in Node here. The GLSL COMPILED AND RAN in headless Chromium, vertex and fragment, and matches the CPU twin to half an 8-bit step (docs/shots/clouds/wxfield-glsl-check/RESULT.txt). Nothing in the picture changes: nothing reads it yet. |
+| 2. clouds.js A2, A3, A5 | next | |
+| 3. A6 shadow map, T5/T3 lines to the look director | | |
+| 4. A4, A9, A10 in sky.js; A8 orbit shell; earth weather row | | |
+| 5. bench rows | | |
+
+**Needed from others.** `?clouds3d=1` alone does not switch the maps on (`?cloudmap=1` / `?windmap=1` are the
+weather group's switches in src/physics/wx2.js); asked the weather group to make clouds3d imply both.
+
 ## Hand-over of THE OIL LOOK, prototype on branch `look-proto` (READ THIS FIRST; kept current)
 
 Branch: `look-proto`, cut from `main` at `5e85754`. Nothing here is live. The plan, the owner's instructions, the sort of
