@@ -207,6 +207,18 @@ export function attachBench(pc) {
   // picture sharper until the frame is clearly off the cap and asks every question THERE. The costs are then of a
   // bigger picture than the device draws -- the header says so plainly -- but they are real costs, and the order
   // and the size of them is what the questions are for.
+  // THE THREE TABLES, IN PLAIN WORDS (the coordinator, 24 Nov: the owner runs them on waking, one after another). Each
+  // address is this very page with only the table changed, so whatever else the owner's link carried is kept.
+  const GUIDE = (() => {
+    const at = (m) => { const q = new URLSearchParams(location.search); q.set('look', 'oil'); q.set('bench', m); return location.origin + location.pathname + '?' + q.toString(); };
+    const which = MODE_B === 'trees' ? 1 : MODE_B === 'air' || MODE_B.startsWith('air,') ? 2 : MODE_B === 'foot' ? 3 : 0;
+    return 'THREE SPEED TESTS, one after another. For each: open its address, lay the phone down and do not touch it until the\n'
+      + 'table says "done" at the bottom, press Copy the table, and paste it into the chat. Then open the next one.\n'
+      + '  1 the trees:             ' + at('trees') + '\n'
+      + '  2 the view from the air: ' + at('air') + '\n'
+      + '  3 on foot:               ' + at('foot') + '\n'
+      + (which ? 'THIS IS TEST ' + which + ' OF 3.' : 'THIS IS THE WHOLE TABLE (not one of the three).') + '\n\n';
+  })();
   let MK = 1;             // how much sharper each way the questions are asked (1: not capped, asked as drawn)
   let capMs = 0;          // the frame interval the device is held at, if it is held at one
   const head = (r0) => {
@@ -214,7 +226,7 @@ export function attachBench(pc) {
     try { const gl = R.getContext(), e = gl.getExtension('WEBGL_debug_renderer_info'); if (e) gpu = String(gl.getParameter(e.UNMASKED_RENDERER_WEBGL)); } catch { /* not told */ }
     const i = P.info || {}, c = R.domElement;
     const sun = sunOut == null ? '' : sunOut ? 'sun out (shadows drawn)' : 'sun not out (no shadows drawn)';
-    return 'PAINTED COSMOS SPEED TEST 10' + (MODE_B === '1' ? '' : ' (' + MODE_B + ')') + ', ' + BUILD + ': press Copy the table at the bottom, then paste it\n' +
+    return GUIDE + 'PAINTED COSMOS SPEED TEST 10' + (MODE_B === '1' ? '' : ' (' + MODE_B + ')') + ', ' + BUILD + ': press Copy the table at the bottom, then paste it\n' +
       gpu.slice(0, 64) + ' | depth ' + (i.depth || '?') + ' | ' + sun + '\n' +
       'picture ' + (i.internalWidth || c.width) + 'x' + (i.internalHeight || c.height) + ' | screen ' + window.innerWidth + 'x' + window.innerHeight + ' @' + (window.devicePixelRatio || 1).toFixed(2) + (pin ? ' | held still' : ' | NOT HELD') +
       ' | tier ' + i.quality + ' | edges ' + (P.aaMode ? P.aaMode() : '?') + ' | paint ' + (P.lite ? 'lighter' : 'full') +
@@ -224,7 +236,7 @@ export function attachBench(pc) {
         + 'So the + / - below are real costs, but of a picture ' + (MK * MK).toFixed(1) + ' times the one it draws. Rows 24 on are back at that size.' : '');
   };
   const run = async () => {
-    el.textContent = 'speed test: waiting for the first view...';
+    el.textContent = GUIDE + 'speed test: waiting for the first view...';
     // (MK and capMs are filled by the probe below, before the rows; head() reads them.)
     while (!window.__pcReady) await wait(250);
     if (pc.settle) await Promise.race([pc.settle(12), wait(20000)]);
@@ -682,5 +694,5 @@ export function attachBench(pc) {
     el.textContent = head(r0) + '\n' + rows.join('\n') + '\ndone. (+ / - ms: against the "as set" row before it)' + warn;
     pc.bench = rows;
   };
-  run().catch((e) => { el.textContent = 'speed test failed: ' + ((e && e.message) || e); });
+  run().catch((e) => { el.textContent = GUIDE + 'speed test failed: ' + ((e && e.message) || e); });
 }
