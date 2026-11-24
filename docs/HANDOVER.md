@@ -481,6 +481,16 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
   soft far off. So: give the room to SHARPNESS (the ladder, v27), and buy more of it by cutting the script, not by
   cutting what is drawn. **Do not cut content for speed on this phone until a table says content costs something.**
 
+**THE OWNER, 24 Nov, about 19:55 (latest): MERGE EVERYTHING INTO THE GAME, AND THE SPEED-TEST LINKS NOW.**
+*"Merge everything into the game and give me the links to the speed tests I need to do rn"* Read as: put every piece
+that is READY into main now (passed work as the default with its opt-out; built-but-unreviewed work behind its OFF
+switch, so its speed-test rows reach the owner's phone run), without waiting for the full render gate; then give the
+three speed-test links (bench=trees, bench=air, bench=foot). Not merged because not ready: W3's new water paint
+(water-paint 2b869d8, not yet on v39.3/v39.4, cost to cut first) and C's 7ab10e2 (waits for the look director). The
+fast gate used: the three suites and all.mjs static+unit, one oil render on foot with no console errors, boot of / and
+/?look=oil; the watercolour 0-pixel proof, the same-switch off-set proof and the high frame run AFTER the merge, and
+any fault is fixed forward at once.
+
 **THE OWNER, 24 Nov, about 10:35 (latest, overrides the line below about the live look): MAKE IT LOOK DIFFERENT.**
 *"No do make it look different i give you access"* The owner gives the session leave to CHANGE THE LIVE LOOK: work
 that is good and reviewed (by the coordinator's own eye and the look director) is made the DEFAULT, not hidden behind an
