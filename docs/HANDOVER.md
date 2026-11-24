@@ -481,6 +481,13 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
   soft far off. So: give the room to SHARPNESS (the ladder, v27), and buy more of it by cutting the script, not by
   cutting what is drawn. **Do not cut content for speed on this phone until a table says content costs something.**
 
+**THE OWNER, 24 Nov, about 10:25 (latest): EIGHT HOURS OF AUTOMATIC WORK.** *"Im gonna he asleep for 8 hours do
+automatic work till then continue working"* The session keeps every helper moving, reviews their stills, merges what
+passes into `look-proto` in stages and ships to `main` under item 41's gate, with the live game's look unchanged unless
+a switch is asked for (each new look goes behind ONE opt-in switch the owner can compare on waking). The owner's two
+checks by eye on the phone (?look=oil&trees2=1 and ?look=oil&fartree=impostor) are still asked; nothing that depends
+on them is made the default before they answer.
+
 **THE OWNER, 24 Nov (latest, overrides the 23 Nov list's order): 30 A SECOND, THE FAR VIEW TO A MILE, FLORA
 BEFORE FAUNA.** *"OK let's aim for 30 fps but also things should look good far before I get there like when im
 flying high in the sky up to a mile I want trees from a distance to look good rocks the water the grass specially it
