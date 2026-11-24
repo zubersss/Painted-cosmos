@@ -6,7 +6,7 @@
 // was the whole picture going white for a moment, with no bolt anywhere. The physics now knows every storm on the planet
 // (physics/cloudfield.js: its cells, and the last flash of every storm cell within 4 km), and this draws two things of
 // them:
-//   RAIN SHAFTS  under every system raining 2 mm/h and more at its core, two or three VEILS (the look director's
+//   RAIN SHAFTS  under every system raining 2 mm/h and more at its core, two wide VEILS (the look director's
 //                review, 24 Nov: the first version was a comb of thin white lines): broad sheets hung from the cloud's
 //                base to the ground, slanted with the wind, each a flat VALUE STEP against what is behind it (a glaze,
 //                laid as a multiply), with low-contrast strokes inside that merge into the step, thinning toward its
@@ -30,7 +30,7 @@ import { register, G } from '../render/shared.js';
 import { BODIES } from '../data/bodies.js';
 
 const MAX_SHAFTS = 12;
-const VEILS = 3;                        // veils hung under one storm at most (two under a lighter one)
+const VEILS = 2;                        // veils hung under one storm (the look director: two wide beat four thin)
 const MAX_BOLTS = 4, BOLT_SEGS = 40;    // bolts drawn at once, and segments in one (its channel and its branches)
 const SHAFT_RATE = 2;                   // mm/h at a system's core from which it has a shaft
 const SHAFT_REACH = 7000;               // m: a shaft further off than this is not drawn
@@ -92,9 +92,11 @@ void main() {
   // and up it: each stroke leaves the cloud's base at its own height, a step thinner at first (the rain is still
   // gathering under the base: and until the clouds lane draws the base, a flat top would read as a wall), and thins
   // toward the foot in two flat steps
-  float y = vUv.y;
-  if (y > 1.0 - 0.22 * h2) discard;
-  if (y > 0.80 - 0.14 * h1) level -= 0.34;
+  // (the look director's second look: until the clouds lane hangs them from a drawn cloud base, the top comes in by
+  //  the same two flat steps as the sides, its edges wandering stroke by stroke, never a ragged top in open air)
+  float y = vUv.y, yt = y + (h1 - 0.5) * 0.08;
+  if (yt > 0.74) level -= 0.34;
+  if (yt > 0.88) level -= 0.33;
   if (y < 0.20 + 0.14 * h3) level -= 0.34;
   if (y < 0.07 + 0.08 * h2) level -= 0.33;
   if (level < 0.2) discard;
@@ -261,7 +263,7 @@ export function makeStorms(bodyUniforms, opts = {}) {
           used++;
           let ex = c.z, ez = -c.x; const el = Math.hypot(ex, ez) || 1; ex /= el; ez /= el;
           const nx = c.y * ez, ny = c.z * ex - c.x * ez, nz = -c.y * ex;
-          const nv = rate >= 12 ? VEILS : VEILS - 1;
+          const nv = VEILS;
           for (let k = 0; k < nv && n < NVL; k++) {
             // each veil has its own place in the storm, fixed there (it does not slide as the eye moves), and its width
             const hA = hs(c.i * 3 + k, c.gen), hR = hs(c.i * 3 + k + 0.5, c.gen + 7), hW = hs(c.i * 3 + k + 0.25, c.gen + 13);
@@ -286,7 +288,7 @@ export function makeStorms(bodyUniforms, opts = {}) {
               ox = -(se * vex + sn * vnx) * tl; oy = -(sn * vny) * tl; oz = -(se * vez + sn * vnz) * tl;
             }
             const o = n * 4;
-            V0[o] = fx; V0[o + 1] = fy; V0[o + 2] = fz; V0[o + 3] = c.r * (0.16 + 0.14 * hW);
+            V0[o] = fx; V0[o + 1] = fy; V0[o + 2] = fz; V0[o + 3] = c.r * (0.30 + 0.20 * hW);
             V1[o] = vx; V1[o + 1] = vy; V1[o + 2] = vz; V1[o + 3] = h;
             V2[o] = ox; V2[o + 1] = oy; V2[o + 2] = oz; V2[o + 3] = hs(c.i + k * 0.37, c.gen + 3);
             V3[o] = ax; V3[o + 1] = ay; V3[o + 2] = az; V3[o + 3] = 0.06 + 0.04 * Math.min(1, rate / 25);

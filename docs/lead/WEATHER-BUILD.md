@@ -381,6 +381,31 @@ A separate session builds W1 CLOUDS once the look director's sky ceiling (touch 
 - **Tests:** one new in `cloudfield.test.mjs`: corners read, count kept within 8 %, and the placement law.
 - **Suites:** physics 440, world and looks 73, unit 325, 0 failing.
 
+### W3.8: THE LOOK DIRECTOR'S SECOND LOOK, AND THE MISSING BINDING (24 Nov)
+
+- **The coordinator found at the gate:** the plant shader's far-field sampler `uPhysFar` (096b6d0) was never bound
+  without the look director's binding in `render/shared.js` (ccf9609). It fell on texture unit 0, and the near trees,
+  grass and flowers VANISHED in the default view, with a WebGL warning and no console error.
+  - It is fixed on the live game (v38.3, main e005830). design-weather now has the binding: merge b44b05d of
+    look-proto 0d5533b.
+  - SEEN after the merge: the autumn wood from the stream, with no switches and with `?wx2=1`, both with the near
+    trees, grass and flowers.
+  - **My own miss:** the check still I took after the first merge (d4b166c, `?wx2=1`) already lacked the near trees on
+    the right, and I did not see it.
+  - **The rule from now on (the coordinator): never land a shader uniform without its binding in the same merge.**
+- **The look director's second look at the veils:** PASS as a step.
+  - The multiply glaze writing no region is the right call: keep it, and keep it out of GLAZES.
+  - Bolts region 8: confirmed. rainlook: pass.
+  - The look director will lay `storms.flash` in the shared light after tonight's release, as a cool white lift,
+    level-stepped, with no glow.
+  - Two notes, now done:
+    - TWO veils per storm, each 0.30 to 0.50 of the core radius: "two wide beat four thin".
+    - Until the clouds lane draws the cloud base, the top comes in by the same two flat steps as the sides, never a
+      ragged top in open air.
+- **Seen:** `W3.8_B_wood150_storm1700m_two_wide_veils.jpg`, plus a 3x crop, the same view as W3.6. Two wider slanted
+  veils whose tops come in by flat steps; they read less like towers than W3.6's four thin ones.
+- **Cost:** the same or less (two veils instead of up to three; wider, about the same area).
+
 ## NEXT
 
 1. **The look director's second review** of the veils (W3.6), and their decision on region (a glaze keeping the region
