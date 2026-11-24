@@ -330,7 +330,13 @@ FV7 of `docs/lead/FARVIEW-DESIGN.md`. A second session (A2, branch `trees-near`)
 the same time: this lane touches only the far parts of `flora.js`, `florakit.js`, the plant material's far branch,
 `render/impostor.js`, `render/shadow.js` and new rows in `core/bench.js`.
 
-**State (update this line every step):** (24 Nov, about 17:45) look-proto v39.2 (c7d8d9e: my small crowns and the
+**State (update this line every step):** (24 Nov, about 17:30) CROWN MASS (F's audit 2, finding 1, the coordinator's top
+priority) built and tuned, OFF by default until F passes it (?crownmass=1; then default with ?crownmass=0 the old way):
+render/impostor.js PC_MASS (one colour a tree under 30 px, whole light steps, one tone under 4-7 px; stands: every tree its
+32 m block's place on the family run, uMassK2.x 1.0; a warm crown's paint x0.65, uMassK2.y). MEASURED autumn noon 150 m V
+0.86 -> 0.71, 420 m 0.82 -> 0.65, 1 km 0.76 -> 0.66; patterns longer (`A1_crownmass_*`); bright yellow crowns still
+scattered (the yellow kind with no family run). Sent to F. The gust crowns: ACCEPTED by F, dormant until the binding.
+Before that: look-proto v39.2 (c7d8d9e: my small crowns and the
 shadow saving live) merged into trees-far (e85dabd), rendered, pushed. THE GUST ON THE FAR CROWNS ACCEPTED BY F at
 150 m and 600 m (11738e6: a small turned crown's one tone at its cap, two-thirds step); dormant until F's binding
 (look-director 43540c5) reaches look-proto, with D's physics (design-weather d2f4277). READY, NOT BUILT: F's audit finding
