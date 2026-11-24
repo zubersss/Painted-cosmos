@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import { CloudField, CLOUDMAP, rainAt, rainBetween, throughfall } from './cloudfield.js';
 import { weatherAt, liveCells, gatherFrom, gather1, cellsAt, DEFAULT_SEED, WEATHER } from './weather.js';
 import { makeWorld, norm, timing } from './testworld.mjs';
+import { Particles } from './particles.js';
 import { createPhysics } from './index.js';
 import { WX2 } from './wx2.js';
 
@@ -119,4 +120,45 @@ test('cloud map: the cost of a full refresh on Earth', () => {
   const ms = (performance.now() - t0) / 10;
   timing(ms < 4, `a full refresh of the cloud map: ${ms.toFixed(2)} ms (a slice of it every frame: ${(ms / (CLOUDMAP.period * 30)).toFixed(3)} ms at 30 a second)`);
   assert.ok(Number.isFinite(ms));
+});
+
+test('rain box (?rainmap=1): at a shower\'s edge more drops fall on its wetter side, as many as before in all', () => {
+  // a place at a raining system's edge: its rate down to half the centre's
+  let edge = null;
+  for (let t = 600; t < 20000 && !edge; t += 97) for (const c of cellsAt('earth', t)) {
+    if (!(c.kind.rate >= 6) || c.w < 0.7) continue;
+    const e = norm({ x: c.z, y: 0, z: -c.x }), r0 = rainAt('earth', c.x, c.y, c.z, t).rate;
+    for (let d = 0.2; d < 1.2 && !edge; d += 0.02) {
+      const a = d * c.r / 4000, u = norm({ x: c.x * Math.cos(a) + e.x * Math.sin(a), y: c.y * Math.cos(a), z: c.z * Math.cos(a) + e.z * Math.sin(a) });
+      const r = rainAt('earth', u.x, u.y, u.z, t).rate;
+      if (r < 0.5 * r0 && r > 1) edge = { t, u };
+    }
+    if (edge) break;
+  }
+  assert.ok(edge, 'a shower\'s edge was found');
+  const sample = makeWorld({ R: 4000 });
+  const wasC = WX2.cloudmap, wasR = WX2.rainmap, out = {};
+  try {
+    for (const on of [false, true]) {
+      WX2.cloudmap = true; WX2.rainmap = on;
+      const p = createPhysics({ sampleSurface: (b, d) => sample(d), timeBudget: false });
+      const F = { x: edge.u.x * 4001.7, y: edge.u.y * 4001.7, z: edge.u.z * 4001.7 };
+      for (let f = 0; f < 240; f++) p.update(1 / 30, { bodyId: 'earth', time: edge.t + f / 30, focus: F, sunDir: null });
+      const S = p.particles.system, b = S.buffers.rain, rc = S.rainCorners;
+      if (on) assert.ok(rc && Math.max(rc[0], rc[1], rc[2], rc[3]) > 1.3 * Math.min(rc[0], rc[1], rc[2], rc[3]), `the corners differ: ${rc && Array.from(rc).map((v) => v.toFixed(2))}`);
+      else assert.equal(rc, null);
+      out[on] = { n: b._n, b, rc, fx: p.fields.frame.lx(F.x, F.y, F.z), fz: p.fields.frame.lz(F.x, F.y, F.z) };
+    }
+    const A = out[false], B = out[true];
+    assert.ok(Math.abs(B.n - A.n) <= 0.08 * A.n, `drops ${A.n} without, ${B.n} with`);
+    // the placement law itself: corners 3, 1, 3, 1 mm/h (wet to the -x side): the wet half holds 2.5 / 4 of the drops.
+    // (In the box as it runs the skew is smaller: at a storm's edge the wind carries a drop across the 48 m box in the
+    //  under three seconds it takes to fall, so where it was placed is smeared along the wind. Measured at the edge
+    //  found here, 3.1 against 1.7 mm/h: 53 % of the drops on the wet half, against 52 % without the switch.)
+    const S = new Particles(5, 1), b = S.buffers.rain;
+    b._rc = new Float64Array([3, 1, 3, 1, 2]); b._rcInv = 1 / 3;
+    let wet = 0; const N = 4000;
+    for (let i = 0; i < N; i++) { S._spawn(b, 0, 0, 0, 10, false, 24); if (b._p[0] < 0) wet++; }
+    assert.ok(Math.abs(wet / N - 0.625) < 0.03, `${(wet / N * 100).toFixed(1)} % placed on the wet half (the law: 62.5 %)`);
+  } finally { WX2.cloudmap = wasC; WX2.rainmap = wasR; }
 });
