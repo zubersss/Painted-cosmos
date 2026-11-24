@@ -181,19 +181,31 @@ vec3 pcNight(vec3 c) {
 vec3 pcBody(vec3 c) { return pcDensity(pcNight(c), uOilA.y); }
 // THE ONE FOLIAGE SHADE (L2, 2026-11-24; LOOK-AUDIT F4). Leaves, blades, far crowns and green floor dabs took their
 // shade from a private recipe written out five times in materials.js -- pcBody(pcDensity(c, 1.35)) * mix(1, the cool
-// key, 0.5) * 0.80 -- which takes the autumn wood's orange leaf to (0.57, 0.20, 0.03), saturation 0.94, and a green
-// blade to (0.10, 0.27, 0.03), 0.91 at value 0.27, where the owner's references put a meadow in shade at 0.49 and 0.33
-// and a conifer at 0.31 and 0.26: the poster-paint darks the art pass of 18 Nov measured. This is that recipe ONCE,
-// and then half of it laid at its own value in a breath of the cool key's hue (so its luminance stays where it was:
-// the shade does not move up or down the value ladder, it only stops shouting), lifted a tenth. Worked through: the
-// green blade comes out (0.151, 0.238, 0.120), saturation 0.50 at value 0.24; the orange leaf (0.466, 0.257, 0.191),
-// 0.59 at 0.47. It takes pcBody, so it is in the night's key (L1). uLookF.y 0 is the recipe exactly as it was.
+// key, 0.5) * 0.80 -- which takes a green blade to (0.10, 0.27, 0.03), saturation 0.91 at value 0.27, where the
+// owner's references put a meadow in shade at 0.49 and 0.33: the poster-paint darks the art pass of 18 Nov measured.
+// This is that recipe ONCE. (REWORKED the same day, after the coordinator's S1 review: the first version pulled every
+// hue half-way to grey and the autumn crowns at golden hour lost their fire, dull brown-maroon where the A was red
+// and orange. Now the recipe stands as it was -- value down, saturation held or up, which is what a lit wood's shade
+// does -- for every hue but the acid greens: a green (hue past about 70, the yellow-greens to the blue-greens) that
+// comes out saturated is brought toward its own value in a breath of the cool key's hue, only as far as takes it to
+// saturation about 0.55 (R2.2), and lifted by six tenths of that pull, so a quieted shade sits up in the shaded
+// grass's band (V 0.25-0.42) instead of sinking into murk. Worked through: the orange leaf's shade is the
+// recipe's own (0.57, 0.20, 0.03), untouched; the green blade (0.10, 0.27, 0.03), hue 102 and S 0.89, is pulled 0.49
+// of the way, to about (0.17, 0.28, 0.13), S 0.55 at value 0.28; an olive at hue 62 is untouched.) It takes pcBody,
+// so it is in the night's key (L1). uLookF.y 0 is the recipe exactly as it was.
 vec3 pcShadeLeaf(vec3 c) {
   vec3 shC = pcOilShadeC();
   vec3 d = pcBody(pcDensity(c, 1.35)) * mix(vec3(1.0), shC, 0.5) * 0.80;
   if (uLookF.y < 0.5) return d;
-  vec3 g = vec3(dot(d, vec3(0.3, 0.5, 0.2))) * mix(vec3(1.0), shC / max(dot(shC, vec3(0.3, 0.5, 0.2)), 1e-3), 0.5);
-  return mix(d, g, 0.5) * 1.10;
+  float mx = max(d.r, max(d.g, d.b)), ch = mx - min(d.r, min(d.g, d.b)), s = ch / max(mx, 1e-4);
+  // (how green: with green the largest channel, how far red falls under it -- 0 at hue 60, 0.5 at 90, 1 from 120 on)
+  float gr = d.g >= mx ? clamp((d.g - d.r) / max(ch, 1e-4), 0.0, 1.0) : 0.0;
+  float w = smoothstep(0.15, 0.40, gr) * smoothstep(0.50, 0.75, s);
+  // (the share of the way to grey that leaves saturation 0.55: (ch - 0.55 mx) / (ch - 0.55 (mx - L)))
+  float L = dot(d, vec3(0.3, 0.5, 0.2));
+  float k = w * clamp((ch - 0.55 * mx) / max(ch - 0.55 * (mx - L), 1e-4), 0.0, 1.0);
+  vec3 g = vec3(L) * mix(vec3(1.0), shC / max(dot(shC, vec3(0.3, 0.5, 0.2)), 1e-3), 0.5);
+  return mix(d, g, k) * (1.0 + 0.6 * k);
 }
 // ONE LIGHT (L3, 2026-11-24; LOOK-AUDIT F3, LOOK-RULES R1.2a). The level for a stroke facing the sun by x (half-
 // Lambert, 0..1, with the stroke's own jitter already in it) that the sun reaches by sunny (1 lit .. 0 in cast shadow)

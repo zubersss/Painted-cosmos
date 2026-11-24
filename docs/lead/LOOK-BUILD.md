@@ -47,9 +47,9 @@ its A).
 | step | state | commit | what was seen |
 | --- | --- | --- | --- |
 | L0 | DONE | see git log (`[painter] L0`) | 7 stills (S1-S6 + S3 at night) against v37: 6 identical to the pixel, 1 with 2 pixels off by 1 of 255 (the 275 m night still); the shader text of all 36 materials of the autumn wood (comments and spaces taken out) identical, the 9 plant shaders with `pcFogAmountV` included, so those 2 pixels are the software renderer's run-to-run noise, not the change. Suites 325 / 65 / 416 pass. |
-| T1 | DONE | see git log (`[painter] T1`) | see the T1 section below; stills in docs/shots/painter/look-director/build/T1 (A = `?skyceil=0`, B = on) |
+| T1 | DONE, REWORKED as THE AIR'S TOP (+ FV1) | see git log (`[painter] T1`, then `[painter] The air's top`) | see the T1 section below and its AIR'S TOP part; stills in build/T1 and build/airtop |
 | L1 | DONE | see git log (`[painter] L1`) | see the L1 section below; stills in docs/shots/painter/look-director/build/L1 (_A off, _B on) |
-| L2 + L7 | DONE | see git log (`[painter] L2 + L7`) | see the L2 + L7 section below; stills in docs/shots/painter/look-director/build/L2-L7 |
+| L2 + L7 | DONE, REWORKED | see git log (`[painter] L2 + L7`, then `[painter] L2 + L7 reworked`) | see the L2 + L7 section below (and its REWORKED part); stills in docs/shots/painter/look-director/build/L2-L7 and L2-L7-rework |
 | L3 | DONE | see git log (`[painter] L3`) | see the L3 section below; stills in docs/shots/painter/look-director/build/L3 |
 
 ## T1, the sky ceiling: what was built and what was seen
@@ -84,6 +84,35 @@ its A).
   fades into the sky's band at the limb and does not read as a cut-out, but the far-view group and L5 should look at
   this pair together. The ball in a pale sky at 3.5 km is the in-between of the climb; the weather group's orbit shell
   (their A8) takes over above 2.8 km.
+
+### THE AIR'S TOP: T1 REWORKED, FV1 FOLDED IN (the coordinator's review of T1: the day sky from 1 to 3 km was one flat pale grey-blue)
+
+- WHY IT WAS FLAT: Earth is 4 km across, so from a mile up the horizon stands 44 degrees below level (the dip,
+  acos(R / (R + h))). The sky laid its bands from LEVEL, and everything between the true horizon and level was the
+  flat band of haze laid under the horizon -- which from the air is nearly all the sky one sees.
+- `world/index.js` `AIRTOP` (`?airtop=0` is T1 as committed): (1) the sky goes to space by the dip, a day sky to
+  52 degrees and space by 66 (Earth 2.5 and 6.0 km; at the mile the dip is 44); a world's `weather.ceiling` row and
+  `?skyceil=a,b` still name heights. (2) `uSkyAir.z`, the true horizon as dot(view, up), eased in from a dip of 20
+  to 36 degrees (Earth 257 m to 944 m): `sky.js` lays its bands, strokes and low air band from there; the cloud
+  sea, the aurora's and the rain's directions keep the true angle (`eR`). (3) FV1, where a look sets
+  `oil.airTop` (Earth only): the ground's air and `space01` by the dip 46 to 59 degrees (Earth 1.76 to 3.68 km,
+  FV1's four times), the cloud deck with the sky's own turn (52 to 66), the relief rounding from 0.6 radii, the
+  visibility growing 1.2 m a metre over 160 m to 1,640 m more.
+- DERIVED: at 160 m and below every number is what it was (dip under 20 degrees, the visibility term 0), so on
+  foot and over the wood nothing moves. At 420 m (the standard S4 still) the visibility grows by 312 m and the
+  bands are laid a fifth of the way from the true horizon: see the S4 pair.
+- SEEN (opened), Earth autumn wood, noon, A `?airtop=0` against B: at 1,620 m (the mile) A is one flat pale
+  grey-blue (S 0.10 looking level), B a sky that deepens to blue overhead in painted bands down to a pale band at
+  the limb (S 0.54 level, 0.36 looking down 29 degrees); at the golden hour A is flat beige, B a warm sky graded
+  in bands; at 2,420 m the same (A S 0.10, B 0.54); at 1,020 m B is the same painted blue; at 3,520 m B is the
+  turn begun, the sky deepening toward indigo (sky 0.38), the world a small ball below.
+- STILL WRONG, said plainly: under the thick air FV1 keeps to 1.76 km the land at the mile is pale and pastel
+  (L5's job: a share of far paint kept and the air's hue); at 1,020 m a thin pale arc and some lilac wisps stand
+  near the limb (the sky's own cloud layer seen from above and the low band's stepped edge; not yet traced); the
+  golden hour's sky is warm but still khaki-leaning (F6, L5). Only Earth was looked at; other worlds keep T1's
+  heights for the ground (no `airTop`) and take the dip for the sky.
+- Stills: docs/shots/painter/look-director/build/airtop (c<height>_<down|level|gold>_<A|B>.jpg, and two
+  side-by-sides).
 
 ## L1, the night key: what was built and what was seen
 
@@ -135,6 +164,30 @@ its A).
   0.90 does not grow anywhere. By eye: the golden hour's shaded leaves and banks go from lurid red-brown and acid
   green to a deep, quieter red and olive (the approved picture moves: the owner should see S1 A/B); the crowns at
   275 m lose their maroon; Neptune's night is the same picture with the snow a breath less bright.
+
+### L2 + L7 REWORKED (the coordinator's S1 review: "S1 golden hour lost its fire")
+
+The coordinator held L2's leaf part from look-proto: in S1 B the crowns went dull brown-maroon and the bank murky.
+Measured on S1 in three states on one page (A0 both off, A1 L7 only, B both), warm crown pixels (hue under 50 or
+over 340, S over 0.35) in the top right of the frame:
+- the FIRST L2 did not touch the crowns at all once reworked (A1 and B crowns identical); the fire was lost in
+  L7: laying the S on the value dimmed every saturated middle value (crowns V 0.54 -> 0.49, S 0.73 -> 0.68),
+  because the old per-channel S is what lifted a red's top channel, and measuring the push by the real
+  saturation took most of the push off every saturated middle value.
+- `pcShadeLeaf` now keeps the recipe as it was (value down, saturation held or up) for every hue but the acid
+  greens: a green past hue ~70 that comes out over S 0.55 is pulled toward its own value in a breath of the cool
+  key's hue only as far as S 0.55, and lifted by 0.6 of that pull so it sits in the shaded grass's band and does
+  not sink into murk.
+- `post.js` L7 is now the darks' step only: under V 0.30 the S on the value, over 0.50 the old S exactly, a blend
+  between; the push measured as before and eased to 0.4 of itself under V 0.20, back in full by 0.40.
+- MEASURED S1 (A0 -> B): crowns warm S 0.73 -> 0.71, V 0.54 -> 0.54, share 61 -> 59 %; the far bank's greens
+  S 0.90 -> 0.56 at V 0.21 -> 0.21, the near bank's 0.91 -> 0.58 at 0.24 -> 0.24; whole frame S(V<.3) 0.51 ->
+  0.41, V over 0.90 0.6 -> 0.6 %. SEEN (opened): the crowns' reds and oranges as A0's; the banks a quieter sage
+  green under the same orange leaf litter, at the same value. S2 (green wood, noon): the lit grass keeps its colour
+  (satL 0.56 -> 0.55), the shaded hillside goes from a lurid dark green to a quieter sage (whole frame S 0.69 ->
+  0.52, S(V<.3) 0.39 -> 0.30), V over 0.90 3.4 -> 3.4 %. S5 (green wood, 23 h): the same picture, the bank a breath
+  greyer (S(V<.3) 0.45 -> 0.36), and the few cool lilac strokes along the grass tops (the coordinator's L1 note)
+  are still there. Stills (A0, A1, B, and S1 A0 over B): docs/shots/painter/look-director/build/L2-L7-rework.
 
 ## L3, one light: what was built
 
