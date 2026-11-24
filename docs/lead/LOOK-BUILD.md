@@ -395,3 +395,22 @@ the owner first. Not started.
   golden-hour wash eased) and the storm water; E-W2's full sea sheet after W3's pointed ends; E's far water line
   tone; C's far rock speckle against v37 and the snowy ridges in fewer patches; A2's ?stormleaf; A1's storm crowns.
 - My open lane: the light's design (a dark frame round a bright warm middle distance). Not started.
+
+## State at 18:25, 24 Nov
+
+- v39.3 is live (pull request 46). look-director has merged look-proto 87053ed (743edca; one conflict in WATER_FRAG,
+  both blocks kept: the golden hour in the water's mirror, then W3's PC_WPAINT sky copy). Suites 328 / 124 / 449.
+  SMOKE-RENDERED after the merge (autumn stream 16.8 with wx=storm, and 1 km noon): both compile, no problems
+  reported, the storm light and the air from the air as before.
+- Passed today, not yet in a release: A1's far spruce D (the near-tree bake with the crown floored at V 0.24, with
+  ?pines), E's far water line (design-water e01eea8, ?farwater: the lake's own colour by the angle), C's far rock
+  speckle (farview 3620305), C's alpine smudge clamp 6cf9c7a with B's dd86fb3, D's gust ground step (W3.12c), B's
+  tuft and comb (defaults; the patch opt-in until its clean phone pair).
+- THE 1 KM DARKS, honest state: with crown mass, the weighted stands, the far spruce and ?airdark, the land at 1 km
+  has 0.02 per cent under V 0.3, 0.75 under 0.35, 4.4 under 0.4 (A1's count). The references themselves go "bluer and
+  paler toward the horizon", so the audit's 8 per cent under 0.3 at 1 km was probably too strict; the next step, if
+  wanted, is ?airdark deeper at the darkest (0.6 to about 0.45, still only from 500 m up) with a still pair at 1 km,
+  and judging by eye whether the far conifers then read as dark blue-green cones.
+- Open questions for the coordinator: B's report that d4cab64 (the ?rockfield flip) carries an index slip in
+  patchgen.js that paints every FV6 flower dab violet near the eye: C to confirm whether the default picture is
+  touched before v39.4.
