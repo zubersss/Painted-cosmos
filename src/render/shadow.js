@@ -42,6 +42,17 @@ const LEAD = 0.4, FULL = 0.86;
 const MID_TIER = 219;
 // (the middle tier's reach as the trees' hand-over has it now, T1 x 1.15: flora.js setHandover writes it; 219 as it was)
 export const SHADOW_TIERS = { mid: MID_TIER };
+// THE SPLIT TREES DRAWN WHOLE IN THIS PASS (by default; ?shwhole=0 the old way; the coordinator, 24 Nov, from the near lane's count: a tree
+// drawn by its two short programs, ?trees2, is a mesh of two materials, and three draws such a mesh group by group even
+// under this pass's override material -- 29 more draw calls here, for nothing, as the override is one program for wood
+// and leaves alike). The meshes listed here (world/flora.js lists every mesh of two materials) are drawn in ONE call in
+// this pass: their groups and their array of materials set aside for the pass and put back after it. The map is the same
+// one: the same program over the same draw range (the leaves by distance, flora.js, set on the geometry as before).
+// MEASURED on foot in the autumn wood with the split trees, phone settings: 226 -> 207 draws a frame, every visible casting
+// split mesh, and the picture byte-identical; the default from v39.2 (the coordinator).
+export const SHADOW_WHOLE = new Set();
+export const SHADOW_OPTS = { whole: (() => { try { return new URLSearchParams(location.search).get('shwhole') !== '0'; } catch (e) { return true; } })() };
+const NO_GROUPS = Object.freeze([]);
 // Looking DOWN this steeply (the sines of 48 and 58 degrees) the middle distance has left the frame, so the square
 // comes back in and the near shadow has its finest texels again. Two numbers and not one so that a view held near
 // the threshold does not change the texels a shadow is cut on from frame to frame.
@@ -274,7 +285,20 @@ export class ShadowMap {
     renderer.clear(true, true, false);
     const ov = scene.overrideMaterial;
     scene.overrideMaterial = this.mat;
-    try { renderer.render(scene, cam); } finally { scene.overrideMaterial = ov; }
+    // (each split tree one draw, as it was before the split, unless ?shwhole=0: SHADOW_WHOLE)
+    const whole = SHADOW_OPTS.whole && SHADOW_WHOLE.size ? (this._whole || (this._whole = [])) : null;
+    if (whole) {
+      whole.length = 0;
+      for (const m of SHADOW_WHOLE) {
+        if (!m.visible || !Array.isArray(m.material)) continue;
+        whole.push(m, m.material, m.geometry.groups);
+        m.material = m.material[0]; m.geometry.groups = NO_GROUPS;
+      }
+    }
+    try { renderer.render(scene, cam); } finally {
+      scene.overrideMaterial = ov;
+      if (whole) for (let i = 0; i < whole.length; i += 3) { whole[i].material = whole[i + 1]; whole[i].geometry.groups = whole[i + 2]; }
+    }
     // the figures (whatever in the scene is marked as a caster and is drawn by bones)
     for (const o of scene.children) {
       if (!o.visible || !o.userData || !o.userData.pcCaster) continue;

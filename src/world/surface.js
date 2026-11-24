@@ -20,7 +20,7 @@ import { bloomTint } from './bloom.js';
 const _cf = {};
 
 const NOT = {};
-const SNOW = [0.97, 0.98, 1.0];
+export const SNOW = [0.97, 0.98, 1.0];
 const CHAR = [0.16, 0.14, 0.19];     // cooled lava: indigo and sepia, the darkest wash of a lava plain
 const EMBER = [0.98, 0.55, 0.24];    // the glow of lava on its banks: cadmium orange run thin
 
@@ -496,7 +496,7 @@ class Surface {
     // and never as a whole stand: dark conifers among the autumn crowns, the owner's references of 2026-11-16)
     if (MODE.oil && bi.oil && bi.oil.tallMix != null) { const tm = bi.oil.tallMix; b.birch = typeof tm === 'number' ? tm : clamp(tm[0] - pz * tm[1], 0.04, 1.5); }
     b.under = clamp((0.45 + 0.55 * glade) * (1 - rk * 0.7) * smoothstep(w0 + 0.1, w0 + 1.2, s) * (1 - 0.85 * bar), 0, 1);
-    b.rock = rk; b.s = s; b.glade = glade; b.aux = 0; b.strata = 0; b.lip = 0;
+    b.rock = rk; b.s = s; b.glade = glade; b.aux = 0; b.strata = 0; b.lip = 0; b.snowK = 0;
     // far colour: the canopy seen from outside (pines cooler and darker), streams as pale lines
     const cz = clamp(b.trees * 1.15, 0, 1);
     const ca = pal.canopyA, cb = pal.canopyB, k = clamp(pz * 1.1, 0, 1), dv = 1 + v1 * 0.25;
@@ -941,6 +941,7 @@ class Surface {
     if (shade > 0) { const kd = shade * 0.9, kg = Math.min(1, shade * 1.7); b.r -= (b.r - b.r * b.r) * kd; b.g -= (b.g - b.g * b.g) * kd; b.b -= (b.b - b.b * b.b) * kd * 0.6; b.r *= 1 - 0.26 * kg; b.g *= 1 - 0.28 * kg; b.b *= 1 - 0.08 * kg; }
     if (crown > 0) { b.r += (0.93 - b.r) * crown; b.g += (0.92 - b.g) * crown; b.b += (0.90 - b.b) * crown; }
     if (snow > 0) mix3(b, SNOW, clamp(snow, 0, 0.94));
+    b.snowK = snow > 0 ? clamp(snow, 0, 0.94) : 0;      // (how much snow was laid over the wash: the far view's FV4 sheds it off steep faces, patchgen.js)
     if (T.frost && k !== 'crater' && k !== 'basin') mix3(b, SNOW, clamp(T.frost * (0.45 + v * 1.6 + 0.3 * tt), 0, 0.92));
     // (`t.bedC`, PAINTER 14: a bed laid in its own wash: the Moon's rilles are winding dark cuts, and with the plain's
     // palest wash in their beds they stood as pale shallow dips)
@@ -979,7 +980,7 @@ class Surface {
     const gw = this._gw, gl = this._gl;
     gw[0] = gw[1] = gw[2] = gw[3] = 0; gl[0] = gl[1] = gl[2] = gl[3] = 0;
     let qw = 0, qr = 0, qg = 0, qb = 0, qk = 0, qglow = 0, qcloud = 0;
-    if (full) { o.r = o.g = o.b = 0; o.r2 = o.g2 = o.b2 = 0; o.dry = o.wet = o.canopy = o.aux = 0; o.trees = o.birch = o.under = o.rock = 0; o.glade = 0; o.s = 1e9; o.strata = 0; o.lip = 0; }
+    if (full) { o.r = o.g = o.b = 0; o.r2 = o.g2 = o.b2 = 0; o.dry = o.wet = o.canopy = o.aux = 0; o.trees = o.birch = o.under = o.rock = 0; o.glade = 0; o.s = 1e9; o.strata = 0; o.lip = 0; o.canS = 0; o.canA = 0; o.snowK = 0; }
     for (let i = 0; i < nb; i++) {
       const wi = w[i];
       if (wi < 0.0015) continue;
@@ -996,6 +997,12 @@ class Surface {
         o.r += wi * b.r; o.g += wi * b.g; o.b += wi * b.b;
         o.r2 += wi * b.r2; o.g2 += wi * b.g2; o.b2 += wi * b.b2;
         o.dry += wi * b.dry; o.wet += wi * b.wet; o.canopy += wi * b.canopy; o.aux += wi * b.aux;
+        // (the trees here, as two shares: those of woods whose far colour was painted in a SUMMER palette -- every wood but
+        // one whose look says autumn: 1 -- and those painted in an AUTUMN one; for the far view's FV3, render/farground.js:
+        // the first is turned to the trees' colour in autumn, the second in summer. Trees and not the canopy: the canopy
+        // also counts a stream bank's shade, and the stream drawn blue into the far colour went turquoise)
+        if (bi.autumn) o.canA += wi * (b.trees || 0); else o.canS += wi * (b.trees || 0);
+        o.snowK += wi * (b.snowK || 0);
         o.rock += wi * b.rock; o.glade += wi * b.glade; o.strata += wi * b.strata;
         if (i === top) { o.trees = b.trees * smoothstep(0.5, 0.8, wi); o.birch = b.birch; o.under = b.under * smoothstep(0.5, 0.8, wi); o.s = b.s; o.lip = b.lip * smoothstep(0.5, 0.8, wi); }
       }
