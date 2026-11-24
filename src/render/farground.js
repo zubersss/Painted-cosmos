@@ -365,15 +365,16 @@ vec3 pcSeasonLeaf(vec3 leaf, vec3 floorC) {
 // What the alpine range was from the air (the design's stills, and fv2_alpine_400m_30deg_12h_phone_AB.jpg): a lilac,
 // green and cream mosaic with no lit and shaded planes. Three causes in the ground's own paint, and the cure for each:
 //   * the biome's patch colours (alpine green and pale cream, 48 m and 20 m across) mottle the faces as much as the
-//     meadows: on steep ground (the dab centre's facing, 35 to 48 degrees) the wash is taken most of the way to its own
-//     value, so a cliff is rock-coloured and the patches stay on the turf;
+//     meadows: on steep ground (the dab centre's facing, 35 to 48 degrees) the wash is taken half way to its own value,
+//     so a cliff is rock-coloured and the patches stay on the turf;
 //   * every dab of the floor strays: one in two takes a neighbouring pigment, two in five of the lit ones are laid a full
 //     step darker, and each varies its weight and warmth: on rock the step down is not taken, the pigment and the
 //     stray are halved, so a face is laid in lit planes and shaded planes by its own facing;
 //   * strata were not painted at all in the oil look (vCol.a carries them, 1 - strata): on steep rock two tones by
 //     height band, beds of unequal thickness (a band of a little over 19 m, wandering with a slow wave), each band one
 //     density of the rock's own wash -- no new hue.
-// The snow is shed off faces over about 40 degrees by the mesher (patchgen.js), so white lies on ledges and in gullies.
+// Most of the snow is shed off faces over about 50 degrees by the mesher (patchgen.js), so white lies on the summits'
+// gentler ground, on ledges and in gullies, with dark ribs where the face is steepest.
 // ?rockfield=0 compiles none of it. (The dabs on a cliff still smear: their chart is edge-on there, which only the look
 // director's slope chart can cure, F13.)
 export const ROCK_FRAG = /* glsl */`
@@ -382,17 +383,20 @@ uniform float uRockK;     // 1 on a world whose rock is painted so (CANOPY_WORLD
 float gRock = 0.0;        // how much this dab is a rock face (set in pcGroundAt, read in pcGroundPaint)
 // the wash at a dab on steep rock: up the dab centre's facing (dot of the normal with up), Bc its place, strata the
 // biome's (1 - vCol.a)
-vec3 pcRockWash(vec3 c, float up, vec3 Bc, float strata) {
-  gRock = smoothstep(0.82, 0.67, up) * uRockK;
+// (and only from about 80 m out, all of it by 250 m: it is the far face that reads as a mosaic, and near, on foot, a
+// steep slope is as often turf as rock -- SEEN at the alpine easel, where the whole green slope went grey -- and the
+// ground does not know which; dist is the pixel's own, the same for every pixel of a dab to within its width)
+vec3 pcRockWash(vec3 c, float up, vec3 Bc, float strata, float dist) {
+  gRock = smoothstep(0.82, 0.67, up) * uRockK * smoothstep(80.0, 250.0, dist);
   if (gRock <= 0.0) return c;
   float l = dot(c, vec3(0.3, 0.5, 0.2));
-  vec3 rk = mix(vec3(l), c, 0.35);
+  vec3 rk = mix(vec3(l), c, 0.5);
   if (strata > 0.004) {
     float hB = length(Bc) - uBodyR;
     float f = fract(hB / 19.3 + 0.6 * sin(hB / 61.0 + 2.3));
     rk = f < 0.42 ? pcDensity(rk, 0.86) : (f < 0.58 ? pcDensity(rk, 1.38) : rk);
   }
-  return mix(c, rk, gRock * (0.75 + 0.25 * min(strata * 2.0, 1.0)));
+  return mix(c, rk, gRock * (0.65 + 0.35 * min(strata * 2.0, 1.0)));
 }
 #endif`;
 

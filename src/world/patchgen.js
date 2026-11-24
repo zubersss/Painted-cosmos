@@ -164,16 +164,18 @@ export function stepPatch(job, deadline) {
       // SNOW DOES NOT LIE ON A CLIFF (the far view, FV4; the references: the snow mountains the lightest thing in the
       // picture, on ledges and in gullies, with dark rock ribs between). The surface lays snow by height and noise alone,
       // so a face of 60 degrees above the snowline was as white as a ledge, and a range from the air was a white cone.
-      // Where the face is steeper than about 40 degrees the snow is taken off it again -- the wash under the snow is found
+      // Where the face is steeper than about 50 degrees most of the snow is taken off it again -- the wash under the snow is found
       // by undoing the surface's own mix (it laid SNOW over it by snowK), and laid again with less of it -- in both washes.
       if (rkf) {
         const sk = _col[(k) * CS + 23];
         if (sk > 0.01) {
           const pr = 1 / Math.sqrt(_px[k] * _px[k] + _py[k] * _py[k] + _pz[k] * _pz[k]);
           const upn = (nor[o] * _px[k] + nor[o + 1] * _py[k] + nor[o + 2] * _pz[k]) * pr;
-          const st = sstep(0.78, 0.60, upn);
+          // (from about 49 degrees, all but a fifth of it by 61: MEASURED from 400 m, shedding from 38 degrees took the snow
+          // off nearly every summit -- at a far patch's spacing a summit's faces all read steep -- and the range went grey)
+          const st = sstep(0.66, 0.48, upn);
           if (st > 0) {
-            const k2 = sk * (1 - st), cc = k * CS, iv = 1 / (1 - sk);
+            const k2 = sk * (1 - 0.8 * st), cc = k * CS, iv = 1 / (1 - sk);
             for (let t = 0; t < 3; t++) {
               const base = (_col[cc + t] - SNOW[t] * sk) * iv, base2 = (_col[cc + 3 + t] - SNOW[t] * sk) * iv;
               _col[cc + t] = base + (SNOW[t] - base) * k2;

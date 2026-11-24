@@ -471,7 +471,7 @@ void pcGroundAt(vec2 ds, float w, vec3 rnd, out vec3 c, out float lvl, out float
   // as everything else here is.
   float upN = dot(nLc, normalize(Bc));
   #ifdef PC_ROCKF
-    c = pcRockWash(c, upN, Bc, 1.0 - colC.a);      // (the far view, FV4: a rock face in its own value and beds, render/farground.js)
+    c = pcRockWash(c, upN, Bc, 1.0 - colC.a, length(vView));      // (the far view, FV4: a rock face in its own value and beds, render/farground.js)
   #endif
   ${SKYUP('upN')}
   snowC = pcSnowCover(upN, rnd.z * 0.5 + n2.b * 0.3 + n1.a * 0.2, parC.z);

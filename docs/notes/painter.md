@@ -86,12 +86,25 @@ colour only). NOT chunks.js, post.js, shared.js, world/index.js (look director),
   the far colour; about 10 instructions a dab for the leaves (about 1.5 % of the ground's: at most 0.07 ms on foot,
   0.25 ms in the air on the design's bounds).
 
-**FV4 (rocks): WRITTEN, compiled out by default (`?rockfield=1` to try), NOT YET SEEN.** surface.js `snowK` (how much snow
-a wash carries), patchgen.js sheds it off faces steeper than about 40 degrees (undoing the surface's own mix), farground.js
-ROCK_FRAG + hooks (uRockK: Earth only). Plan as it was: on steep rock the dabs' own stray taken down, the patch
-colours (alpine green and cream) desaturated toward the rock's value, two rock tones by height band where the biome has
-strata (vCol.a), snow shed from faces over about 50 degrees; the dabs along the contour need the look director's slope
-chart (L8, `pcSlopeChart` in chunks.js), asked for.
+**FV4, ROCK FACES AND SNOW FROM AFAR (`?rockfield=0|1`, DEFAULT 0 until the look director rules; oil look, Earth).**
+BUILT AND SEEN, a first step; NOT the cure for the smear (F13 needs the look director's slope chart, L8: asked 24 Nov).
+- `surface.js` sample `snowK`: how much SNOW the recipe laid over the wash (alpine: by height and noise only).
+  `patchgen.js`: once the patch's normals are known, the snow is taken off faces from about 49 degrees, all but a fifth by
+  61 (the surface's own mix undone, laid again with less), in both washes. First tried from 38 degrees: it took the snow
+  off nearly every summit at a far patch's spacing and the range went grey (SEEN; fixed).
+- `farground.js` ROCK_FRAG (`pcRockWash`, uRockK Earth only): on steep dabs (35 to 48 degrees) from 80 m out (all by
+  250 m) the wash goes half way to its own value (the alpine green and cream patches off the faces), two densities of it
+  by height band where the biome has strata; in pcGroundPaint no dab on rock is laid a step darker by its own number and
+  its pigment and stray are halved. Without the distance fade the whole green slope at the alpine easel went grey (SEEN:
+  the ground cannot tell steep turf from rock; there is no spare byte left to tell it).
+- SEEN (fv4_* sheets): alpine 400 m at 30 deg: summits keep snow, steepest faces dark rock, the lilac/mint mottle calmer
+  (V>0.90 4.8 -> 3.3 %, S(V<0.3) 0.11 -> 0.13); 1 km: rock ribs through the snow (V>0.90 5.8 -> 4.2 %); coast cliffs at
+  400 m: next to no change; on foot at the alpine easel: the same to the hundredth in lookstats (only the far peak loses
+  its lilac). Honest verdict: a modest step; the faces still smear vertically and the far mountains still read faceted
+  (F12 is the coarse mesh's silhouette: triangle count, unpriced). Phone cost: per vertex for the snow; about 25
+  instructions on a steep dab only (at most 0.7 ms on an alpine air view on the design's bound, nothing on foot in a wood).
+- **Next for FV4:** the slope chart (L8) from the look director, then dabs laid along the contour on rock; a per-vertex
+  rock value (would need a new 4-byte attribute: no spare byte left) to keep steep turf green while rock goes grey.
 
 Branch: `cosmos` (shared with PILOT and PHYSICS, one working tree). Commits: `tools/commit.sh painter`.
 This file was rewritten by the second PAINTER agent (the first ran out of working context). The
