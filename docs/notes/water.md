@@ -169,6 +169,52 @@ The coordinator's order (3a): the references' long S-bends on the big rivers. Al
   river inland (a reach ending in a junction, not thinned: at the sea the mouth is W2's, and the widest segment there was a
   river thinning into a meadow).
 
+### MOUNTAIN STREAMS (built 24 Nov, this session; ?mount=1 with ?rivers=tree)
+
+The coordinator's order (3c). Plan sent to the coordinator before touching surface.js. Files: `src/world/mountain.js` (new),
+`src/world/rivers.js`, `src/world/drainage.js` (one kept array), `src/world/waterhooks.js`, `src/data/mode.js`, and ONE hook in
+`src/world/surface.js` (the alpine branch of `_generic`, plus `this.mount = null` in the constructor).
+- WHAT WAS THERE: Earth's alpine meadow (a sixth of the world, peaks to 890 m, mountains 1-3 km north of the landing) had no
+  water: its recipe carries no liquid (group -1) and the drainage field reads it as a wall 30 m over the wood's base.
+- FIRST TRY, REFUSED (measured): the field over the mountains' own height. Their terrain is ridges round closed valleys: the
+  flood filled a quarter of the mountain's nodes, p90 by 160 m, up to 488 m; a stream's path out climbed over saddles, so
+  either lakes hundreds of metres deep or gorges as deep (a 70 m trench with 42-degree walls in the first map); and the
+  basins reached into the wood at the mountains' feet as sheets of water. Pruning the climbing streams left almost none.
+- WHAT IS BUILT: the field is untouched (W1's levels, lakes and routing exactly; it only keeps the mountains' share of each
+  node, `D.share`, from the weights it asks anyway). `rivers.js` gives the mountains a LOCAL flow: each node over half
+  mountain drains down its steepest slope on the mountain's own large-scale height (`mountain.js alpineMacro`, the alpine
+  recipe's sums without the noises under 60 m; `mountBaseAt` blends it with the wood's base at the edges), into the valley
+  floors, where a torrent ends (thinning away as at a wood's edge: 107 pits) or runs off the mountain into the wood's own
+  tree. The hybrid tree's catchments and order (peeled from the sources) replace the field's for the build. A stream starts
+  at `mountA1` = 6 nodes on the mountain (the mountain's flow runs into a hundred small valleys of about forty nodes each;
+  at the wood's 24 there were 57 stream nodes in all); `mountW` 5 m wide at most; `mountWander` 0.7 of the wood's wander.
+- THE WATER'S LEVEL on a mountain stream (`sM` 1 marks its segments) is NOT the nodes': between two 98 m nodes a crag rises
+  and falls tens of metres, and a level drawn straight between them stood up to 275 m under the slope and 46 m over it. At
+  build, each end of each mountain segment (24 m at most) takes the mountain's large-scale height (`mountBaseAt`), 0.5 m
+  under it (`mountSink`), and the level runs down the stream as a running minimum: it NEVER RISES (taking the slope's height
+  as it came, the water rose along 28 % of the mountain's segments, by up to 149 m in one: the test caught it). Where the
+  slope rises across the stream it cuts a gorge, at most `mountCut` = 10 m; where a crag stands higher than that, the stretch
+  runs DRY (`sM` 2: no water, no gully, a torrent under scree) and the stream comes out below at the slope's level.
+  MEASURED: 40.7 km wet, 3.2 km dry (7 %); the land over the water at a wet segment's middle p1 -5.1, p10 -0.9, p50 0.5,
+  p90 3.3, p99 11.2, max 37 m (perched where the slope dips between two ends: a low bank keeps it in). White water from
+  the level's fall along a segment (turbW from 0.05 to 0.22 m a metre).
+- THE GULLY: a shallow trough under the water, walls at 0.9 (42 degrees) up to the slope, a 3 m bank where the slope lies
+  lower, a bed of stones, no trees within 5 m, no water over the snow line + 30 m (the gully stays). Nothing beyond 30 m.
+- BUILD (rivers): about 157-165 ms with ?mount=1 against about 110-125 without (the mountain's own flow about 20 ms: the
+  mountain's height at 6,000 nodes 11, steepest slopes 5.5, the order 3; the levels at the segments' ends about 7; the rest
+  the 2,700 more segments). The sample is no dearer (the hook reads the segment's level). Without ?mount the network and
+  20,000 samples hash the same as the S-bends commit; switches off, 0 differ.
+- NOT DONE (said plainly): tarns in the mountain hollows (lakes are W2's: under ?mount=1 the field is unchanged, so W2 has
+  nothing new to read; a tarn would need the alpine hook to be handed the hollow); the torrents are short and straight on
+  the 98 m grid (a finer grid for the mountains would cost about 130 ms); the streams do not branch much.
+- SEEN (the gallery, A ?rivers=tree | B &mount=1, `docs/shots/painter/water-mount/`): 150 m over a mountain valley (A no
+  water; B a torrent down the flank, white where steep, joining a stream across the meadow); at a stream's bank (B a white
+  cascade on the slope and the stream across the meadow: the white is one flat even white, no strokes: the paint's, W3);
+  1 km toward the mountains (the streams, 5 m wide, do not show at 2 km: A and B alike). The map `map-ab-valley.jpg`.
+- Test: `src/world/mountain.test.mjs` (the switch and the groups; streams on the mountains, narrow, their water never rising,
+  dry stretches under 15 %; water in every wet gully under the snow line, white water, the snow rule asked directly; the
+  landing as without the switch).
+
 ### W2 THE BODIES OF WATER (branch `water-bodies`, session_01R5Bri2xowNiwS1SnP3VG3f; READ THIS to pick W2 up)
 
 Branch `water-bodies` = lane 0 + look-proto v37.1 + `origin/design-water` (W1's rivers, merged 24 Nov for `net.mouths` and

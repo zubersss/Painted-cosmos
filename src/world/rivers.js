@@ -62,6 +62,11 @@ export const RIVER_DEF = {
   bendJit: 0.3,    // wavelengths: how far a bend may run early or late, so they are not a ruled wave
   bendSmooth: 6,   // passes of smoothing more for the wide rivers' nodes (their bends their own, not the grid's turns)
   smooth: 3,       // passes of smoothing over the nodes (the grid's 45-degree zigzag out of the curve)
+  mountW: 5,       // ?mount=1 (world/mountain.js): a stream's full width at most on the mountains, and the share of the wood's
+  mountWander: 0.7, //   wander and meander it keeps there (torrents run straight down), and the catchment a stream starts at
+  mountA1: 6,      //   there (nodes: the mountain's own flow runs into a hundred small valleys, each draining about forty),
+  mountSink: 0.5,  //   and how far its water stands under the mountain's large-scale height (metres), and the deepest gorge
+  mountCut: 10,    //   it cuts through a rise across it (metres; past that it runs dry over it)
   edgeThin: 90,    // metres: a river that ends at the edge of the wood (a marsh, a dry biome) thins away over this
   springs: null,   // [{ near: [x, y, z], up, acc }]: catchment added so a stream runs past a place (a look's oil.springs)
   near: 100,       // metres: the exact distance is asked of the segments within this; beyond, the coarse field
@@ -81,7 +86,8 @@ export function buildRivers(S, D, opts) {
   const o = Object.assign({}, RIVER_DEF, opts || {});
   if (!D || !D.to || !D.accF || !D.ordR) return null;          // the field must have kept its flow tree (drainage.js)
   const t0 = now();
-  const g = D.g, n = g.n, R = S.R, to = D.to, accF = D.accF, ord = D.ordR, lvl = D.lvl, ter = D.ter, len = g.len;
+  const g = D.g, n = g.n, R = S.R, lvl = D.lvl, ter = D.ter, len = g.len;
+  let to = D.to, accF = D.accF, ord = D.ordR;
   // node directions and what kind of ground each node is
   const dir = new Float64Array(len * 3), wet = new Float32Array(len).fill(-1), sea = new Float32Array(len).fill(-1);
   const bw = new Float32Array(S.nB), d3 = [0, 0, 0];
@@ -97,6 +103,53 @@ export function buildRivers(S, D, opts) {
     for (let k = 0; k < S.nB; k++) { const lg = S.lqGroup[k]; if (lg === 0 || lg === 2) a += bw[k]; else if (lg === 1) b += bw[k]; }
     wet[p] = a; sea[p] = b;
   };
+  // THE MOUNTAINS (?mount=1, world/mountain.js). The field takes them for a wall (it routes the wood's water round them), and
+  // their own terrain is ridges round closed valleys: a field filled over it fills a quarter of the mountain's nodes, some by
+  // hundreds of metres (measured 24 Nov), and its streams climb over saddles. So the mountains get their own LOCAL flow: from
+  // each node down its steepest slope on the mountain's own height (hM, the alpine recipe's large scale), into the valley
+  // floors, where a torrent ends (it sinks into the meadow) or runs on off the mountain into the wood's own tree. The tree,
+  // the catchments and the order below are this hybrid's; the field itself is untouched.
+  const MT = S.mount, aS = MT ? new Float32Array(len) : null, hM = MT ? new Float32Array(len) : null;
+  if (MT) {
+    const ww = new Float32Array(S.nB), nb8 = new Int32Array(8), sh = D.share;
+    for (let f = 0; f < 6; f++) for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
+      const p = g.pid(f, i, j), x = dir[p * 3], y = dir[p * 3 + 1], z = dir[p * 3 + 2];
+      let a = 0;
+      if (sh) a = sh[p];
+      else { S.biomeWeights(x, y, z, ww); for (const k of MT.idx) a += ww[k]; }
+      aS[p] = a;
+      // (the mountain's height where the mountain's flow is asked: its own nodes, over half mountain, and their neighbours)
+      hM[p] = a > 0.25 ? MT.baseAt(S, x, y, z, ww, undefined, !sh) : ter[p];
+    }
+    const to2 = Int32Array.from(to), indeg = new Int32Array(len);
+    for (let f = 0; f < 6; f++) for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
+      const p = g.pid(f, i, j);
+      if (aS[p] <= 0.5) continue;
+      const k = D._nbs(p, nb8);
+      let best = -1, bs = 0;
+      for (let t = 0; t < k; t++) {
+        const q = nb8[t], dd = len3(dir[p * 3] - dir[q * 3], dir[p * 3 + 1] - dir[q * 3 + 1], dir[p * 3 + 2] - dir[q * 3 + 2]) || 1;
+        const sl = (hM[p] - hM[q]) / dd;
+        if (sl > bs) { bs = sl; best = q; }
+      }
+      to2[p] = best;
+    }
+    // (the order, sources first, by peeling the nodes nothing drains into; a loop where the wood's tree runs back into the
+    //  mountain's, if any, is left out)
+    const ord2 = new Int32Array(ord.length);
+    let nO = 0;
+    for (let t = 0; t < ord.length; t++) { const q = to2[ord[t]]; if (q >= 0) indeg[q]++; }
+    for (let t = 0; t < ord.length; t++) if (indeg[ord[t]] === 0) ord2[nO++] = ord[t];
+    for (let h0 = 0; h0 < nO; h0++) { const q = to2[ord2[h0]]; if (q >= 0 && --indeg[q] === 0) ord2[nO++] = q; }
+    const acc2 = new Float32Array(len);
+    for (let t = 0; t < nO; t++) acc2[ord2[t]] = 1;
+    for (let t = 0; t < nO; t++) { const p = ord2[t], q = to2[p]; if (q >= 0) acc2[q] += acc2[p]; }
+    // (the rest of the build walks `ord` outlet first: reversed)
+    const ordR2 = new Int32Array(nO);
+    for (let t = 0; t < nO; t++) ordR2[t] = ord2[nO - 1 - t];
+    to = to2; accF = acc2; ord = ordR2;
+    if (globalThis.__MTDBG) { const h = [0, 0, 0, 0, 0, 0]; let pits = 0, nm = 0; for (let p = 0; p < len; p++) { if (aS[p] <= 0.5) continue; nm++; if (to2[p] < 0) pits++; const a = acc2[p]; h[a >= 48 ? 5 : a >= 24 ? 4 : a >= 12 ? 3 : a >= 6 ? 2 : a >= 3 ? 1 : 0]++; } console.log('mountain nodes', nm, 'pits', pits, 'acc <3,3+,6+,12+,24+,48+', h.join(' ')); }
+  }
   // (springs: catchment added at a node a few steps up the tree from a place, and carried down its path, so that a stream
   //  runs past it: the landing's brook, which the noise rivers had by `oil.riverAt`)
   if (o.springs) for (const sp of o.springs) {
@@ -113,7 +166,7 @@ export function buildRivers(S, D, opts) {
   const isR = new Uint8Array(len);
   for (let f = 0; f < 6; f++) for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
     const p = g.pid(f, i, j);
-    if (accF[p] >= o.a1) { kind(p); if (wet[p] >= o.wetMin) isR[p] = 1; }
+    if (accF[p] >= (aS && aS[p] > 0.5 ? o.mountA1 : o.a1)) { kind(p); if (wet[p] >= o.wetMin) isR[p] = 1; }
   }
   const par = new Uint8Array(len);
   for (let p = 0; p < len; p++) if (isR[p] && to[p] >= 0 && isR[to[p]]) par[to[p]]++;
@@ -123,7 +176,8 @@ export function buildRivers(S, D, opts) {
   for (let t = ord.length - 1; t >= 0; t--) {
     const p = ord[t];
     if (!isR[p]) continue;
-    const own = Math.max(lvl[p], ter[p] - o.cutMax);
+    // (?mount=1: on the mountains a stream's level is the mountain's own height, down which it runs)
+    const own = aS && aS[p] > 0.5 ? hM[p] - o.cutMax : Math.max(lvl[p], ter[p] - o.cutMax);
     if (own < P[p]) P[p] = own;
     const q = to[p];
     if (q >= 0 && isR[q] && P[p] < P[q]) P[q] = P[p];
@@ -181,9 +235,10 @@ export function buildRivers(S, D, opts) {
   stems.sort((a, b) => rank[a.pts[a.pts.length - 1]] - rank[b.pts[b.pts.length - 1]]);
   const tStems = now();
   // 4. the curves and their segments
-  const SA = [], SB = [], SW = [], SP = [], SQ = [], SR = [], SK = [];   // (built as plain arrays, packed below)
+  const SA = [], SB = [], SW = [], SP = [], SQ = [], SR = [], SK = [], SM = [];   // (built as plain arrays, packed below)
   const pt = new Float64Array(3);
   const width = (a) => Math.min(o.wMax, o.wMin + o.wK * Math.sqrt(a / 10));
+  const wOf = (q, a) => { const w = width(a); return aS ? w + (Math.min(w, o.mountW) - w) * aS[q] : w; };
   const bendOf = (w) => (o.bends ? smoothstep(o.bendW[0], o.bendW[1], w) : 0);   // 0..1: how much a river of S-bends this is
   const nC = S.nC.n3;
   // (a) the nodes smoothed along their stems, the stem's two ends held (the grid's stair of 45-degree steps is taken out;
@@ -193,7 +248,7 @@ export function buildRivers(S, D, opts) {
     const cn = st.end === 'join' ? st.pts.concat([st.join]) : st.pts, m = cn.length;
     if (m < 3) continue;
     const ps = new Float64Array(m * 3), pv = new Float64Array(m * 3), f2 = new Float32Array(m);
-    for (let k = 0; k < m; k++) { const q = cn[k]; ps[k * 3] = spos[q * 3]; ps[k * 3 + 1] = spos[q * 3 + 1]; ps[k * 3 + 2] = spos[q * 3 + 2]; f2[k] = bendOf(width(accF[q])); }
+    for (let k = 0; k < m; k++) { const q = cn[k]; ps[k * 3] = spos[q * 3]; ps[k * 3 + 1] = spos[q * 3 + 1]; ps[k * 3 + 2] = spos[q * 3 + 2]; f2[k] = bendOf(wOf(q, accF[q])); }
     const passes = o.smooth + (o.bends ? o.bendSmooth : 0);
     for (let it = 0; it < passes; it++) {
       pv.set(ps);
@@ -222,7 +277,7 @@ export function buildRivers(S, D, opts) {
     else if ((st.end === 'sea' || st.end === 'edge') && st.endNode >= 0) ctl.push(P3(st.endNode));
     else ctl.push(null);
     if (m < 2) {      // a mouth right at a source: a stub toward the sea
-      mouths.push({ end: ctl[1].slice(), lip: ctl[2] ? ctl[2].slice() : ctl[1].slice(), width: width(accF[last]), levelTop: P[last], levelSea: S.sea == null ? 0 : S.sea, dir: null, reach: pieceR[last] });
+      mouths.push({ end: ctl[1].slice(), lip: ctl[2] ? ctl[2].slice() : ctl[1].slice(), width: wOf(last, accF[last]), levelTop: P[last], levelSea: S.sea == null ? 0 : S.sea, dir: null, reach: pieceR[last] });
       continue;
     }
     if (!ctl[0]) ctl[0] = [2 * ctl[1][0] - ctl[2][0], 2 * ctl[1][1] - ctl[2][1], 2 * ctl[1][2] - ctl[2][2]];
@@ -236,29 +291,32 @@ export function buildRivers(S, D, opts) {
     for (let k = 0; k < m - 1; k++) {
       const b = ctl[k + 1], c = ctl[k + 2];
       const chord = len3(c[0] - b[0], c[1] - b[1], c[2] - b[2]) * R;
-      const qa = accF[cn[k]], qb = join && k === m - 2 ? qa : accF[cn[k + 1]];
-      stp[k] = Math.max(1, Math.ceil(chord / (bendOf(Math.max(width(qa), width(qb))) > 0 ? o.seg / 2 : o.seg)));
+      const toJ = join && k === m - 2, qa = accF[cn[k]], qb = toJ ? qa : accF[cn[k + 1]];
+      stp[k] = Math.max(1, Math.ceil(chord / (bendOf(Math.max(wOf(cn[k], qa), wOf(toJ ? cn[k] : cn[k + 1], qb))) > 0 ? o.seg / 2 : o.seg)));
       nR += stp[k];
     }
     const X = new Float64Array(nR), Y = new Float64Array(nR), Z = new Float64Array(nR), RW = new Float64Array(nR);
-    const RP = new Float64Array(nR), RQ = new Float64Array(nR), RR = new Int32Array(nR);
+    const RP = new Float64Array(nR), RQ = new Float64Array(nR), RR = new Int32Array(nR), RA = aS ? new Float32Array(nR) : null;
     let nk = 0;
     for (let k = 0; k < m - 1; k++) {
       const a = ctl[k], b = ctl[k + 1], c = ctl[k + 2], d = ctl[k + 3], steps = stp[k];
-      const qa = accF[cn[k]], qb = join && k === m - 2 ? qa : accF[cn[k + 1]];
-      const wa = width(qa), wb = width(qb), pa = P[cn[k]], pb = P[cn[k + 1]], r = pieceR[cn[k]];
+      const toJ = join && k === m - 2, qa = accF[cn[k]], qb = toJ ? qa : accF[cn[k + 1]], kb = toJ ? cn[k] : cn[k + 1];
+      const wa = wOf(cn[k], qa), wb = wOf(kb, qb), pa = P[cn[k]], pb = P[cn[k + 1]], r = pieceR[cn[k]];
+      const aa = aS ? aS[cn[k]] : 0, ab = aS ? aS[kb] : 0;
       at[k] = nk;
       for (let s = 0; s < steps; s++, nk++) {
         const u = s / steps;
         catmull(a, b, c, d, u, pt);
         const l = len3(pt[0], pt[1], pt[2]);
         X[nk] = pt[0] / l; Y[nk] = pt[1] / l; Z[nk] = pt[2] / l; RW[nk] = wa + (wb - wa) * u; RP[nk] = pa + (pb - pa) * u; RQ[nk] = qa + (qb - qa) * u; RR[nk] = r;
+        if (RA) RA[nk] = aa + (ab - aa) * u;
       }
     }
     {
-      const b = ctl[m], l = len3(b[0], b[1], b[2]), qe = join ? accF[cn[m - 2]] : accF[cn[m - 1]];
+      const b = ctl[m], l = len3(b[0], b[1], b[2]), ke = join ? cn[m - 2] : cn[m - 1], qe = accF[ke];
       at[m - 1] = nk;
-      X[nk] = b[0] / l; Y[nk] = b[1] / l; Z[nk] = b[2] / l; RW[nk] = width(qe); RP[nk] = P[cn[m - 1]]; RQ[nk] = qe; RR[nk] = pieceR[cn[m - 2]];
+      if (RA) RA[nk] = aS[ke];
+      X[nk] = b[0] / l; Y[nk] = b[1] / l; Z[nk] = b[2] / l; RW[nk] = wOf(ke, qe); RP[nk] = P[cn[m - 1]]; RQ[nk] = qe; RR[nk] = pieceR[cn[m - 2]];
     }
     const sArr = new Float64Array(nR);
     for (let k = 1; k < nR; k++) sArr[k] = sArr[k - 1] + len3(X[k] - X[k - 1], Y[k] - Y[k - 1], Z[k] - Z[k - 1]) * R;
@@ -287,7 +345,7 @@ export function buildRivers(S, D, opts) {
       const dd = Math.sqrt(bd2);
       Ls = dd > 0.01 ? (2.5 * dd > arc * 0.6 ? arc : Math.max(Math.min(60, arc * 0.6), 2.5 * dd)) : 1;
     }
-    const thinEnd = st.end === 'edge' ? o.edgeThin : 0;
+    const thinEnd = st.end === 'edge' || (st.end === 'outlet' && aS && aS[last] > 0.5) ? o.edgeThin : 0;
     const OX = new Float64Array(nR), OY = new Float64Array(nR), OZ = new Float64Array(nR), OH = new Float64Array(nR);
     let phN = 0, phB = 0;
     // (the slow noises -- how tight the bends, how early or late, the 350 m wander -- asked on a coarse grid along the river
@@ -323,7 +381,7 @@ export function buildRivers(S, D, opts) {
       }
       const sp = sArr[wk1] - sArr[wk0];
       swing += sp > 0 ? wd0 + (wd1 - wd0) * Math.max(0, Math.min(1, (sGo - sArr[wk0]) / sp)) : wd0;
-      const push2 = hold * swing / R;
+      const push2 = hold * swing * (RA ? 1 - (1 - o.mountWander) * RA[k] : 1) / R;
       let x = qx + ax * push2, y = qy + ay * push2, z = qz + az * push2;
       if (Ls > 1) { const f = 1 - smoothstep(0, Ls, arc - sGo); x += dx0 * f; y += dy0 * f; z += dz0 * f; }
       const l = R / len3(x, y, z);
@@ -377,7 +435,7 @@ export function buildRivers(S, D, opts) {
         j = c;
       }
       const kS1 = kSAt(j);
-      SA.push(OX[i0], OY[i0], OZ[i0]); SB.push(OX[j], OY[j], OZ[j]); SW.push(OH[i0], OH[j]); SP.push(RP[i0], RP[j]); SQ.push(RQ[i0]); SR.push(RR[i0]); SK.push(kS0, kS1);
+      SA.push(OX[i0], OY[i0], OZ[i0]); SB.push(OX[j], OY[j], OZ[j]); SW.push(OH[i0], OH[j]); SP.push(RP[i0], RP[j]); SQ.push(RQ[i0]); SR.push(RR[i0]); SK.push(kS0, kS1); if (RA) SM.push(RA[i0] > 0.5 ? 1 : 0);
       i0 = j; kS0 = kS1;
     }
     if (st.end === 'sea' || st.end === 'edge') {
@@ -392,7 +450,34 @@ export function buildRivers(S, D, opts) {
   const net = new RiverNet(S, D, o);
   net.sA = Float64Array.from(SA); net.sB = Float64Array.from(SB); net.sW = Float32Array.from(SW); net.sP = Float32Array.from(SP);
   net.sQ = Float32Array.from(SQ); net.sR = Int32Array.from(SR); net.sK = Float32Array.from(SK); net.nSeg = nS;
-  net.stems = stems.length;
+  net.sM = aS ? Uint8Array.from(SM) : null;     // (?mount=1: the segments of the mountains' own streams)
+  // (?mount=1: on a mountain stream the water's level comes from the mountain's own large-scale height at each end of each
+  //  segment (24 m at most), not from the 98 m nodes: between two nodes a crag rises and falls tens of metres, and the nodes'
+  //  level drawn straight between them stood up to 275 m under the slope and 46 m over it (measured 24 Nov). The level follows
+  //  the slope down, `mountSink` under it, and NEVER RISES: where the slope rises along the stream it cuts a gorge, at most
+  //  `mountCut` deep; where a crag stands higher than that across it, the stream runs DRY over the crag (sM = 2: no water, no
+  //  gully, as a torrent runs under scree) and comes out below it at the slope's own level. Taking the slope's height as it
+  //  came, the water rose along 28 % of the mountain's segments, by up to 149 m in one)
+  if (aS) {
+    const ww = new Float32Array(S.nB), sP = net.sP, sM = net.sM;
+    let run = Infinity, prev = -1, prevB = 0;
+    for (let s2 = 0; s2 < nS; s2++) {
+      const a = s2 * 3;
+      const joined = prev === s2 - 1 && net.sA[a] === net.sB[a - 3] && net.sA[a + 1] === net.sB[a - 2] && net.sA[a + 2] === net.sB[a - 1];
+      if (!joined) run = Infinity;
+      prev = s2;
+      if (!sM[s2]) { run = Math.min(run, sP[s2 * 2], sP[s2 * 2 + 1]); continue; }
+      const hA = joined && prevB === prevB ? prevB : MT.baseAt(S, net.sA[a] / R, net.sA[a + 1] / R, net.sA[a + 2] / R, ww) - o.mountSink;
+      const hB = MT.baseAt(S, net.sB[a] / R, net.sB[a + 1] / R, net.sB[a + 2] / R, ww) - o.mountSink;
+      prevB = hB;
+      let pA = Math.min(run, hA);
+      if (hA - pA > o.mountCut) { pA = hA; sM[s2] = 2; }
+      let pB = Math.min(pA, hB);
+      if (hB - pB > o.mountCut) { pB = hB; sM[s2] = 2; }
+      sP[s2 * 2] = pA; sP[s2 * 2 + 1] = pB;
+      run = pB;
+    }
+  }
   net.reaches = reaches.map((r, i) => ({ end: r.end, n: r.pts.length, thin: thinned.has(i) }));
   net.mouths = mouths;
   net.riverNodes = 0; for (let p = 0; p < len; p++) if (isR[p]) net.riverNodes++;
