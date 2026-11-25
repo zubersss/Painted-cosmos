@@ -13,6 +13,16 @@ sky to a mile: look director), FV2-T and FV7 (the far trees and the air speed te
 `src/render/materials.js`, `src/world/terrain.js`, `src/world/patchgen.js`, `src/world/surface.js` (recipes and far
 colour only). NOT chunks.js, post.js, shared.js, world/index.js (look director), NOT flora.js, florakit.js (trees groups).
 
+**STATE (25 Nov, after midnight): THE MILE SURVEY** (the coordinator's item 2; sheets in docs/shots/painter/farview/
+mile_survey/, farview 31c3577 = look-proto v39.5 + glades, real far trees, weather frozen; each sheet: 1 km noon, 1 km
+16.8, 1.6 km noon, 1.6 km 16.8). The camera's own tilt (cam=high, -28.6 deg) looks above the horizon from a mile on this
+4 km planet, so a second set looks 55 deg down. WORST THREE, my reading: (1) the land beyond the woods at 1 to 3 km, a
+pale busy mosaic of long pastel strokes with hard edges and blue pool strokes among them, no larger shapes (mine: the
+ground's far paint; the pools are the water group's; the haze the look director's); (2) the sky, broad flat bands over
+half the frame; (3) the sea, very large flat rectangles in two blues. The woods themselves now read from above (rust or
+green masses with yellow glades). NEXT: (1), the far land in larger calmer patches. Also queued: the boulders with B
+(lines sent; PROP_FRAG is shared paint, B asked the coordinator), F's lime floor between the trees.
+
 **STATE (24 Nov, late night) IN SHORT:** v39.4 and v39.5 are LIVE with all of this lane's mountain work (v39.5 = farview
 87b25e8). farview has look-proto v39.5 merged (62c203d; snow at sample slot 24). Passed by the look director since:
 7f4c006 (the noon lit plane's two values inside ?rockfield; the colour part closed). The glades: see below (on). Behind switches, off: ?farshadow=1 (A1's hook, level 0.40, passed), ?bloomfar (one switch with B's bloom.js since
