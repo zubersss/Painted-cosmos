@@ -693,10 +693,12 @@ vec3 pcAtmosV(vec3 c, float f, vec3 viewPos) {
   // So, on foot only ((1 - uLookN.w): from the air L5 has its own split), by day, in fair weather: (a) the far air is the
   // air LIT: the light's own colour toward the sun (pale gold at a golden hour), the sky's air away from it, never
   // darker than it was (uLookS.z away, w toward, as lightness floors); (b) in the middle distance only (where the
-  // air already takes 0.10 to 0.40, uLookM.z w: so it scales with each world's own air), the air comes closer to its
+  // air already takes 0.25 to 0.55, uLookM.z w: so it scales with each world's own air), the air comes closer to its
   // ceiling, more toward the sun at a golden hour (uLookM.y) than at noon (uLookM.x). The ceiling itself is never
   // passed (the owner's "fully rendered from 300 yards": the far land keeps its quarter of paint) and the near ground
-  // (the dark frame) is untouched. Flat mixes only: no edge moves, nothing is softened.
+  // (the dark frame) is untouched. Flat mixes only: no edge moves, nothing is softened. (SEEN, 25 Nov: with the band
+  // at 0.10 to 0.40 the autumn stream's orange grove 20 to 40 m off lost its fire, the maple's darks 0.29 to 0.42: those
+  // trees are the frame, not the glow, so the band starts where the air already takes a quarter.)
   // ?midlight=0 (uLookS.y) is the air as it was.
   float fM = f;
   float wM = uLookS.y * (1.0 - uLookN.w) * uDayness * (1.0 - uMoon) * (1.0 - uWx.x) * (1.0 - uStorm);
