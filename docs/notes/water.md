@@ -492,8 +492,26 @@ Branch `water-bodies` = lane 0 + look-proto v37.1 + `origin/design-water` (W1's 
   parts are in, or my part alone if W3 cannot tonight.
 - E (water lead): the owner's phone tables (v39.5) make the water the second cost after the far trees; my bodies add no
   fragment work of their own beyond the falls' layer (which has its 'no falls' row; the falls view was at the cap).
-- NEXT: W3's overlap and bits, then the sheet and crops to F; after the branches meet (the coordinator's call): the pool's pcThinLayer to W3's
-  pcWStrokes, pcFallMilk and the FALL_ colours into waterchunk.js.
+- **F (24 Nov, late): v39.6 ships the river paint and keeps v37's sea (?wsea off)** until the full sheet with W3's overlap
+  passes; "no need to rush the sea tonight". W3's default commit is water-paint 3cc4b66 (the new paint on rivers, ponds and
+  lakes under ~150 m by my lakeWidthAt; v37's on the sea and wider lakes). W3's OVERLAP is water-paint 74ce240 (past a
+  stroke's point the row's next stroke, sea only). Both merged into water-sea 329f07d (with v39.5; no conflicts; suites
+  328 / 133 / 449). A lake over 150 m is open water now, so at ?wsea=1 it takes the sea's paint, no turn, no chop.
+- **THE WHITE JAGGED BITS, DIAGNOSED (water-sea b9777af, stills only: `sea-bits-diagnosis.jpg`).** Three debug renders with
+  a scratch uniform (not committed): not foam, whitecaps or churn (0 there); not an input that changes per pixel (stroke
+  length, way and slide measured smooth; the bits stay with the length held at 8 and the shore turn off; they mostly go at
+  ~15 widths); they sit where the fine octave hands over to the coarse (oc.x 0.6-0.9), a pixel-scale mix of fine, coarse and
+  edgeF there. Cause read from the code: the taper runs before the thinning test, so a THINNED fine stroke kept the taper's
+  own and neighbour and its whole outline went through edgeF over the coarse stroke. W3's overlap already lowers it.
+  Offered to W3 (W3's file): keep pcThinR's own/rndN for a thinned stroke -- MEASURED band slivers 2.8 -> 2.2 % (1.1 % with
+  no taper). What is left visible: a light X where two tips meet (each wedge shows the other stroke); suggested to W3: past
+  a tip, the adjacent row's stroke (pcThinR's eB/eT neighbour). Waiting on W3's answer.
+- **v39.5's 3D CLOUDS are the default and their shadows move between shots** (30 % of the sky's pixels changed between two
+  shots of one load; the strait's p95 0.88 -> 0.58 under them). F's sheets from now on with `clouds3d=0`, v37 re-rendered
+  on the same code (v37 started on 329f07d: scratch `f_*_v37c.png`).
+- NEXT: W3's answer on the two suggestions; then the sheet (four views) and both crops with clouds3d=0, new against v37 on
+  the same code, value stats, the default re-proven, to F. After the branches meet (the coordinator's call): the pool's
+  pcThinLayer to W3's pcWStrokes, pcFallMilk and the FALL_ colours into waterchunk.js.
 - Camera places for the falls views: `fallsView(S)` and the scratch `fallcams.mjs` (sea60, sea150, air400, bank, E7).
 
 ## Stations and tools
