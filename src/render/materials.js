@@ -1908,8 +1908,10 @@ void main() {
       // game's camera at a golden hour went a pale cream, S 0.17 against v37's 0.36, a tenth of it near white -- the
       // widened path's marks white-gold over a wide lobe and the cream sky's mirror over the thinned wash)
       float gW = pcGold();
-      wBodyK *= 1.0 - 0.30 * gW;
-      wSunE = mix(wSunE, 24.0, gW);
+      // (and again, the look director on the game's first view: even so the near reach was one pale cream area that read as
+      // sand. The wash is kept nearly whole and the sun's lobe as narrow as v37's; the path is made a path below, a capped
+      // share of gold strokes with the river's warm slate between them)
+      wBodyK *= 1.0 - 0.12 * gW;
     }
     #endif
     c = mix(c, pcDensity(vLiq.rgb, wBodyD) * vec3(0.80, 0.95, 1.06), wBodyK * (1.0 - vLiqP.x) * (1.0 - vLiqP.y));
@@ -2010,13 +2012,26 @@ void main() {
     if (wpL > 0.5) wsun = min(mix(pcOilSunC(), vec3(1.0), 0.35 * (1.0 - pcGold())) * 1.02, vec3(1.0));      // (gold, not white, at a golden hour)
     #endif
     float wau = uAuroraK * (1.0 - uDayness);
+    #ifdef PC_WPAINT
+    if (wpL > 0.5) clight = mix(clight, mix(c, clight, 0.5), pcGold() * liq);      // (the light strokes at a golden hour: below)
+    #endif
     vec3 w1 = wr1.x > wThL ? clight : (wr1.x < wThD ? cdeep : c), w2 = wr2.x > wThL ? clight : (wr2.x < wThD ? cdeep : c);
     w1 = wr1.z < 0.34 * wau ? mix(vec3(0.10, 0.74, 0.60), vec3(0.24, 0.96, 0.56), step(0.5, fract(wr1.z * 31.7))) : w1;
     w2 = wr2.z < 0.34 * wau ? mix(vec3(0.10, 0.74, 0.60), vec3(0.24, 0.96, 0.56), step(0.5, fract(wr2.z * 31.7))) : w2;
-    w1 = wr1.y < wsp * 1.2 ? wsun : w1; w2 = wr2.y < wsp * 1.2 ? wsun : w2;
+    float wspC = wsp * 1.2;
+    #ifdef PC_WPAINT
+    if (wpL > 0.5) {
+      // THE SUN'S PATH A PATH (the look director, 24 Nov night, on the game's first view at a golden hour): never more than
+      // about two strokes in seven gold even at its middle, so it is separate gold strokes with the river's body between
+      // them; and at a golden hour the light strokes hold back from the sky's cream (a step lighter than the body, warmed,
+      // not the mirrored cream sky), so nothing else on the river reads as sand.
+      wspC = min(wspC, 0.28);
+    }
+    #endif
+    w1 = wr1.y < wspC ? wsun : w1; w2 = wr2.y < wspC ? wsun : w2;
     // (for the night's pull, at the end: which of the pixel's strokes are light ones, and which the sun's or the moon's marks)
     wLitN = mix(wr2.x > wThL ? 1.0 : 0.0, wr1.x > wThL ? 1.0 : 0.0, wown);
-    wMarkN = mix(wr2.y < wsp * 1.2 ? 1.0 : 0.0, wr1.y < wsp * 1.2 ? 1.0 : 0.0, wown);
+    wMarkN = mix(wr2.y < wspC ? 1.0 : 0.0, wr1.y < wspC ? 1.0 : 0.0, wown);
     c = mix(w2, w1, wown);
     #ifdef PC_WPAINT
     if (wpL > 1.5) {

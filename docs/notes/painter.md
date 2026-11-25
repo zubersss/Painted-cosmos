@@ -311,6 +311,15 @@ Stills (default against `?wpaint=0`): `s11-trees-ab.jpg` (cam=trees: v39.5's riv
 `s11-B10-ab.jpg` (10 m over the landing, B's view as near as I could set it), `s11-F1-ab.jpg` (on foot at the landing's
 river), `s11-HI-ab.jpg` (the river from 150 m), `s11-S150-ab.jpg` (the sea from 150 m: v37 in both, by design),
 `s11-game-first-view-ab.jpg`.
+**THE FIRST VIEW AT THE GOLDEN HOUR (F held 3cc4b66 on it, 24 Nov night).** The sun's path made a path: never more than
+about two strokes in seven gold even at its middle (`wspC` capped at 0.28; this also thins the brightest middle of the
+path at noon), the sun's lobe as narrow as v37's again, the blue wash nearly whole at a golden hour (x(1 - 0.12 gold)),
+and the light strokes a step lighter than the body rather than the mirrored cream sky. MEASURED in the game's first view
+(1024 x 480 phone settings): cream-gold strokes 16 % of the river's pixels (F: 15-20 %; v37 21 %), V 0.65 S 0.23
+(`s13-game-first-view-ab.jpg`). NOT fixed: the fan-shaped wedges in the middle reach (the per-cell turn; F wants the
+mesher to hand each cell its current's way: E owns patchgen's layout) and F's stepped near-left bank from 150 m: the steps
+are in the new paint only; they are NOT the lace (v37's lace there leaves them), NOT the still/cell-size switch (easing it
+left them) and NOT the wide-lake byte (no river point has a lake width there): still to find.
 **PAST A POINTED STROKE'S TIP, THE ROW'S NEXT STROKE** (F on the sea's near chop, by E-W2; the sea only, `?wsea`>=1): in
 pcWCand's lens taper the gap past a stroke's point shows the stroke the row continues with on that side (found as pcThinR
 finds the pixel's own, one column either way), so pointed strokes overlap end to end and no body shows between them.
