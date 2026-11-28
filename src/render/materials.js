@@ -1222,6 +1222,21 @@ export function groundGuardCheck(renderer) {
   }
 }
 
+// THE GUARD AHEAD OF THE FIRST BUILD (28 Nov). On Qualcomm's own GLES compiler -- an Adreno chip under Android, the owner's
+// phone -- the two parts that doubled the ground's program since v38 (the rock faces and the painted canopy; about 9.5k
+// instructions at v38, 19.2k now, about 11.8k without these two) start out, taken out the very way the guard above takes them
+// out after a refusal, so the phone neither waits through refused builds nor depends on its driver saying so. Any other
+// chip returns at the first line: nothing of the program changes there. ?canopy= or ?rockfield= named in the address
+// keeps the guard's own way on this chip too (for the phone's tests).
+export function groundGuardAhead(gpuName) {
+  const ua = (typeof navigator !== 'undefined' && navigator.userAgent) || '';
+  if (!/Adreno/i.test(gpuName || '') || !(/OpenGL ES/i.test(gpuName) || /Android/i.test(ua))) return;
+  try { const q = new URLSearchParams(location.search); if (q.has('canopy') || q.has('rockfield')) return; } catch (e) { /* no address */ }
+  for (const k of ['PC_ROCKF', 'PC_CANOPY']) if (!GROUND_GUARD.dropped.includes(k)) GROUND_GUARD.dropped.push(k);
+  GROUND_GUARD.why = 'left out ahead on this chip: ' + String(gpuName).slice(0, 60);
+  for (const m of GROUND_GUARD.mats) groundDrop(m);
+}
+
 export function makeTerrainMaterial(bodyU) {
   const m = new THREE.ShaderMaterial({
     name: 'pc-terrain',
