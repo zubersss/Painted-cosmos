@@ -77,6 +77,8 @@ export function startGlErr(renderer, scene, store) {
     s += 'context lost ' + lost + '   gl errors ' + (Object.keys(errs).length ? Object.entries(errs).map(([k, v]) => (CODES[k] || k) + ' x' + v).join(', ') : 'none') + '\n';
     s += 'ground meshes ' + gr.n + ' (visible ' + gr.vis + ')' + (gr.bad.length ? '  SHORT DATA: ' + gr.bad.slice(0, 3).join(' | ') : '  data ok') + '\n';
     s += 'programs not runnable: ' + (nr.length ? nr.join(', ') : 'none') + '\n';
+    const gg = window.__pcGroundGuard;
+    s += 'ground guard: ' + (gg ? (gg.dropped.length ? 'TOOK OUT ' + gg.dropped.join(', ') : 'nothing taken out') + (gg.gaveUp ? '  GAVE UP' : '') + (gg.why ? '\n  why: ' + gg.why : '') : 'not loaded') + '\n';
     s += 'shader failures: ' + (store.shader.length ? '' : 'none') + '\n';
     for (const f of store.shader.slice(0, 4)) s += '- ' + f.name + '\n  ' + (f.prog || '').slice(0, 300) + '\n  vs: ' + (f.vs || '').slice(0, 300) + '\n  fs: ' + (f.fs || '').slice(0, 400) + '\n';
     box.textContent = s;

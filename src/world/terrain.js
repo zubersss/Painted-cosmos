@@ -45,6 +45,8 @@ const WATER_FOV_T = Math.tan(58 * Math.PI / 360);     // (the game's own vertica
 // ?uplist=0 (or UPLIST.on = false: the speed test's row) is the old way, every list whole.
 const PATCH_U = new Set(['uOrigin', 'uAnchor', 'uCamLocal', 'uMorph']);
 export const UPLIST = { on: (() => { try { const q = new URLSearchParams(location.search); return !(q.has('uplist') && q.get('uplist') === '0'); } catch (e) { return true; } })() };
+const _SAMPLERS = new Set([0x8b5e, 0x8b5f, 0x8b60, 0x8b62, 0x8dc1, 0x8dc4, 0x8dc5, 0x8dca, 0x8dcb, 0x8dcc, 0x8dcf, 0x8dd2, 0x8dd3, 0x8dd4, 0x8dd7]);
+const _isSampler = (t) => _SAMPLERS.has(t);
 const _isTex = (v) => !!(v && (v.isTexture || (Array.isArray(v) && v[0] && v[0].isTexture)));
 // Which list three is to use for this patch's draw. st: the terrain's own record ({ prog, full, short, frame }).
 export function pickUniformList(renderer, material, st) {
@@ -55,7 +57,11 @@ export function pickUniformList(renderer, material, st) {
     st.prog = prog;
     const U = mp.uniforms || material.uniforms;      // (three's own: for a ShaderMaterial the material's)
     st.full = prog.getUniforms().seq.filter((u) => u.id in U);  // (what three's seqWithValue makes)
-    st.short = st.full.filter((u) => PATCH_U.has(u.id) || _isTex(U[u.id].value));
+    // (every sampler by its TYPE, not only one that holds a texture when this list is made: a sampler empty at that
+    //  moment and filled later was left out for good, and the short list then numbered the texture units after it one
+    //  lower than the full list had, so two samplers shared a unit. Which textures exist at the ground's first draw is
+    //  a matter of timing, so it differs from device to device: the coordinator, 28 Nov, reading for the owner's phone.)
+    st.short = st.full.filter((u) => PATCH_U.has(u.id) || _isTex(U[u.id].value) || _isSampler(u.type));
     st.frame = -1;
   }
   const f = renderer.info.render.frame;
