@@ -547,8 +547,27 @@ whether the performance work is one more version or a redesign.** Their own row 
 
 ## 3. State right now (update this before you stop)
 
-**STATE 28 Nov (first account; three days after the helpers went idle on 25 Nov ~00:10, usage spent): `main` is
-v39.5.2 (pull request #49, main 1bfa34c; look-proto bef701c), THE GROUND'S GUARD. EVERYTHING ELSE WAITS ON THE OWNER'S WORD THAT THE GROUND IS BACK ON THE PHONE.**
+**STATE 28 Nov ~10:00 (first account): `main` is v39.5.3 (pull request #50, merge 33b5a34; look-proto 4ba3715c; Pages
+success): THE GROUND'S GUARD AHEAD ON AN ADRENO PHONE. EVERYTHING ELSE WAITS ON THE OWNER'S WORD THAT THE GROUND IS
+BACK ON THE PHONE.**
+- v39.5.3: the investigation (docs/lead/2026-11-28-ground-on-adreno.md) found Qualcomm's own compiler refusing the
+  ground's program, most likely for size: 9.5k instructions at v38, 19.2k at v39.5, almost all of it the canopy and
+  the rock faces. groundGuardAhead (render/materials.js): on an Adreno chip under OpenGL ES or Android, the ground
+  starts without PC_ROCKF and PC_CANOPY (about 11.8k). ?canopy= or ?rockfield= in the address hands the choice back
+  to the guard. SEEN as if on the phone (the chip's name spoofed headless): the ground is drawn. Every other machine:
+  0 px. The script side of the two parts stays on (the canopy's bytes and the snow shed in patchgen; root patches are
+  built before the painter starts); it costs the phone some processor time: a later fix.
+- THE OWNER'S PHONE TESTS (wait 20 s on each; answer ground / no ground):
+  T1 https://zubersss.github.io/Painted-cosmos/?look=oil&canopy=1&glerr=1 (everything in, the guard free: photo of the box)
+  T2 https://zubersss.github.io/Painted-cosmos/?look=oil&canopy=0&rockfield=0&groundseason=0&farwater=0&glerr=1
+  plain ?look=oil = the fix. READING: plain ground -> fixed. T1 ground with 'TOOK OUT ...' -> the driver reports;
+  the line tells size (stops at PC_ROCKF) from the canopy's arrays (goes on to PC_CANOPY). T1 no ground -> silent
+  failure in canopy/rock; the fix is what helps. Plain no ground but T2 ground -> also leave out PC_FARWATER and
+  PC_SEASONG on Adreno. T2 no ground -> the base: one-off cut builds.
+- NEXT once the phone answers: the lasting fix, so the phone gets the canopy and the rock back. Shrink the canopy's
+  two inlined copies, unroll its four cells into plain locals, and drop inout in pcCanopyLayers. Then give the parts
+  back one at a time. v39.6 (branch v396) adds PC_BLOOMF (the far flower drifts) to the ground: merge v39.5.3 into
+  it and make the guard ahead also leave out PC_BLOOMF on Adreno before shipping it.
 - THE LIVE FAULT: on the owner's phone (Adreno 740) v39.5 draws NO GROUND (two screenshots, docs/shots/owner/). Read
   from the phone's own v39.5 tables: 'no ground drawn' and 'ground one flat colour' cost +0.4 ms from the air where
   v38 read -39 and -8.9: the ground's program does not run there, at any tier. No desktop or software GPU shows it;
