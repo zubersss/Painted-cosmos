@@ -481,7 +481,13 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
   soft far off. So: give the room to SHARPNESS (the ladder, v27), and buy more of it by cutting the script, not by
   cutting what is drawn. **Do not cut content for speed on this phone until a table says content costs something.**
 
-**THE OWNER, 28 Nov (latest): FINISH THE GROUND NOT LOADING; TWO PLAYABLE LINKS.** *"Finish up the problem of the
+**THE OWNER, 28 Nov, later (latest): RESUME, WITH THE RIGHT NUMBER OF AGENTS; ULTRACODE WHERE IT PAYS.** *"Resume working
+use up to the perfect number for agents to not bloat the work and to have the best quality product use ultracode for the
+parts that need it as well for a better product"* So: multi-agent workflows (Workflow tool) for the hard parts only,
+each small and focused (about 4-8 agents), with adversarial checks; plain work done directly. First: the ground on the
+owner's phone (find what the driver refuses, from the exact shader text, v38 good against v39.5.2).
+
+**THE OWNER, 28 Nov: FINISH THE GROUND NOT LOADING; TWO PLAYABLE LINKS.** *"Finish up the problem of the
 ground not loading and give me a playable link 1 top quality and 1 regular phone"* (The owner switched this session's
 model for it; usage is nearly spent, so: one session, no fan-out.) The owner's two screenshots of 24 Nov (docs/shots/owner/)
 show NO GROUND on the phone in v39.5; the phone's own v39.5 speed test prices the ground at nothing (v38: 8.9 ms from
