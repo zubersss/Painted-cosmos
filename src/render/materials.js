@@ -6,7 +6,7 @@ import * as THREE from 'three';
 // THE GROUND SEEN FROM THE AIR (group C, the far view): the canopy painted into the ground. Its shader text, its uniforms
 // and its switch (?canopy=) live in render/farground.js; the hooks in the ground's shaders are all inside #ifdef PC_CANOPY, which is set
 // only in the oil look with the switch on.
-import { CANOPY, CANOPY_DEBUG, CANOPY_FARSHADOW, CANOPY_DAB, CANOPY_FLOOR, CANOPY_VERT_DECL, CANOPY_VERT_MAIN, CANOPY_FRAG, canopyUniforms, GROUND_SEASON, SEASON_VERT, SEASON_VERT_MAIN, SEASON_FRAG, seasonUniforms, ROCKFIELD, ROCK_FRAG, rockUniforms, ROCK_DEBUG, bloomFar, BLOOM_VERT_DECL, BLOOM_VERT_MAIN, BLOOM_FRAG, bloomUniforms, FARWATER_VERT_DECL, FARWATER_VERT_MAIN, FARWATER_FRAG, FARWATER_U } from './farground.js';
+import { CANOPY, CANOPY_DEBUG, CANOPY_FARSHADOW, CANOPY_DAB, CANOPY_FLOOR, CANOPY_VERT_DECL, CANOPY_VERT_MAIN, CANOPY_FRAG, canopyUniforms, GROUND_SEASON, SEASON_VERT, SEASON_VERT_MAIN, SEASON_FRAG, seasonUniforms, ROCKFIELD, ROCK_FRAG, rockUniforms, ROCK_DEBUG, bloomFar, BLOOM_VERT_DECL, BLOOM_VERT_MAIN, BLOOM_FRAG, bloomUniforms, FARWATER_VERT_DECL, FARWATER_VERT_MAIN, FARWATER_FRAG, FARWATER_U, CANOPY_BENCH } from './farground.js';
 import { G, PHYS, PHYSW, PREV, OIL, LOOK, BURNPAINT, register, ensureGlobals, makeBodyUniforms } from './shared.js';
 import { MODE } from '../data/mode.js';
 import { FLORA_GLSL } from '../physics/flora.glsl.js';
@@ -298,6 +298,11 @@ ${BLOOM_VERT_MAIN}
 
 const TERRAIN_FRAG = /* glsl */`
 ${FRAG_PARS}
+// (?groundfail=<part>: breaks this program on purpose while that part is compiled in, so the ground's guard can be SEEN
+//  to work on a machine whose driver takes everything: GROUND_GUARD below)
+#if (defined(PC_GFAIL_FARWATER) && defined(PC_FARWATER)) || (defined(PC_GFAIL_ROCK) && defined(PC_ROCKF)) || (defined(PC_GFAIL_SEASON) && defined(PC_SEASONG)) || (defined(PC_GFAIL_CANOPY) && defined(PC_CANOPY)) || defined(PC_GFAIL_ALL)
+  #error the ground guard's test: this program is broken on purpose
+#endif
 varying vec3 vBody;
 varying vec3 vAnch;
 varying vec3 vNV;
@@ -1168,6 +1173,55 @@ void main() {
 #endif
 `;
 
+// THE GUARD ON THE GROUND'S PROGRAM (the coordinator, 28 Nov). The owner's phone (Adreno 740) drew NO GROUND at all on
+// v39.5: the grass, the trees and the water stood over the sky's haze, and its own speed test priced the ground's paint
+// at nothing from the air (v38: 8.9 ms). Every desktop and software GPU drew it, and by count the program fits a phone's
+// limits: so the phone's driver refuses something in the ground's program, which since v38 has grown by the painted
+// canopy, the year's colours, the rock faces and the far water line -- and, unlike the trees' and the weather's new
+// programs, it had no guard. Here it is: after each frame the painter asks whether a ground program failed to link
+// (three's own diagnostics, as TREE_GUARD); if one did, the NEWEST part still compiled in is taken out of every ground
+// material and the program is built again, until one links: the far water line, the rock faces, the far flower
+// drifts, the year's colours, the painted canopy, in that order. A ground without its newest part is a lesser picture;
+// no ground is none. It is asked afresh at every start (a refused program costs a moment each time; nothing is kept
+// between visits), and the console (and ?glerr=1, on the page itself) says which part went and the driver's own words.
+// ?groundfail=farwater|rock|season|canopy|all breaks the program on purpose while that part is in.
+export const GROUND_GUARD = { mats: new Set(), dropped: [], why: '', gaveUp: false, seen: new WeakSet() };
+const GROUND_PARTS = ['PC_BLOOMF', 'PC_FARWATER', 'PC_ROCKF', 'PC_SEASONG', 'PC_CANOPY'];      // (newest first: in v39.6 the far flower drifts are the newest part)
+const GROUND_FAIL = (() => {
+  try { const q = new URLSearchParams(location.search).get('groundfail'); return ({ farwater: 'PC_GFAIL_FARWATER', rock: 'PC_GFAIL_ROCK', season: 'PC_GFAIL_SEASON', canopy: 'PC_GFAIL_CANOPY', all: 'PC_GFAIL_ALL' })[q] || ''; } catch (e) { return ''; }
+})();
+if (typeof window !== 'undefined') window.__pcGroundGuard = GROUND_GUARD;
+function groundDrop(m) {
+  if (!m.defines) return;
+  for (const k of GROUND_GUARD.dropped) if (k in m.defines) { delete m.defines[k]; m.needsUpdate = true; }
+  if (GROUND_GUARD.dropped.includes('PC_CANOPY')) CANOPY_BENCH.off = true;      // (the script's side of the canopy: farground.js)
+}
+export function groundGuardCheck(renderer) {
+  const GG = GROUND_GUARD;
+  if (GG.gaveUp || !GG.mats.size || !renderer || !renderer.properties) return;
+  for (const m of GG.mats) {
+    const progs = renderer.properties.get(m).programs;
+    if (!progs) continue;
+    for (const p of progs.values()) {
+      const d = p && p.diagnostics;
+      if (!d || d.runnable !== false || GG.seen.has(p)) continue;
+      GG.seen.add(p);
+      const log = [d.programLog, d.fragmentShader && d.fragmentShader.log, d.vertexShader && d.vertexShader.log].filter(Boolean).join('\n');
+      const first = (log.split('\n').find((l) => l.trim()) || 'the driver gave no log').trim().slice(0, 240);
+      const next = GROUND_PARTS.find((k) => !GG.dropped.includes(k) && [...GG.mats].some((x) => x.defines && k in x.defines));
+      if (!next) {
+        GG.gaveUp = true; GG.why = first;
+        console.warn('[ground] the ground\'s program cannot be used on this device even with every newer part taken out: ' + first);
+        return;
+      }
+      GG.dropped.push(next); GG.why = first;
+      for (const x of GG.mats) groundDrop(x);
+      console.warn('[ground] the ground\'s program did not link on this device (' + first + '). Built again without ' + next + ' (taken out so far: ' + GG.dropped.join(', ') + ').');
+      return;
+    }
+  }
+}
+
 export function makeTerrainMaterial(bodyU) {
   const m = new THREE.ShaderMaterial({
     name: 'pc-terrain',
@@ -1198,6 +1252,13 @@ export function makeTerrainMaterial(bodyU) {
   }
   // (the powers, fire: the ground goes black where the fire passed. Only with ?powers=1 and ?look=oil; see addFire.)
   addFire(m, true);
+  // (the ground's guard, above: what this device's driver refused is left out from the start)
+  if (LOOK.oil) {
+    if (GROUND_FAIL) { m.defines = m.defines || {}; m.defines[GROUND_FAIL] = 1; }
+    GROUND_GUARD.mats.add(m);
+    groundDrop(m);
+    m.addEventListener('dispose', () => GROUND_GUARD.mats.delete(m));
+  }
   return register(m, 'terrain');
 }
 

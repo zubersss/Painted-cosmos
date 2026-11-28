@@ -129,6 +129,17 @@ async function boot() {
     else delete options.reversedDepthBuffer;
   }
   const renderer = new THREE.WebGLRenderer({ canvas, ...options });
+  // (?glerr=1: what the graphics chip refused, laid on the page for a phone that cannot show its console: core/glerr.js.
+  //  The shader hook is set here, before the first compile; without the switch nothing of it runs or is fetched.)
+  const GLERR = params.get('glerr') === '1' ? { shader: [] } : null;
+  if (GLERR) {
+    renderer.debug.onShaderError = (g, program, vs, fs) => {
+      const src = g.getShaderSource(fs) || g.getShaderSource(vs) || '', m = src.match(/#define SHADER_NAME (.+)/);
+      const f = { name: m ? m[1] : '?', prog: g.getProgramInfoLog(program), vs: g.getShaderInfoLog(vs), fs: g.getShaderInfoLog(fs) };
+      GLERR.shader.push(f);
+      console.error('glerr: program failed', f.name, f.prog, f.vs, f.fs);
+    };
+  }
   // A lost context (a driver reset, the browser taking WebGL away): three restores what it can
   // when the context comes back; until then the sheet says so, and if it never comes back the
   // player is told to reload, not left with a blank page and the sound playing on (P15).
@@ -146,6 +157,7 @@ async function boot() {
     if (window.__pc && window.__pc.audio && !document.hidden) window.__pc.audio.resume();
   });
   const scene = new THREE.Scene();
+  if (GLERR) import('./core/glerr.js').then((m) => m.startGlErr(renderer, scene, GLERR)).catch((e) => console.error('glerr', e));
   const camera = new THREE.PerspectiveCamera(58, 1, 0.1, 3e6);
 
   // WATER THAT RUNS DOWNHILL AND POOLS WHERE IT CANNOT FALL FURTHER (?flow=1; world/drainage.js, the owner,
