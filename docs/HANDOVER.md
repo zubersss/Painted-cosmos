@@ -541,8 +541,8 @@ whether the performance work is one more version or a redesign.** Their own row 
 
 ## 3. State right now (update this before you stop)
 
-**STATE 28 Nov (first account; three days after the helpers went idle on 25 Nov ~00:10, usage spent): `main` is being
-given v39.5.2, THE GROUND'S GUARD. EVERYTHING ELSE WAITS ON THE OWNER'S WORD THAT THE GROUND IS BACK ON THE PHONE.**
+**STATE 28 Nov (first account; three days after the helpers went idle on 25 Nov ~00:10, usage spent): `main` is
+v39.5.2 (pull request #49, main 1bfa34c; look-proto bef701c), THE GROUND'S GUARD. EVERYTHING ELSE WAITS ON THE OWNER'S WORD THAT THE GROUND IS BACK ON THE PHONE.**
 - THE LIVE FAULT: on the owner's phone (Adreno 740) v39.5 draws NO GROUND (two screenshots, docs/shots/owner/). Read
   from the phone's own v39.5 tables: 'no ground drawn' and 'ground one flat colour' cost +0.4 ms from the air where
   v38 read -39 and -8.9: the ground's program does not run there, at any tier. No desktop or software GPU shows it;
