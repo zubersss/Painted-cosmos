@@ -481,6 +481,13 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
   soft far off. So: give the room to SHARPNESS (the ladder, v27), and buy more of it by cutting the script, not by
   cutting what is drawn. **Do not cut content for speed on this phone until a table says content costs something.**
 
+**THE OWNER, 28 Nov (latest): FINISH THE GROUND NOT LOADING; TWO PLAYABLE LINKS.** *"Finish up the problem of the
+ground not loading and give me a playable link 1 top quality and 1 regular phone"* (The owner switched this session's
+model for it; usage is nearly spent, so: one session, no fan-out.) The owner's two screenshots of 24 Nov (docs/shots/owner/)
+show NO GROUND on the phone in v39.5; the phone's own v39.5 speed test prices the ground at nothing (v38: 8.9 ms from
+the air), so it was missing in normal play too, not only on the top-quality links. Until the ground is SEEN on the
+owner's phone, nothing else ships.
+
 **THE OWNER, 24 Nov, about 19:55 (latest): MERGE EVERYTHING INTO THE GAME, AND THE SPEED-TEST LINKS NOW.**
 *"Merge everything into the game and give me the links to the speed tests I need to do rn"* Read as: put every piece
 that is READY into main now (passed work as the default with its opt-out; built-but-unreviewed work behind its OFF
@@ -534,25 +541,36 @@ whether the performance work is one more version or a redesign.** Their own row 
 
 ## 3. State right now (update this before you stop)
 
-**STATE 24 Nov, 20:40 (first account; the owner awake and running the speed tests): TWELVE HELPER SESSIONS BUILDING, EACH ON ITS OWN BRANCH. `main` is v39.5.**
-- v39.5 is LIVE (pull request #48, main c862641; look-proto 1cb697c), shipped on a FAST gate at the owner's word
-  ("merge everything into the game ... rn"): the far view after v39.4 (all inside ?rockfield: planes on whole beds, the
-  smudge clamp, far rock speckle, snowy tops, noon cool lean, snow in flat touches), the far spruce (?farspruce=0), the
-  crowns under a storm far and near (?impstorm=0, ?stormleaf=0; follow ?stormlight), the drift patch with the poppy's
-  centre (?driftpatch=0), the far water line (?farwater=0), the falls' own water (?falls=0 only), the LIVE RIVER SEAM
-  FIX at the landing's confluence (E, F "ship it"), and OFF with their bench rows: A1's far crown shadows, cached, with
-  C's hook (?farshadow=1: F passed the look and recommends it as the default after the owner's phone run prices it),
-  ?leafgrow=1, ?bloomfar=1 (with the far dab index fix). Fast gate: suites 328 / 144 / 449, all.mjs static+unit,
-  one oil render on foot OPENED (the flower patches in the middle distance, nothing missing, console clean), boot
-  clean on / and /?look=oil ('v39.5 (24 Nov)'). AFTER-RELEASE CHECKS PASSED: watercolour 0 px vs v39.4; the high river
-  frame opened; the same-switch off-set differed only by E's confluence fix (with ?rivers=old added on both sides: 0 px).
-  The owner's three phone tables on v39.5: docs/lead/bench/2026-11-24-v39.5-owner-phone.md (held at 60 / 56: goal met).
-- NEXT, v39.6 (about 2 h): trees-far (ee22d1f farshadow fixes, caadb47 early-out ON, impminpx OFF, the rows), FV6 the
-  flower drifts default (design-flora 1b0444e + farview 5b9400e TOGETHER), B's u2cells default once F passes, E's
-  bench=water rows (e9f06de), W3's new paint default if F passes (sea per F), A2's near trees after the ground. Then
-  v39.7: A2's sharper phone picture (rung 1 = 1.2x each way, climb to 1.4x, line 27 ms, ?sharp=0; approved plan).
-  The owner will spend a last bit of another model on a READ-ONLY review of v39.6: push the candidate to branch `v396`
-  and tell the owner; the paste-ready brief is in the chat of 24 Nov ~21:55 (git diff origin/main origin/v396 -- src).
+**STATE 28 Nov (first account; three days after the helpers went idle on 25 Nov ~00:10, usage spent): `main` is being
+given v39.5.2, THE GROUND'S GUARD. EVERYTHING ELSE WAITS ON THE OWNER'S WORD THAT THE GROUND IS BACK ON THE PHONE.**
+- THE LIVE FAULT: on the owner's phone (Adreno 740) v39.5 draws NO GROUND (two screenshots, docs/shots/owner/). Read
+  from the phone's own v39.5 tables: 'no ground drawn' and 'ground one flat colour' cost +0.4 ms from the air where
+  v38 read -39 and -8.9: the ground's program does not run there, at any tier. No desktop or software GPU shows it;
+  by count (87 uniform vectors, 12 attributes, 16 varyings, 4 samplers) the program fits a phone. Most likely the
+  phone's driver refuses to compile or link the ground's program, which grew since v38 by the painted canopy (v39),
+  the year's colours (v39.2), the rock faces (v39.4) and the far water line (v39.5), and had no guard.
+- v39.5.2 (look-proto; /home/user/wt-v395, branch v395): (1) GROUND_GUARD (render/materials.js, asked after each
+  frame in render/index.js): a ground program that fails to link loses its newest part and is built again, until one
+  links (far water line, rock faces, far drifts, year's colours, canopy); ?groundfail=farwater|rock|season|canopy|all
+  breaks it on purpose. (2) the short uniform list keeps every sampler by its TYPE (world/terrain.js): a latent
+  unit-numbering fault that depended on timing. (3) ?glerr=1 (core/glerr.js): on the page itself, the driver's own
+  words for every failed program, GL errors, the chip's limits and what the guard took out. NOT PROVEN ON THE PHONE:
+  only the owner's phone can say. IF THE GROUND IS STILL MISSING: ask for one screenshot of
+  https://zubersss.github.io/Painted-cosmos/?look=oil&glerr=1 and read the box (shader failures / gl errors / guard).
+  If the guard did take parts out, the box names the part and the driver's reason: fix that part for the phone and
+  put it back (the lane that owns it: farground.js is the far view's).
+- v39.6 IS BUILT AND HELD (branch `v396`, /home/user/wt-v396 cfa4d3c5; its gate stopped half way: watercolour 0 px,
+  same-switch off-set 0 px; default renders not opened): FV6 flower drifts default, u2cells default, far trees'
+  early-out, near trees after the ground, far shadow fixes (off), bench=water rows. It adds MORE to the ground's
+  program (FV6): do not ship it before the ground draws on the phone; rebase it on v39.5.2 first.
+- v39.7 CANDIDATES, all passed by the look director, on their branches: trees-far 2f59bbb (R3.9 on the device anchor
+  + the impostor paint cut), trees-near 82b2f6c+ (the sharper touch picture: tier 2 kept, one rung, 21 ms line;
+  ?nearshade / ?bushleaf / ?bushpaint off), design-flora 32e570c (bench row for the far drifts, ?dense, ?stone, ?under
+  off), farview ea4260b (glades default, the mile survey), design-water d7d3fc0 (?wcut off), water-paint 81988b5 (the
+  river paint as the default: F's hold lifted), look-director 411b819 (?midlight off).
+- THE PHONE'S v39.5 TABLES NEED RE-READING once the ground draws: with no ground the water under the land was
+  visible and priced, and the far trees stood over sky: the 'water is the second cost' reading may be wrong.
+- v39.5 LIVE (#48, main c862641): see the log. The independent review of v39.6 and what came of it: the log, 24 Nov.
 - v39.4 LIVE (#47, e42452a): the mountains, the land under a storm, the water's gold, the anvil, tufts and comb.
 - v39.3 LIVE (#46), v39.2 LIVE (#45), v39.1 LIVE (#44): see the log.
 - BUG FOUND AND FIXED (v39.5): the far dabs' palette index was never written (farview d4cab64; a trailing comment
