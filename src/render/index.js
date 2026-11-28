@@ -7,7 +7,7 @@ import * as THREE from 'three';
 import { Post } from './post.js';
 import { G, SHEET, WX, QUALITY, FRAME_HOOKS, GLAZES, MOTION, PREV, LOOK, OIL, SHADOW, ensureGlobals, SCREEN, MATERIALS, PREPASSES } from './shared.js';
 const _lv = new THREE.Vector3();
-import { makeWashMaterial, makePaintUniforms, standInFor, bindBodyUniforms, defaultBodyUniforms, TREE_DEPTH, TREE_GUARD, treeGuardCheck } from './materials.js';
+import { makeWashMaterial, makePaintUniforms, standInFor, bindBodyUniforms, defaultBodyUniforms, TREE_DEPTH, TREE_GUARD, treeGuardCheck, GROUND_GUARD, groundGuardCheck } from './materials.js';
 import { VERT_PARS, VERT_END, FRAG_PARS } from './chunks.js';
 import { ShadowMap } from './shadow.js';
 
@@ -284,6 +284,9 @@ export function createPainter(renderer) {
     // (did any of the trees' two short programs fail to link? Then every tree goes back to the one program on the next
     //  frame: materials.js TREE_GUARD. A look at a score of materials' programs, until one fails.)
     if (TREE_GUARD.mats.size && !TREE_GUARD.failed) treeGuardCheck(renderer);
+    // (and the ground's own program: if this device's driver refused it, its newest part is taken out and it is built
+    //  again, until the ground is drawn: materials.js GROUND_GUARD)
+    if (GROUND_GUARD.mats.size && !GROUND_GUARD.gaveUp) groundGuardCheck(renderer);
     post.finish(glazed, camera);
     renderer.setRenderTarget(prevTarget);
     renderer.autoClear = prevAuto;
